@@ -11,6 +11,10 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'SpotMe API is running smoothly!', time: new Date() });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 
