@@ -16,7 +16,14 @@ app.use('/api/onboarding', onboardingRoutes);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, async () => {
-  await initDB();
-  console.log(`Server running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, async () => {
+    await initDB();
+    console.log(`Server running on port ${PORT}`);
+  });
+} else {
+  // For Vercel/Production
+  initDB().catch(err => console.error("DB Init Error:", err));
+}
+
+module.exports = app;
