@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth');
 const onboardingRoutes = require('./routes/onboarding');
 const profileRoutes = require('./routes/profile');
 const exercisesRoutes = require('./routes/exercises');
+const workoutRoutes = require('./routes/workouts');
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/exercises', exercisesRoutes);
+app.use('/api/workouts', workoutRoutes);
 
 
 const PORT = process.env.PORT || 5000;

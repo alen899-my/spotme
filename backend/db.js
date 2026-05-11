@@ -72,6 +72,37 @@ const initDB = async () => {
       );
     `);
 
+    // Create workout splits tables (Hierarchical: Split -> Sessions -> Exercises)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS workout_splits (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS workout_sessions (
+        id SERIAL PRIMARY KEY,
+        split_id INT REFERENCES workout_splits(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        sort_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS workout_session_exercises (
+        id SERIAL PRIMARY KEY,
+        session_id INT REFERENCES workout_sessions(id) ON DELETE CASCADE,
+        exercise_id VARCHAR(10) REFERENCES exercises(id),
+        sets INT DEFAULT 3,
+        reps VARCHAR(50) DEFAULT '8-12',
+        rest_time VARCHAR(50) DEFAULT '60s',
+        weight VARCHAR(50) DEFAULT '0',
+        sort_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log("Database connected and all tables ready");
   } catch (error) {
     console.error("Database initialization failed:", error);

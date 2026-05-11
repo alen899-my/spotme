@@ -10,9 +10,10 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -58,7 +59,7 @@ export default function ExerciseDetailScreen() {
       <View style={[styles.centered, { backgroundColor: colors.bg }]}>
         <Ionicons name="alert-circle-outline" size={48} color={colors.textMuted} />
         <Text style={[styles.errorText, { color: colors.text }]}>Exercise not found</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: '#E00000' }]}>
           <Text style={styles.backBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -69,31 +70,34 @@ export default function ExerciseDetailScreen() {
   const secondaryMuscles = exercise.secondary_muscles || [];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* ── Hero Section (Video/GIF) ─────────────────────────────────── */}
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+        {/* ── Hero Section (GIF / Image) ─────────────────────────────────── */}
         <View style={styles.heroContainer}>
-          {exercise.gif_url ? (
-            <Image
-              source={{ uri: exercise.gif_url }}
-              style={styles.heroImage}
-              resizeMode="contain"
-            />
-          ) : exercise.image_url ? (
-            <Image
-              source={{ uri: exercise.image_url }}
-              style={styles.heroImage}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={[styles.heroImage, { backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center' }]}>
-              <Ionicons name="barbell-outline" size={64} color={colors.textDim} />
-            </View>
-          )}
+          <View style={[styles.heroImageWrap, { backgroundColor: '#FFF' }]}>
+            {exercise.gif_url ? (
+              <Image
+                source={{ uri: exercise.gif_url }}
+                style={styles.heroImage}
+                resizeMode="contain"
+              />
+            ) : exercise.image_url ? (
+              <Image
+                source={{ uri: exercise.image_url }}
+                style={styles.heroImage}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={[styles.heroImage, { backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="barbell-outline" size={64} color={colors.textDim} />
+              </View>
+            )}
+          </View>
 
-          {/* Overlays */}
+          {/* Premium Overlays */}
           <LinearGradient
-            colors={['rgba(0,0,0,0.4)', 'transparent', 'rgba(0,0,0,0.05)']}
+            colors={['rgba(0,0,0,0.4)', 'transparent', 'rgba(0,0,0,0.6)']}
             style={StyleSheet.absoluteFillObject}
           />
 
@@ -103,34 +107,47 @@ export default function ExerciseDetailScreen() {
           >
             <Ionicons name="chevron-back" size={24} color="#FFF" />
           </TouchableOpacity>
+
+          <View style={styles.heroLabelWrap}>
+            <Text style={styles.heroBgLabel}>{exercise.category?.slice(0, 3).toUpperCase()}</Text>
+          </View>
         </View>
 
         {/* ── Content Section ─────────────────────────────────────────── */}
-        <View style={styles.contentWrap}>
+        <View style={[styles.contentWrap, { backgroundColor: colors.bg }]}>
+          {/* Handle */}
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+
           <View style={styles.headerRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: colors.text }]}>{exercise.name}</Text>
-              <View style={styles.badgeRow}>
-                <View style={[styles.badge, { backgroundColor: '#E00000' }]}>
-                  <Text style={styles.badgeText}>{exercise.category}</Text>
-                </View>
-                <View style={[styles.badge, { backgroundColor: colors.inputBg }]}>
-                  <Text style={[styles.badgeText, { color: colors.textMuted }]}>{exercise.equipment || 'Bodyweight'}</Text>
-                </View>
+            <Text style={[styles.title, { color: colors.text }]}>{exercise.name}</Text>
+            <View style={styles.badgeRow}>
+              <LinearGradient 
+                colors={['#E00000', '#B00000']} 
+                style={styles.badge}
+                start={{x:0, y:0}} end={{x:1, y:1}}
+              >
+                <Text style={styles.badgeText}>{exercise.category}</Text>
+              </LinearGradient>
+              <View style={[styles.badge, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+                <Text style={[styles.badgeText, { color: colors.text }]}>{exercise.equipment || 'Bodyweight'}</Text>
               </View>
             </View>
           </View>
 
-          {/* Metrics Grid */}
+          {/* Stats Grid (Uber Style) */}
           <View style={styles.metricsGrid}>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Ionicons name="body-outline" size={20} color="#E00000" />
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Target</Text>
+              <View style={[styles.metricIconWrap, { backgroundColor: 'rgba(224,0,0,0.1)' }]}>
+                <MaterialCommunityIcons name="arm-flex" size={20} color="#E00000" />
+              </View>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Target Muscle</Text>
               <Text style={[styles.metricValue, { color: colors.text }]}>{exercise.target || 'N/A'}</Text>
             </View>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Ionicons name="layers-outline" size={20} color="#E00000" />
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Body Part</Text>
+              <View style={[styles.metricIconWrap, { backgroundColor: 'rgba(0,122,255,0.1)' }]}>
+                <MaterialCommunityIcons name="human-handsup" size={20} color="#007AFF" />
+              </View>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Focus Area</Text>
               <Text style={[styles.metricValue, { color: colors.text }]}>{exercise.body_part || 'N/A'}</Text>
             </View>
           </View>
@@ -141,7 +158,7 @@ export default function ExerciseDetailScreen() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Secondary Muscles</Text>
               <View style={styles.muscleTags}>
                 {secondaryMuscles.map((muscle: string, index: number) => (
-                  <View key={index} style={[styles.muscleTag, { backgroundColor: colors.inputBg }]}>
+                  <View key={index} style={[styles.muscleTag, { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }]}>
                     <Text style={[styles.muscleTagText, { color: colors.text }]}>{muscle}</Text>
                   </View>
                 ))}
@@ -151,27 +168,48 @@ export default function ExerciseDetailScreen() {
 
           {/* Instructions */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>How to Perform</Text>
-            {steps.length > 0 ? (
-              steps.map((step: string, index: number) => (
-                <View key={index} style={styles.stepRow}>
-                  <View style={[styles.stepNumber, { backgroundColor: '#E00000' }]}>
-                    <Text style={styles.stepNumberText}>{index + 1}</Text>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Instructions</Text>
+              <View style={[styles.stepBadge, { backgroundColor: 'rgba(224,0,0,0.1)' }]}>
+                <Text style={styles.stepBadgeText}>{steps.length || 1} STEPS</Text>
+              </View>
+            </View>
+            
+            <View style={[styles.instructionsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {steps.length > 0 ? (
+                steps.map((step: string, index: number) => (
+                  <View key={index} style={[styles.stepRow, index === steps.length - 1 && { marginBottom: 0 }]}>
+                    <View style={[styles.stepNumber, { backgroundColor: '#E00000' }]}>
+                      <Text style={styles.stepNumberText}>{index + 1}</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: colors.text }]}>{step}</Text>
                   </View>
-                  <Text style={[styles.stepText, { color: colors.text }]}>{step}</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={[styles.stepText, { color: colors.textDim }]}>
-                {exercise.instructions_en || 'No instructions available.'}
-              </Text>
-            )}
+                ))
+              ) : (
+                <Text style={[styles.stepText, { color: colors.text }]}>
+                  {exercise.instructions_en || 'Position yourself correctly and perform the movement with controlled form.'}
+                </Text>
+              )}
+            </View>
           </View>
 
-          <View style={{ height: 60 }} />
+          <View style={{ height: 100 }} />
         </View>
       </ScrollView>
-    </SafeAreaView>
+
+      {/* Floating Action Button */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity style={styles.mainActionBtn} activeOpacity={0.9}>
+          <LinearGradient
+            colors={['#E00000', '#B00000']}
+            style={styles.actionGradient}
+          >
+            <Ionicons name="add-circle" size={24} color="#FFF" />
+            <Text style={styles.actionText}>ADD TO WORKOUT</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -184,17 +222,22 @@ const styles = StyleSheet.create({
   },
   heroContainer: {
     width: '100%',
-    height: SCREEN_WIDTH * 0.85,
-    backgroundColor: '#FFF',
+    height: SCREEN_WIDTH,
     position: 'relative',
   },
-  heroImage: {
+  heroImageWrap: {
     width: '100%',
     height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroImage: {
+    width: '90%',
+    height: '90%',
   },
   floatingBack: {
     position: 'absolute',
-    top: 20,
+    top: Platform.OS === 'ios' ? 50 : 20,
     left: 20,
     width: 44,
     height: 44,
@@ -203,88 +246,137 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
+  heroLabelWrap: {
+    position: 'absolute',
+    right: -20,
+    top: 60,
+    zIndex: 1,
+  },
+  heroBgLabel: {
+    fontSize: 120,
+    fontFamily: FONTS.heading,
+    color: 'rgba(255,255,255,0.15)',
+    transform: [{ rotate: '90deg' }],
+  },
   contentWrap: {
     padding: 24,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    marginTop: -32,
-    backgroundColor: 'inherit', // Handled by container
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    marginTop: -40,
+    zIndex: 2,
+    minHeight: 500,
+  },
+  handle: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 24,
+    opacity: 0.5,
   },
   headerRow: {
-    marginBottom: 20,
+    marginBottom: 28,
   },
   title: {
     fontFamily: FONTS.heading,
-    fontSize: 28,
-    lineHeight: 34,
-    marginBottom: 12,
+    fontSize: 32,
+    lineHeight: 38,
+    marginBottom: 16,
     textTransform: 'capitalize',
   },
   badgeRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   badge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
   badgeText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 12,
     color: '#FFF',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   metricsGrid: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 32,
   },
   metricCard: {
     flex: 1,
     padding: 16,
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    alignItems: 'flex-start',
+  },
+  metricIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   metricLabel: {
     fontFamily: FONTS.body,
-    fontSize: 12,
-    marginTop: 8,
-    marginBottom: 2,
+    fontSize: 11,
+    marginBottom: 4,
   },
   metricValue: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 14,
+    fontSize: 15,
     textTransform: 'capitalize',
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 32,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontFamily: FONTS.heading,
-    fontSize: 20,
-    marginBottom: 16,
+    fontSize: 22,
+  },
+  stepBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  stepBadgeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: '#E00000',
+    letterSpacing: 1,
+  },
+  instructionsCard: {
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
   },
   muscleTags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
   muscleTag: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
   },
   muscleTagText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 13,
+    fontSize: 14,
     textTransform: 'capitalize',
   },
   stepRow: {
     flexDirection: 'row',
     gap: 16,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   stepNumber: {
     width: 28,
@@ -303,7 +395,40 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: FONTS.body,
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 24,
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    backgroundColor: 'transparent',
+  },
+  mainActionBtn: {
+    width: '100%',
+    height: 60,
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#E00000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+  },
+  actionGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  actionText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 16,
+    color: '#FFF',
+    letterSpacing: 1,
   },
   errorText: {
     fontFamily: FONTS.bodySemiBold,
@@ -312,7 +437,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   backBtn: {
-    backgroundColor: '#E00000',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,

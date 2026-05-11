@@ -11,12 +11,14 @@ import {
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { FONTS } from "../constants/theme";
 import { useTheme } from "../contexts/ThemeContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function WorkoutScreen() {
+  const router = useRouter();
   const { colors } = useTheme();
 
   return (
@@ -61,24 +63,32 @@ export default function WorkoutScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* ── Quick Action Grid (Uber Style) ─────────────────────────── */}
+        {/* ── Quick Action Tiles (Uber Grid) ─────────────────────────── */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
         <View style={styles.tileGrid}>
-          <TouchableOpacity style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity 
+            style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => router.push('/splits/create')}
+          >
             <View style={[styles.tileIconWrap, { backgroundColor: 'rgba(224,0,0,0.1)' }]}>
               <Ionicons name="add-circle" size={30} color="#E00000" />
             </View>
-            <Text style={[styles.tileLabel, { color: colors.text }]}>Empty{"\n"}Workout</Text>
+            <Text style={[styles.tileLabel, { color: colors.text }]}>New{"\n"}Program</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity 
+            style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => router.push('/(tabs)/splits')}
+          >
             <View style={[styles.tileIconWrap, { backgroundColor: 'rgba(0,122,255,0.1)' }]}>
-              <Ionicons name="library" size={30} color="#007AFF" />
+              <Ionicons name="layers" size={30} color="#007AFF" />
             </View>
-            <Text style={[styles.tileLabel, { color: colors.text }]}>Saved{"\n"}Routines</Text>
+            <Text style={[styles.tileLabel, { color: colors.text }]}>My Custom{"\n"}Splits</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity 
+            style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => alert('Stats coming soon!')}
+          >
             <View style={[styles.tileIconWrap, { backgroundColor: 'rgba(52,199,89,0.1)' }]}>
               <Ionicons name="stats-chart" size={30} color="#34C759" />
             </View>
