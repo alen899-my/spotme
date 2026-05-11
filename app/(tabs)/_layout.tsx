@@ -19,9 +19,10 @@ import { useTheme } from "../../contexts/ThemeContext";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const TABS = [
-  { name: "index", title: "Home", icon: "home" as const, iconOutline: "home-outline" as const, href: "/(tabs)/" },
-  { name: "workout", title: "Workout", icon: "barbell" as const, iconOutline: "barbell-outline" as const, href: "/(tabs)/workout" },
-  { name: "profile", title: "Profile", icon: "person" as const, iconOutline: "person-outline" as const, href: "/(tabs)/profile" },
+  { name: "index",     title: "Home",      icon: "home" as const,    iconOutline: "home-outline" as const,    href: "/(tabs)/" },
+  { name: "exercises", title: "Exercises", icon: "fitness" as const, iconOutline: "fitness-outline" as const, href: "/(tabs)/exercises" },
+  { name: "workout",   title: "Workout",   icon: "barbell" as const, iconOutline: "barbell-outline" as const, href: "/(tabs)/workout" },
+  { name: "profile",   title: "Profile",   icon: "person" as const,  iconOutline: "person-outline" as const,  href: "/(tabs)/profile" },
 ];
 
 function CustomTabBar() {
@@ -45,7 +46,7 @@ function CustomTabBar() {
   );
   const current = activeIndex < 0 ? 0 : activeIndex;
 
-  const TAB_WIDTH = 100;
+  const TAB_WIDTH = 82;
   const PILL_PADDING = 4;
   const containerWidth = TABS.length * TAB_WIDTH + PILL_PADDING * 2;
 
@@ -99,6 +100,7 @@ export default function TabsLayout() {
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={() => <CustomTabBar />}>
       <Tabs.Screen name="index" />
+      <Tabs.Screen name="exercises" />
       <Tabs.Screen name="workout" />
       <Tabs.Screen name="profile" />
     </Tabs>

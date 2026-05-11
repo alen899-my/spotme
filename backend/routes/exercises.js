@@ -29,6 +29,28 @@ function authMiddleware(req, res, next) {
   }
 }
 
+// ─── GET /categories ── one image per unique category ────────────────────────
+router.get('/categories', async (req, res) => {
+  try {
+    // DISTINCT ON picks one row per category — the one with the lowest id
+    // ensuring we always get the same stable representative image
+    const result = await pool.query(`
+      SELECT DISTINCT ON (category)
+        category,
+        image_url,
+        COUNT(*) OVER (PARTITION BY category) AS exercise_count
+      FROM exercises
+      WHERE category IS NOT NULL
+        AND image_url IS NOT NULL
+      ORDER BY category, id
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('GET /exercises/categories error:', err);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
 // ─── GET /meta/filters ── must come BEFORE /:id ──────────────────────────────
 router.get('/meta/filters', async (req, res) => {
   try {
