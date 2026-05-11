@@ -7,13 +7,16 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  Switch,
+  Dimensions,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { COLORS, FONTS } from "../../constants/theme";
 import axios from "axios";
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -35,7 +38,7 @@ export default function ProfileScreen() {
         router.replace("/");
         return;
       }
-      const res = await axios.get(`${API_URL}/auth/me`, {
+      const res = await axios.get(`${API_URL}/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUser(res.data);
@@ -49,19 +52,30 @@ export default function ProfileScreen() {
   const menuItems = [
     {
       id: "details",
-      title: "My Details",
-      subtitle: "Personal information & metrics",
+      title: "My Profile Details",
+      subtitle: "Personal stats & physical data",
       icon: "account-details-outline",
       iconType: "MaterialCommunityIcons",
       onPress: () => router.push("/profile/details"),
+      color: "#111111"
+    },
+    {
+      id: "goals",
+      title: "Fitness Goals",
+      subtitle: "Adjust your targets",
+      icon: "target",
+      iconType: "MaterialCommunityIcons",
+      onPress: () => alert("Goals module coming soon"),
+      color: "#111111"
     },
     {
       id: "settings",
       title: "Settings",
-      subtitle: "App preferences & security",
-      icon: "settings-outline",
+      subtitle: "Preferences & Security",
+      icon: "cog-outline",
       iconType: "Ionicons",
-      onPress: () => alert("Settings clicked"),
+      onPress: () => alert("Settings module coming soon"),
+      color: "#111111"
     },
   ];
 
@@ -73,33 +87,32 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header / Profile Header */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Header Section - Centered */}
         <View style={styles.header}>
-          <View style={styles.profilePicWrap}>
-            {user?.profile_pic_url || user?.profilePicUrl ? (
-              <Image 
-                source={{ uri: user.profile_pic_url || user.profilePicUrl }} 
-                style={styles.profilePic} 
-              />
+          <View style={styles.avatarContainer}>
+            {user?.profile_pic_url ? (
+              <Image source={{ uri: user.profile_pic_url }} style={styles.avatar} />
             ) : (
-              <View style={[styles.profilePic, styles.placeholderPic]}>
-                <Ionicons name="person" size={40} color="#CCC" />
+              <View style={[styles.avatar, styles.placeholderAvatar]}>
+                <Ionicons name="person" size={40} color="#DDD" />
               </View>
             )}
-            <TouchableOpacity style={styles.editBtn}>
+            <TouchableOpacity style={styles.cameraBtn}>
               <Ionicons name="camera" size={16} color="#FFF" />
             </TouchableOpacity>
           </View>
+          <Text style={styles.userName}>{user?.full_name || "Gym Warrior"}</Text>
+          <Text style={styles.userEmail}>{user?.email || "warrior@spotme.com"}</Text>
           
-          <Text style={styles.userName}>
-            {user?.full_name || user?.fullName || "User Name"}
-          </Text>
-          <Text style={styles.userEmail}>{user?.email || "email@example.com"}</Text>
+          <View style={styles.badge}>
+            <Ionicons name="flame" size={12} color="#E00000" />
+            <Text style={styles.badgeText}>7 Day Streak</Text>
+          </View>
         </View>
 
-        {/* Menu Items */}
-        <View style={styles.menuContainer}>
+        {/* Menu Section */}
+        <View style={styles.menuSection}>
           {menuItems.map((item) => (
             <TouchableOpacity 
               key={item.id} 
@@ -118,16 +131,17 @@ export default function ProfileScreen() {
                 <Text style={styles.menuTitle}>{item.title}</Text>
                 <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#CCC" />
+              <Ionicons name="chevron-forward" size={18} color="#DDD" />
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Logout Section */}
+        {/* Signout - Instagram Style (Centered Red Text) */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#E00000" />
-          <Text style={styles.logoutText}>Logout Session</Text>
+          <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
+
+        <Text style={styles.version}>SpotMe v1.0.4 • Beta Access</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -136,84 +150,105 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FBFBFB",
+    backgroundColor: COLORS.bg,
   },
   scrollContent: {
     paddingBottom: 40,
   },
   header: {
-    alignItems: "center",
+    alignItems: 'center',
     paddingVertical: 40,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: COLORS.border,
   },
-  profilePicWrap: {
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 20,
+  },
+  avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: 16,
-    position: "relative",
-  },
-  profilePic: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 50,
     borderWidth: 3,
-    borderColor: "#F0F0F0",
+    borderColor: '#FFF',
+    backgroundColor: '#F5F5F5',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  placeholderPic: {
-    backgroundColor: "#F7F7F7",
-    justifyContent: "center",
-    alignItems: "center",
+  placeholderAvatar: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EEE',
   },
-  editBtn: {
-    position: "absolute",
+  cameraBtn: {
+    position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: "#E00000",
+    backgroundColor: '#E00000',
     width: 32,
     height: 32,
     borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#FFF",
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FFF',
   },
   userName: {
     fontFamily: FONTS.heading,
-    fontSize: 22,
-    color: "#111",
+    fontSize: 28,
+    color: COLORS.text,
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
   userEmail: {
     fontFamily: FONTS.body,
     fontSize: 14,
-    color: "#888",
+    color: COLORS.textMuted,
+    marginBottom: 12,
   },
-  menuContainer: {
-    padding: 24,
-    gap: 16,
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(224, 0, 0, 0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  badgeText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+    color: '#E00000',
+  },
+  menuSection: {
+    padding: 20,
+    paddingTop: 30,
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderRadius: 16,
+    padding: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#F0F0F0",
+    borderColor: COLORS.border,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0.02,
     shadowRadius: 5,
-    elevation: 2,
+    elevation: 1,
   },
   menuIconWrap: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 12,
-    backgroundColor: "#F9F9F9",
+    backgroundColor: '#F9F9F9',
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
@@ -224,30 +259,30 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontFamily: FONTS.bodyBold,
     fontSize: 16,
-    color: "#111",
+    color: COLORS.text,
     marginBottom: 2,
   },
   menuSubtitle: {
     fontFamily: FONTS.body,
     fontSize: 12,
-    color: "#888",
+    color: COLORS.textMuted,
   },
   logoutBtn: {
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,
-    marginHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#FFE5E5",
-    backgroundColor: "#FFF5F5",
-    gap: 8,
+    paddingVertical: 12,
   },
   logoutText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 14,
-    color: "#E00000",
+    fontSize: 16,
+    color: '#E00000',
   },
+  version: {
+    textAlign: 'center',
+    fontFamily: FONTS.body,
+    fontSize: 10,
+    color: COLORS.textDim,
+    marginTop: 40,
+  }
 });

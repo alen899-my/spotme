@@ -4,6 +4,7 @@ const cors = require('cors');
 const { initDB } = require('./db');
 const authRoutes = require('./routes/auth');
 const onboardingRoutes = require('./routes/onboarding');
+const profileRoutes = require('./routes/profile');
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/onboarding', onboardingRoutes);
+app.use('/api/profile', profileRoutes);
 
 const PORT = process.env.PORT || 5000;
 
