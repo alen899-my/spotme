@@ -6,6 +6,7 @@ import {
   Animated,
   Dimensions,
   Platform,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -89,23 +90,30 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      {visible && (
-        <Animated.View
-          style={[
-            styles.toastContainer,
-            {
-              transform: [{ translateY: slideAnim }],
-              opacity: opacityAnim,
-              backgroundColor: getColors().bg,
-            },
-          ]}
-        >
-          <View style={styles.content}>
-            <Ionicons name={getIcon() as any} size={22} color={getColors().icon} />
-            <Text style={styles.message}>{message}</Text>
-          </View>
-        </Animated.View>
-      )}
+      <Modal
+        transparent
+        visible={visible}
+        animationType="none"
+        pointerEvents="none"
+      >
+        <View style={styles.modalOverlay} pointerEvents="box-none">
+          <Animated.View
+            style={[
+              styles.toastContainer,
+              {
+                transform: [{ translateY: slideAnim }],
+                opacity: opacityAnim,
+                backgroundColor: getColors().bg,
+              },
+            ]}
+          >
+            <View style={styles.content}>
+              <Ionicons name={getIcon() as any} size={22} color={getColors().icon} />
+              <Text style={styles.message}>{message}</Text>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </ToastContext.Provider>
   );
 };
@@ -117,6 +125,10 @@ export const useToast = () => {
 };
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   toastContainer: {
     position: 'absolute',
     top: 0,
@@ -124,8 +136,8 @@ const styles = StyleSheet.create({
     right: 20,
     borderRadius: 16,
     padding: 16,
-    zIndex: 9999,
-    elevation: 10,
+    zIndex: 999999,
+    elevation: 9999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,

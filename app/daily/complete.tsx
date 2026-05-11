@@ -172,32 +172,33 @@ export default function WorkoutCompleteScreen() {
           </View>
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.saveBtn}
-            onPress={handleFinalSave}
-            disabled={saving}
-          >
-            <LinearGradient colors={['#E00000', '#B00000']} style={styles.saveBtnGradient}>
-              {saving ? <ActivityIndicator color="#FFF" /> : (
-                <>
-                  <Ionicons name="checkmark-done" size={22} color="#FFF" />
-                  <Text style={styles.saveBtnText}>SAVE & FINISH</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.skipLink} 
-            onPress={() => router.replace('/(tabs)/daily')}
-            disabled={saving}
-          >
-            <Text style={[styles.skipLinkText, { color: colors.textMuted }]}>I'll do this later</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
+
+      {/* Sticky Bottom Buttons */}
+      <View style={[styles.footer, { backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }]}>
+        <TouchableOpacity
+          style={styles.saveBtn}
+          onPress={handleFinalSave}
+          disabled={saving}
+        >
+          <LinearGradient colors={['#E00000', '#B00000']} style={styles.saveBtnGradient}>
+            {saving ? <ActivityIndicator color="#FFF" /> : (
+              <>
+                <Ionicons name="checkmark-done" size={22} color="#FFF" />
+                <Text style={styles.saveBtnText}>SAVE & FINISH</Text>
+              </>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.skipLink} 
+          onPress={() => router.replace('/(tabs)/daily')}
+          disabled={saving}
+        >
+          <Text style={[styles.skipLinkText, { color: colors.textMuted }]}>I'll do this later</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
