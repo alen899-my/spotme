@@ -51,7 +51,28 @@ const initDB = async () => {
       ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE;
     `);
 
-    console.log("Database connected and users table ready with onboarding fields");
+    // Create exercises table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS exercises (
+        id VARCHAR(10) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        category VARCHAR(100),
+        body_part VARCHAR(100),
+        equipment VARCHAR(100),
+        instructions_en TEXT,
+        instructions_tr TEXT,
+        instruction_steps_en TEXT[],
+        instruction_steps_tr TEXT[],
+        muscle_group VARCHAR(100),
+        secondary_muscles TEXT[],
+        target VARCHAR(100),
+        image_url VARCHAR(500),
+        gif_url VARCHAR(500),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log("Database connected and all tables ready");
   } catch (error) {
     console.error("Database initialization failed:", error);
   }

@@ -5,6 +5,7 @@ const { initDB } = require('./db');
 const authRoutes = require('./routes/auth');
 const onboardingRoutes = require('./routes/onboarding');
 const profileRoutes = require('./routes/profile');
+const exercisesRoutes = require('./routes/exercises');
 
 const app = express();
 
@@ -17,12 +18,14 @@ app.use(express.json());
 
 // Routes
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'SpotMe API is running smoothly!', time: new Date() });
+  res.json({ status: 'ok', message: 'SpotMe API is running smoothly!', time: new Date() })
 });
 
 app.use('/api/auth', authRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/exercises', exercisesRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 
