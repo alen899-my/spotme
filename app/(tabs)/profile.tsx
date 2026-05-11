@@ -7,19 +7,17 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  Dimensions,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { COLORS, FONTS } from "../../constants/theme";
+import { FONTS } from "../../constants/theme";
+import { useTheme } from "../../contexts/ThemeContext";
 import axios from "axios";
-import { LinearGradient } from 'expo-linear-gradient';
-
-const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,10 +32,7 @@ export default function ProfileScreen() {
   const fetchUserData = async () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
-      if (!token) {
-        router.replace("/");
-        return;
-      }
+      if (!token) { router.replace("/"); return; }
       const res = await axios.get(`${API_URL}/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -57,7 +52,6 @@ export default function ProfileScreen() {
       icon: "account-details-outline",
       iconType: "MaterialCommunityIcons",
       onPress: () => router.push("/profile/details"),
-      color: "#111111"
     },
     {
       id: "goals",
@@ -66,16 +60,14 @@ export default function ProfileScreen() {
       icon: "target",
       iconType: "MaterialCommunityIcons",
       onPress: () => alert("Goals module coming soon"),
-      color: "#111111"
     },
     {
       id: "settings",
       title: "Settings",
-      subtitle: "Preferences & Security",
+      subtitle: "Preferences & theme",
       icon: "cog-outline",
       iconType: "Ionicons",
-      onPress: () => alert("Settings module coming soon"),
-      color: "#111111"
+      onPress: () => router.push("/profile/settings"),
     },
   ];
 
@@ -86,84 +78,75 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {/* Header Section - Centered */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <View style={styles.avatarContainer}>
             {user?.profile_pic_url ? (
-              <Image source={{ uri: user.profile_pic_url }} style={styles.avatar} />
+              <Image source={{ uri: user.profile_pic_url }} style={[styles.avatar, { borderColor: colors.card }]} />
             ) : (
-              <View style={[styles.avatar, styles.placeholderAvatar]}>
-                <Ionicons name="person" size={40} color="#DDD" />
+              <View style={[styles.avatar, styles.placeholderAvatar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                <Ionicons name="person" size={40} color={colors.border} />
               </View>
             )}
-            <TouchableOpacity style={styles.cameraBtn}>
+            <TouchableOpacity style={[styles.cameraBtn, { borderColor: colors.card }]}>
               <Ionicons name="camera" size={16} color="#FFF" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>{user?.full_name || "Gym Warrior"}</Text>
-          <Text style={styles.userEmail}>{user?.email || "warrior@spotme.com"}</Text>
-          
-          <View style={styles.badge}>
+          <Text style={[styles.userName, { color: colors.text }]}>{user?.full_name || "Gym Warrior"}</Text>
+          <Text style={[styles.userEmail, { color: colors.textMuted }]}>{user?.email || "warrior@spotme.com"}</Text>
+
+          <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(224,0,0,0.1)' : '#FFF5F5' }]}>
             <Ionicons name="flame" size={12} color="#E00000" />
             <Text style={styles.badgeText}>7 Day Streak</Text>
           </View>
         </View>
 
         {/* Menu Section */}
-        <View style={styles.menuSection}>
+        <View style={{ padding: 20, paddingTop: 30 }}>
           {menuItems.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              key={item.id}
+              style={[styles.menuItem, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={item.onPress}
               activeOpacity={0.7}
             >
-              <View style={styles.menuIconWrap}>
+              <View style={[styles.menuIconWrap, { backgroundColor: colors.inputBg }]}>
                 {item.iconType === "MaterialCommunityIcons" ? (
-                  <MaterialCommunityIcons name={item.icon as any} size={24} color="#111" />
+                  <MaterialCommunityIcons name={item.icon as any} size={24} color={colors.text} />
                 ) : (
-                  <Ionicons name={item.icon as any} size={24} color="#111" />
+                  <Ionicons name={item.icon as any} size={24} color={colors.text} />
                 )}
               </View>
-              <View style={styles.menuTextWrap}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuTitle, { color: colors.text }]}>{item.title}</Text>
+                <Text style={[styles.menuSubtitle, { color: colors.textMuted }]}>{item.subtitle}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#DDD" />
+              <Ionicons name="chevron-forward" size={18} color={colors.border} />
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Signout - Instagram Style (Centered Red Text) */}
+        {/* Instagram-style logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>SpotMe v1.0.4 • Beta Access</Text>
+        <Text style={[styles.version, { color: colors.textDim }]}>SpotMe v1.0.4 • Beta Access</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 40,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
   avatarContainer: {
-    position: 'relative',
+    position: "relative",
     marginBottom: 20,
   },
   avatar: {
@@ -171,50 +154,39 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#FFF',
-    backgroundColor: '#F5F5F5',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
   },
   placeholderAvatar: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: '#EEE',
   },
   cameraBtn: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: '#E00000',
+    backgroundColor: "#E00000",
     width: 32,
     height: 32,
     borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 3,
-    borderColor: '#FFF',
+    borderColor: "#FFFFFF", // fallback, overridden inline
   },
   userName: {
     fontFamily: FONTS.heading,
     fontSize: 28,
-    color: COLORS.text,
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   userEmail: {
     fontFamily: FONTS.body,
     fontSize: 14,
-    color: COLORS.textMuted,
     marginBottom: 12,
   },
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(224, 0, 0, 0.05)',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -223,66 +195,48 @@ const styles = StyleSheet.create({
   badgeText: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: 12,
-    color: '#E00000',
-  },
-  menuSection: {
-    padding: 20,
-    paddingTop: 30,
+    color: "#E00000",
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
     padding: 18,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: COLORS.border,
     marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 5,
-    elevation: 1,
   },
   menuIconWrap: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#F9F9F9',
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
   },
-  menuTextWrap: {
-    flex: 1,
-  },
   menuTitle: {
     fontFamily: FONTS.bodyBold,
     fontSize: 16,
-    color: COLORS.text,
     marginBottom: 2,
   },
   menuSubtitle: {
     fontFamily: FONTS.body,
     fontSize: 12,
-    color: COLORS.textMuted,
   },
   logoutBtn: {
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20,
     paddingVertical: 12,
+    marginTop: 8,
   },
   logoutText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 16,
-    color: '#E00000',
+    color: "#E00000",
   },
   version: {
-    textAlign: 'center',
+    textAlign: "center",
     fontFamily: FONTS.body,
     fontSize: 10,
-    color: COLORS.textDim,
     marginTop: 40,
-  }
+  },
 });

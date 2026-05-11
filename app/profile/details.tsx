@@ -18,13 +18,22 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { COLORS, FONTS } from "../../constants/theme";
+import { FONTS } from "../../constants/theme";
+import { useTheme } from "../../contexts/ThemeContext";
 import Input from "../../components/ui/Input";
 import axios from "axios";
 import { LinearGradient } from 'expo-linear-gradient';
 
+const SectionHeader = ({ title, colors }: { title: string; colors: any }) => (
+  <View style={styles.sectionHeader}>
+    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
+    <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
+  </View>
+);
+
 export default function MyDetailsScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -199,6 +208,53 @@ export default function MyDetailsScreen() {
     return age.toString();
   };
 
+  // ─── VIEW MODE HELPERS ───────────────────────────────────────────────
+  const ViewField = ({ label, value }: { label: string; value: any }) => (
+    <View style={[vStyles.field, { borderBottomColor: colors.border }]}>
+      <Text style={[vStyles.fieldLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[vStyles.fieldValue, { color: colors.text }]}>{value || '—'}</Text>
+    </View>
+  );
+
+  const StatTile = ({ label, value, icon }: { label: string; value: any; icon: any }) => (
+    <View style={[vStyles.statTile, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={vStyles.statIconWrap}>
+        <Ionicons name={icon} size={18} color="#E00000" />
+      </View>
+      <Text style={[vStyles.statValue, { color: colors.text }]}>{value || '—'}</Text>
+      <Text style={[vStyles.statLabel, { color: colors.textMuted }]}>{label}</Text>
+    </View>
+  );
+
+  const BadgeRow = ({ label, value, icon }: { label: string; value: any; icon: any }) => (
+    <View style={[vStyles.badgeRow, { borderBottomColor: colors.border }]}>
+      <Text style={[vStyles.badgeLabel, { color: colors.textMuted }]}>{label}</Text>
+      {value ? (
+        <View style={vStyles.badge}>
+          <Text style={vStyles.badgeText}>{value}</Text>
+        </View>
+      ) : <Text style={[vStyles.fieldValue, { color: colors.text }]}>—</Text>}
+    </View>
+  );
+
+  const MeasurementChip = ({ label, value }: { label: string; value: any }) => (
+    <View style={[vStyles.measureChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[vStyles.measureValue, { color: colors.text }]}>{value || '—'}</Text>
+      <Text style={[vStyles.measureLabel, { color: colors.textMuted }]}>{label}</Text>
+    </View>
+  );
+
+  const HealthRow = ({ label, value, dot }: { label: string; value: any; dot?: string }) => (
+    <View style={[vStyles.healthRow, { borderBottomColor: colors.border }]}>
+      <View style={[vStyles.dot, { backgroundColor: dot || '#E00000' }]} />
+      <View style={{ flex: 1 }}>
+        <Text style={[vStyles.fieldLabel, { color: colors.textMuted }]}>{label}</Text>
+        <Text style={[vStyles.fieldValue, { color: colors.text }]}>{value || '—'}</Text>
+      </View>
+    </View>
+  );
+  // ─────────────────────────────────────────────────────────────────────
+
   const renderInfoRow = (
     label: string, 
     value: any, 
@@ -240,37 +296,27 @@ export default function MyDetailsScreen() {
       );
     }
 
-    return (
-      <View style={styles.infoRow}>
-        <View style={styles.infoLabelContainer}>
-          <View style={styles.iconCircle}>
-            {iconType === 'Ionicons' ? <Ionicons name={icon} size={18} color="#E00000" /> : <MaterialCommunityIcons name={icon} size={18} color="#E00000" />}
-          </View>
-          <Text style={styles.infoLabel}>{label}</Text>
-        </View>
-        <Text style={styles.infoValue}>{value || "—"}</Text>
-      </View>
-    );
+    return null; // view mode handled by dedicated components
   };
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered]}>
+      <View style={[styles.centered, { flex: 1, backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color="#E00000" />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Ionicons name="chevron-back" size={24} color={COLORS.text} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.headerBtn, { backgroundColor: colors.inputBg }]}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Details</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>My Details</Text>
         <TouchableOpacity 
           onPress={() => isEditing ? handleSave() : setIsEditing(true)} 
-          style={[styles.headerBtn, isEditing && styles.saveBtnHeader]}
+          style={[styles.headerBtn, { backgroundColor: isEditing ? '#E00000' : colors.inputBg }]}
           disabled={saving}
         >
           {saving ? (
@@ -291,159 +337,144 @@ export default function MyDetailsScreen() {
           contentContainerStyle={styles.scrollContent} 
           showsVerticalScrollIndicator={false}
         >
-          {/* Section: Account Information */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Account Details</Text>
-              <View style={styles.sectionLine} />
-            </View>
-            <View style={styles.card}>
-              {renderInfoRow("Full Name", formData.full_name, "full_name", "person-outline")}
-              {renderInfoRow("Email Address", formData.email, "email", "mail-outline")}
-              {renderInfoRow("Phone Number", formData.phone_number, "phone_number", "call-outline")}
-              {renderInfoRow("Gender", formData.gender, "gender", "transgender-outline", 'dropdown', ["Male", "Female", "Other", "Prefer not to say"])}
-              
-              {/* Date of Birth with Picker */}
-              {isEditing ? (
+          {/* ── ACCOUNT DETAILS ─────────────────────────── */}
+          {isEditing ? (
+            <View style={styles.section}>
+              <SectionHeader title="Account Details" colors={colors} />
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {renderInfoRow("Full Name", formData.full_name, "full_name", "person-outline")}
+                {renderInfoRow("Email Address", formData.email, "email", "mail-outline")}
+                {renderInfoRow("Phone Number", formData.phone_number, "phone_number", "call-outline")}
+                {renderInfoRow("Gender", formData.gender, "gender", "transgender-outline", 'dropdown', ["Male", "Female", "Other", "Prefer not to say"])}
                 <View>
-                  <TouchableOpacity 
-                    activeOpacity={1} 
-                    onPress={() => {
-                      if (Platform.OS === "web") {
-                        const dateInput = document.getElementById("profile-web-date-picker") as any;
-                        if (dateInput && dateInput.showPicker) {
-                          dateInput.showPicker();
-                        }
-                      } else {
-                        setShowDatePicker(true);
-                      }
-                    }}
-                  >
+                  <TouchableOpacity activeOpacity={1} onPress={() => {
+                    if (Platform.OS === "web") {
+                      const d = document.getElementById("profile-web-date-picker") as any;
+                      if (d && d.showPicker) d.showPicker();
+                    } else { setShowDatePicker(true); }
+                  }}>
                     <View pointerEvents="none">
-                      <Input
-                        label="Date of Birth"
-                        placeholder="DD / MM / YYYY"
-                        value={formData.dob ? formatDate(formData.dob) : ""}
-                        editable={false}
-                        icon={<Ionicons name="calendar-outline" size={20} color="#E00000" />}
-                        containerStyle={styles.inputContainer}
-                      />
+                      <Input label="Date of Birth" placeholder="DD / MM / YYYY" value={formData.dob ? formatDate(formData.dob) : ""} editable={false} icon={<Ionicons name="calendar-outline" size={20} color="#E00000" />} containerStyle={styles.inputContainer} />
                     </View>
                   </TouchableOpacity>
-                  {Platform.OS === "web" && (
-                    <input
-                      id="profile-web-date-picker"
-                      type="date"
-                      style={{
-                        position: "absolute",
-                        opacity: 0,
-                        width: 0,
-                        height: 0,
-                        pointerEvents: "none",
-                      }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val) {
-                          setFormData({ 
-                            ...formData, 
-                            dob: val,
-                            age: calculateAge(val)
-                          });
-                        }
-                      }}
-                    />
-                  )}
-                  {Platform.OS !== "web" && showDatePicker && (
-                    <DateTimePicker
-                      value={formData.dob ? new Date(formData.dob) : new Date()}
-                      mode="date"
-                      display={Platform.OS === "ios" ? "spinner" : "default"}
-                      onChange={onDateChange}
-                      maximumDate={new Date()}
-                    />
-                  )}
+                  {Platform.OS === "web" && (<input id="profile-web-date-picker" type="date" style={{ position: "absolute", opacity: 0, width: 0, height: 0, pointerEvents: "none" }} onChange={(e) => { const v = e.target.value; if (v) setFormData({ ...formData, dob: v, age: calculateAge(v) }); }} />)}
+                  {Platform.OS !== "web" && showDatePicker && (<DateTimePicker value={formData.dob ? new Date(formData.dob) : new Date()} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={onDateChange} maximumDate={new Date()} />)}
                 </View>
-              ) : (
-                renderInfoRow("Date of Birth", formData.dob ? formatDate(formData.dob) : "", "dob", "calendar-outline")
-              )}
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.section}>
+              <SectionHeader title="Account Details" colors={colors} />
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <ViewField label="Full Name" value={formData.full_name} />
+                <ViewField label="Email Address" value={formData.email} />
+                <ViewField label="Phone Number" value={formData.phone_number} />
+                <ViewField label="Gender" value={formData.gender} />
+                <ViewField label="Date of Birth" value={formData.dob ? formatDate(formData.dob) : ''} />
+              </View>
+            </View>
+          )}
 
-          {/* Section: Vital Metrics */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Physical Metrics</Text>
-              <View style={styles.sectionLine} />
-            </View>
-            <View style={styles.card}>
-              <View style={styles.grid}>
-                <View style={styles.gridItem}>{renderInfoRow("Age", formData.age, "age", "calendar-clear-outline")}</View>
-                <View style={styles.gridItem}>{renderInfoRow("Body Fat %", formData.body_fat, "body_fat", "water-outline")}</View>
-              </View>
-              <View style={styles.grid}>
-                <View style={styles.gridItem}>{renderInfoRow("Height", formData.height, "height", "resize-outline")}</View>
-                <View style={styles.gridItem}>{renderInfoRow("Weight", formData.weight, "weight", "speedometer-outline")}</View>
+          {/* ── PHYSICAL METRICS ────────────────────────── */}
+          {isEditing ? (
+            <View style={styles.section}>
+              <SectionHeader title="Physical Metrics" colors={colors} />
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Age", formData.age, "age", "calendar-clear-outline")}</View><View style={styles.gridItem}>{renderInfoRow("Body Fat %", formData.body_fat, "body_fat", "water-outline")}</View></View>
+                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Height", formData.height, "height", "resize-outline")}</View><View style={styles.gridItem}>{renderInfoRow("Weight", formData.weight, "weight", "speedometer-outline")}</View></View>
               </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.section}>
+              <SectionHeader title="Physical Metrics" colors={colors} />
+              <View style={vStyles.statGrid}>
+                <StatTile label="Age" value={formData.age} icon="calendar-clear-outline" />
+                <StatTile label="Body Fat" value={formData.body_fat ? `${formData.body_fat}%` : ''} icon="water-outline" />
+                <StatTile label="Height" value={formData.height} icon="resize-outline" />
+                <StatTile label="Weight" value={formData.weight} icon="speedometer-outline" />
+              </View>
+            </View>
+          )}
 
-          {/* Section: Fitness Profile */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Fitness Strategy</Text>
-              <View style={styles.sectionLine} />
+          {/* ── FITNESS STRATEGY ────────────────────────── */}
+          {isEditing ? (
+            <View style={styles.section}>
+              <SectionHeader title="Fitness Strategy" colors={colors} />
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {renderInfoRow("Fitness Goal", formData.fitness_goal, "fitness_goal", "target", "dropdown", ["Lose Weight", "Build Muscle", "Improve Endurance", "Maintain Health", "Rehab"], 'MaterialCommunityIcons')}
+                {renderInfoRow("Experience Level", formData.experience_level, "experience_level", "trophy-outline", "dropdown", ["Beginner (0-1 years)", "Intermediate (1-3 years)", "Advanced (3+ years)"])}
+                {renderInfoRow("Activity Level", formData.activity_level, "activity_level", "flash-outline", "dropdown", ["Sedentary", "Lightly Active", "Moderately Active", "Very Active"])}
+              </View>
             </View>
-            <View style={styles.card}>
-              {renderInfoRow("Fitness Goal", formData.fitness_goal, "fitness_goal", "target", "dropdown", ["Lose Weight", "Build Muscle", "Improve Endurance", "Maintain Health", "Rehab"], 'MaterialCommunityIcons')}
-              {renderInfoRow("Experience Level", formData.experience_level, "experience_level", "trophy-outline", "dropdown", ["Beginner (0-1 years)", "Intermediate (1-3 years)", "Advanced (3+ years)"])}
-              {renderInfoRow("Activity Level", formData.activity_level, "activity_level", "flash-outline", "dropdown", ["Sedentary", "Lightly Active", "Moderately Active", "Very Active"])}
+          ) : (
+            <View style={styles.section}>
+              <SectionHeader title="Fitness Strategy" colors={colors} />
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <BadgeRow label="Fitness Goal" value={formData.fitness_goal} icon="target" />
+                <BadgeRow label="Experience Level" value={formData.experience_level} icon="trophy-outline" />
+                <BadgeRow label="Activity Level" value={formData.activity_level} icon="flash-outline" />
+              </View>
             </View>
-          </View>
+          )}
 
-          {/* Section: Body Measurements */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Body Stats</Text>
-              <View style={styles.sectionLine} />
-            </View>
-            <View style={styles.card}>
-              <View style={styles.grid}>
-                <View style={styles.gridItem}>{renderInfoRow("Neck", formData.neck, "neck", "bandage-outline")}</View>
-                <View style={styles.gridItem}>{renderInfoRow("Chest", formData.chest, "chest", "shirt-outline")}</View>
-              </View>
-              <View style={styles.grid}>
-                <View style={styles.gridItem}>{renderInfoRow("Waist", formData.waist, "waist", "body-outline")}</View>
-                <View style={styles.gridItem}>{renderInfoRow("Hip", formData.hip, "hip", "body-outline")}</View>
-              </View>
-              <View style={styles.grid}>
-                <View style={styles.gridItem}>{renderInfoRow("Arm", formData.arm, "arm", "fitness-outline")}</View>
-                <View style={styles.gridItem}>{renderInfoRow("Thigh", formData.thigh, "thigh", "fitness-outline")}</View>
+          {/* ── BODY STATS ──────────────────────────────── */}
+          {isEditing ? (
+            <View style={styles.section}>
+              <SectionHeader title="Body Stats" colors={colors} />
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Neck", formData.neck, "neck", "bandage-outline")}</View><View style={styles.gridItem}>{renderInfoRow("Chest", formData.chest, "chest", "shirt-outline")}</View></View>
+                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Waist", formData.waist, "waist", "body-outline")}</View><View style={styles.gridItem}>{renderInfoRow("Hip", formData.hip, "hip", "body-outline")}</View></View>
+                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Arm", formData.arm, "arm", "fitness-outline")}</View><View style={styles.gridItem}>{renderInfoRow("Thigh", formData.thigh, "thigh", "fitness-outline")}</View></View>
               </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.section}>
+              <SectionHeader title="Body Stats (cm)" colors={colors} />
+              <View style={vStyles.measureGrid}>
+                <MeasurementChip label="Neck" value={formData.neck} />
+                <MeasurementChip label="Chest" value={formData.chest} />
+                <MeasurementChip label="Waist" value={formData.waist} />
+                <MeasurementChip label="Hip" value={formData.hip} />
+                <MeasurementChip label="Arm" value={formData.arm} />
+                <MeasurementChip label="Thigh" value={formData.thigh} />
+              </View>
+            </View>
+          )}
 
-          {/* Section: Health & Nutrition */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Nutrition & Health</Text>
-              <View style={styles.sectionLine} />
+          {/* ── NUTRITION & HEALTH ──────────────────────── */}
+          {isEditing ? (
+            <View style={styles.section}>
+              <SectionHeader title="Nutrition & Health" colors={colors} />
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {renderInfoRow("Diet Type", formData.diet_type, "diet_type", "restaurant-outline", "dropdown", ["Standard", "Vegetarian", "Vegan", "Keto", "Paleo"])}
+                {renderInfoRow("Food Preference", formData.food_preference, "food_preference", "nutrition-outline", "dropdown", ["No Preference", "High Protein", "Low Carb", "Low Fat"])}
+                {renderInfoRow("Water Intake", formData.water_intake, "water_intake", "water-outline", "dropdown", ["Less than 1L", "1-2L", "2-3L", "More than 3L"])}
+                {renderInfoRow("Medical Issues", formData.medical_conditions, "medical_conditions", "medical-outline")}
+                {renderInfoRow("Medication", formData.medication, "medication", "medkit-outline", "dropdown", ["Yes", "No"])}
+                {renderInfoRow("Allergies", formData.allergies, "allergies", "warning-outline")}
+                {renderInfoRow("Food Allergies", formData.food_allergies, "food_allergies", "alert-circle-outline")}
+              </View>
             </View>
-            <View style={styles.card}>
-              {renderInfoRow("Diet Type", formData.diet_type, "diet_type", "restaurant-outline", "dropdown", ["Standard", "Vegetarian", "Vegan", "Keto", "Paleo"])}
-              {renderInfoRow("Food Preference", formData.food_preference, "food_preference", "nutrition-outline", "dropdown", ["No Preference", "High Protein", "Low Carb", "Low Fat"])}
-              {renderInfoRow("Water Intake", formData.water_intake, "water_intake", "water-outline", "dropdown", ["Less than 1L", "1-2L", "2-3L", "More than 3L"])}
-              {renderInfoRow("Medical Issues", formData.medical_conditions, "medical_conditions", "medical-outline")}
-              {renderInfoRow("Medication", formData.medication, "medication", "medkit-outline", "dropdown", ["Yes", "No"])}
-              {renderInfoRow("Allergies", formData.allergies, "allergies", "warning-outline")}
-              {renderInfoRow("Food Allergies", formData.food_allergies, "food_allergies", "alert-circle-outline")}
+          ) : (
+            <View style={styles.section}>
+              <SectionHeader title="Nutrition & Health" colors={colors} />
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <HealthRow label="Diet Type" value={formData.diet_type} dot="#E00000" />
+                <HealthRow label="Food Preference" value={formData.food_preference} dot="#FF9800" />
+                <HealthRow label="Water Intake" value={formData.water_intake} dot="#2196F3" />
+                <HealthRow label="Medical Issues" value={formData.medical_conditions} dot="#9C27B0" />
+                <HealthRow label="Medication" value={formData.medication} dot="#E91E63" />
+                <HealthRow label="Allergies" value={formData.allergies} dot="#FF5722" />
+                <HealthRow label="Food Allergies" value={formData.food_allergies} dot="#F44336" />
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Photos Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Progress Snapshots</Text>
-              <View style={styles.sectionLine} />
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Progress Snapshots</Text>
+              <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoScroll}>
               {[
@@ -456,7 +487,7 @@ export default function MyDetailsScreen() {
                   <TouchableOpacity 
                     activeOpacity={isEditing ? 0.8 : 1}
                     onPress={() => pickImage(img.key)}
-                    style={styles.photoWrapper}
+                    style={[styles.photoWrapper, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
                   >
                     {(newPhotos[img.key] || img.url) ? (
                       <Image 
@@ -466,7 +497,7 @@ export default function MyDetailsScreen() {
                       />
                     ) : (
                       <View style={styles.photoPlaceholder}>
-                        <Ionicons name="image-outline" size={32} color={COLORS.border} />
+                        <Ionicons name="image-outline" size={32} color={colors.border} />
                       </View>
                     )}
                     <LinearGradient
@@ -476,7 +507,7 @@ export default function MyDetailsScreen() {
                     <Text style={styles.photoLabel}>{img.label}</Text>
                     
                     {isEditing && (
-                      <View style={styles.editPhotoBadge}>
+                      <View style={[styles.editPhotoBadge, { borderColor: colors.card }]}>
                         <Ionicons name="camera" size={16} color="#FFF" />
                       </View>
                     )}
@@ -497,7 +528,7 @@ export default function MyDetailsScreen() {
                });
                setFormData(user);
              }}>
-               <Text style={styles.cancelBtnText}>Discard Changes</Text>
+               <Text style={[styles.cancelBtnText, { color: colors.textDim }]}>Discard Changes</Text>
              </TouchableOpacity>
           )}
         </ScrollView>
@@ -510,17 +541,17 @@ export default function MyDetailsScreen() {
           activeOpacity={1}
           onPress={() => setModalConfig({ ...modalConfig, visible: false })}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalDragIndicator} />
-            <Text style={styles.modalTitle}>{modalConfig.title}</Text>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalDragIndicator, { backgroundColor: colors.border }]} />
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{modalConfig.title}</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {modalConfig.options.map((opt, i) => (
                 <TouchableOpacity
                   key={i}
-                  style={styles.modalOption}
+                  style={[styles.modalOption, { borderBottomColor: colors.border }]}
                   onPress={() => handleSelectOption(opt)}
                 >
-                  <Text style={styles.modalOptionText}>{opt}</Text>
+                  <Text style={[styles.modalOptionText, { color: colors.text }]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -534,7 +565,7 @@ export default function MyDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#FBFBFB',
   },
   centered: {
     justifyContent: "center",
@@ -547,18 +578,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: '#EEEEEE',
   },
   headerTitle: {
     fontFamily: FONTS.heading,
     fontSize: 22,
-    color: COLORS.text,
+    color: '#111111',
     letterSpacing: 1,
   },
   headerBtn: {
     padding: 8,
     borderRadius: 12,
-    backgroundColor: COLORS.inputBg,
+    backgroundColor: '#F7F7F7',
     minWidth: 44,
     alignItems: 'center',
   },
@@ -585,21 +616,21 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontFamily: FONTS.heading,
     fontSize: 18,
-    color: COLORS.textMuted,
+    color: '#666666',
     marginRight: 12,
     textTransform: 'uppercase',
   },
   sectionLine: {
     flex: 1,
     height: 1,
-    backgroundColor: COLORS.border,
+    backgroundColor: '#EEEEEE',
   },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 8,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#EEEEEE',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
@@ -613,7 +644,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: '#EEEEEE',
   },
   infoLabelContainer: {
     flexDirection: 'row',
@@ -631,12 +662,12 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontFamily: FONTS.body,
     fontSize: 14,
-    color: COLORS.textMuted,
+    color: '#666666',
   },
   infoValue: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: 15,
-    color: COLORS.text,
+    color: '#111111',
   },
   grid: {
     flexDirection: 'row',
@@ -659,9 +690,9 @@ const styles = StyleSheet.create({
     width: 140,
     height: 180,
     borderRadius: 20,
-    backgroundColor: COLORS.inputBg,
+    backgroundColor: '#F7F7F7',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#EEEEEE',
     overflow: "hidden",
     position: 'relative',
   },
@@ -700,7 +731,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: '#FFFFFF', // fallback, overridden inline
   },
   bottomActions: {
     marginTop: 20,
@@ -729,7 +760,7 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 14,
-    color: COLORS.textDim,
+    color: '#999999',
     textDecorationLine: 'underline',
   },
   // Modal Styles
@@ -773,3 +804,105 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+const vStyles = StyleSheet.create({
+  field: {
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+  },
+  fieldLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  fieldValue: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 16,
+  },
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statTile: {
+    width: '48%',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  statIconWrap: {
+    marginBottom: 8,
+  },
+  statValue: {
+    fontFamily: FONTS.heading,
+    fontSize: 20,
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+  },
+  badgeLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+  },
+  badge: {
+    backgroundColor: '#E00000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+    color: '#FFF',
+  },
+  measureGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  measureChip: {
+    width: '31.5%',
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  measureValue: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  measureLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  healthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 16,
+  },
+});
+

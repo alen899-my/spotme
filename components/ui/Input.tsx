@@ -9,7 +9,8 @@ import {
   Platform,
   TouchableOpacity,
 } from "react-native";
-import { COLORS, FONTS } from "../../constants/theme";
+import { FONTS } from "../../constants/theme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -17,7 +18,7 @@ interface InputProps extends TextInputProps {
   containerStyle?: ViewStyle;
   icon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-  type?: string; // Web only: 'date', 'password', etc.
+  type?: string;
   unitOptions?: string[];
   unitValue?: string;
   onUnitChange?: (unit: string) => void;
@@ -25,6 +26,7 @@ interface InputProps extends TextInputProps {
 
 const Input = ({ label, error, containerStyle, icon, rightIcon, type, unitOptions, unitValue, onUnitChange, ...props }: InputProps) => {
   const [isFocused, setIsFocused] = React.useState(false);
+  const { colors, isDark } = useTheme();
 
   const handleUnitToggle = () => {
     if (unitOptions && unitValue && onUnitChange) {
@@ -36,25 +38,43 @@ const Input = ({ label, error, containerStyle, icon, rightIcon, type, unitOption
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text style={[styles.label, { color: isDark ? 'rgba(255,255,255,0.6)' : '#333333' }]}>{label}</Text>
+      )}
       <View
         style={[
           styles.inputWrapper,
-          isFocused && styles.inputFocused,
-          !!error && styles.inputError,
+          {
+            backgroundColor: isDark
+              ? (isFocused ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)')
+              : (isFocused ? '#FFFFFF' : '#F7F7F7'),
+            borderColor: isFocused
+              ? '#E00000'
+              : isDark ? 'rgba(255,255,255,0.1)' : '#EBEBEB',
+            shadowColor: isFocused ? '#E00000' : 'transparent',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: isFocused ? 0.15 : 0,
+            shadowRadius: 6,
+            elevation: isFocused ? 2 : 0,
+          },
+          !!error && { borderColor: '#E00000' },
         ]}
       >
         {icon && <View style={styles.iconWrapper}>{icon}</View>}
         <TextInput
-          style={styles.input}
-          placeholderTextColor="#BBBBBB"
+          style={[styles.input, { color: isDark ? '#FFFFFF' : '#1A1A1A' }]}
+          placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#BBBBBB'}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           {...props}
           {...(Platform.OS === "web" ? { type } : {})}
         />
         {unitOptions && unitOptions.length > 0 && unitValue && onUnitChange ? (
-          <TouchableOpacity style={styles.unitToggleBtn} onPress={handleUnitToggle} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={[styles.unitToggleBtn, { backgroundColor: isDark ? 'rgba(224,0,0,0.15)' : '#FFF0F0' }]}
+            onPress={handleUnitToggle}
+            activeOpacity={0.7}
+          >
             <Text style={styles.unitToggleText}>{unitValue}</Text>
           </TouchableOpacity>
         ) : rightIcon ? (
@@ -74,34 +94,19 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: 13,
-    color: "#333333",
     marginBottom: 7,
   },
   inputWrapper: {
-    backgroundColor: "#F7F7F7",
     borderWidth: 1,
-    borderColor: "#EBEBEB",
     borderRadius: 12,
     height: 52,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
   },
-  inputFocused: {
-    borderColor: COLORS.primary,
-    backgroundColor: "#FFFFFF",
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  inputError: {
-    borderColor: COLORS.error ?? "#E00000",
-  },
   iconWrapper: {
     marginRight: 10,
-    opacity: 0.6,
+    opacity: 0.7,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -114,19 +119,17 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: FONTS.body,
     fontSize: 14,
-    color: "#1A1A1A",
     height: "100%",
-    paddingVertical: 0, // fix Android vertical misalignment
+    paddingVertical: 0,
     ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
   },
   errorText: {
     fontFamily: FONTS.body,
     fontSize: 12,
-    color: COLORS.error ?? "#E00000",
+    color: '#E00000',
     marginTop: 5,
   },
   unitToggleBtn: {
-    backgroundColor: "#FFF0F0",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,

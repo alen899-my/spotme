@@ -11,6 +11,7 @@ import {
 } from "@expo-google-fonts/outfit";
 import { BebasNeue_400Regular } from "@expo-google-fonts/bebas-neue";
 import { useEffect } from "react";
+import { ThemeProvider } from "../contexts/ThemeContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -34,8 +35,10 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }} />
-    </SafeAreaProvider>
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <Stack screenOptions={{ headerShown: false }} />
+      </SafeAreaProvider>
+    </ThemeProvider>
   );
 }
