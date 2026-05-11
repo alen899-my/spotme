@@ -13,6 +13,10 @@ import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import * as ImagePicker from 'expo-image-picker';
+import Slider from '@react-native-community/slider';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -54,9 +58,10 @@ export default function ActiveWorkoutScreen() {
   const [inputWeight, setInputWeight] = useState('');
   const [inputReps, setInputReps] = useState('');
 
-  // Completion
   const [showFinishModal, setShowFinishModal] = useState(false);
+  const [showEditMetricsModal, setShowEditMetricsModal] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [updatingMetrics, setUpdatingMetrics] = useState(false);
 
   // Guide Modal
   const [guideModalVisible, setGuideModalVisible] = useState(false);
@@ -76,6 +81,15 @@ export default function ActiveWorkoutScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const LIMIT = 20;
 
+  // Finish Workflow States
+  const [finishWater, setFinishWater] = useState(0);
+  const [finishWeight, setFinishWeight] = useState('');
+  const [finishPhotos, setFinishPhotos] = useState<string[]>([]);
+
+  // Viewer
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
+
   const fetchWorkout = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -83,7 +97,6 @@ export default function ActiveWorkoutScreen() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setWorkout(res.data);
-      // Initialize timer from saved state if not already running or if we want to sync
       if (res.data.total_duration_seconds > 0 && workoutElapsed === 0) {
         setWorkoutElapsed(res.data.total_duration_seconds);
       }
@@ -98,21 +111,17 @@ export default function ActiveWorkoutScreen() {
     fetchWorkout();
   }, [fetchWorkout]));
 
-  // Start/Stop workout timer
   useEffect(() => {
     if (workout?.status === 'completed') {
       if (workoutTimerRef.current) clearInterval(workoutTimerRef.current);
-      // Ensure local timer matches saved duration for completed workouts
       setWorkoutElapsed(workout.total_duration_seconds || 0);
       return;
     }
-
     if (!workoutTimerRef.current && workout?.status === 'active') {
       workoutTimerRef.current = setInterval(() => {
         setWorkoutElapsed(prev => prev + 1);
       }, 1000);
     }
-
     return () => {
       if (workoutTimerRef.current) {
         clearInterval(workoutTimerRef.current);
@@ -121,7 +130,6 @@ export default function ActiveWorkoutScreen() {
     };
   }, [workout?.status, workout?.total_duration_seconds]);
 
-  // Set timer toggle
   const toggleSetTimer = () => {
     if (setTimerRunning) {
       clearInterval(setTimerRef.current);
@@ -132,7 +140,6 @@ export default function ActiveWorkoutScreen() {
     }
   };
 
-  // Start rest timer
   const startRest = (seconds: number) => {
     setRestTimer(seconds);
     setRestRunning(true);
@@ -170,7 +177,6 @@ export default function ActiveWorkoutScreen() {
       clearInterval(setTimerRef.current);
       setSetTimerRunning(false);
     }
-
     try {
       const token = await AsyncStorage.getItem('userToken');
       await axios.post(`${API_URL}/daily/exercises/${activeExercise.id}/sets`, {
@@ -179,14 +185,11 @@ export default function ActiveWorkoutScreen() {
         reps: parseInt(inputReps),
         duration_seconds: setTimer,
         rest_seconds: 0,
-        workout_duration: workoutElapsed, // Sync overall duration
+        workout_duration: workoutElapsed,
       }, { headers: { Authorization: `Bearer ${token}` } });
-
       showToast(`Set ${activeSetNum} logged! 🔥`);
       setSetModalVisible(false);
       fetchWorkout();
-
-      // Start rest timer (parse from target_reps format like '60s' or '90')
       const restMatch = (activeExercise.target_reps || '60s').match(/\d+/);
       const restSec = restMatch ? parseInt(restMatch[0]) : 60;
       startRest(restSec);
@@ -208,7 +211,6 @@ export default function ActiveWorkoutScreen() {
         workout_duration: workoutElapsed,
         is_skipped: true,
       }, { headers: { Authorization: `Bearer ${token}` } });
-
       showToast(`Set ${activeSetNum} skipped`);
       setSetModalVisible(false);
       fetchWorkout();
@@ -262,17 +264,14 @@ export default function ActiveWorkoutScreen() {
   const fetchExtraExercises = async (q: string, cat: string | null, p: number = 0) => {
     if (p === 0) setLoadingExs(true);
     else setLoadingMore(true);
-
     try {
       const token = await AsyncStorage.getItem('userToken');
       const offset = p * LIMIT;
       const url = `${API_URL}/workouts/exercises/search`;
-      
       const res = await axios.get(url, {
         params: { q, category: cat, limit: LIMIT, offset },
         headers: { Authorization: `Bearer ${token}` }
       });
-      
       const newExs = res.data;
       if (p === 0) {
         if (cat) setExercisesInCategory(newExs);
@@ -316,7 +315,6 @@ export default function ActiveWorkoutScreen() {
         target_reps: '10-12',
         target_weight: 0,
       }, { headers: { Authorization: `Bearer ${token}` } });
-      
       showToast(`${ex.name} added to session!`);
       setAddExModalVisible(false);
       fetchWorkout();
@@ -325,6 +323,7 @@ export default function ActiveWorkoutScreen() {
       showToast('Failed to add exercise', 'error');
     }
   };
+
 
   const handleSearch = (text: string) => {
     setSearchQuery(text);
@@ -341,53 +340,124 @@ export default function ActiveWorkoutScreen() {
       return;
     }
     setFinishing(true);
-    // Always stop the workout timer
     if (workoutTimerRef.current) {
       clearInterval(workoutTimerRef.current);
       workoutTimerRef.current = null;
     }
     if (restTimerRef.current) clearInterval(restTimerRef.current);
-
     try {
       const token = await AsyncStorage.getItem('userToken');
-
-      // Safely calculate total volume
+      
       let totalVolume = 0;
-      const exercises = workout?.exercises || [];
-      for (const ex of exercises) {
-        for (const s of (ex.sets || [])) {
-          totalVolume += (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0);
+      if (workout?.exercises) {
+        for (const ex of workout.exercises) {
+          if (ex.sets) {
+            for (const s of ex.sets) {
+              totalVolume += (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0);
+            }
+          }
         }
       }
 
-      const response = await axios.patch(
-        `${API_URL}/daily/workouts/${workoutId}/complete`,
-        {
-          total_duration_seconds: workoutElapsed,
-          total_volume: Math.round(totalVolume * 100) / 100,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.patch(`${API_URL}/daily/workouts/${workoutId}/complete`, {
+        total_duration_seconds: workoutElapsed,
+        total_volume: Math.round(totalVolume),
+        water_intake_liters: finishWater,
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-      if (response.data) {
-        if (response.data.status === 'completed') {
-          router.replace(`/daily/complete?id=${workoutId}&duration=${workoutElapsed}&volume=${totalVolume.toFixed(1)}`);
-        } else {
-          showToast('Progress saved! You can finish this workout later. 💪');
-          router.replace('/(tabs)/daily');
-        }
-      } else {
-        throw new Error('No data returned from server');
-      }
+      showToast('Workout finished! Great job! 🏆');
+      router.replace(`/daily/complete?id=${workoutId}&duration=${workoutElapsed}&volume=${totalVolume}&water=${finishWater}`);
     } catch (err: any) {
-      console.error('Error finishing workout:', err?.response?.data || err);
-      const data = err?.response?.data;
-      const msg = data?.details || data?.error || 'Failed to save workout';
-      showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), 'error');
-      // Restart the timer since we failed
+      console.error('Error finishing workout:', err);
+      showToast('Failed to save workout', 'error');
       workoutTimerRef.current = setInterval(() => setWorkoutElapsed(prev => prev + 1), 1000);
       setFinishing(false);
     }
+  };
+
+  const handleDownload = async (uri: string) => {
+    if (Platform.OS === 'web') {
+      const link = document.createElement('a');
+      link.href = uri;
+      link.download = `spotme-workout-${Date.now()}.jpg`;
+      link.click();
+    } else {
+      try {
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(uri);
+        } else {
+          showToast('Sharing not available', 'error');
+        }
+      } catch (err) {
+        console.error('Download error:', err);
+        showToast('Failed to download photo', 'error');
+      }
+    }
+  };
+
+  const handleUpdatePhotos = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.7,
+    });
+    if (!result.canceled) {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const uris = result.assets.map(a => a.uri);
+        // Append instead of replace
+        await axios.post(`${API_URL}/daily/workouts/${workoutId}/photos`, {
+          photos: uris,
+        }, { headers: { Authorization: `Bearer ${token}` } });
+        showToast('Photos added!');
+        fetchWorkout();
+      } catch (err) {
+        console.error('Error adding photos:', err);
+        showToast('Failed to add photos', 'error');
+      }
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: number) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.delete(`${API_URL}/daily/photos/${photoId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast('Photo removed');
+      fetchWorkout();
+    } catch (err) {
+      console.error('Error deleting photo:', err);
+      showToast('Failed to remove photo', 'error');
+    }
+  };
+
+  const handleUpdateMetrics = async () => {
+    setUpdatingMetrics(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.patch(`${API_URL}/daily/workouts/${workoutId}/metrics`, {
+        water_intake_liters: finishWater,
+        post_workout_weight: parseFloat(finishWeight) || 0,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      showToast('Metrics updated!');
+      setShowEditMetricsModal(false);
+      fetchWorkout();
+    } catch (err) {
+      console.error('Error updating metrics:', err);
+      showToast('Failed to update metrics', 'error');
+    } finally {
+      setUpdatingMetrics(false);
+    }
+  };
+
+  const openEditMetrics = () => {
+    setFinishWater(Number(workout?.water_intake_liters) || 0);
+    setFinishWeight(String(workout?.post_workout_weight || ''));
+    setShowEditMetricsModal(true);
   };
 
   const completedCount = workout?.exercises?.filter((e: any) => e.is_completed).length || 0;
@@ -398,7 +468,6 @@ export default function ActiveWorkoutScreen() {
     const targetSets = item.target_sets || 3;
     const isDone = item.is_completed;
     const isSkipped = item.is_skipped;
-
     return (
       <View style={[
         styles.exCard,
@@ -419,15 +488,6 @@ export default function ActiveWorkoutScreen() {
           {isDone && !isSkipped && <Ionicons name="checkmark-circle" size={24} color="#10B981" />}
           {isSkipped && <Text style={[styles.skipLabel, { color: colors.textMuted }]}>SKIPPED</Text>}
         </TouchableOpacity>
-
-        {/* View mode indicator */}
-        {workout?.status === 'completed' && isDone && !isSkipped && (
-          <View style={styles.doneBadge}>
-            <Text style={styles.doneBadgeText}>COMPLETED</Text>
-          </View>
-        )}
-
-        {/* Sets logged */}
         {item.sets && item.sets.length > 0 && (
           <View style={[styles.setsTable, { backgroundColor: colors.inputBg }]}>
             <View style={styles.tableHeader}>
@@ -445,8 +505,6 @@ export default function ActiveWorkoutScreen() {
             ))}
           </View>
         )}
-
-        {/* Progress + Log Set button */}
         <View style={styles.exFooter}>
           <View style={[styles.exProgress, { backgroundColor: colors.border }]}>
             <View style={[styles.exProgressFill, {
@@ -487,7 +545,6 @@ export default function ActiveWorkoutScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => workout?.status === 'completed' ? router.back() : setShowFinishModal(true)}>
             <Ionicons name={workout?.status === 'completed' ? 'arrow-back' : 'close'} size={28} color={colors.text} />
@@ -507,53 +564,124 @@ export default function ActiveWorkoutScreen() {
           )}
         </View>
 
-        {/* Completion Photo if exists */}
-        {workout?.status === 'completed' && workout?.completion_photo_url && (
-          <View style={styles.photoContainer}>
-            <Image source={{ uri: workout.completion_photo_url }} style={styles.completionPhoto} />
-            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.photoOverlay}>
-              <Text style={styles.photoOverlayText}>Session Completed ✨</Text>
-            </LinearGradient>
-          </View>
-        )}
-
-        {/* Progress overview */}
-        <View style={[styles.progressCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.workoutTitle, { color: colors.text }]} numberOfLines={1}>
-            {workout?.title || 'Workout'}
-          </Text>
-          <View style={styles.progressRow}>
-            <Text style={[styles.progressText, { color: colors.textMuted }]}>
-              {completedCount}/{totalCount} exercises complete
-            </Text>
-            {restRunning && (
-              <View style={styles.restPill}>
-                <Ionicons name="bed-outline" size={12} color="#3B82F6" />
-                <Text style={styles.restPillText}>REST {formatTime(restTimer)}</Text>
-              </View>
-            )}
-          </View>
-          <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-            <View style={[styles.progressFill, { width: totalCount > 0 ? `${(completedCount / totalCount) * 100}%` as any : '0%' }]} />
-          </View>
-        </View>
-
         <FlatList
           data={workout?.exercises || []}
           keyExtractor={item => String(item.id)}
           renderItem={renderExercise}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={workout?.status === 'completed' ? (
+            <View style={{ marginBottom: 20 }}>
+              {/* Photo Gallery */}
+              {workout.photos && workout.photos.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 0, gap: 12, marginBottom: 20 }}>
+                  {workout.photos.map((p: any) => (
+                    <TouchableOpacity 
+                      key={p.id} 
+                      style={styles.photoThumbWrap} 
+                      onPress={() => { setViewerUri(p.photo_url); setViewerVisible(true); }}
+                    >
+                      <Image source={{ uri: p.photo_url }} style={styles.photoThumb} />
+                      <TouchableOpacity 
+                        style={styles.removePhotoBtn} 
+                        onPress={() => handleDeletePhoto(p.id)}
+                      >
+                        <Ionicons name="close" size={14} color="#FFF" />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity 
+                    style={[styles.photoThumbWrap, { backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: colors.border }]} 
+                    onPress={handleUpdatePhotos}
+                  >
+                    <Ionicons name="add" size={24} color={colors.textDim} />
+                  </TouchableOpacity>
+                </ScrollView>
+              ) : (
+                <TouchableOpacity 
+                  style={[styles.photoContainer, { backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', borderWidth: 2, borderColor: colors.border, marginHorizontal: 0 }]} 
+                  onPress={handleUpdatePhotos}
+                >
+                  <Ionicons name="camera" size={40} color={colors.textDim} />
+                  <Text style={{ color: colors.textDim, fontFamily: FONTS.bodyBold, marginTop: 10 }}>ADD SESSION PHOTOS</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Stats Summary Card */}
+              <View style={[styles.progressCard, { backgroundColor: colors.card, borderColor: colors.border, marginHorizontal: 0 }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <Text style={[styles.workoutTitle, { color: colors.text, flex: 1, marginBottom: 0 }]} numberOfLines={1}>
+                    {workout?.title || workout?.session_name || 'Workout Summary'}
+                  </Text>
+                  <TouchableOpacity onPress={openEditMetrics} style={{ padding: 4 }}>
+                    <Ionicons name="create-outline" size={20} color="#E00000" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.progressRow}>
+                  <Text style={[styles.progressText, { color: colors.textMuted }]}>
+                    {completedCount}/{totalCount} exercises complete
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <View style={styles.statChip}>
+                      <Ionicons name="layers-outline" size={12} color={colors.textDim} />
+                      <Text style={[styles.statText, { color: colors.text }]}>{workout.total_sets || 0} Sets</Text>
+                    </View>
+                    <View style={styles.statChip}>
+                      <Ionicons name="water-outline" size={12} color="#3B82F6" />
+                      <Text style={[styles.statText, { color: '#3B82F6' }]}>{workout.water_intake_liters || 0}L</Text>
+                    </View>
+                    <View style={styles.statChip}>
+                      <Ionicons name="scale-outline" size={12} color="#10B981" />
+                      <Text style={[styles.statText, { color: '#10B981' }]}>{workout.post_workout_weight || 0}kg</Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                  <View style={[styles.progressFill, { width: totalCount > 0 ? `${(completedCount / totalCount) * 100}%` as any : '0%' }]} />
+                </View>
+              </View>
+            </View>
+          ) : null}
           ListFooterComponent={workout?.status === 'active' ? (
-            <TouchableOpacity style={[styles.addExFooterBtn, { borderColor: colors.border }]} onPress={openAddExercise}>
-              <Ionicons name="add-circle-outline" size={20} color="#E00000" />
-              <Text style={[styles.addExFooterText, { color: colors.text }]}>ADD EXTRA EXERCISE</Text>
-            </TouchableOpacity>
+            <View style={styles.footerContainer}>
+              <TouchableOpacity style={[styles.addExFooterBtn, { borderColor: colors.border }]} onPress={openAddExercise}>
+                <Ionicons name="add-circle-outline" size={20} color="#E00000" />
+                <Text style={[styles.addExFooterText, { color: colors.text }]}>ADD EXTRA EXERCISE</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.progressCard, { backgroundColor: colors.card, borderColor: colors.border, marginHorizontal: 0 }]}>
+                <View style={styles.waterTracker}>
+                  <View style={styles.waterInfo}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                      <Ionicons name="water" size={20} color="#3B82F6" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.waterTitle, { color: colors.text }]} numberOfLines={1}>Hydration Tracker</Text>
+                        <Text style={{ color: colors.textMuted, fontSize: 10, fontFamily: FONTS.body }} numberOfLines={1}>
+                          Record your drinking water during workout initially from 0
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.waterVal, { color: '#3B82F6' }]}>{(Number(finishWater) || 0).toFixed(1)}L</Text>
+                  </View>
+                  <Slider
+                    style={{ width: '100%', height: 40 }}
+                    minimumValue={0}
+                    maximumValue={5}
+                    step={0.1}
+                    value={finishWater}
+                    onValueChange={setFinishWater}
+                    minimumTrackTintColor="#3B82F6"
+                    maximumTrackTintColor={colors.border}
+                    thumbTintColor="#3B82F6"
+                  />
+                </View>
+              </View>
+            </View>
           ) : null}
         />
       </View>
 
-      {/* Set Logger Modal */}
       <Modal visible={setModalVisible} transparent animationType="slide" onRequestClose={() => setSetModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
@@ -566,15 +694,10 @@ export default function ActiveWorkoutScreen() {
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-
-            {/* Digital Clock */}
             <View style={styles.clockWrap}>
               <Text style={[styles.clockTime, { color: colors.text }]}>{formatTime(setTimer)}</Text>
               <TouchableOpacity style={styles.clockBtn} onPress={toggleSetTimer}>
-                <LinearGradient
-                  colors={setTimerRunning ? ['#EF4444', '#B91C1C'] : ['#E00000', '#B00000']}
-                  style={styles.clockBtnGrad}
-                >
+                <LinearGradient colors={setTimerRunning ? ['#EF4444', '#B91C1C'] : ['#E00000', '#B00000']} style={styles.clockBtnGrad}>
                   <Ionicons name={setTimerRunning ? 'pause' : 'play'} size={28} color="#FFF" />
                 </LinearGradient>
               </TouchableOpacity>
@@ -582,33 +705,16 @@ export default function ActiveWorkoutScreen() {
                 <Text style={[styles.resetText, { color: colors.textMuted }]}>Reset</Text>
               </TouchableOpacity>
             </View>
-
-            {/* Input fields */}
             <View style={styles.inputRow}>
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: colors.textMuted }]}>WEIGHT (kg)</Text>
-                <TextInput
-                  style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
-                  keyboardType="decimal-pad"
-                  value={inputWeight}
-                  onChangeText={setInputWeight}
-                  placeholder="0"
-                  placeholderTextColor={colors.textDim}
-                />
+                <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="decimal-pad" value={inputWeight} onChangeText={setInputWeight} placeholder="0" placeholderTextColor={colors.textDim} />
               </View>
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: colors.textMuted }]}>REPS DONE</Text>
-                <TextInput
-                  style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
-                  keyboardType="numeric"
-                  value={inputReps}
-                  onChangeText={setInputReps}
-                  placeholder="0"
-                  placeholderTextColor={colors.textDim}
-                />
+                <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="numeric" value={inputReps} onChangeText={setInputReps} placeholder="0" placeholderTextColor={colors.textDim} />
               </View>
             </View>
-
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity style={[styles.modalSkipBtn, { borderColor: colors.border }]} onPress={handleSkipSet}>
                 <Text style={[styles.modalSkipBtnText, { color: colors.textMuted }]}>SKIP SET</Text>
@@ -624,125 +730,66 @@ export default function ActiveWorkoutScreen() {
         </View>
       </Modal>
 
-      {/* Finish Workout Confirmation */}
       <ConfirmationModal
         visible={showFinishModal}
-        title="Finish Workout?"
-        message={`You've completed ${completedCount} of ${totalCount} exercises. Save and end this session?`}
-        confirmText={finishing ? 'SAVING...' : 'FINISH & SAVE'}
+        title="Finish Session?"
+        message="Are you sure you want to end this workout?"
+        confirmText={finishing ? 'FINISHING...' : 'YES, FINISH'}
         confirmColor="#10B981"
         onConfirm={handleFinishWorkout}
         onCancel={() => setShowFinishModal(false)}
       />
 
-      {/* Exercise Guide Modal */}
       <Modal visible={guideModalVisible} transparent animationType="fade" onRequestClose={() => setGuideModalVisible(false)}>
         <View style={styles.guideOverlay}>
           <View style={[styles.guideContent, { backgroundColor: colors.card }]}>
-            <TouchableOpacity style={styles.closeGuide} onPress={() => setGuideModalVisible(false)}>
-              <Ionicons name="close-circle" size={32} color="rgba(0,0,0,0.5)" />
-            </TouchableOpacity>
-            
+            <TouchableOpacity style={styles.closeGuide} onPress={() => setGuideModalVisible(false)}><Ionicons name="close-circle" size={32} color="rgba(0,0,0,0.5)" /></TouchableOpacity>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Image source={{ uri: guideExercise?.gif_url || guideExercise?.image_url }} style={styles.guideGif} resizeMode="contain" />
-              
               <View style={styles.guideBody}>
                 <Text style={[styles.guideName, { color: colors.text }]}>{guideExercise?.name}</Text>
-                
                 <View style={styles.guideMetaRow}>
-                  <View style={[styles.guideBadge, { backgroundColor: colors.inputBg }]}>
-                    <Text style={[styles.guideBadgeText, { color: colors.textMuted }]}>{guideExercise?.equipment}</Text>
-                  </View>
-                  <View style={[styles.guideBadge, { backgroundColor: colors.inputBg }]}>
-                    <Text style={[styles.guideBadgeText, { color: colors.textMuted }]}>{guideExercise?.target}</Text>
-                  </View>
+                  <View style={[styles.guideBadge, { backgroundColor: colors.inputBg }]}><Text style={[styles.guideBadgeText, { color: colors.textMuted }]}>{guideExercise?.equipment}</Text></View>
+                  <View style={[styles.guideBadge, { backgroundColor: colors.inputBg }]}><Text style={[styles.guideBadgeText, { color: colors.textMuted }]}>{guideExercise?.target}</Text></View>
                 </View>
-
                 <Text style={[styles.guideSectionTitle, { color: colors.text }]}>Instructions</Text>
-                <Text style={[styles.guideText, { color: colors.textMuted }]}>
-                  {guideExercise?.instructions_en || 'No instructions available for this exercise.'}
-                </Text>
+                <Text style={[styles.guideText, { color: colors.textMuted }]}>{guideExercise?.instructions_en || 'No instructions available.'}</Text>
               </View>
             </ScrollView>
-
             <TouchableOpacity style={styles.gotItBtn} onPress={() => setGuideModalVisible(false)}>
-              <LinearGradient colors={['#E00000', '#B00000']} style={styles.gotItBtnGrad}>
-                <Text style={styles.gotItBtnText}>GOT IT, LET'S GO!</Text>
-              </LinearGradient>
+              <LinearGradient colors={['#E00000', '#B00000']} style={styles.gotItBtnGrad}><Text style={styles.gotItBtnText}>GOT IT, LET'S GO!</Text></LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Add Extra Exercise Modal */}
       <Modal visible={addExModalVisible} transparent animationType="slide" onRequestClose={() => setAddExModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card, height: '80%' }]}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  {browseCategory ? browseCategory : (searchQuery ? 'Search Results' : 'Add Exercise')}
-                </Text>
-                <Text style={[styles.modalSub, { color: colors.textMuted }]}>
-                  {browseCategory || searchQuery ? 'Select an exercise to add' : 'Choose a category or search'}
-                </Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>{browseCategory ? browseCategory : (searchQuery ? 'Search Results' : 'Add Exercise')}</Text>
+                <Text style={[styles.modalSub, { color: colors.textMuted }]}>{browseCategory || searchQuery ? 'Select an exercise' : 'Choose category or search'}</Text>
               </View>
-              <TouchableOpacity onPress={() => {
-                if (browseCategory) setBrowseCategory(null);
-                else if (searchQuery) { setSearchQuery(''); setIsSearching(false); }
-                else setAddExModalVisible(false);
-              }}>
-                <Ionicons name={(browseCategory || searchQuery) ? "arrow-back" : "close"} size={24} color={colors.text} />
-              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { if (browseCategory) setBrowseCategory(null); else if (searchQuery) { setSearchQuery(''); setIsSearching(false); } else setAddExModalVisible(false); }}><Ionicons name={(browseCategory || searchQuery) ? "arrow-back" : "close"} size={24} color={colors.text} /></TouchableOpacity>
             </View>
-
-            {/* Search Bar */}
             <View style={[styles.searchWrap, { backgroundColor: colors.inputBg }]}>
               <Ionicons name="search" size={18} color={colors.textDim} />
-              <TextInput
-                style={[styles.searchInput, { color: colors.text }]}
-                placeholder={browseCategory ? `Search in ${browseCategory}...` : "Search exercises..."}
-                placeholderTextColor={colors.textDim}
-                value={searchQuery}
-                onChangeText={handleSearch}
-                autoCorrect={false}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => { setSearchQuery(''); setIsSearching(false); }}>
-                  <Ionicons name="close-circle" size={18} color={colors.textDim} />
-                </TouchableOpacity>
-              )}
+              <TextInput style={[styles.searchInput, { color: colors.text }]} placeholder={browseCategory ? `Search in ${browseCategory}...` : "Search exercises..."} placeholderTextColor={colors.textDim} value={searchQuery} onChangeText={handleSearch} autoCorrect={false} />
+              {searchQuery.length > 0 && <TouchableOpacity onPress={() => { setSearchQuery(''); setIsSearching(false); }}><Ionicons name="close-circle" size={18} color={colors.textDim} /></TouchableOpacity>}
             </View>
-
             {browseCategory || isSearching ? (
-              loadingExs ? (
-                <ActivityIndicator color="#E00000" style={{ marginTop: 40 }} />
-              ) : (
-                <FlatList
-                  style={{ flex: 1 }}
-                  data={browseCategory ? exercisesInCategory : searchResults}
-                  keyExtractor={item => item.id}
-                  showsVerticalScrollIndicator={false}
-                  onEndReached={loadMoreExtra}
-                  onEndReachedThreshold={0.5}
-                  ListFooterComponent={loadingMore ? <ActivityIndicator color="#E00000" style={{ marginVertical: 20 }} /> : null}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity style={[styles.browserItem, { borderBottomColor: colors.border }]} onPress={() => addExtraExercise(item)}>
-                      <Image source={{ uri: item.image_url }} style={styles.browserImg} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.browserName, { color: colors.text }]}>{item.name}</Text>
-                        <Text style={[styles.browserMeta, { color: colors.textMuted }]}>{item.equipment} • {item.target}</Text>
-                      </View>
-                      <Ionicons name="add-circle" size={24} color="#E00000" />
-                    </TouchableOpacity>
-                  )}
-                  contentContainerStyle={{ paddingBottom: 20 }}
-                  ListEmptyComponent={
-                    <View style={{ alignItems: 'center', marginTop: 40 }}>
-                      <Text style={{ color: colors.textMuted, fontFamily: FONTS.body }}>No exercises found.</Text>
+              loadingExs ? <ActivityIndicator color="#E00000" style={{ marginTop: 40 }} /> : (
+                <FlatList style={{ flex: 1 }} data={browseCategory ? exercisesInCategory : searchResults} keyExtractor={item => item.id} showsVerticalScrollIndicator={false} onEndReached={loadMoreExtra} onEndReachedThreshold={0.5} ListFooterComponent={loadingMore ? <ActivityIndicator color="#E00000" style={{ marginVertical: 20 }} /> : null} renderItem={({ item }) => (
+                  <TouchableOpacity style={[styles.browserItem, { borderBottomColor: colors.border }]} onPress={() => addExtraExercise(item)}>
+                    <Image source={{ uri: item.image_url }} style={styles.browserImg} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.browserName, { color: colors.text }]}>{item.name}</Text>
+                      <Text style={[styles.browserMeta, { color: colors.textMuted }]}>{item.equipment} • {item.target}</Text>
                     </View>
-                  }
-                />
+                    <Ionicons name="add-circle" size={24} color="#E00000" />
+                  </TouchableOpacity>
+                )} />
               )
             ) : (
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
@@ -756,6 +803,89 @@ export default function ActiveWorkoutScreen() {
                 </View>
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={viewerVisible} transparent animationType="fade" onRequestClose={() => setViewerVisible(false)}>
+        <View style={styles.viewerOverlay}>
+          <TouchableOpacity style={styles.viewerClose} onPress={() => setViewerVisible(false)}><Ionicons name="close" size={32} color="#FFF" /></TouchableOpacity>
+          {viewerUri && (
+            <>
+              <Image source={{ uri: viewerUri }} style={styles.viewerImage} resizeMode="contain" />
+              <TouchableOpacity style={styles.downloadBtn} onPress={() => handleDownload(viewerUri)}>
+                <LinearGradient colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)']} style={styles.downloadBtnGrad}>
+                  <Ionicons name="download-outline" size={24} color="#FFF" />
+                  <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold, marginLeft: 10 }}>DOWNLOAD / SHARE</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </Modal>
+
+      {/* Edit Metrics Modal */}
+      <Modal visible={showEditMetricsModal} transparent animationType="slide" onRequestClose={() => setShowEditMetricsModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Workout Metrics</Text>
+                <Text style={[styles.modalSub, { color: colors.textMuted }]}>Update your session data</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowEditMetricsModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flex: 1, minHeight: 300 }}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                <View style={styles.finishSection}>
+                  <View style={styles.sectionHeader}>
+                    <Ionicons name="water" size={20} color="#3B82F6" />
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Water Intake</Text>
+                    <Text style={[styles.sectionVal, { color: '#3B82F6' }]}>{(Number(finishWater) || 0).toFixed(1)} Liters</Text>
+                  </View>
+                  <Slider
+                    style={{ width: '100%', height: 40 }}
+                    minimumValue={0}
+                    maximumValue={5}
+                    step={0.1}
+                    value={finishWater}
+                    onValueChange={setFinishWater}
+                    minimumTrackTintColor="#3B82F6"
+                    maximumTrackTintColor={colors.border}
+                    thumbTintColor="#3B82F6"
+                  />
+                </View>
+
+                <View style={styles.finishSection}>
+                  <View style={styles.sectionHeader}>
+                    <Ionicons name="scale" size={20} color="#10B981" />
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Body Weight</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, textAlign: 'left', paddingHorizontal: 16 }]}
+                    placeholder="Enter weight in kg (e.g. 75.5)"
+                    placeholderTextColor={colors.textDim}
+                    keyboardType="decimal-pad"
+                    value={finishWeight}
+                    onChangeText={setFinishWeight}
+                  />
+                </View>
+              </ScrollView>
+            </View>
+
+            <TouchableOpacity style={[styles.saveSetBtn, { marginTop: 20 }]} onPress={handleUpdateMetrics} disabled={updatingMetrics}>
+              <LinearGradient colors={['#10B981', '#059669']} style={styles.saveSetBtnGrad}>
+                {updatingMetrics ? <ActivityIndicator color="#FFF" /> : (
+                  <>
+                    <Ionicons name="checkmark-done" size={22} color="#FFF" />
+                    <Text style={styles.saveSetBtnText}>UPDATE METRICS</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -796,7 +926,6 @@ const styles = StyleSheet.create({
   logSetBtn: { borderRadius: 10, overflow: 'hidden' },
   logSetBtnGrad: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 9 },
   logSetBtnText: { fontFamily: FONTS.bodyBold, fontSize: 12, color: '#FFF' },
-  // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
@@ -825,7 +954,6 @@ const styles = StyleSheet.create({
   skipBtnText: { fontFamily: FONTS.bodyBold, fontSize: 11 },
   modalSkipBtn: { flex: 0.8, height: 58, borderRadius: 18, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   modalSkipBtnText: { fontFamily: FONTS.bodyBold, fontSize: 14, letterSpacing: 1 },
-  // Guide Modal
   guideOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 },
   guideContent: { borderRadius: 32, overflow: 'hidden', maxHeight: '85%' },
   closeGuide: { position: 'absolute', top: 16, right: 16, zIndex: 10 },
@@ -851,4 +979,30 @@ const styles = StyleSheet.create({
   browserMeta: { fontFamily: FONTS.body, fontSize: 12 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 54, borderRadius: 16, marginBottom: 20, gap: 10, borderWidth: 0 },
   searchInput: { flex: 1, fontFamily: FONTS.body, fontSize: 15, padding: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
+  statChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.03)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  statText: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  finishSection: { marginBottom: 24 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  sectionTitle: { fontFamily: FONTS.bodyBold, fontSize: 14, flex: 1 },
+  sectionVal: { fontFamily: FONTS.bodyBold, fontSize: 14 },
+  finishPhotoPrev: { width: '100%', height: 180, borderRadius: 16 },
+  finishPhotoPlaceholder: { width: '100%', height: 120, borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
+  changePhotoBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  photoThumbWrap: { width: 120, height: 160, borderRadius: 16, overflow: 'hidden' },
+  photoThumb: { width: '100%', height: '100%' },
+  finishPhotoWrap: { width: 100, height: 100, borderRadius: 12, overflow: 'hidden' },
+  finishPhotoThumb: { width: '100%', height: '100%' },
+  finishPhotoAdd: { width: 100, height: 100, borderRadius: 12, borderStyle: 'dashed', borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
+  removePhotoBtn: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(224,0,0,0.8)', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+  viewerClose: { position: 'absolute', top: 50, right: 20, zIndex: 100 },
+  viewerImage: { width: '100%', height: '80%' },
+  downloadBtn: { position: 'absolute', bottom: 40, borderRadius: 20, overflow: 'hidden' },
+  downloadBtnGrad: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 14 },
+  listHeader: { marginBottom: 20 },
+  footerContainer: { gap: 20, marginTop: 10, marginBottom: 40, width: '100%' },
+  waterTracker: { padding: 16, borderRadius: 20, backgroundColor: 'rgba(59, 130, 246, 0.05)', borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.1)' },
+  waterInfo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  waterTitle: { fontFamily: FONTS.bodyBold, fontSize: 14 },
+  waterVal: { fontFamily: FONTS.heading, fontSize: 18 },
 });

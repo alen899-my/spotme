@@ -45,6 +45,9 @@ const completeWorkoutSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
   completion_photo_url: z.string().nullable().optional()
     .transform(v => v || null),
+  water_intake_liters: z.number().min(0).optional(),
+  post_workout_weight: z.number().min(0).optional(),
+  photos: z.array(z.string()).optional(),
 });
 
 const addExerciseSchema = z.object({

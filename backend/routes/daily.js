@@ -15,7 +15,8 @@ router.get('/workouts', authenticateToken, async (req, res) => {
         (SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = dw.id AND is_completed = true) AS completed_count,
         (SELECT COUNT(*) FROM daily_workout_sets dws 
          JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id 
-         WHERE dwe.daily_workout_id = dw.id) AS total_sets
+         WHERE dwe.daily_workout_id = dw.id) AS total_sets,
+        (SELECT photo_url FROM daily_workout_photos WHERE daily_workout_id = dw.id ORDER BY created_at ASC LIMIT 1) AS cover_photo_url
        FROM daily_workouts dw
        LEFT JOIN workout_splits ws ON dw.split_id = ws.id
        LEFT JOIN workout_sessions wsess ON dw.session_id = wsess.id
@@ -107,7 +108,12 @@ router.get('/workouts/:id', authenticateToken, async (req, res) => {
       sets: setsRows.filter(s => s.daily_exercise_id === ex.id),
     }));
 
-    res.json({ ...workout.rows[0], exercises: exercisesWithSets });
+    const photos = await pool.query(
+      'SELECT * FROM daily_workout_photos WHERE daily_workout_id = $1 ORDER BY created_at ASC',
+      [parseInt(req.params.id)]
+    );
+
+    res.json({ ...workout.rows[0], exercises: exercisesWithSets, photos: photos.rows });
   } catch (err) {
     console.error('GET /daily/workouts/:id error:', err);
     res.status(500).json({ error: err.message });
@@ -244,6 +250,8 @@ router.patch(
     console.log('[Daily] Body:', req.body);
 
     try {
+      const { water_intake_liters, post_workout_weight, photos } = req.body;
+      
       // Check if all exercises are done or skipped
       const exercisesCheck = await pool.query(
         'SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = $1 AND is_completed = false',
@@ -252,40 +260,144 @@ router.patch(
       const remainingCount = parseInt(exercisesCheck.rows[0].count);
       const shouldComplete = remainingCount === 0;
 
-      const result = await pool.query(
-        `UPDATE daily_workouts
-         SET status = $1,
-             completed_at = $2,
-             total_duration_seconds = COALESCE($3, total_duration_seconds),
-             total_volume = COALESCE($4, total_volume),
-             notes = COALESCE($5, notes),
-             completion_photo_url = COALESCE($6, completion_photo_url)
-         WHERE id = $7 AND user_id = $8
-         RETURNING *`,
-        [
-          shouldComplete ? 'completed' : 'active',
-          shouldComplete ? new Date() : null,
-          total_duration_seconds,
-          total_volume,
-          notes || null,
-          completion_photo_url || null,
-          parseInt(id),
-          userId,
-        ]
-      );
+      // Build dynamic update query
+      let updateFields = [];
+      let queryParams = [];
+      let paramIdx = 1;
+
+      const addToQuery = (field, val) => {
+        if (val !== undefined) {
+          updateFields.push(`${field} = $${paramIdx}`);
+          queryParams.push(val);
+          paramIdx++;
+        }
+      };
+
+      addToQuery('status', shouldComplete ? 'completed' : 'active');
+      if (shouldComplete) {
+        updateFields.push(`completed_at = $${paramIdx}`);
+        queryParams.push(new Date());
+        paramIdx++;
+      }
+
+      addToQuery('total_duration_seconds', total_duration_seconds);
+      addToQuery('total_volume', total_volume);
+      addToQuery('notes', notes);
+      addToQuery('completion_photo_url', completion_photo_url);
+      addToQuery('water_intake_liters', water_intake_liters);
+      addToQuery('post_workout_weight', post_workout_weight);
+
+      if (updateFields.length === 0) {
+        return res.status(400).json({ error: 'No fields to update' });
+      }
+
+      queryParams.push(parseInt(id), userId);
+      const query = `UPDATE daily_workouts SET ${updateFields.join(', ')} WHERE id = $${paramIdx} AND user_id = $${paramIdx + 1} RETURNING *`;
+      
+      const result = await pool.query(query, queryParams);
 
       if (result.rows.length === 0) {
         console.warn(`[Daily] Workout ${id} not found or not owned by user ${userId}`);
         return res.status(404).json({ error: 'Workout not found or unauthorized' });
       }
 
+      // Handle multi-photos if provided
+      if (Array.isArray(photos)) {
+        // Clear old ones first (if any)
+        await pool.query('DELETE FROM daily_workout_photos WHERE daily_workout_id = $1', [parseInt(id)]);
+        for (const photoUrl of photos) {
+          await pool.query(
+            'INSERT INTO daily_workout_photos (daily_workout_id, photo_url) VALUES ($1, $2)',
+            [parseInt(id), photoUrl]
+          );
+        }
+      }
+
       console.log(`[Daily] Workout ${id} saved. Status: ${result.rows[0].status}`);
-      res.json(result.rows[0]);
+      res.json({ ...result.rows[0], photos: photos || [] });
     } catch (err) {
       console.error('[Daily] PATCH /complete error:', err);
       res.status(500).json({ error: 'Database update failed', details: err.message });
     }
   }
 );
+
+// ── DELETE /daily/workouts/:id — remove a workout ────────────────────────────
+router.delete('/workouts/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      'DELETE FROM daily_workouts WHERE id = $1 AND user_id = $2 RETURNING id',
+      [parseInt(id), userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found or unauthorized' });
+    }
+
+    res.json({ success: true, message: 'Workout and associated photos deleted' });
+  } catch (err) {
+    console.error('DELETE /daily/workouts/:id error:', err);
+    res.status(500).json({ error: 'Database deletion failed', details: err.message });
+  }
+});
+
+// ── PATCH /daily/workouts/:id/metrics — update weight and water ──────────────
+router.patch('/workouts/:id/metrics', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { water_intake_liters, post_workout_weight } = req.body;
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      `UPDATE daily_workouts
+       SET water_intake_liters = COALESCE($1, water_intake_liters),
+           post_workout_weight = COALESCE($2, post_workout_weight)
+       WHERE id = $3 AND user_id = $4
+       RETURNING *`,
+      [water_intake_liters, post_workout_weight, parseInt(id), userId]
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Workout not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('PATCH /daily/workouts/:id/metrics error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /daily/workouts/:id/photos — append photos ─────────────────────────
+router.post('/workouts/:id/photos', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { photos } = req.body;
+    if (!Array.isArray(photos)) return res.status(400).json({ error: 'Photos must be an array' });
+
+    for (const url of photos) {
+      await pool.query(
+        'INSERT INTO daily_workout_photos (daily_workout_id, photo_url) VALUES ($1, $2)',
+        [parseInt(id), url]
+      );
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST /daily/workouts/:id/photos error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── DELETE /daily/photos/:id — delete a specific photo ───────────────────────
+router.delete('/photos/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM daily_workout_photos WHERE id = $1', [parseInt(id)]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /daily/photos/:id error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;

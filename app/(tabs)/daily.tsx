@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList,
   TouchableOpacity, ActivityIndicator, Dimensions, Image,
+  Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,6 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useToast } from '../../contexts/ToastContext';
+import ConfirmationModal from '../../components/ui/ConfirmationModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -30,8 +33,13 @@ function formatDate(dateStr: string) {
 export default function DailyTab() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { showToast } = useToast();
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Deletion
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchWorkouts = useCallback(async () => {
     try {
@@ -49,11 +57,30 @@ export default function DailyTab() {
 
   useFocusEffect(useCallback(() => { fetchWorkouts(); }, [fetchWorkouts]));
 
+  const handleDeleteWorkout = async () => {
+    if (!deletingId) return;
+    setIsDeleting(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.delete(`${API_URL}/daily/workouts/${deletingId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast('Workout deleted successfully');
+      setWorkouts(prev => prev.filter(w => w.id !== deletingId));
+    } catch (err) {
+      console.error('Error deleting workout:', err);
+      showToast('Failed to delete workout', 'error');
+    } finally {
+      setIsDeleting(false);
+      setDeletingId(null);
+    }
+  };
+
   const renderWorkout = ({ item }: { item: any }) => {
     const isCompleted = item.status === 'completed';
     const totalExs = parseInt(item.exercise_count || 0);
     const totalSets = parseInt(item.total_sets || 0);
-    const hasPhoto = !!item.completion_photo_url;
+    const hasPhoto = !!item.cover_photo_url || !!item.completion_photo_url;
 
     return (
       <TouchableOpacity
@@ -65,7 +92,7 @@ export default function DailyTab() {
           {/* Workout Image / Placeholder */}
           <View style={styles.imageContainer}>
             {hasPhoto ? (
-              <Image source={{ uri: item.completion_photo_url }} style={styles.workoutImg} />
+              <Image source={{ uri: item.cover_photo_url || item.completion_photo_url }} style={styles.workoutImg} />
             ) : (
               <LinearGradient colors={['#333', '#111']} style={styles.workoutImgPlaceholder}>
                 <MaterialCommunityIcons name="arm-flex" size={32} color="rgba(224,0,0,0.4)" />
@@ -77,7 +104,15 @@ export default function DailyTab() {
           </View>
 
           <View style={styles.cardInfo}>
-            <Text style={[styles.dateText, { color: colors.textMuted }]}>{formatDate(item.started_at)}</Text>
+            <View style={styles.cardHeader}>
+              <Text style={[styles.dateText, { color: colors.textMuted }]}>{formatDate(item.started_at)}</Text>
+              <TouchableOpacity 
+                style={styles.deleteBtn} 
+                onPress={() => setDeletingId(item.id)}
+              >
+                <Ionicons name="trash-outline" size={18} color={colors.textDim} />
+              </TouchableOpacity>
+            </View>
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
               {item.title || item.session_name || 'Workout'}
             </Text>
@@ -151,6 +186,16 @@ export default function DailyTab() {
           />
         )}
       </View>
+
+      <ConfirmationModal
+        visible={deletingId !== null}
+        title="Delete Workout?"
+        message="This will permanently remove this session and all associated photos. Are you sure?"
+        confirmText={isDeleting ? "DELETING..." : "YES, DELETE"}
+        confirmColor="#EF4444"
+        onConfirm={handleDeleteWorkout}
+        onCancel={() => setDeletingId(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -171,7 +216,9 @@ const styles = StyleSheet.create({
   statusBadge: { position: 'absolute', top: 8, left: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   statusText: { color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 8, letterSpacing: 0.5 },
   cardInfo: { flex: 1, marginLeft: 16, justifyContent: 'center' },
-  dateText: { fontFamily: FONTS.body, fontSize: 11, marginBottom: 4 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  deleteBtn: { padding: 4 },
+  dateText: { fontFamily: FONTS.body, fontSize: 11 },
   cardTitle: { fontFamily: FONTS.heading, fontSize: 18, marginBottom: 2 },
   splitNameText: { fontFamily: FONTS.bodyBold, fontSize: 13, marginBottom: 12 },
   statsGrid: { flexDirection: 'row', alignItems: 'center', gap: 10 },
