@@ -19,11 +19,11 @@ import { useTheme } from "../../contexts/ThemeContext";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const TABS = [
-  { name: "index",     title: "Home",      icon: "home" as const,    iconOutline: "home-outline" as const,    href: "/(tabs)/" },
-  { name: "exercises", title: "Exercises", icon: "fitness" as const, iconOutline: "fitness-outline" as const, href: "/(tabs)/exercises" },
-  { name: "splits",    title: "Splits",    icon: "layers" as const,  iconOutline: "layers-outline" as const,  href: "/(tabs)/splits" },
-  { name: "workout",   title: "Workout",   icon: "barbell" as const, iconOutline: "barbell-outline" as const, href: "/(tabs)/workout" },
-  { name: "profile",   title: "Profile",   icon: "person" as const,  iconOutline: "person-outline" as const,  href: "/(tabs)/profile" },
+  { name: "index",     title: "Home",      icon: "home" as const,         iconOutline: "home-outline" as const,         href: "/(tabs)/" },
+  { name: "exercises", title: "Exercises", icon: "fitness" as const,      iconOutline: "fitness-outline" as const,      href: "/(tabs)/exercises" },
+  { name: "daily",     title: "Daily",     icon: "calendar" as const,     iconOutline: "calendar-outline" as const,     href: "/(tabs)/daily" },
+  { name: "splits",    title: "Splits",    icon: "layers" as const,       iconOutline: "layers-outline" as const,       href: "/(tabs)/splits" },
+  { name: "profile",   title: "Profile",   icon: "person" as const,       iconOutline: "person-outline" as const,       href: "/(tabs)/profile" },
 ];
 
 function CustomTabBar() {
@@ -102,6 +102,7 @@ export default function TabsLayout() {
     <Tabs screenOptions={{ headerShown: false }} tabBar={() => <CustomTabBar />}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="exercises" />
+      <Tabs.Screen name="daily" />
       <Tabs.Screen name="splits" />
       <Tabs.Screen name="workout" />
       <Tabs.Screen name="profile" />

@@ -7,12 +7,13 @@ const onboardingRoutes = require('./routes/onboarding');
 const profileRoutes = require('./routes/profile');
 const exercisesRoutes = require('./routes/exercises');
 const workoutRoutes = require('./routes/workouts');
+const dailyRoutes = require('./routes/daily');
 
 const app = express();
 
 app.use(cors({
   origin: ['https://spotme-gym.vercel.app', 'http://localhost:19006', 'http://localhost:8081', 'http://localhost:5173'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
@@ -27,6 +28,7 @@ app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/exercises', exercisesRoutes);
 app.use('/api/workouts', workoutRoutes);
+app.use('/api/daily', dailyRoutes);
 
 
 const PORT = process.env.PORT || 5000;

@@ -103,6 +103,47 @@ const initDB = async () => {
       );
     `);
 
+
+    // ── Daily Workout Logging Tables ─────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS daily_workouts (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(255),
+        split_id INT REFERENCES workout_splits(id) ON DELETE SET NULL,
+        session_id INT REFERENCES workout_sessions(id) ON DELETE SET NULL,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP,
+        total_duration_seconds INT DEFAULT 0,
+        total_volume NUMERIC(10,2) DEFAULT 0,
+        notes TEXT,
+        completion_photo_url VARCHAR(500),
+        status VARCHAR(20) DEFAULT 'active'
+      );
+
+      CREATE TABLE IF NOT EXISTS daily_workout_exercises (
+        id SERIAL PRIMARY KEY,
+        daily_workout_id INT REFERENCES daily_workouts(id) ON DELETE CASCADE,
+        exercise_id VARCHAR(10) REFERENCES exercises(id),
+        target_sets INT DEFAULT 3,
+        target_reps VARCHAR(50) DEFAULT '8-12',
+        target_weight VARCHAR(50) DEFAULT '0',
+        sort_order INT DEFAULT 0,
+        is_completed BOOLEAN DEFAULT FALSE
+      );
+
+      CREATE TABLE IF NOT EXISTS daily_workout_sets (
+        id SERIAL PRIMARY KEY,
+        daily_exercise_id INT REFERENCES daily_workout_exercises(id) ON DELETE CASCADE,
+        set_number INT NOT NULL,
+        weight NUMERIC(6,2) DEFAULT 0,
+        reps INT DEFAULT 0,
+        duration_seconds INT DEFAULT 0,
+        rest_seconds INT DEFAULT 0,
+        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log("Database connected and all tables ready");
   } catch (error) {
     console.error("Database initialization failed:", error);

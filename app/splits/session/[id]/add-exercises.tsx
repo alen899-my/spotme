@@ -11,6 +11,7 @@ import {
   TextInput,
   Dimensions,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,7 +35,11 @@ export default function AddSessionExercisesScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [addingId, setAddingId] = useState<string | null>(null);
+  const LIMIT = 20;
 
   const fetchFilters = useCallback(async () => {
     try {
@@ -45,36 +50,62 @@ export default function AddSessionExercisesScreen() {
     }
   }, []);
 
-  const fetchExercises = useCallback(async (q: string, cat: string | null) => {
-    setLoading(true);
+  const fetchExercises = useCallback(async (q: string, cat: string | null, p: number = 0) => {
+    if (p === 0) setLoading(true);
+    else setLoadingMore(true);
+
     try {
-      const params: any = { q, limit: 30 };
-      if (cat) params.category = cat;
+      const offset = p * LIMIT;
+      // Use the new search endpoint for everything if query or category is provided
+      const url = q || cat 
+        ? `${API_URL}/workouts/exercises/search`
+        : `${API_URL}/workouts/exercises/search`; // Use search as default with empty q
+        
+      const res = await axios.get(url, { 
+        params: { q, category: cat, limit: LIMIT, offset } 
+      });
       
-      const res = await axios.get(`${API_URL}/exercises`, { params });
-      setExercises(res.data.data);
+      const newExs = res.data;
+      if (p === 0) {
+        setExercises(newExs);
+      } else {
+        setExercises(prev => [...prev, ...newExs]);
+      }
+      setHasMore(newExs.length === LIMIT);
+      setPage(p);
     } catch (err) {
       console.error('Error fetching exercises:', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
-  useEffect(() => { 
+  useEffect(() => {
     fetchFilters();
-    fetchExercises('', null); 
-  }, [fetchFilters, fetchExercises]);
+  }, [fetchFilters]);
+
+  // Debounced Search & Category Effect
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      fetchExercises(query, selectedCategory, 0);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [query, selectedCategory]);
 
   const handleSearch = (text: string) => {
     setQuery(text);
-    const timeout = setTimeout(() => fetchExercises(text, selectedCategory), 300);
-    return () => clearTimeout(timeout);
   };
 
   const handleCategoryPress = (cat: string) => {
-    const newCat = selectedCategory === cat ? null : cat;
-    setSelectedCategory(newCat);
-    fetchExercises(query, newCat);
+    setSelectedCategory(prev => prev === cat ? null : cat);
+  };
+
+  const loadMore = () => {
+    if (!loading && !loadingMore && hasMore) {
+      console.log('Loading more exercises, page:', page + 1);
+      fetchExercises(query, selectedCategory, page + 1);
+    }
   };
 
   const handleAdd = async (exerciseId: string) => {
@@ -105,8 +136,8 @@ export default function AddSessionExercisesScreen() {
         <Text style={[styles.exName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
         <Text style={[styles.exMeta, { color: colors.textMuted }]}>{item.target} • {item.equipment}</Text>
       </View>
-      <TouchableOpacity 
-        style={[styles.addBtn, { backgroundColor: '#E00000' }]} 
+      <TouchableOpacity
+        style={[styles.addBtn, { backgroundColor: '#E00000' }]}
         onPress={() => handleAdd(item.id)}
         disabled={addingId === item.id}
       >
@@ -124,18 +155,26 @@ export default function AddSessionExercisesScreen() {
           <View style={{ width: 28 }} />
         </View>
 
-        <View style={styles.searchContainer}>
-          <Input
+        <View style={[styles.searchWrap, { backgroundColor: colors.inputBg }]}>
+          <Ionicons name="search" size={18} color={colors.textDim} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Search movements..."
+            placeholderTextColor={colors.textDim}
             value={query}
             onChangeText={handleSearch}
-            icon={<Ionicons name="search-outline" size={20} color={colors.textDim} />}
+            autoCorrect={false}
           />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => handleSearch('')}>
+              <Ionicons name="close-circle" size={18} color={colors.textDim} />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.filterWrap}>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterScroll}
           >
@@ -164,7 +203,17 @@ export default function AddSessionExercisesScreen() {
         {loading && exercises.length === 0 ? (
           <View style={styles.centered}><ActivityIndicator size="large" color="#E00000" /></View>
         ) : (
-          <FlatList data={exercises} keyExtractor={(item) => item.id} renderItem={renderExercise} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" />
+          <FlatList 
+            data={exercises} 
+            keyExtractor={(item) => item.id} 
+            renderItem={renderExercise} 
+            contentContainerStyle={styles.listContent} 
+            showsVerticalScrollIndicator={false} 
+            keyboardShouldPersistTaps="handled"
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={loadingMore ? <ActivityIndicator color="#E00000" style={{ marginVertical: 20 }} /> : null}
+          />
         )}
       </View>
     </SafeAreaView>
@@ -188,4 +237,6 @@ const styles = StyleSheet.create({
   exMeta: { fontFamily: FONTS.body, fontSize: 12, textTransform: 'capitalize' },
   addBtn: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 54, borderRadius: 16, marginHorizontal: 20, marginBottom: 20, gap: 10, borderWidth: 0 },
+  searchInput: { flex: 1, fontFamily: FONTS.body, fontSize: 15, padding: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
 });

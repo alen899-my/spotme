@@ -175,4 +175,51 @@ router.put('/exercises/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// ─── GLOBAL EXERCISES BROWSER ────────────────────────────────────────────────
+
+// Get all unique categories
+router.get('/exercises/categories', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT DISTINCT category FROM exercises ORDER BY category ASC');
+    res.json(result.rows.map(r => r.category));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get exercises by category
+router.get('/exercises/by-category/:category', authenticateToken, async (req, res) => {
+  const { limit = 20, offset = 0 } = req.query;
+  try {
+    const result = await pool.query(
+      'SELECT * FROM exercises WHERE category = $1 ORDER BY name ASC LIMIT $2 OFFSET $3',
+      [req.params.category, parseInt(limit), parseInt(offset)]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/exercises/search', authenticateToken, async (req, res) => {
+  const { q, category, limit = 20, offset = 0 } = req.query;
+  try {
+    let queryText = 'SELECT * FROM exercises WHERE (name ILIKE $1 OR target ILIKE $1)';
+    let params = [`%${q}%`];
+
+    if (category) {
+      queryText += ' AND category = $2';
+      params.push(category);
+    }
+
+    queryText += ` ORDER BY name ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(parseInt(limit), parseInt(offset));
+    
+    const result = await pool.query(queryText, params);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
