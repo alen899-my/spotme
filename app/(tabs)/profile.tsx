@@ -72,9 +72,13 @@ export default function ProfileScreen() {
   ];
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem("userToken");
-    await AsyncStorage.removeItem("userData");
-    router.replace("/");
+    try {
+      await AsyncStorage.removeItem("userToken");
+      await AsyncStorage.removeItem("userData");
+      router.replace("/");
+    } catch (e) {
+      console.error("Logout error in profile:", e);
+    }
   };
 
   return (

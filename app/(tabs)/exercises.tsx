@@ -56,14 +56,14 @@ const SkeletonCard = ({ colors, tall = true }: { colors: any; tall?: boolean }) 
   ]} />
 );
 
-// ─── Category card ────────────────────────────────────────────────────────────
+// ─── Category card (Uber-Premium Look) ─────────────────────────────────────────
 const CategoryCard = React.memo(({ item, colors, onPress }: { item: any; colors: any; onPress: () => void }) => {
   const [imgError, setImgError] = useState(false);
-  const [start] = accentFor(item.category);
+  const [start, end] = accentFor(item.category);
   const label = item.category.charAt(0).toUpperCase() + item.category.slice(1);
 
   return (
-    <TouchableOpacity activeOpacity={0.86}
+    <TouchableOpacity activeOpacity={0.88}
       onPress={onPress}
       style={[
         styles.card,
@@ -72,92 +72,101 @@ const CategoryCard = React.memo(({ item, colors, onPress }: { item: any; colors:
           height: CARD_HEIGHT,
           backgroundColor: start,
           borderColor: 'transparent',
-          overflow: 'hidden'
         }
       ]}
     >
-      {item.image_url && !imgError ? (
-        <Image
-          source={{ uri: item.image_url }}
-          style={[StyleSheet.absoluteFillObject, { opacity: 0.5 }]}
-          resizeMode="cover"
-          onError={() => setImgError(true)}
-        />
-      ) : (
-        <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center' }]}>
-          <Ionicons name="fitness-outline" size={44} color="rgba(255,255,255,0.3)" />
-        </View>
-      )}
-
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.6)']}
+        colors={[start, end]}
         style={StyleSheet.absoluteFillObject}
       />
 
-      <View style={styles.cardBottom}>
-        <Text style={[styles.cardLabel, { color: '#FFF' }]}>{label}</Text>
-        {!!item.exercise_count && (
-          <Text style={[styles.cardCount, { color: 'rgba(255,255,255,0.9)' }]}>
-            {item.exercise_count} exercises
-          </Text>
+      {/* Decorative large text behind */}
+      <Text style={styles.cardBgLabel}>{label.slice(0, 3).toUpperCase()}</Text>
+
+      {/* Image placement - shifted for a dynamic 'Uber' look */}
+      <View style={styles.imageContainer}>
+        {item.image_url && !imgError ? (
+          <Image
+            source={{ uri: item.image_url }}
+            style={styles.floatingImage}
+            resizeMode="contain"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <Ionicons name="fitness-outline" size={60} color="rgba(255,255,255,0.15)" />
         )}
       </View>
 
-      <View style={[styles.arrowWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-        <Ionicons name="chevron-forward" size={14} color="#FFF" />
+      <View style={styles.cardContent}>
+        <Text style={styles.cardLabelPremium}>{label}</Text>
+        <View style={styles.cardInfoRow}>
+          <Text style={styles.cardCountPremium}>{item.exercise_count || 0} exercises</Text>
+          <View style={styles.miniArrow}>
+            <Ionicons name="arrow-forward" size={12} color="#FFF" />
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   );
 });
 
-// ─── Exercise result card (clean square grid) ──────────────────────────────────
+// ─── Exercise card (Uber-Premium Square Look) ──────────────────────────────────
 const ExerciseCard = React.memo(({ item, colors, square = false }: { item: any; colors: any; square?: boolean }) => {
   const router = useRouter();
   const [imgError, setImgError] = useState(false);
   const [accent] = accentFor(item.category);
+  const bgLabel = item.name.slice(0, 3).toUpperCase();
 
   return (
     <TouchableOpacity
-      activeOpacity={0.84}
+      activeOpacity={0.85}
       onPress={() => router.push(`/exercises/${item.id}`)}
       style={[
         styles.card,
         {
           width: CARD_WIDTH,
-          height: square ? CARD_WIDTH : CARD_WIDTH * 0.72,
-          backgroundColor: '#E00000',
+          height: square ? CARD_WIDTH : CARD_WIDTH * 0.75,
+          backgroundColor: '#1A1A1A',
           borderColor: 'transparent',
-          overflow: 'hidden'
         }
       ]}
     >
+      {/* Decorative background label */}
+      <Text style={[styles.cardBgLabel, { fontSize: 60, opacity: 0.1 }]}>{bgLabel}</Text>
+
       {item.image_url && !imgError ? (
         <Image
           source={{ uri: item.image_url }}
-          style={[StyleSheet.absoluteFillObject, { opacity: 0.65 }]}
+          style={[StyleSheet.absoluteFillObject, { opacity: 0.75 }]}
           resizeMode="cover"
           onError={() => setImgError(true)}
         />
       ) : (
         <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center' }]}>
-          <Ionicons name="barbell-outline" size={32} color="rgba(255,255,255,0.3)" />
+          <Ionicons name="barbell-outline" size={32} color="rgba(255,255,255,0.2)" />
         </View>
       )}
 
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.8)']}
+        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.95)']}
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Category chip - only show in search mode, not drilldown */}
       {!square && (
-        <View style={[styles.chip, { backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }]}>
-          <Text style={styles.chipText}>{item.category}</Text>
+        <View style={[styles.premiumChip, { backgroundColor: accent }]}>
+          <Text style={styles.premiumChipText}>{item.category}</Text>
         </View>
       )}
 
-      <View style={styles.exCardBottom}>
-        <Text style={[styles.exCardName, { color: '#FFF' }]} numberOfLines={2}>{item.name}</Text>
+      <View style={styles.exCardContent}>
+        <Text style={styles.exNamePremium} numberOfLines={2}>{item.name}</Text>
+        {square && (
+          <View style={styles.exTagRow}>
+            <Text style={styles.exTargetPremium}>{item.target}</Text>
+            <View style={styles.dot} />
+            <Text style={styles.exTargetPremium}>{item.equipment}</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -474,47 +483,125 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: H_PADDING, paddingTop: 16, paddingBottom: 40 },
   row: { justifyContent: 'space-between', marginBottom: CARD_GAP },
 
-  // Card shared
+  // Card shared (Uber Style: Flat with deep rounding and subtle shadows)
   card: {
-    borderRadius: 22,
-    borderWidth: 1,
+    borderRadius: 24,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
   },
 
-  // Category card internals
-  accentBar: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: 4,
-    borderTopLeftRadius: 22, borderTopRightRadius: 22,
+  // Category Premium Internals
+  cardBgLabel: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    fontSize: 80,
+    fontFamily: FONTS.heading,
+    color: 'rgba(255,255,255,0.08)',
+    zIndex: 0,
   },
-  cardBottom: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: 14, paddingBottom: 16,
+  imageContainer: {
+    position: 'absolute',
+    bottom: -10,
+    right: -10,
+    width: '80%',
+    height: '70%',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    zIndex: 1,
   },
-  cardLabel: {
-    fontFamily: FONTS.heading, fontSize: 16, color: '#FFF', letterSpacing: 0.3,
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
+  floatingImage: {
+    width: '100%',
+    height: '100%',
+    transform: [{ rotate: '-5deg' }, { scale: 1.1 }],
   },
-  cardCount: { fontFamily: FONTS.body, fontSize: 11, color: 'rgba(255,255,255,0.72)', marginTop: 2 },
-  arrowWrap: {
-    position: 'absolute', bottom: 14, right: 14,
-    width: 26, height: 26, borderRadius: 8, justifyContent: 'center', alignItems: 'center',
+  cardContent: {
+    padding: 16,
+    justifyContent: 'space-between',
+    flex: 1,
+    zIndex: 2,
+  },
+  cardLabelPremium: {
+    fontFamily: FONTS.heading,
+    fontSize: 22,
+    color: '#FFF',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  cardInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 'auto',
+  },
+  cardCountPremium: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  miniArrow: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
-  // Exercise card (search results)
-  chip: {
-    position: 'absolute', top: 8, left: 8,
-    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7,
+  // Exercise Premium Internals
+  premiumChip: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    zIndex: 3,
   },
-  chipText: { fontFamily: FONTS.bodyBold, fontSize: 9, color: '#FFF', textTransform: 'uppercase', letterSpacing: 0.4 },
-  exCardBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10 },
-  exCardName: {
-    fontFamily: FONTS.bodyBold, fontSize: 12, color: '#FFF', lineHeight: 16,
+  premiumChipText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: '#FFF',
+    textTransform: 'uppercase',
+  },
+  exCardContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+    zIndex: 3,
+  },
+  exNamePremium: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 14,
+    color: '#FFF',
+    lineHeight: 18,
     textTransform: 'capitalize',
-    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  exTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    marginHorizontal: 6,
+  },
+  exTargetPremium: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.7)',
+    textTransform: 'capitalize',
   },
 
   // States

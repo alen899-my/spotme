@@ -17,7 +17,7 @@ import { COLORS, FONTS } from "../constants/theme";
 
 const { width, height } = Dimensions.get("window");
 
-export default function HomeScreen() {
+export default function LandingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -137,7 +137,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: "#000000", // Fixed black for the root
     ...(Platform.OS === "web"
       ? {
           maxWidth: 430,
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 240,
     height: 68,
-    marginLeft: -10, // Pull it slightly left if there's padding in the image
+    marginLeft: -10,
   },
   pillBadge: {
     backgroundColor: "rgba(224,0,0,0.2)",
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   eyebrowLine: {
     width: 24,
     height: 2,
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#E00000",
     borderRadius: 2,
   },
   eyebrow: {
@@ -221,13 +221,13 @@ const styles = StyleSheet.create({
   headline: {
     fontFamily: FONTS.heading,
     fontSize: 68,
-    color: COLORS.text,
+    color: "#FFFFFF", // Always white
     lineHeight: 66,
     letterSpacing: 1,
     marginBottom: 16,
   },
   headlineAccent: {
-    color: COLORS.primary,
+    color: "#E00000", // Primary red
   },
   sub: {
     fontFamily: FONTS.body,
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   ctaText: {
     fontFamily: FONTS.heading,
     fontSize: 20,
-    color: COLORS.text,
+    color: "#FFFFFF", // Always white
     letterSpacing: 3,
   },
   ctaArrow: {
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   secondaryText: {
     fontFamily: FONTS.body,
     fontSize: 13,
-    color: COLORS.textDim,
+    color: "rgba(255,255,255,0.4)", // Dim text
   },
   secondaryAccent: {
     fontFamily: FONTS.bodyBold,

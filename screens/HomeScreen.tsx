@@ -55,9 +55,14 @@ export default function HomeScreen() {
   };
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem("userToken");
-    await AsyncStorage.removeItem("userData");
-    router.replace("/");
+    try {
+      await AsyncStorage.removeItem("userToken");
+      await AsyncStorage.removeItem("userData");
+      // Use replace to the root landing page (app/index.tsx)
+      router.replace("/");
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
   };
 
   if (loading) {
