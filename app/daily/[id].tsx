@@ -89,9 +89,18 @@ export default function ActiveWorkoutScreen() {
       { label: 'BODY WEIGHT', val: `${data.post_workout_weight || 0}kg`, icon: 'scale', color: '#10B981', sub: 'Current body mass' },
     ];
 
-    const startTime = (data.started_at || data.created_at) ? new Date(data.started_at || data.created_at).toLocaleString([], { 
-      weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-    }) : '';
+    const formatDisplayDate = (dateStr: string) => {
+      if (!dateStr) return '';
+      // Ensure UTC string is parsed as UTC by appending Z if missing
+      const normalized = (dateStr.includes('Z') || dateStr.includes('+')) 
+        ? dateStr 
+        : `${dateStr.replace(' ', 'T')}Z`;
+      return new Date(normalized).toLocaleString([], { 
+        weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+      });
+    };
+
+    const startTime = formatDisplayDate(data.started_at || data.created_at);
 
     return (
       <View style={styles.perfContainer}>
