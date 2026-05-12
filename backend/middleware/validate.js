@@ -36,6 +36,7 @@ const logSetSchema = z.object({
   duration_seconds: z.number().int().min(0).default(0),
   rest_seconds: z.number().int().min(0).default(0),
   workout_duration: z.number().int().min(0).optional(),
+  total_rest_duration: z.number().int().min(0).optional(),
   is_skipped: z.boolean().default(false),
 });
 
@@ -47,6 +48,7 @@ const completeWorkoutSchema = z.object({
     .transform(v => v || null),
   water_intake_liters: z.number().min(0).optional(),
   post_workout_weight: z.number().min(0).optional(),
+  total_rest_seconds: z.number().int().min(0).optional(),
   photos: z.array(z.string()).optional(),
 });
 
@@ -55,6 +57,7 @@ const addExerciseSchema = z.object({
   target_sets: z.number().int().min(1).default(3),
   target_reps: z.coerce.string().default('8-12'),
   target_weight: z.coerce.string().default('0'),
+  target_rest_time: z.coerce.string().default('60s'),
 });
 
 module.exports = {

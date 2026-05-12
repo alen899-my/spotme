@@ -118,7 +118,8 @@ const initDB = async () => {
         total_volume NUMERIC(10,2) DEFAULT 0,
         notes TEXT,
         completion_photo_url VARCHAR(500),
-        status VARCHAR(20) DEFAULT 'active'
+        status VARCHAR(20) DEFAULT 'active',
+        total_rest_seconds INT DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS daily_workout_exercises (
@@ -128,6 +129,7 @@ const initDB = async () => {
         target_sets INT DEFAULT 3,
         target_reps VARCHAR(50) DEFAULT '8-12',
         target_weight VARCHAR(50) DEFAULT '0',
+        target_rest_time VARCHAR(50) DEFAULT '60s',
         sort_order INT DEFAULT 0,
         is_completed BOOLEAN DEFAULT FALSE
       );

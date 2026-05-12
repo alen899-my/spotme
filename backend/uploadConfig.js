@@ -19,7 +19,9 @@ const upload = multer({
     contentType: multerS3.AUTO_CONTENT_TYPE,
     key: function (req, file, cb) {
       const ext = file.originalname.split('.').pop() || 'jpg';
-      cb(null, `spotme/onboarding/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`);
+      // Dynamically set folder based on route
+      const folder = req.originalUrl.includes('/daily') ? 'daily' : 'onboarding';
+      cb(null, `spotme/${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`);
     }
   })
 });
