@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList,
   TouchableOpacity, ActivityIndicator, Image, Modal,
-  ScrollView, Platform, Dimensions, TextInput,
+  ScrollView, Platform, Dimensions, TextInput, KeyboardAvoidingView,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +24,11 @@ export default function MealsScreen() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   
+  // Log Meal Form State
+  const [showLogForm, setShowLogForm] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [mealDescription, setMealDescription] = useState('');
+
   // Analysis Modal State
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analysisData, setAnalysisData] = useState<any>(null);
@@ -58,25 +64,33 @@ export default function MealsScreen() {
     });
 
     if (!result.canceled) {
-      analyzeMeal(result.assets[0].uri);
+      setSelectedImage(result.assets[0].uri);
     }
   };
 
-  const analyzeMeal = async (uri: string) => {
+  const startAnalysis = async () => {
+    if (!selectedImage) {
+      showToast('Please select a meal image', 'error');
+      return;
+    }
+
     setUploading(true);
+    setShowLogForm(false);
+    
     try {
       const token = await AsyncStorage.getItem('userToken');
       const formData = new FormData();
+      formData.append('description', mealDescription);
       
       if (Platform.OS === 'web') {
-        const response = await fetch(uri);
+        const response = await fetch(selectedImage);
         const blob = await response.blob();
         formData.append('photo', blob, 'meal.jpg');
       } else {
-        const name = uri.split('/').pop();
+        const name = selectedImage.split('/').pop();
         const match = /\.(\w+)$/.exec(name || '');
         const type = match ? `image/${match[1]}` : `image`;
-        formData.append('photo', { uri, name, type } as any);
+        formData.append('photo', { uri: selectedImage, name, type } as any);
       }
 
       const res = await axios.post(`${API_URL}/meals/analyze`, formData, {
@@ -98,9 +112,13 @@ export default function MealsScreen() {
       setMealType(type);
 
       setShowAnalysis(true);
+      // Reset form
+      setSelectedImage(null);
+      setMealDescription('');
     } catch (err) {
       console.error('Analysis error:', err);
       showToast('Failed to analyze meal', 'error');
+      setShowLogForm(true); // Re-open form on error
     } finally {
       setUploading(false);
     }
@@ -193,6 +211,45 @@ export default function MealsScreen() {
     );
   };
 
+  const RenderLoadingCard = () => {
+    const pulseAnim = React.useRef(new Animated.Value(0.4)).current;
+    const skeletonColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
+
+    React.useEffect(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 0.4, duration: 1000, useNativeDriver: true }),
+        ])
+      ).start();
+    }, []);
+
+    return (
+      <View style={[styles.mealCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Animated.View style={[styles.mealCardImage, { backgroundColor: skeletonColor, opacity: pulseAnim }]} />
+        <View style={styles.mealCardContent}>
+          <View style={styles.mealCardHeader}>
+            <View style={{ flex: 1 }}>
+              <Animated.View style={{ height: 24, width: '50%', backgroundColor: skeletonColor, borderRadius: 6, opacity: pulseAnim }} />
+              <Animated.View style={{ height: 14, width: '30%', backgroundColor: skeletonColor, borderRadius: 4, marginTop: 10, opacity: pulseAnim }} />
+            </View>
+          </View>
+          
+          <View style={[styles.nutrientRow, { marginTop: 20 }]}>
+            {[1, 2, 3, 4].map((i) => (
+              <Animated.View key={i} style={[styles.nutrientBadge, { backgroundColor: skeletonColor, height: 50, opacity: pulseAnim }]} />
+            ))}
+          </View>
+
+          <View style={[styles.foodItemsList, { marginTop: 16 }]}>
+            <Animated.View style={{ height: 12, width: '80%', backgroundColor: skeletonColor, borderRadius: 4, opacity: pulseAnim, marginBottom: 8 }} />
+            <Animated.View style={{ height: 12, width: '70%', backgroundColor: skeletonColor, borderRadius: 4, opacity: pulseAnim }} />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const NutrientBadge = ({ label, value, color, unit = 'g' }: { label: string, value: number, color: string, unit?: string }) => (
     <View style={[styles.nutrientBadge, { backgroundColor: color + '15' }]}>
       <Text style={[styles.nutrientBadgeValue, { color }]}>{value}{unit}</Text>
@@ -207,9 +264,9 @@ export default function MealsScreen() {
           <Text style={[styles.headerTitle, { color: colors.text }]}>Meal Tracker</Text>
           <Text style={[styles.headerSub, { color: colors.textMuted }]}>AI-powered nutrition analysis</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={handlePickImage} disabled={uploading}>
+        <TouchableOpacity style={styles.addBtn} onPress={() => setShowLogForm(true)}>
           <LinearGradient colors={['#E00000', '#B00000']} style={styles.addBtnGrad}>
-            {uploading ? <ActivityIndicator color="#FFF" size="small" /> : <Ionicons name="add" size={28} color="#FFF" />}
+            <Ionicons name="add" size={28} color="#FFF" />
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -218,27 +275,82 @@ export default function MealsScreen() {
         <View style={styles.centered}><ActivityIndicator size="large" color="#E00000" /></View>
       ) : (
         <FlatList
-          data={meals}
+          data={uploading ? [{ id: 'loading' }, ...meals] : meals}
           keyExtractor={(item) => item.id.toString()}
-          renderItem={renderMealCard}
+          renderItem={({ item }) => {
+            if (item.id === 'loading') return <RenderLoadingCard />;
+            return renderMealCard({ item });
+          }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="restaurant-outline" size={64} color={colors.textDim} />
-              <Text style={[styles.emptyText, { color: colors.textDim }]}>No meals logged yet</Text>
-              <TouchableOpacity style={styles.emptyBtn} onPress={handlePickImage}>
-                <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold }}>Log Your First Meal</Text>
-              </TouchableOpacity>
-            </View>
+            uploading ? null : (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="restaurant-outline" size={64} color={colors.textDim} />
+                <Text style={[styles.emptyText, { color: colors.textDim }]}>No meals logged yet</Text>
+                <TouchableOpacity style={styles.emptyBtn} onPress={() => setShowLogForm(true)}>
+                  <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold }}>Log Your First Meal</Text>
+                </TouchableOpacity>
+              </View>
+            )
           }
         />
       )}
 
+      {/* Log Meal Form Modal */}
+      <Modal visible={showLogForm} animationType="fade" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, height: 'auto', maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>New Meal</Text>
+              <TouchableOpacity onPress={() => setShowLogForm(false)}>
+                <Ionicons name="close" size={28} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TouchableOpacity style={[styles.imageUploadBox, { borderColor: colors.border }]} onPress={handlePickImage}>
+                {selectedImage ? (
+                  <Image source={{ uri: selectedImage }} style={styles.previewImage} />
+                ) : (
+                  <View style={{ alignItems: 'center' }}>
+                    <Ionicons name="camera-outline" size={40} color={colors.textDim} />
+                    <Text style={{ color: colors.textDim, fontFamily: FONTS.bodyBold, marginTop: 8 }}>SELECT MEAL PHOTO</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 20 }]}>Description / Ingredients (Optional)</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, height: 100, textAlignVertical: 'top', paddingTop: 12 }]}
+                placeholder="Describe your meal to help AI be more accurate..."
+                placeholderTextColor={colors.textDim}
+                multiline
+                numberOfLines={4}
+                value={mealDescription}
+                onChangeText={setMealDescription}
+              />
+              
+              <TouchableOpacity 
+                style={[styles.saveBtn, { marginTop: 30, opacity: selectedImage ? 1 : 0.5 }]} 
+                onPress={startAnalysis}
+                disabled={!selectedImage || uploading}
+              >
+                <LinearGradient colors={['#E00000', '#B00000']} style={styles.saveBtnGrad}>
+                  {uploading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>ANALYZE & LOG</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+              
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Analysis Modal */}
       <Modal visible={showAnalysis} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, height: '90%' }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Meal Analysis</Text>
               <TouchableOpacity onPress={() => setShowAnalysis(false)}>
@@ -346,9 +458,13 @@ const styles = StyleSheet.create({
   
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { height: '90%', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24 },
+  modalContent: { width: '100%', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontFamily: FONTS.heading, fontSize: 24 },
+  imageUploadBox: { width: '100%', height: 200, borderRadius: 20, borderStyle: 'dashed', borderWidth: 2, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  previewImage: { width: '100%', height: '100%' },
+  fieldLabel: { fontFamily: FONTS.bodyBold, fontSize: 12, marginBottom: 8, letterSpacing: 0.5 },
+  input: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 16, fontFamily: FONTS.bodySemiBold, fontSize: 14 },
   analysisImage: { width: '100%', height: 250, borderRadius: 20, marginBottom: 20 },
   typeSelector: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   typeBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
