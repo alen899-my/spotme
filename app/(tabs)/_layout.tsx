@@ -8,6 +8,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  ScrollView,
 } from "react-native";
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,6 +34,7 @@ function CustomTabBar() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const [user, setUser] = React.useState<any>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => { loadUser(); }, [pathname]);
 
@@ -48,7 +50,7 @@ function CustomTabBar() {
   );
   const current = activeIndex < 0 ? 0 : activeIndex;
 
-  const TAB_WIDTH = 68;
+  const TAB_WIDTH = 78;
   const PILL_PADDING = 4;
   const containerWidth = TABS.length * TAB_WIDTH + PILL_PADDING * 2;
 
@@ -62,38 +64,58 @@ function CustomTabBar() {
       ...scaleAnims.map((anim, i) => Animated.spring(anim, { toValue: i === current ? 1 : 0.85, useNativeDriver: true, tension: 80, friction: 10 })),
       ...opacityAnims.map((anim, i) => Animated.timing(anim, { toValue: i === current ? 1 : 0.5, duration: 180, useNativeDriver: true })),
     ]).start();
+
+    // Auto-scroll to active tab
+    if (scrollViewRef.current) {
+      const scrollX = current * TAB_WIDTH + PILL_PADDING - (SCREEN_WIDTH / 2) + (TAB_WIDTH / 2);
+      scrollViewRef.current.scrollTo({ x: Math.max(0, scrollX), animated: true });
+    }
   }, [current]);
 
   const bottomPad = Math.max(insets.bottom, Platform.OS === "ios" ? 24 : 10);
 
   return (
     <View style={[styles.outerWrap, { paddingBottom: bottomPad, backgroundColor: colors.tabBar, borderTopColor: colors.tabBarBorder }]}>
-      <View style={[styles.pill, { width: containerWidth, backgroundColor: colors.pill, borderColor: colors.border }]}>
-        <Animated.View
-          style={[
-            styles.activeBg,
-            { width: TAB_WIDTH, backgroundColor: colors.activeBg, borderColor: colors.border, transform: [{ translateX: slideAnim }] },
-          ]}
-        />
-        {TABS.map((tab, i) => {
-          const isActive = i === current;
-          return (
-            <TouchableOpacity key={tab.name} style={[styles.tabItem, { width: TAB_WIDTH }]} onPress={() => router.push(tab.href as any)} activeOpacity={0.8}>
-              <Animated.View style={{ alignItems: "center", transform: [{ scale: scaleAnims[i] }], opacity: opacityAnims[i] }}>
-                {tab.name === "profile" && (user?.profile_pic_url || user?.profilePicUrl) ? (
-                  <Image
-                    source={{ uri: user.profile_pic_url || user.profilePicUrl }}
-                    style={[styles.profileIcon, isActive && { borderColor: "#E00000" }, !isActive && { borderColor: colors.textDim }]}
-                  />
-                ) : (
-                  <Ionicons name={isActive ? tab.icon : tab.iconOutline} size={22} color={isActive ? "#E00000" : colors.textMuted} />
-                )}
-                <Text style={[styles.label, { color: isActive ? "#E00000" : colors.textMuted }]}>{tab.title}</Text>
-              </Animated.View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <ScrollView
+        ref={scrollViewRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        bounces={true}
+        contentContainerStyle={styles.scrollContent}
+        decelerationRate="fast"
+      >
+        <View style={[styles.pill, { width: containerWidth, backgroundColor: colors.pill, borderColor: colors.border }]}>
+          <Animated.View
+            style={[
+              styles.activeBg,
+              { width: TAB_WIDTH, backgroundColor: colors.activeBg, borderColor: colors.border, transform: [{ translateX: slideAnim }] },
+            ]}
+          />
+          {TABS.map((tab, i) => {
+            const isActive = i === current;
+            return (
+              <TouchableOpacity 
+                key={tab.name} 
+                style={[styles.tabItem, { width: TAB_WIDTH }]} 
+                onPress={() => router.push(tab.href as any)} 
+                activeOpacity={0.7}
+              >
+                <Animated.View style={{ alignItems: "center", transform: [{ scale: scaleAnims[i] }], opacity: opacityAnims[i] }}>
+                  {tab.name === "profile" && (user?.profile_pic_url || user?.profilePicUrl) ? (
+                    <Image
+                      source={{ uri: user.profile_pic_url || user.profilePicUrl }}
+                      style={[styles.profileIcon, isActive && { borderColor: "#E00000" }, !isActive && { borderColor: colors.textDim }]}
+                    />
+                  ) : (
+                    <Ionicons name={isActive ? tab.icon : tab.iconOutline} size={22} color={isActive ? "#E00000" : colors.textMuted} />
+                  )}
+                  <Text style={[styles.label, { color: isActive ? "#E00000" : colors.textMuted }]} numberOfLines={1}>{tab.title}</Text>
+                </Animated.View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -114,30 +136,35 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   outerWrap: {
-    alignItems: "center",
     borderTopWidth: 0.5,
     paddingTop: 10,
   },
+  scrollContent: {
+    paddingHorizontal: 20,
+    flexGrow: 1,
+    justifyContent: "center",
+  },
   pill: {
     flexDirection: "row",
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 4,
     position: "relative",
     overflow: "hidden",
-    borderWidth: 1,
+    borderWidth: 1.5,
+    alignSelf: "center",
   },
   activeBg: {
     position: "absolute",
     top: 4,
     left: 4,
     bottom: 4,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   tabItem: {
     alignItems: "center",
@@ -147,7 +174,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 11,
+    fontSize: 10,
     marginTop: 3,
   },
   profileIcon: {
