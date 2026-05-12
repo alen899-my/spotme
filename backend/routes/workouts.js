@@ -204,20 +204,37 @@ router.get('/exercises/by-category/:category', authenticateToken, async (req, re
 router.get('/exercises/search', authenticateToken, async (req, res) => {
   const { q, category, limit = 20, offset = 0 } = req.query;
   try {
-    let queryText = 'SELECT * FROM exercises WHERE (name ILIKE $1 OR target ILIKE $1)';
-    let params = [`%${q}%`];
+    const conditions = [];
+    const params = [];
+    let idx = 1;
 
-    if (category) {
-      queryText += ' AND category = $2';
-      params.push(category);
+    // Only filter by name/target if q is provided
+    if (q && q.trim()) {
+      conditions.push(`(name ILIKE $${idx} OR target ILIKE $${idx})`);
+      params.push(`%${q.trim()}%`);
+      idx++;
     }
 
-    queryText += ` ORDER BY name ASC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    if (category && category.trim()) {
+      conditions.push(`category ILIKE $${idx}`);
+      params.push(category.trim());
+      idx++;
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const queryText = `
+      SELECT * FROM exercises 
+      ${where}
+      ORDER BY name ASC 
+      LIMIT $${idx} OFFSET $${idx + 1}
+    `;
     params.push(parseInt(limit), parseInt(offset));
-    
+
     const result = await pool.query(queryText, params);
     res.json(result.rows);
   } catch (error) {
+    console.error('Search error:', error);
     res.status(500).json({ error: error.message });
   }
 });
