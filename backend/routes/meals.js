@@ -19,34 +19,24 @@ router.post('/analyze', authenticateToken, upload.single('photo'), async (req, r
     const imageUrl = `${publicUrl}/${req.file.key}`;
 
     const prompt = `
-      Act as a high-precision nutrition scientist and culinary expert. 
-      Analyze the attached food image with extreme care. 
-      ${description ? `CRITICAL CONTEXT FROM USER: "${description}". Use this to guide your identification of hidden ingredients and portion sizes.` : ''}
+      Identify the food in this image and provide nutritional info.
+      ${description ? `User says: "${description}"` : ''}
 
-      INSTRUCTIONS:
-      1. Identify every visible food item and those implied by the user's description.
-      2. Estimate the volume/weight of each item using standard culinary references (e.g., "150g", "1 tbsp", "1 medium piece").
-      3. Calculate precise nutritional values based on standard USDA food databases.
-      4. For "Harmful" nutrients (Sugar, Sodium, Saturated Fat, Cholesterol), be conservative and thorough.
-      5. Ensure the "total_" fields are the exact sum of the individual items.
-
-      RETURN ONLY A RAW JSON OBJECT. No markdown, no filler.
-
-      SCHEMA:
+      Return ONLY this JSON format:
       {
         "items": [
           {
-            "item_name": "string", 
-            "quantity": "string", 
+            "item_name": "name", 
+            "quantity": "estimated amount", 
             "calories": number, 
-            "protein": number, (g)
-            "carbs": number, (g)
-            "fat": number, (g)
-            "fiber": number, (g)
-            "sugar": number, (g)
-            "sodium": number, (mg)
-            "saturated_fat": number, (g)
-            "cholesterol": number (mg)
+            "protein": number, 
+            "carbs": number, 
+            "fat": number,
+            "fiber": number,
+            "sugar": number,
+            "sodium": number,
+            "saturated_fat": number,
+            "cholesterol": number
           }
         ],
         "total_calories": number,
