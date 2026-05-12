@@ -60,6 +60,33 @@ const addExerciseSchema = z.object({
   target_rest_time: z.coerce.string().default('60s'),
 });
 
+const mealSchema = z.object({
+  image_url: z.string().min(1, 'Image URL is required'),
+  meal_type: z.string().min(1, 'Meal type is required'),
+  total_calories: z.number().min(0),
+  total_protein: z.number().min(0),
+  total_carbs: z.number().min(0),
+  total_fat: z.number().min(0),
+  total_fiber: z.number().min(0).optional().default(0),
+  total_sugar: z.number().min(0).optional().default(0),
+  total_sodium: z.number().min(0).optional().default(0),
+  total_saturated_fat: z.number().min(0).optional().default(0),
+  total_cholesterol: z.number().min(0).optional().default(0),
+  items: z.array(z.object({
+    item_name: z.string().min(1),
+    quantity: z.string().optional(),
+    calories: z.number().min(0),
+    protein: z.number().min(0),
+    carbs: z.number().min(0),
+    fat: z.number().min(0),
+    fiber: z.number().min(0).optional().default(0),
+    sugar: z.number().min(0).optional().default(0),
+    sodium: z.number().min(0).optional().default(0),
+    saturated_fat: z.number().min(0).optional().default(0),
+    cholesterol: z.number().min(0).optional().default(0),
+  })),
+});
+
 module.exports = {
   validate,
   schemas: {
@@ -67,5 +94,6 @@ module.exports = {
     logSet: logSetSchema,
     completeWorkout: completeWorkoutSchema,
     addExercise: addExerciseSchema,
+    meal: mealSchema,
   },
 };
