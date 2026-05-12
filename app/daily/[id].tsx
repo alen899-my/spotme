@@ -89,7 +89,7 @@ export default function ActiveWorkoutScreen() {
       { label: 'BODY WEIGHT', val: `${data.post_workout_weight || 0}kg`, icon: 'scale', color: '#10B981', sub: 'Current body mass' },
     ];
 
-    const startTime = data.created_at ? new Date(data.created_at).toLocaleString([], { 
+    const startTime = (data.started_at || data.created_at) ? new Date(data.started_at || data.created_at).toLocaleString([], { 
       weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
     }) : '';
 
