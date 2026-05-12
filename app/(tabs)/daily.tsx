@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList,
   TouchableOpacity, ActivityIndicator, Dimensions, Image,
-  Alert,
+  Alert, ScrollView,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,8 +26,24 @@ function formatDuration(seconds: number) {
 }
 
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  if (!dateStr) return '';
+  try {
+    // The DB stores local time (via NOW()), NOT UTC — parse directly as local
+    const normalized = dateStr.replace(' ', 'T');
+    const date = new Date(normalized);
+    if (isNaN(date.getTime())) return dateStr;
+
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes.toString().padStart(2, '0');
+    return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${displayHours}:${displayMinutes} ${ampm}`;
+  } catch (e) {
+    return dateStr;
+  }
 }
 
 export default function DailyTab() {
@@ -35,11 +51,27 @@ export default function DailyTab() {
   const { colors } = useTheme();
   const { showToast } = useToast();
   const [workouts, setWorkouts] = useState<any[]>([]);
+  const [splits, setSplits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingSplits, setLoadingSplits] = useState(true);
   
   // Deletion
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchSplits = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(`${API_URL}/workouts/splits`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSplits(res.data);
+    } catch (err) {
+      console.error('Error fetching splits:', err);
+    } finally {
+      setLoadingSplits(false);
+    }
+  }, []);
 
   const fetchWorkouts = useCallback(async () => {
     try {
@@ -55,7 +87,10 @@ export default function DailyTab() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchWorkouts(); }, [fetchWorkouts]));
+  useFocusEffect(useCallback(() => { 
+    fetchWorkouts(); 
+    fetchSplits();
+  }, [fetchWorkouts, fetchSplits]));
 
   const handleDeleteWorkout = async () => {
     if (!deletingId) return;
@@ -85,7 +120,13 @@ export default function DailyTab() {
     return (
       <TouchableOpacity
         style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-        onPress={() => router.push(`/daily/${item.id}`)}
+        onPress={() => {
+          if (item.status === 'completed') {
+            router.push(`/daily/view/${item.id}`);
+          } else {
+            router.push(`/daily/${item.id}`);
+          }
+        }}
         activeOpacity={0.85}
       >
         <View style={styles.cardRow}>
@@ -183,6 +224,51 @@ export default function DailyTab() {
             renderItem={renderWorkout}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={(
+              <View style={styles.listHeader}>
+                {/* Training Splits Section */}
+                <View style={styles.splitsSection}>
+                  <View style={styles.splitsHeaderRow}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Training Programs</Text>
+                    <TouchableOpacity onPress={() => router.push('/splits/create')}>
+                      <Ionicons name="add-circle" size={24} color="#E00000" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {loadingSplits ? (
+                    <ActivityIndicator color="#E00000" style={{ marginVertical: 20 }} />
+                  ) : splits.length === 0 ? (
+                    <TouchableOpacity 
+                      style={[styles.emptySplitsBtn, { borderColor: colors.border }]}
+                      onPress={() => router.push('/splits/create')}
+                    >
+                      <Ionicons name="layers-outline" size={20} color={colors.textDim} />
+                      <Text style={[styles.emptySplitsText, { color: colors.textDim }]}>Setup your workout split</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.splitsScroll}>
+                      {splits.map(split => (
+                        <TouchableOpacity 
+                          key={split.id} 
+                          style={styles.splitMenuCard}
+                          onPress={() => router.push(`/splits/${split.id}`)}
+                        >
+                          <LinearGradient colors={['#E00000', '#B00000']} style={styles.splitMenuGrad}>
+                            <MaterialCommunityIcons name="folder-zip-outline" size={20} color="#FFF" />
+                            <Text style={styles.splitMenuName} numberOfLines={1}>{split.name}</Text>
+                            <Text style={styles.splitMenuMeta}>{split.session_count} Sessions</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+
+                <View style={styles.historyHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+                </View>
+              </View>
+            )}
           />
         )}
       </View>
@@ -232,4 +318,16 @@ const styles = StyleSheet.create({
   startBtn: { borderRadius: 18, overflow: 'hidden' },
   startBtnGradient: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 28, paddingVertical: 18 },
   startBtnText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF', letterSpacing: 1 },
+  listHeader: { marginBottom: 10 },
+  splitsSection: { marginBottom: 24 },
+  splitsHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { fontFamily: FONTS.heading, fontSize: 18 },
+  splitsScroll: { gap: 12, paddingRight: 20 },
+  splitMenuCard: { width: 140, borderRadius: 18, overflow: 'hidden', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 },
+  splitMenuGrad: { padding: 16, height: 100, justifyContent: 'center' },
+  splitMenuName: { color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 14, marginTop: 8 },
+  splitMenuMeta: { color: 'rgba(255,255,255,0.7)', fontFamily: FONTS.body, fontSize: 10, marginTop: 2 },
+  emptySplitsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 20, borderStyle: 'dashed', borderWidth: 1.5, borderRadius: 18 },
+  emptySplitsText: { fontFamily: FONTS.bodyBold, fontSize: 13 },
+  historyHeader: { marginBottom: 16, marginTop: 8 },
 });

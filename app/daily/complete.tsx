@@ -27,6 +27,12 @@ function formatDuration(sec: number) {
   return `${s}s`;
 }
 
+function formatTime(sec: number) {
+  const m = Math.floor(sec / 60).toString().padStart(2, '0');
+  const s = (sec % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
 export default function WorkoutCompleteScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -95,18 +101,36 @@ export default function WorkoutCompleteScreen() {
     setSaving(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
-      
+
+      // Step 1: Upload photos as binary FormData (not blob URLs in JSON)
+      if (photos.length > 0) {
+        const formData = new FormData();
+        for (const [index, uri] of photos.entries()) {
+          if (Platform.OS === 'web') {
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            formData.append('photos', blob, `photo_${index}.jpg`);
+          } else {
+            const name = uri.split('/').pop();
+            const match = /\.(\w+)$/.exec(name || '');
+            formData.append('photos', { uri, name: name || `photo_${index}.jpg`, type: match ? `image/${match[1]}` : 'image/jpeg' } as any);
+          }
+        }
+        await axios.post(`${API_URL}/daily/workouts/${workoutId}/photos`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+
+      // Step 2: Save metrics as JSON
       const payload: any = {
         water_intake_liters: waterIntake,
         total_duration_seconds: duration,
         total_volume: volume,
       };
       if (weight.trim()) payload.post_workout_weight = parseFloat(weight);
-      if (photos.length > 0) payload.photos = photos;
 
-      // Update workout with weight, water and photos
-      await axios.patch(`${API_URL}/daily/workouts/${workoutId}/complete`, payload, { 
-        headers: { Authorization: `Bearer ${token}` } 
+      await axios.patch(`${API_URL}/daily/workouts/${workoutId}/complete`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       showToast('Workout summary saved! 🏆');
@@ -124,11 +148,11 @@ export default function WorkoutCompleteScreen() {
   const displayRest = workout?.total_rest_seconds || rest;
 
   const stats = [
-    { icon: 'time-outline', label: 'Duration', value: formatDuration(displayDuration), color: '#E00000' },
-    { icon: 'barbell-outline', label: 'Total Volume', value: `${Math.round(displayVolume)} kg`, color: '#10B981' },
-    { icon: 'water-outline', label: 'Hydration', value: `${waterIntake.toFixed(1)}L`, color: '#3B82F6' },
-    { icon: 'hourglass-outline', label: 'Total Rest', value: formatDuration(displayRest), color: '#F59E0B' },
-    { icon: 'layers-outline', label: 'Total Sets', value: `${workout?.total_sets || 0}`, color: '#8B5CF6' },
+    { icon: 'time', label: 'DURATION', value: formatDuration(displayDuration), color: '#EF4444', sub: 'Total active time' },
+    { icon: 'barbell', label: 'VOLUME', value: `${Math.round(displayVolume)}kg`, color: '#10B981', sub: 'Total weight lifted' },
+    { icon: 'hourglass', label: 'REST TIME', value: formatDuration(displayRest), color: '#F59E0B', sub: 'Recovery between sets' },
+    { icon: 'layers', label: 'SETS', value: `${workout?.total_sets || 0}`, color: '#8B5CF6', sub: 'Total sets completed' },
+    { icon: 'water', label: 'HYDRATION', value: `${waterIntake.toFixed(1)}L`, color: '#3B82F6', sub: 'Water intake' },
   ];
 
   return (
@@ -146,12 +170,23 @@ export default function WorkoutCompleteScreen() {
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           {stats.map((s, i) => (
-            <View key={i} style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.statIconBox, { backgroundColor: `${s.color}15` }]}>
-                <Ionicons name={s.icon as any} size={18} color={s.color} />
+            <View key={i} style={[
+              styles.perfCard, 
+              { 
+                backgroundColor: s.color, 
+                borderRightColor: 'rgba(255,255,255,0.3)',
+                borderRightWidth: 4,
+                borderWidth: 0
+              }
+            ]}>
+              <View style={[styles.perfIconBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <Ionicons name={s.icon as any} size={18} color="#FFF" />
               </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>{s.value}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{s.label}</Text>
+              <View style={styles.perfContent}>
+                <Text style={[styles.perfLabel, { color: 'rgba(255,255,255,0.7)' }]}>{s.label}</Text>
+                <Text style={[styles.perfValue, { color: '#FFF' }]}>{s.value}</Text>
+                <Text style={[styles.perfSubLabel, { color: 'rgba(255,255,255,0.6)' }]} numberOfLines={1}>{s.sub}</Text>
+              </View>
             </View>
           ))}
         </View>
@@ -167,47 +202,60 @@ export default function WorkoutCompleteScreen() {
             </View>
             {loading ? (
               <ActivityIndicator color="#8B5CF6" style={{ marginVertical: 20 }} />
+            ) : !workout ? (
+              <Text style={{ color: colors.textMuted, textAlign: 'center', marginVertical: 20 }}>Failed to load session details</Text>
             ) : (
               <View style={styles.summaryList}>
                 {workout?.exercises?.map((ex: any) => {
+                  const isSkipped = ex.is_skipped;
                   const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
-                  const totalReps = completedSets.reduce((acc: number, s: any) => acc + (s.reps || 0), 0);
-                  const totalWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0), 0);
+                  
+                  const totalReps = completedSets.reduce((acc: number, s: any) => acc + (parseInt(s.reps) || 0), 0);
+                  const totalWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0);
+                  const totalSetWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0), 0);
                   const totalTime = completedSets.reduce((acc: number, s: any) => acc + (s.duration_seconds || 0), 0);
                   
-                  const avgReps = completedSets.length > 0 ? (totalReps / completedSets.length).toFixed(1) : '0';
-                  const avgWeight = completedSets.length > 0 ? (totalWeight / completedSets.length).toFixed(1) : '0';
+                  const avgWeight = completedSets.length > 0 ? (totalSetWeight / completedSets.length).toFixed(1) : '0';
                   const avgTime = completedSets.length > 0 ? Math.round(totalTime / completedSets.length) : 0;
-                  const maxWeight = completedSets.length > 0 ? Math.max(...completedSets.map((s: any) => parseFloat(s.weight) || 0)) : 0;
 
                   return (
-                    <View key={ex.id} style={[styles.summaryCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                      <View style={styles.summaryHeader}>
-                        <Text style={[styles.summaryExName, { color: colors.text }]}>{ex.name}</Text>
-                        <View style={[styles.summaryBadge, { backgroundColor: ex.is_skipped ? '#6B728020' : '#10B98120' }]}>
-                          <Text style={[styles.summaryBadgeText, { color: ex.is_skipped ? '#6B7280' : '#10B981' }]}>
-                            {ex.is_skipped ? 'SKIPPED' : `${completedSets.length} SETS`}
+                    <View key={ex.id} style={[
+                      styles.summaryFullCard, 
+                      { backgroundColor: colors.inputBg, borderColor: colors.border },
+                      isSkipped && { opacity: 0.6 }
+                    ]}>
+                      <View style={styles.summaryFullHeader}>
+                        <Image source={{ uri: ex.image_url }} style={styles.summaryFullImage} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.summaryFullName, { color: colors.text }]}>{ex.name}</Text>
+                          <Text style={[styles.summaryFullSub, { color: colors.textMuted }]}>
+                            {isSkipped ? 'Movement skipped' : `${completedSets.length} sets completed`}
                           </Text>
                         </View>
+                        {isSkipped && (
+                          <View style={styles.skippedBadge}>
+                            <Text style={styles.skippedBadgeText}>SKIPPED</Text>
+                          </View>
+                        )}
                       </View>
 
-                      {!ex.is_skipped && completedSets.length > 0 && (
-                        <View style={styles.metricsGrid}>
-                          <View style={styles.metricItem}>
-                            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>TOTAL REPS</Text>
-                            <Text style={[styles.metricValue, { color: colors.text }]}>{totalReps}</Text>
+                      {!isSkipped && completedSets.length > 0 && (
+                        <View style={styles.summaryFullGrid}>
+                          <View style={styles.summaryFullItem}>
+                            <Text style={styles.summaryFullLabel}>TOTAL WEIGHT</Text>
+                            <Text style={[styles.summaryFullValue, { color: colors.text }]}>{totalWeight}kg</Text>
                           </View>
-                          <View style={styles.metricItem}>
-                            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>AVG WEIGHT</Text>
-                            <Text style={[styles.metricValue, { color: colors.text }]}>{avgWeight}kg</Text>
+                          <View style={styles.summaryFullItem}>
+                            <Text style={styles.summaryFullLabel}>AVG WEIGHT/SET</Text>
+                            <Text style={[styles.summaryFullValue, { color: colors.text }]}>{avgWeight}kg</Text>
                           </View>
-                          <View style={styles.metricItem}>
-                            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>MAX LIFT</Text>
-                            <Text style={[styles.metricValue, { color: '#10B981' }]}>{maxWeight}kg</Text>
+                          <View style={styles.summaryFullItem}>
+                            <Text style={styles.summaryFullLabel}>TOTAL REPS</Text>
+                            <Text style={[styles.summaryFullValue, { color: colors.text }]}>{totalReps}</Text>
                           </View>
-                          <View style={styles.metricItem}>
-                            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>AVG TIME/SET</Text>
-                            <Text style={[styles.metricValue, { color: colors.text }]}>{formatTime(avgTime)}</Text>
+                          <View style={styles.summaryFullItem}>
+                            <Text style={styles.summaryFullLabel}>AVG TIME/SET</Text>
+                            <Text style={[styles.summaryFullValue, { color: colors.text }]}>{formatTime(avgTime)}</Text>
                           </View>
                         </View>
                       )}
@@ -217,6 +265,7 @@ export default function WorkoutCompleteScreen() {
               </View>
             )}
           </View>
+
           {/* Weight Input */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.sectionHeader}>
@@ -330,27 +379,31 @@ const styles = StyleSheet.create({
   heroIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   heroTitle: { fontFamily: FONTS.heading, fontSize: 32, color: '#FFF', marginBottom: 6 },
   heroSub: { fontFamily: FONTS.body, fontSize: 16, color: 'rgba(255,255,255,0.9)' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 20, gap: 12, marginTop: -30 },
-  statCard: { width: (SCREEN_WIDTH - 52) / 2, borderRadius: 24, padding: 16, borderWidth: 1, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 },
-  statIconBox: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  statValue: { fontFamily: FONTS.heading, fontSize: 20, marginBottom: 4 },
-  statLabel: { fontFamily: FONTS.body, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 20, gap: 12 },
+  perfCard: { width: (SCREEN_WIDTH - 52) / 2, padding: 16, borderRadius: 24, overflow: 'hidden', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 },
+  perfIconBox: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  perfContent: { gap: 2 },
+  perfLabel: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 1 },
+  perfValue: { fontFamily: FONTS.heading, fontSize: 18 },
+  perfSubLabel: { fontFamily: FONTS.body, fontSize: 10 },
   formContainer: { padding: 20, paddingTop: 0, gap: 20 },
   section: { borderRadius: 28, padding: 20, borderWidth: 1 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
   sectionIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   sectionTitle: { fontFamily: FONTS.heading, fontSize: 18 },
   sectionSub: { fontFamily: FONTS.body, fontSize: 13, marginTop: 2 },
-  summaryList: { gap: 16 },
-  summaryCard: { borderRadius: 20, padding: 16, borderWidth: 1 },
-  summaryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  summaryExName: { fontFamily: FONTS.bodyBold, fontSize: 16, flex: 1, marginRight: 10 },
-  summaryBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  summaryBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 0.5 },
-  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  metricItem: { width: '47%', gap: 2 },
-  metricLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5, textTransform: 'uppercase' },
-  metricValue: { fontFamily: FONTS.heading, fontSize: 16 },
+  summaryList: { gap: 12 },
+  summaryFullCard: { borderRadius: 20, padding: 16, borderWidth: 1 },
+  summaryFullHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  summaryFullImage: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#FFF' },
+  summaryFullName: { fontFamily: FONTS.bodyBold, fontSize: 16 },
+  summaryFullSub: { fontFamily: FONTS.body, fontSize: 12 },
+  summaryFullGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  summaryFullItem: { width: '47%', gap: 2 },
+  summaryFullLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(0,0,0,0.4)', letterSpacing: 0.5 },
+  summaryFullValue: { fontFamily: FONTS.heading, fontSize: 18 },
+  skippedBadge: { backgroundColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  skippedBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 10, color: 'rgba(0,0,0,0.4)' },
   weightInput: { height: 64, borderRadius: 18, borderWidth: 1, paddingHorizontal: 20, fontFamily: FONTS.heading, fontSize: 24 },
   photoList: { gap: 12 },
   photoWrap: { width: 100, height: 130, borderRadius: 16, overflow: 'hidden' },

@@ -76,72 +76,12 @@ export default function ActiveWorkoutScreen() {
   const [showDeleteSetModal, setShowDeleteSetModal] = useState(false);
   const [deleteSetId, setDeleteSetId] = useState<number | null>(null);
 
-  // New Performance Summary Component
-  const WorkoutPerformanceSummary = ({ data }: { data: any }) => {
-    if (!data) return null;
-
-    const stats = [
-      { label: 'DURATION', val: formatTime(data.total_duration_seconds || 0), icon: 'time', color: '#EF4444', sub: 'Total active time' },
-      { label: 'VOLUME', val: `${Math.round(data.total_volume || 0)}kg`, icon: 'barbell', color: '#10B981', sub: 'Total weight lifted' },
-      { label: 'REST TIME', val: formatTime(data.total_rest_seconds || 0), icon: 'hourglass', color: '#F59E0B', sub: 'Recovery between sets' },
-      { label: 'SETS', val: `${data.total_sets || 0}`, icon: 'layers', color: '#8B5CF6', sub: 'Total sets completed' },
-      { label: 'HYDRATION', val: `${Number(data.water_intake_liters || 0).toFixed(1)}L`, icon: 'water', color: '#3B82F6', sub: 'Water intake' },
-      { label: 'BODY WEIGHT', val: `${data.post_workout_weight || 0}kg`, icon: 'scale', color: '#10B981', sub: 'Current body mass' },
-    ];
-
-    const formatDisplayDate = (dateStr: string) => {
-      if (!dateStr) return '';
-      // Ensure UTC string is parsed as UTC by appending Z if missing
-      const normalized = (dateStr.includes('Z') || dateStr.includes('+')) 
-        ? dateStr 
-        : `${dateStr.replace(' ', 'T')}Z`;
-      return new Date(normalized).toLocaleString([], { 
-        weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-      });
-    };
-
-    const startTime = formatDisplayDate(data.started_at || data.created_at);
-
-    return (
-      <View style={styles.perfContainer}>
-        <View style={styles.perfHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.perfTitle, { color: colors.text }]}>{data.title || data.session_name || 'Workout Summary'}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-              <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
-              <Text style={[styles.perfSub, { color: colors.textMuted }]}>{startTime}</Text>
-            </View>
-          </View>
-          <TouchableOpacity onPress={openEditMetrics} style={styles.perfEditBtn}>
-            <Ionicons name="options-outline" size={20} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.perfGrid}>
-          {stats.map((item, idx) => (
-            <View key={idx} style={[
-              styles.perfCard, 
-              { 
-                backgroundColor: item.color, 
-                borderRightColor: 'rgba(255,255,255,0.3)',
-                borderRightWidth: 4,
-                borderWidth: 0
-              }
-            ]}>
-              <View style={[styles.perfIconBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <Ionicons name={item.icon as any} size={18} color="#FFF" />
-              </View>
-              <View style={styles.perfContent}>
-                <Text style={[styles.perfLabel, { color: 'rgba(255,255,255,0.7)' }]}>{item.label}</Text>
-                <Text style={[styles.perfValue, { color: '#FFF' }]}>{item.val}</Text>
-                <Text style={[styles.perfSubLabel, { color: 'rgba(255,255,255,0.6)' }]} numberOfLines={1}>{item.sub}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  };
+  // Redirection for completed workouts
+  useEffect(() => {
+    if (workout?.status === 'completed') {
+      router.replace(`/daily/view/${workoutId}`);
+    }
+  }, [workout?.status]);
 
   // Guide Modal
   const [guideModalVisible, setGuideModalVisible] = useState(false);
@@ -907,47 +847,7 @@ export default function ActiveWorkoutScreen() {
           renderItem={renderExercise}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={workout?.status === 'completed' ? (
-            <View style={{ marginBottom: 20 }}>
-              {/* Photo Gallery */}
-              {workout.photos && workout.photos.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 0, gap: 12, marginBottom: 20 }}>
-                  {workout.photos.map((p: any) => (
-                    <TouchableOpacity 
-                      key={p.id} 
-                      style={styles.photoThumbWrap} 
-                      onPress={() => { setViewerUri(p.photo_url); setViewerVisible(true); }}
-                    >
-                      <Image source={{ uri: p.photo_url }} style={styles.photoThumb} />
-                      <TouchableOpacity 
-                        style={styles.removePhotoBtn} 
-                        onPress={() => handleDeletePhoto(p.id)}
-                      >
-                        <Ionicons name="close" size={14} color="#FFF" />
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity 
-                    style={[styles.photoThumbWrap, { backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: colors.border }]} 
-                    onPress={handleUpdatePhotos}
-                  >
-                    <Ionicons name="add" size={24} color={colors.textDim} />
-                  </TouchableOpacity>
-                </ScrollView>
-              ) : (
-                <TouchableOpacity 
-                  style={[styles.photoContainer, { backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', borderWidth: 2, borderColor: colors.border, marginHorizontal: 0 }]} 
-                  onPress={handleUpdatePhotos}
-                >
-                  <Ionicons name="camera" size={40} color={colors.textDim} />
-                  <Text style={{ color: colors.textDim, fontFamily: FONTS.bodyBold, marginTop: 10 }}>ADD SESSION PHOTOS</Text>
-                </TouchableOpacity>
-              )}
-
-              {/* New Professional Performance Dashboard */}
-              <WorkoutPerformanceSummary data={workout} />
-            </View>
-          ) : null}
+          ListHeaderComponent={null}
           ListFooterComponent={workout?.status === 'active' ? (
             <View style={styles.footerContainer}>
               <TouchableOpacity style={[styles.addExFooterBtn, { borderColor: colors.border }]} onPress={openAddExercise}>
@@ -1367,7 +1267,7 @@ const styles = StyleSheet.create({
   perfSub: { fontFamily: FONTS.body, fontSize: 13 },
   perfEditBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#E00000', justifyContent: 'center', alignItems: 'center', elevation: 4 },
   perfGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  perfCard: { width: (SCREEN_WIDTH - 52) / 2, padding: 16, borderRadius: 20, overflow: 'hidden' },
+  perfCard: { width: (SCREEN_WIDTH - 52) / 2, padding: 16, borderRadius: 24, overflow: 'hidden', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 },
   perfIconBox: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   perfContent: { gap: 2 },
   perfLabel: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 1 },
