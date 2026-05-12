@@ -35,11 +35,8 @@ export default function AddSessionExercisesScreen() {
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const [addingId, setAddingId] = useState<string | null>(null);
 
-  // Use refs to always have latest values in loadMore without causing re-renders
   const pageRef = useRef(0);
   const hasMoreRef = useRef(true);
   const loadingRef = useRef(false);
@@ -47,27 +44,34 @@ export default function AddSessionExercisesScreen() {
   const queryRef = useRef('');
   const categoryRef = useRef<string | null>(null);
 
-  // Fetch categories once on mount
+  // Shared helper — avoids repeating AsyncStorage.getItem everywhere
+  const getToken = useCallback(async () => {
+    return await AsyncStorage.getItem('userToken');
+  }, []);
+
+  // Fetch categories on mount — token required by your authMiddleware
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const res = await axios.get(`${API_URL}/exercises/meta/filters`);
+        const token = await getToken();
+        const res = await axios.get(`${API_URL}/exercises/meta/filters`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setCategories(res.data.categories || []);
       } catch (err) {
         console.error('Error fetching filters:', err);
       }
     };
     fetchFilters();
-  }, []);
+  }, [getToken]);
 
-  // Core fetch function — does NOT depend on state, uses params directly
+  // Core fetch — token added here (was missing, caused 401)
   const fetchExercises = useCallback(async (
     q: string,
     cat: string | null,
     p: number,
     append: boolean = false
   ) => {
-    // Prevent duplicate calls
     if (append && loadingMoreRef.current) return;
     if (!append && loadingRef.current) return;
 
@@ -80,6 +84,7 @@ export default function AddSessionExercisesScreen() {
     }
 
     try {
+      const token = await getToken();
       const offset = p * LIMIT;
       const res = await axios.get(`${API_URL}/workouts/exercises/search`, {
         params: {
@@ -88,6 +93,7 @@ export default function AddSessionExercisesScreen() {
           limit: LIMIT,
           offset,
         },
+        headers: { Authorization: `Bearer ${token}` },  // ← THE FIX
       });
 
       const newExercises: any[] = res.data ?? [];
@@ -99,9 +105,7 @@ export default function AddSessionExercisesScreen() {
       }
 
       const more = newExercises.length === LIMIT;
-      setHasMore(more);
       hasMoreRef.current = more;
-      setPage(p);
       pageRef.current = p;
     } catch (err: any) {
       console.error('Error fetching exercises:', err?.response?.data || err.message);
@@ -112,9 +116,9 @@ export default function AddSessionExercisesScreen() {
       loadingRef.current = false;
       loadingMoreRef.current = false;
     }
-  }, [showToast]);
+  }, [getToken, showToast]);
 
-  // Debounced search: fires when query or category changes
+  // Debounced search
   useEffect(() => {
     queryRef.current = query;
     categoryRef.current = selectedCategory;
@@ -126,33 +130,24 @@ export default function AddSessionExercisesScreen() {
     return () => clearTimeout(timeout);
   }, [query, selectedCategory, fetchExercises]);
 
-  const handleSearch = (text: string) => {
-    setQuery(text);
-  };
+  const handleSearch = (text: string) => setQuery(text);
 
   const handleCategoryPress = (cat: string) => {
     setSelectedCategory(prev => (prev === cat ? null : cat));
   };
 
-  // loadMore reads from refs to avoid stale closure issues
   const loadMore = useCallback(() => {
     if (loadingRef.current || loadingMoreRef.current || !hasMoreRef.current) return;
-    const nextPage = pageRef.current + 1;
-    fetchExercises(queryRef.current, categoryRef.current, nextPage, true);
+    fetchExercises(queryRef.current, categoryRef.current, pageRef.current + 1, true);
   }, [fetchExercises]);
 
   const handleAdd = async (exerciseId: string) => {
     setAddingId(exerciseId);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(
         `${API_URL}/workouts/sessions/${sessionId}/exercises`,
-        {
-          exercise_id: exerciseId,
-          sets: 3,
-          reps: '8-12',
-          rest_time: '60s',
-        },
+        { exercise_id: exerciseId, sets: 3, reps: '8-12', rest_time: '60s' },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       showToast('Exercise added to session!');
