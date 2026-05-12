@@ -28,19 +28,18 @@ function formatDuration(seconds: number) {
 function formatDate(dateStr: string) {
   if (!dateStr) return '';
   try {
-    // The DB stores local time (via NOW()), NOT UTC — parse directly as local
+    // Backend now stores UTC — append Z so browser treats it as UTC, then getHours() gives local time
     const normalized = dateStr.replace(' ', 'T');
-    const date = new Date(normalized);
+    const utcStr = (normalized.endsWith('Z') || normalized.includes('+')) ? normalized : `${normalized}Z`;
+    const date = new Date(utcStr);
     if (isNaN(date.getTime())) return dateStr;
 
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const displayHours = hours % 12 || 12;
-    const displayMinutes = minutes.toString().padStart(2, '0');
-    return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${displayHours}:${displayMinutes} ${ampm}`;
+    const h = date.getHours();
+    const m = date.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`;
   } catch (e) {
     return dateStr;
   }

@@ -42,7 +42,7 @@ router.post(
     try {
       const result = await pool.query(
         `INSERT INTO daily_workouts (user_id, title, split_id, session_id, started_at, status)
-         VALUES ($1, $2, $3, $4, NOW(), 'active') RETURNING *`,
+         VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', 'active') RETURNING *`,
         [req.user.id, title || null, split_id || null, session_id || null]
       );
 

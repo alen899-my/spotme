@@ -28,15 +28,16 @@ function formatTime(sec: number) {
 function formatLocalDate(dateStr: string) {
   if (!dateStr) return '';
   try {
+    // Backend now stores UTC — append Z so JS treats as UTC, getHours() then gives local time
     const normalized = dateStr.replace(' ', 'T');
-    const date = new Date(normalized);
+    const utcStr = (normalized.endsWith('Z') || normalized.includes('+')) ? normalized : `${normalized}Z`;
+    const date = new Date(utcStr);
     if (isNaN(date.getTime())) return dateStr;
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const h = date.getHours(), m = date.getMinutes();
     const ampm = h >= 12 ? 'PM' : 'AM';
-    const dh = h % 12 || 12;
-    return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${dh}:${m.toString().padStart(2, '0')} ${ampm}`;
+    return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`;
   } catch { return dateStr; }
 }
 
