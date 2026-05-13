@@ -15,6 +15,7 @@ import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
 import axios from "axios";
 import StreakIcon from "../../components/ui/StreakIcon";
+import XPBar from "../../components/ui/XPBar";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -105,6 +106,12 @@ export default function ProfileScreen() {
           {user?.current_streak > 0 && (
             <View style={{ marginTop: 12 }}>
               <StreakIcon streak={user.current_streak} size={50} />
+            </View>
+          )}
+
+          {user && (
+            <View style={{ width: '85%', marginTop: 24 }}>
+              <XPBar level={user.level} currentXp={user.total_xp % (user.level * 1000)} />
             </View>
           )}
         </View>

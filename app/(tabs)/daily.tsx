@@ -13,6 +13,7 @@ import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import XPBar from '../../components/ui/XPBar';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -57,6 +58,7 @@ export default function DailyTab() {
   // Deletion
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   const fetchSplits = useCallback(async () => {
     try {
@@ -86,10 +88,23 @@ export default function DailyTab() {
     }
   }, []);
 
+  const fetchUserData = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(`${API_URL}/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(res.data);
+    } catch (err) {
+      console.error('Error fetching user for XP:', err);
+    }
+  }, []);
+
   useFocusEffect(useCallback(() => { 
     fetchWorkouts(); 
     fetchSplits();
-  }, [fetchWorkouts, fetchSplits]));
+    fetchUserData();
+  }, [fetchWorkouts, fetchSplits, fetchUserData]));
 
   const handleDeleteWorkout = async () => {
     if (!deletingId) return;

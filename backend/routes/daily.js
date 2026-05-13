@@ -376,10 +376,60 @@ router.patch(
           [newStreak, today, userId]
         );
         
-        // Add streak to response
+        // ─── XP & LEVEL CALCULATION ───
+        const workoutStats = await pool.query(`
+          SELECT 
+            COUNT(dws.id) as total_sets,
+            SUM(dws.reps) as total_reps,
+            dw.total_duration_seconds,
+            dw.total_volume
+          FROM daily_workouts dw
+          LEFT JOIN daily_workout_exercises dwe ON dw.id = dwe.daily_workout_id
+          LEFT JOIN daily_workout_sets dws ON dwe.id = dws.daily_exercise_id
+          WHERE dw.id = $1 AND dws.is_skipped = false
+          GROUP BY dw.id
+        `, [parseInt(id)]);
+
+        if (workoutStats.rows.length > 0) {
+          const stats = workoutStats.rows[0];
+          const baseSetsXP = (parseInt(stats.total_sets) || 0) * 10;
+          const baseRepsXP = (parseInt(stats.total_reps) || 0) * 1;
+          const durationXP = Math.floor((parseInt(stats.total_duration_seconds) || 0) / 10);
+          const volumeXP = Math.floor((parseFloat(stats.total_volume) || 0) / 100);
+          const perfectBonus = hasSkips ? 0 : 150;
+          
+          let earnedXP = baseSetsXP + baseRepsXP + durationXP + volumeXP + perfectBonus;
+          
+          // Streak Multiplier: +5% per day, max 50%
+          const streakMultiplier = 1 + Math.min((newStreak * 0.05), 0.5);
+          earnedXP = Math.round(earnedXP * streakMultiplier);
+
+          // Update User XP and Level
+          const userXpRes = await pool.query('SELECT total_xp, level FROM users WHERE id = $1', [userId]);
+          let { total_xp, level } = userXpRes.rows[0];
+          
+          total_xp = (total_xp || 0) + earnedXP;
+          
+          // Leveling logic: Level * 1000 XP per level
+          let xpForNext = level * 1000;
+          let leveledUp = false;
+          while (total_xp >= xpForNext) {
+            level += 1;
+            xpForNext = level * 1000;
+            leveledUp = true;
+          }
+
+          await pool.query('UPDATE users SET total_xp = $1, level = $2 WHERE id = $3', [total_xp, level, userId]);
+          
+          result.rows[0].earned_xp = earnedXP;
+          result.rows[0].new_level = level;
+          result.rows[0].leveled_up = leveledUp;
+          result.rows[0].total_xp = total_xp;
+        }
+
         result.rows[0].new_streak = newStreak;
       } catch (streakErr) {
-        console.error('[Streak] Failed to update streak:', streakErr);
+        console.error('[XP/Streak] Failed to update metrics:', streakErr);
       }
 
       res.json({ ...result.rows[0], photos: photos || [] });
