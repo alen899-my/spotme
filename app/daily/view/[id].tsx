@@ -55,6 +55,8 @@ export default function WorkoutViewScreen() {
   const [updatingMetrics, setUpdatingMetrics] = useState(false);
   const [finishWater, setFinishWater] = useState(0);
   const [finishWeight, setFinishWeight] = useState('');
+  const [uploadingPhotos, setUploadingPhotos] = useState<string[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
 
   const fetchWorkout = useCallback(async () => {
     try {
@@ -79,6 +81,9 @@ export default function WorkoutViewScreen() {
       quality: 0.7,
     });
     if (!result.canceled) {
+      const newUris = result.assets.map(a => a.uri);
+      setUploadingPhotos(newUris);
+      setLoadingPhotos(true);
       try {
         const token = await AsyncStorage.getItem('userToken');
         const formData = new FormData();
@@ -87,18 +92,33 @@ export default function WorkoutViewScreen() {
           if (Platform.OS === 'web') {
             const response = await fetch(uri);
             const blob = await response.blob();
-            formData.append('photos', blob, uri.split('/').pop() || `photo_${index}.jpg`);
+            const filename = `photo_${Date.now()}_${index}.jpg`;
+            formData.append('photos', blob, filename);
           } else {
-            const name = uri.split('/').pop();
-            const match = /\.(\w+)$/.exec(name || '');
-            formData.append('photos', { uri, name: name || `photo_${index}.jpg`, type: match ? `image/${match[1]}` : 'image/jpeg' } as any);
+            const name = uri.split('/').pop() || `photo_${index}.jpg`;
+            const match = /\.(\w+)$/.exec(name);
+            const type = match ? `image/${match[1]}` : 'image/jpeg';
+            formData.append('photos', { 
+              uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''), 
+              name, 
+              type 
+            } as any);
           }
         }
-        await axios.post(`${API_URL}/daily/workouts/${workoutId}/photos`, formData, { headers: { Authorization: `Bearer ${token}` } });
+        await axios.post(`${API_URL}/daily/workouts/${workoutId}/photos`, formData, { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          } 
+        });
         showToast('Photos uploaded!');
         fetchWorkout();
       } catch (err) {
+        console.error('History photo upload error:', err);
         showToast('Failed to upload photos', 'error');
+      } finally {
+        setLoadingPhotos(false);
+        setUploadingPhotos([]);
       }
     }
   };
@@ -143,13 +163,17 @@ export default function WorkoutViewScreen() {
     finally { setUpdatingMetrics(false); }
   };
 
+  const calculatedTotalSets = workout?.exercises?.reduce((acc: number, ex: any) => {
+    return acc + (ex.sets?.filter((s: any) => !s.is_skipped).length || 0);
+  }, 0) || 0;
+
   const WorkoutPerformanceSummary = ({ data }: { data: any }) => {
     if (!data) return null;
     const stats = [
       { label: 'DURATION', val: formatTime(data.total_duration_seconds || 0), icon: 'time', color: '#EF4444', sub: 'Total active time' },
       { label: 'VOLUME', val: `${Math.round(data.total_volume || 0)}kg`, icon: 'barbell', color: '#10B981', sub: 'Total weight lifted' },
       { label: 'REST TIME', val: formatTime(data.total_rest_seconds || 0), icon: 'hourglass', color: '#F59E0B', sub: 'Recovery between sets' },
-      { label: 'SETS', val: `${data.total_sets || 0}`, icon: 'layers', color: '#8B5CF6', sub: 'Total sets completed' },
+      { label: 'SETS', val: `${data.total_sets || calculatedTotalSets || 0}`, icon: 'layers', color: '#8B5CF6', sub: 'Total sets completed' },
       { label: 'HYDRATION', val: `${Number(data.water_intake_liters || 0).toFixed(1)}L`, icon: 'water', color: '#3B82F6', sub: 'Water intake' },
       { label: 'BODY WEIGHT', val: `${data.post_workout_weight || 0}kg`, icon: 'scale', color: '#10B981', sub: 'Current body mass' },
     ];
@@ -266,9 +290,9 @@ export default function WorkoutViewScreen() {
             <View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
               {/* Photo Gallery */}
               <View style={{ marginBottom: 20 }}>
-                {workout.photos && workout.photos.length > 0 ? (
+                {(workout.photos && workout.photos.length > 0) || uploadingPhotos.length > 0 ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                    {workout.photos.map((p: any) => (
+                    {workout.photos?.map((p: any) => (
                       <TouchableOpacity key={p.id} style={styles.photoThumbWrap} onPress={() => { setViewerUri(p.photo_url); setViewerVisible(true); }}>
                         <Image source={{ uri: p.photo_url }} style={styles.photoThumb} />
                         <TouchableOpacity style={styles.removePhotoBtn} onPress={() => handleDeletePhoto(p.id)}>
@@ -276,8 +300,21 @@ export default function WorkoutViewScreen() {
                         </TouchableOpacity>
                       </TouchableOpacity>
                     ))}
-                    <TouchableOpacity style={[styles.photoThumbWrap, styles.photoAdd]} onPress={handleUpdatePhotos}>
-                      <Ionicons name="add" size={24} color={colors.textDim} />
+                    {/* Optimistic uploading photos */}
+                    {uploadingPhotos.map((uri, idx) => (
+                      <View key={`uploading-${idx}`} style={[styles.photoThumbWrap, { opacity: 0.6 }]}>
+                        <Image source={{ uri }} style={styles.photoThumb} />
+                        <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+                          <ActivityIndicator size="small" color="#FFF" />
+                        </View>
+                      </View>
+                    ))}
+                    <TouchableOpacity 
+                      style={[styles.photoThumbWrap, styles.photoAdd, loadingPhotos && { opacity: 0.5 }]} 
+                      onPress={handleUpdatePhotos}
+                      disabled={loadingPhotos}
+                    >
+                      {loadingPhotos ? <ActivityIndicator size="small" color={colors.textDim} /> : <Ionicons name="add" size={24} color={colors.textDim} />}
                     </TouchableOpacity>
                   </ScrollView>
                 ) : (

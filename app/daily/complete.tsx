@@ -98,46 +98,73 @@ export default function WorkoutCompleteScreen() {
   };
 
   const handleFinalSave = async () => {
+    if (saving) return;
     setSaving(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
 
-      // Step 1: Upload photos as binary FormData (not blob URLs in JSON)
+      // Step 1: Upload photos if any
       if (photos.length > 0) {
+        showToast(`Uploading ${photos.length} photos...`, 'info');
         const formData = new FormData();
         for (const [index, uri] of photos.entries()) {
-          if (Platform.OS === 'web') {
-            const response = await fetch(uri);
-            const blob = await response.blob();
-            formData.append('photos', blob, `photo_${index}.jpg`);
-          } else {
-            const name = uri.split('/').pop();
-            const match = /\.(\w+)$/.exec(name || '');
-            formData.append('photos', { uri, name: name || `photo_${index}.jpg`, type: match ? `image/${match[1]}` : 'image/jpeg' } as any);
+          try {
+            if (Platform.OS === 'web') {
+              const response = await fetch(uri);
+              const blob = await response.blob();
+              const filename = `photo_${Date.now()}_${index}.jpg`;
+              formData.append('photos', blob, filename);
+            } else {
+              const name = uri.split('/').pop() || `photo_${index}.jpg`;
+              const match = /\.(\w+)$/.exec(name);
+              const type = match ? `image/${match[1]}` : 'image/jpeg';
+              formData.append('photos', {
+                uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+                name,
+                type,
+              } as any);
+            }
+          } catch (e) {
+            console.error('Error processing photo:', e);
           }
         }
-        await axios.post(`${API_URL}/daily/workouts/${workoutId}/photos`, formData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        
+        try {
+          await axios.post(`${API_URL}/daily/workouts/${workoutId}/photos`, formData, {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data',
+            },
+            timeout: 60000, // 60s timeout for large photos
+          });
+          showToast('Photos uploaded successfully!');
+        } catch (photoErr: any) {
+          console.error('Photo upload failed:', photoErr);
+          showToast('Photos failed to upload, but saving metrics...', 'warning');
+        }
       }
 
-      // Step 2: Save metrics as JSON
+      // Step 2: Save metrics
       const payload: any = {
         water_intake_liters: waterIntake,
         total_duration_seconds: duration,
         total_volume: volume,
       };
-      if (weight.trim()) payload.post_workout_weight = parseFloat(weight);
+      if (weight.trim()) {
+        const parsedWeight = parseFloat(weight);
+        if (!isNaN(parsedWeight)) payload.post_workout_weight = parsedWeight;
+      }
 
       await axios.patch(`${API_URL}/daily/workouts/${workoutId}/complete`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      showToast('Workout summary saved! 🏆');
+      showToast('Workout finalized! Great job! 🏆');
       router.replace('/(tabs)/daily');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving final metrics:', err);
-      showToast('Failed to save metrics', 'error');
+      const msg = err.response?.data?.error || 'Failed to update metrics';
+      showToast(msg, 'error');
     } finally {
       setSaving(false);
     }
@@ -147,11 +174,15 @@ export default function WorkoutCompleteScreen() {
   const displayVolume = workout?.total_volume || volume;
   const displayRest = workout?.total_rest_seconds || rest;
 
+  const calculatedTotalSets = workout?.exercises?.reduce((acc: number, ex: any) => {
+    return acc + (ex.sets?.filter((s: any) => !s.is_skipped).length || 0);
+  }, 0) || 0;
+  
   const stats = [
     { icon: 'time', label: 'DURATION', value: formatDuration(displayDuration), color: '#EF4444', sub: 'Total active time' },
     { icon: 'barbell', label: 'VOLUME', value: `${Math.round(displayVolume)}kg`, color: '#10B981', sub: 'Total weight lifted' },
     { icon: 'hourglass', label: 'REST TIME', value: formatDuration(displayRest), color: '#F59E0B', sub: 'Recovery between sets' },
-    { icon: 'layers', label: 'SETS', value: `${workout?.total_sets || 0}`, color: '#8B5CF6', sub: 'Total sets completed' },
+    { icon: 'layers', label: 'SETS', value: `${workout?.total_sets || calculatedTotalSets || 0}`, color: '#8B5CF6', sub: 'Total sets completed' },
     { icon: 'water', label: 'HYDRATION', value: `${waterIntake.toFixed(1)}L`, color: '#3B82F6', sub: 'Water intake' },
   ];
 

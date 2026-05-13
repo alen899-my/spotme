@@ -105,6 +105,8 @@ export default function ActiveWorkoutScreen() {
   const [finishWater, setFinishWater] = useState(0);
   const [finishWeight, setFinishWeight] = useState('');
   const [finishPhotos, setFinishPhotos] = useState<string[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState<string[]>([]);
 
   // Viewer
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -573,6 +575,11 @@ export default function ActiveWorkoutScreen() {
         showToast('Workout ID not found', 'error');
         return;
       }
+      
+      const newUris = result.assets.map(a => a.uri);
+      setUploadingPhotos(newUris);
+      setLoadingPhotos(true);
+      
       try {
         const token = await AsyncStorage.getItem('userToken');
         const formData = new FormData();
@@ -581,21 +588,19 @@ export default function ActiveWorkoutScreen() {
           const uri = asset.uri;
           
           if (Platform.OS === 'web') {
-            // For Web: fetch the blob from the URI
             const response = await fetch(uri);
             const blob = await response.blob();
-            const filename = uri.split('/').pop() || `photo_${index}.jpg`;
+            const filename = `photo_${Date.now()}_${index}.jpg`;
             formData.append('photos', blob, filename);
           } else {
-            // For Native: use the uri/name/type object
-            const name = uri.split('/').pop();
-            const match = /\.(\w+)$/.exec(name || '');
+            const name = uri.split('/').pop() || `photo_${index}.jpg`;
+            const match = /\.(\w+)$/.exec(name);
             const type = match ? `image/${match[1]}` : 'image/jpeg';
             
             formData.append('photos', {
               uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
-              name: name || `photo_${index}.jpg`,
-              type: type,
+              name,
+              type,
             } as any);
           }
         }
@@ -603,6 +608,7 @@ export default function ActiveWorkoutScreen() {
         await axios.post(`${API_URL}/daily/workouts/${workoutId}/photos`, formData, {
           headers: { 
             Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
           }
         });
         showToast('Photos uploaded!');
@@ -610,6 +616,9 @@ export default function ActiveWorkoutScreen() {
       } catch (err) {
         console.error('Error uploading photos:', err);
         showToast('Failed to upload photos', 'error');
+      } finally {
+        setLoadingPhotos(false);
+        setUploadingPhotos([]);
       }
     }
   };
@@ -847,12 +856,71 @@ export default function ActiveWorkoutScreen() {
           renderItem={renderExercise}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={null}
+          ListHeaderComponent={
+            <View style={styles.listHeader}>
+              <Text style={[styles.workoutTitle, { color: colors.text }]}>{workout?.title || workout?.session_name || 'Workout Session'}</Text>
+              <View style={styles.progressRow}>
+                <Text style={[styles.progressText, { color: colors.textMuted }]}>
+                  {completedCount} of {totalCount} exercises completed
+                </Text>
+                <Text style={[styles.progressPercent, { color: '#E00000' }]}>
+                  {Math.round((completedCount / (totalCount || 1)) * 100)}%
+                </Text>
+              </View>
+              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                <View style={[styles.progressFill, { width: `${(completedCount / (totalCount || 1)) * 100}%` as any }]} />
+              </View>
+
+              {(workout?.photos?.length > 0 || uploadingPhotos.length > 0) && (
+                <View style={{ marginTop: 24, marginBottom: 10 }}>
+                  <View style={styles.sectionHeader}>
+                    <Ionicons name="camera" size={18} color="#E00000" />
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>SESSION PHOTOS</Text>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 10 }}>
+                    {/* Real uploaded photos */}
+                    {workout?.photos?.map((p: any) => (
+                      <TouchableOpacity key={p.id} style={styles.photoThumbWrap} onPress={() => { setViewerUri(p.photo_url); setViewerVisible(true); }}>
+                        <Image source={{ uri: p.photo_url }} style={styles.photoThumb} />
+                        <TouchableOpacity style={styles.removePhotoBtn} onPress={() => handleDeletePhoto(p.id)}>
+                          <Ionicons name="close" size={14} color="#FFF" />
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    ))}
+                    {/* Optimistic uploading photos */}
+                    {uploadingPhotos.map((uri, idx) => (
+                      <View key={`uploading-${idx}`} style={[styles.photoThumbWrap, { opacity: 0.6 }]}>
+                        <Image source={{ uri }} style={styles.photoThumb} />
+                        <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+                          <ActivityIndicator size="small" color="#FFF" />
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          }
           ListFooterComponent={workout?.status === 'active' ? (
             <View style={styles.footerContainer}>
               <TouchableOpacity style={[styles.addExFooterBtn, { borderColor: colors.border }]} onPress={openAddExercise}>
                 <Ionicons name="add-circle-outline" size={20} color="#E00000" />
                 <Text style={[styles.addExFooterText, { color: colors.text }]}>ADD EXTRA EXERCISE</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.addExFooterBtn, { borderColor: colors.border, borderStyle: 'solid', opacity: loadingPhotos ? 0.7 : 1 }]} 
+                onPress={handleUpdatePhotos}
+                disabled={loadingPhotos}
+              >
+                {loadingPhotos ? (
+                  <ActivityIndicator size="small" color="#3B82F6" />
+                ) : (
+                  <>
+                    <Ionicons name="camera-outline" size={20} color="#3B82F6" />
+                    <Text style={[styles.addExFooterText, { color: colors.text }]}>ADD SESSION PHOTOS ({workout?.photos?.length || 0})</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           ) : null}

@@ -16,7 +16,7 @@ router.get('/workouts', authenticateToken, async (req, res) => {
         (SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = dw.id AND is_completed = true) AS completed_count,
         (SELECT COUNT(*) FROM daily_workout_sets dws 
          JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id 
-         WHERE dwe.daily_workout_id = dw.id) AS total_sets,
+         WHERE dwe.daily_workout_id = dw.id AND dws.is_skipped = false) AS total_sets,
         (SELECT photo_url FROM daily_workout_photos WHERE daily_workout_id = dw.id ORDER BY created_at ASC LIMIT 1) AS cover_photo_url
        FROM daily_workouts dw
        LEFT JOIN workout_splits ws ON dw.split_id = ws.id
@@ -74,7 +74,14 @@ router.post(
 router.get('/workouts/:id', authenticateToken, async (req, res) => {
   try {
     const workout = await pool.query(
-      `SELECT dw.*, ws.name AS split_name, wsess.name AS session_name
+      `SELECT dw.*, 
+        ws.name AS split_name, 
+        wsess.name AS session_name,
+        (SELECT COUNT(*) FROM daily_workout_sets dws 
+         JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id 
+         WHERE dwe.daily_workout_id = dw.id AND dws.is_skipped = false) AS total_sets,
+        (SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = dw.id) AS exercise_count,
+        (SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = dw.id AND is_completed = true) AS completed_count
        FROM daily_workouts dw
        LEFT JOIN workout_splits ws ON dw.split_id = ws.id
        LEFT JOIN workout_sessions wsess ON dw.session_id = wsess.id
@@ -257,13 +264,19 @@ router.patch(
     try {
       const { water_intake_liters, post_workout_weight, photos, total_rest_seconds } = req.body;
       
+      console.log(`[Daily] Processing metrics for workout ${id}:`, {
+        water: water_intake_liters,
+        weight: post_workout_weight,
+        photosCount: Array.isArray(photos) ? photos.length : 0
+      });
+
       // Check if all exercises are done or skipped
       const exercisesCheck = await pool.query(
         'SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = $1 AND is_completed = false',
         [parseInt(id)]
       );
       const remainingCount = parseInt(exercisesCheck.rows[0].count);
-      const shouldComplete = remainingCount === 0;
+      console.log(`[Daily] Remaining exercises for workout ${id}: ${remainingCount}`);
 
       // Build dynamic update query
       let updateFields = [];
@@ -298,6 +311,7 @@ router.patch(
       queryParams.push(parseInt(id), userId);
       const query = `UPDATE daily_workouts SET ${updateFields.join(', ')} WHERE id = $${paramIdx} AND user_id = $${paramIdx + 1} RETURNING *`;
       
+      console.log(`[Daily] Executing update query for workout ${id}`);
       const result = await pool.query(query, queryParams);
 
       if (result.rows.length === 0) {
@@ -307,6 +321,7 @@ router.patch(
 
       // Handle multi-photos if provided
       if (Array.isArray(photos)) {
+        console.log(`[Daily] Updating ${photos.length} photos for workout ${id}`);
         // Clear old ones first (if any)
         await pool.query('DELETE FROM daily_workout_photos WHERE daily_workout_id = $1', [parseInt(id)]);
         for (const photoUrl of photos) {
@@ -317,7 +332,7 @@ router.patch(
         }
       }
 
-      console.log(`[Daily] Workout ${id} saved. Status: ${result.rows[0].status}`);
+      console.log(`[Daily] Workout ${id} successfully finalized. Status: ${result.rows[0].status}`);
       res.json({ ...result.rows[0], photos: photos || [] });
     } catch (err) {
       console.error('[Daily] PATCH /complete error:', err);
@@ -390,8 +405,11 @@ router.post('/workouts/:id/photos', authenticateToken, upload.array('photos', 5)
     }
     
     if (!req.files || req.files.length === 0) {
+      console.warn(`[Daily] No photos found in request for workout ${id}`);
       return res.status(400).json({ error: 'No photos uploaded' });
     }
+
+    console.log(`[Daily] Uploaded ${req.files.length} photos to R2 for workout ${id}`);
 
     const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL.endsWith('/') 
       ? process.env.CLOUDFLARE_R2_PUBLIC_URL.slice(0, -1) 
@@ -400,6 +418,7 @@ router.post('/workouts/:id/photos', authenticateToken, upload.array('photos', 5)
     const urls = req.files.map(file => `${publicUrl}/${file.key}`);
 
     for (const url of urls) {
+      console.log(`[Daily] Saving photo URL to DB: ${url}`);
       await pool.query(
         'INSERT INTO daily_workout_photos (daily_workout_id, photo_url) VALUES ($1, $2)',
         [parseInt(id), url]
@@ -407,7 +426,7 @@ router.post('/workouts/:id/photos', authenticateToken, upload.array('photos', 5)
     }
     res.json({ success: true, urls });
   } catch (err) {
-    console.error('POST /daily/workouts/:id/photos error:', err);
+    console.error('[Daily] POST /daily/workouts/:id/photos error:', err);
     res.status(500).json({ error: err.message });
   }
 });

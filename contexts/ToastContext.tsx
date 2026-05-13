@@ -14,7 +14,7 @@ import { FONTS } from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type ToastType = 'success' | 'error' | 'info';
+type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface ToastContextType {
   showToast: (message: string, type?: ToastType) => void;
@@ -75,6 +75,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     switch (type) {
       case 'success': return 'checkmark-circle';
       case 'error': return 'alert-circle';
+      case 'warning': return 'warning';
       default: return 'information-circle';
     }
   };
@@ -83,6 +84,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     switch (type) {
       case 'success': return { bg: '#10B981', icon: '#FFF' };
       case 'error': return { bg: '#EF4444', icon: '#FFF' };
+      case 'warning': return { bg: '#F59E0B', icon: '#FFF' };
       default: return { bg: '#3B82F6', icon: '#FFF' };
     }
   };
