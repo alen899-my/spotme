@@ -2,53 +2,83 @@ const axios = require('axios');
 require('dotenv').config({ path: __dirname + '/../.env' });
 
 /**
- * Common AI utility to call models via OpenRouter
+ * Common AI utility to call models via OpenRouter or Groq
  * @param {string} prompt - The text prompt
  * @param {string} imageUrl - Optional image URL for vision models
- * @param {string} model - The model to use (defaults to minimax/minimax-01)
- * @param {object} options - Additional OpenRouter options
+ * @param {string} model - The model to use
+ * @param {object} options - Additional options
  */
-async function callAI(prompt, imageUrl = null, model = 'minimax/minimax-01', options = {}) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY is not defined in .env');
+async function callAI(prompt, imageUrl = null, model = null, options = {}) {
+  // If we have an image and a Groq key, default to Groq's high-speed vision model
+  const groqKey = process.env.GROQ_API_KEY;
+  if (imageUrl && groqKey && (!model || model.includes('groq') || model === 'vision')) {
+    try {
+      const response = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                {
+                  type: 'image_url',
+                  image_url: { url: imageUrl }
+                }
+              ]
+            }
+          ],
+          temperature: 0,
+          max_tokens: 1024,
+          response_format: { type: 'json_object' }, // Llama-4 Scout supports JSON mode!
+          ...options
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${groqKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      return response.data.choices[0].message.content;
+    } catch (error) {
+      console.warn('Groq Vision failed, falling back to OpenRouter:', error.response?.data || error.message);
+      // Fall through to OpenRouter logic below
+    }
   }
 
-  // Image FIRST, then text — vision models attend better when image precedes instruction
-  const contentParts = [];
+  // Fallback / Default: OpenRouter
+  const orApiKey = process.env.OPENROUTER_API_KEY;
+  if (!orApiKey) {
+    throw new Error('No AI API keys defined in .env');
+  }
 
+  // Use a stable vision model for OpenRouter
+  const orModel = model || (imageUrl ? 'google/gemini-2.0-flash-exp:free' : 'minimax/minimax-01');
+
+  const contentParts = [];
   if (imageUrl) {
     contentParts.push({
       type: 'image_url',
-      image_url: {
-        url: imageUrl,
-        detail: 'high', // high-res tiles = better food/portion recognition
-      },
+      image_url: { url: imageUrl },
     });
   }
-
   contentParts.push({ type: 'text', text: prompt });
-
-  const messages = [
-    {
-      role: 'user',
-      content: contentParts,
-    },
-  ];
 
   try {
     const response = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: model,
-        messages: messages,
+        model: orModel,
+        messages: [{ role: 'user', content: contentParts }],
         max_tokens: 2000,
-        temperature: 0, // deterministic = consistent JSON, no random number drift
+        temperature: 0,
         ...options
       },
       {
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${orApiKey}`,
           'HTTP-Referer': 'https://spotme.app',
           'X-Title': 'SpotMe AI',
           'Content-Type': 'application/json'

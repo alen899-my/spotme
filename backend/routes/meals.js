@@ -19,38 +19,23 @@ router.post('/analyze', authenticateToken, upload.single('photo'), async (req, r
     const imageUrl = `${publicUrl}/${req.file.key}`;
 
     const prompt = `
-You are a registered dietitian and expert food analyst with deep knowledge of the USDA FoodData Central database.
+You are a high-precision food recognition AI. Your goal is to analyze the provided image and return a detailed, accurate nutritional breakdown.
 
-Carefully examine the image provided and identify every food and drink item visible.
+${description ? `CRITICAL CONTEXT: The user has provided this description: "${description}". Use this to resolve any visual ambiguity (e.g., identifying a specific type of soup or hidden ingredient).` : ''}
 
-${description ? `The user added this note about the meal: "${description}"` : ''}
+ANALYSIS PROTOCOL:
+1. IDENTIFY: List every visible food and beverage. Be specific (e.g., "Sourdough bread" vs "bread").
+2. QUANTIFY: Estimate portions in standard units (cups, grams, oz). Use the plate/cutlery for scale.
+3. NUTRITION: Calculate macros based on verified nutritional data. Do not use generic rounded numbers.
+4. HONESTY: If an item is unrecognizable, do not hallucinate. List it as "Unknown item" with 0 macros or use the user's description to identify it.
 
-STEP 1 — IDENTIFY:
-List every distinct food item you can see, including sauces, oils, garnishes, and beverages.
-
-STEP 2 — ESTIMATE PORTIONS:
-For each item, estimate the real-world portion size using visual anchors:
-- Compare to known objects (fist = ~1 cup, palm = ~3oz protein, thumb = ~1 tbsp)
-- Include estimated weight in grams, e.g. "1 cup cooked (185g)"
-
-STEP 3 — LOOK UP NUTRITION:
-Use USDA FoodData Central values for each item at the estimated portion:
-- Be precise: use realistic figures like 143 kcal, 6.3g protein — do NOT round everything to multiples of 5 or 10
-- Account for cooking method (fried adds fat, boiled does not)
-- Oils/sauces/dressings add meaningful calories — always include them
-
-ACCURACY RULES:
-- Specific food names only: "white rice, cooked" not "rice", "chicken breast, grilled" not "chicken"
-- If a food is partially obscured, make a conservative estimate
-- All numeric fields must be numbers, never null or strings
-- Sodium is in milligrams, everything else in grams, calories in kcal
-
-Return ONLY the following JSON with no extra text before or after:
+RETURN FORMAT:
+Return ONLY a valid JSON object with the following structure. No conversational text.
 {
   "items": [
     {
-      "item_name": "precise USDA-style food name",
-      "quantity": "portion with weight e.g. 1 cup (185g)",
+      "item_name": "Specific food name",
+      "quantity": "Amount (e.g., 150g)",
       "calories": 0,
       "protein": 0.0,
       "carbs": 0.0,
