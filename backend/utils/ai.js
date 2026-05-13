@@ -14,21 +14,27 @@ async function callAI(prompt, imageUrl = null, model = 'minimax/minimax-01', opt
     throw new Error('OPENROUTER_API_KEY is not defined in .env');
   }
 
+  // Image FIRST, then text — vision models attend better when image precedes instruction
+  const contentParts = [];
+
+  if (imageUrl) {
+    contentParts.push({
+      type: 'image_url',
+      image_url: {
+        url: imageUrl,
+        detail: 'high', // high-res tiles = better food/portion recognition
+      },
+    });
+  }
+
+  contentParts.push({ type: 'text', text: prompt });
+
   const messages = [
     {
       role: 'user',
-      content: [
-        { type: 'text', text: prompt }
-      ]
-    }
+      content: contentParts,
+    },
   ];
-
-  if (imageUrl) {
-    messages[0].content.push({
-      type: 'image_url',
-      image_url: { url: imageUrl }
-    });
-  }
 
   try {
     const response = await axios.post(
@@ -37,13 +43,14 @@ async function callAI(prompt, imageUrl = null, model = 'minimax/minimax-01', opt
         model: model,
         messages: messages,
         max_tokens: 2000,
+        temperature: 0, // deterministic = consistent JSON, no random number drift
         ...options
       },
       {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://spotme.app', // Optional, for OpenRouter tracking
-          'X-Title': 'SpotMe AI', // Optional
+          'HTTP-Referer': 'https://spotme.app',
+          'X-Title': 'SpotMe AI',
           'Content-Type': 'application/json'
         }
       }
