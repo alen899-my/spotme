@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, Image, Platform, ActivityIndicator,
-  TextInput, Dimensions,
+  TextInput, Dimensions, Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,7 @@ import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import Slider from '@react-native-community/slider';
+import StreakIcon from '../../components/ui/StreakIcon';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -51,6 +52,8 @@ export default function WorkoutCompleteScreen() {
   const [saving, setSaving] = useState(false);
   const [workout, setWorkout] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [newStreak, setNewStreak] = useState<number | null>(null);
+  const [showStreakOverlay, setShowStreakOverlay] = useState(false);
 
   useEffect(() => {
     fetchWorkout();
@@ -155,12 +158,23 @@ export default function WorkoutCompleteScreen() {
         if (!isNaN(parsedWeight)) payload.post_workout_weight = parsedWeight;
       }
 
-      await axios.patch(`${API_URL}/daily/workouts/${workoutId}/complete`, payload, {
+      const completeRes = await axios.patch(`${API_URL}/daily/workouts/${workoutId}/complete`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      if (completeRes.data.new_streak !== undefined) {
+        setNewStreak(completeRes.data.new_streak);
+        if (completeRes.data.new_streak > 0) {
+          setShowStreakOverlay(true);
+        }
+      }
+
       showToast('Workout finalized! Great job! 🏆');
-      router.replace('/(tabs)/daily');
+      
+      // Redirect after showing the streak for a bit
+      setTimeout(() => {
+        router.replace('/(tabs)/daily');
+      }, completeRes.data.new_streak > 0 ? 3500 : 1500);
     } catch (err: any) {
       console.error('Error saving final metrics:', err);
       const msg = err.response?.data?.error || 'Failed to update metrics';
@@ -191,11 +205,21 @@ export default function WorkoutCompleteScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Celebration Hero */}
         <LinearGradient colors={['#10B981', '#059669']} style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Ionicons name="trophy" size={48} color="#FFF" />
-          </View>
-          <Text style={styles.heroTitle}>Workout Complete!</Text>
-          <Text style={styles.heroSub}>You crushed it today 💪</Text>
+          {newStreak !== null && newStreak > 0 ? (
+            <View style={{ marginBottom: 20 }}>
+              <StreakIcon streak={newStreak} size={100} />
+            </View>
+          ) : (
+            <View style={styles.heroIcon}>
+              <Ionicons name="trophy" size={48} color="#FFF" />
+            </View>
+          )}
+          <Text style={styles.heroTitle}>{newStreak !== null && newStreak > 0 ? 'Perfect Workout!' : 'Workout Complete!'}</Text>
+          <Text style={styles.heroSub}>
+            {newStreak !== null && newStreak > 0 
+              ? `You kept your ${newStreak} day streak alive! 🔥` 
+              : 'You crushed it today 💪'}
+          </Text>
         </LinearGradient>
 
         {/* Stats Grid */}
@@ -400,6 +424,20 @@ export default function WorkoutCompleteScreen() {
           <Text style={[styles.skipLinkText, { color: colors.textMuted }]}>I'll do this later</Text>
         </TouchableOpacity>
       </View>
+      {/* Streak Celebration Overlay */}
+      {showStreakOverlay && (
+        <View style={styles.streakOverlay}>
+          <LinearGradient 
+            colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.95)']} 
+            style={StyleSheet.absoluteFill} 
+          />
+          <Animated.View style={styles.streakPopup}>
+            <StreakIcon streak={newStreak || 0} size={120} />
+            <Text style={styles.streakPopupTitle}>STREAK UP!</Text>
+            <Text style={styles.streakPopupSub}>Consistency is key. Keep it up!</Text>
+          </Animated.View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -447,4 +485,8 @@ const styles = StyleSheet.create({
   saveBtnText: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF', letterSpacing: 1 },
   skipLink: { alignItems: 'center', paddingVertical: 10 },
   skipLinkText: { fontFamily: FONTS.body, fontSize: 14, textDecorationLine: 'underline' },
+  streakOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 100, justifyContent: 'center', alignItems: 'center' },
+  streakPopup: { alignItems: 'center', gap: 10 },
+  streakPopupTitle: { fontFamily: FONTS.heading, fontSize: 36, color: '#FFF', letterSpacing: 2, marginTop: 20 },
+  streakPopupSub: { fontFamily: FONTS.body, fontSize: 16, color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
 });

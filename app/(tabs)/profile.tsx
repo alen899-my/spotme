@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
 import axios from "axios";
+import StreakIcon from "../../components/ui/StreakIcon";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -101,10 +102,11 @@ export default function ProfileScreen() {
           <Text style={[styles.userName, { color: colors.text }]}>{user?.full_name || "Gym Warrior"}</Text>
           <Text style={[styles.userEmail, { color: colors.textMuted }]}>{user?.email || "warrior@spotme.com"}</Text>
 
-          <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(224,0,0,0.1)' : '#FFF5F5' }]}>
-            <Ionicons name="flame" size={12} color="#E00000" />
-            <Text style={styles.badgeText}>7 Day Streak</Text>
-          </View>
+          {user?.current_streak > 0 && (
+            <View style={{ marginTop: 12 }}>
+              <StreakIcon streak={user.current_streak} size={50} />
+            </View>
+          )}
         </View>
 
         {/* Menu Section */}

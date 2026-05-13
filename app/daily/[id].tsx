@@ -908,21 +908,6 @@ export default function ActiveWorkoutScreen() {
                 <Ionicons name="add-circle-outline" size={20} color="#E00000" />
                 <Text style={[styles.addExFooterText, { color: colors.text }]}>ADD EXTRA EXERCISE</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.addExFooterBtn, { borderColor: colors.border, borderStyle: 'solid', opacity: loadingPhotos ? 0.7 : 1 }]} 
-                onPress={handleUpdatePhotos}
-                disabled={loadingPhotos}
-              >
-                {loadingPhotos ? (
-                  <ActivityIndicator size="small" color="#3B82F6" />
-                ) : (
-                  <>
-                    <Ionicons name="camera-outline" size={20} color="#3B82F6" />
-                    <Text style={[styles.addExFooterText, { color: colors.text }]}>ADD SESSION PHOTOS ({workout?.photos?.length || 0})</Text>
-                  </>
-                )}
-              </TouchableOpacity>
             </View>
           ) : null}
         />

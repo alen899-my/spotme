@@ -333,6 +333,55 @@ router.patch(
       }
 
       console.log(`[Daily] Workout ${id} successfully finalized. Status: ${result.rows[0].status}`);
+
+      // ─── STREAK CALCULATION ───
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+        // 1. Check for any skips in this workout
+        const skippedCheck = await pool.query(
+          'SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = $1 AND is_skipped = true',
+          [parseInt(id)]
+        );
+        const hasSkips = parseInt(skippedCheck.rows[0].count) > 0;
+
+        // 2. Get user's current streak
+        const userRes = await pool.query('SELECT current_streak, last_workout_date FROM users WHERE id = $1', [userId]);
+        const { current_streak, last_workout_date } = userRes.rows[0];
+        let newStreak = current_streak || 0;
+
+        if (hasSkips) {
+          // Rule: Skip any exercise = Streak Gone
+          newStreak = 0;
+          console.log(`[Streak] Reset to 0 due to skips in workout ${id}`);
+        } else {
+          if (!last_workout_date) {
+            newStreak = 1;
+          } else {
+            const lastDateStr = new Date(last_workout_date).toISOString().split('T')[0];
+            if (lastDateStr === today) {
+              // Already counted today, no change
+            } else if (lastDateStr === yesterday) {
+              newStreak += 1;
+            } else {
+              // Missed at least one day = Streak Gone (Restart at 1)
+              newStreak = 1;
+            }
+          }
+        }
+
+        await pool.query(
+          'UPDATE users SET current_streak = $1, last_workout_date = $2 WHERE id = $3',
+          [newStreak, today, userId]
+        );
+        
+        // Add streak to response
+        result.rows[0].new_streak = newStreak;
+      } catch (streakErr) {
+        console.error('[Streak] Failed to update streak:', streakErr);
+      }
+
       res.json({ ...result.rows[0], photos: photos || [] });
     } catch (err) {
       console.error('[Daily] PATCH /complete error:', err);
