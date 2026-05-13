@@ -12,52 +12,95 @@ router.post('/analyze', authenticateToken, upload.single('photo'), async (req, r
     if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
     const { description } = req.body;
 
-    const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL.endsWith('/') 
-      ? process.env.CLOUDFLARE_R2_PUBLIC_URL.slice(0, -1) 
+    const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL.endsWith('/')
+      ? process.env.CLOUDFLARE_R2_PUBLIC_URL.slice(0, -1)
       : process.env.CLOUDFLARE_R2_PUBLIC_URL;
-    
+
     const imageUrl = `${publicUrl}/${req.file.key}`;
 
     const prompt = `
-      Identify the food in this image and provide nutritional info.
-      ${description ? `User says: "${description}"` : ''}
+You are a registered dietitian and expert food analyst with deep knowledge of the USDA FoodData Central database.
 
-      Return ONLY this JSON format:
-      {
-        "items": [
-          {
-            "item_name": "name", 
-            "quantity": "estimated amount", 
-            "calories": number, 
-            "protein": number, 
-            "carbs": number, 
-            "fat": number,
-            "fiber": number,
-            "sugar": number,
-            "sodium": number,
-            "saturated_fat": number,
-            "cholesterol": number
-          }
-        ],
-        "total_calories": number,
-        "total_protein": number,
-        "total_carbs": number,
-        "total_fat": number,
-        "total_fiber": number,
-        "total_sugar": number,
-        "total_sodium": number,
-        "total_saturated_fat": number,
-        "total_cholesterol": number
-      }
-    `;
+Carefully examine the image provided and identify every food and drink item visible.
+
+${description ? `The user added this note about the meal: "${description}"` : ''}
+
+STEP 1 — IDENTIFY:
+List every distinct food item you can see, including sauces, oils, garnishes, and beverages.
+
+STEP 2 — ESTIMATE PORTIONS:
+For each item, estimate the real-world portion size using visual anchors:
+- Compare to known objects (fist = ~1 cup, palm = ~3oz protein, thumb = ~1 tbsp)
+- Include estimated weight in grams, e.g. "1 cup cooked (185g)"
+
+STEP 3 — LOOK UP NUTRITION:
+Use USDA FoodData Central values for each item at the estimated portion:
+- Be precise: use realistic figures like 143 kcal, 6.3g protein — do NOT round everything to multiples of 5 or 10
+- Account for cooking method (fried adds fat, boiled does not)
+- Oils/sauces/dressings add meaningful calories — always include them
+
+ACCURACY RULES:
+- Specific food names only: "white rice, cooked" not "rice", "chicken breast, grilled" not "chicken"
+- If a food is partially obscured, make a conservative estimate
+- All numeric fields must be numbers, never null or strings
+- Sodium is in milligrams, everything else in grams, calories in kcal
+
+Return ONLY the following JSON with no extra text before or after:
+{
+  "items": [
+    {
+      "item_name": "precise USDA-style food name",
+      "quantity": "portion with weight e.g. 1 cup (185g)",
+      "calories": 0,
+      "protein": 0.0,
+      "carbs": 0.0,
+      "fat": 0.0,
+      "fiber": 0.0,
+      "sugar": 0.0,
+      "sodium": 0,
+      "saturated_fat": 0.0,
+      "cholesterol": 0
+    }
+  ],
+  "total_calories": 0,
+  "total_protein": 0.0,
+  "total_carbs": 0.0,
+  "total_fat": 0.0,
+  "total_fiber": 0.0,
+  "total_sugar": 0.0,
+  "total_sodium": 0,
+  "total_saturated_fat": 0.0,
+  "total_cholesterol": 0
+}
+`.trim();
 
     const aiResponse = await callAI(prompt, imageUrl);
-    
-    // Extract JSON from AI response (handle potential markdown formatting)
-    const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Failed to parse AI response');
-    
-    const analysis = JSON.parse(jsonMatch[0]);
+
+    // Robust JSON extraction — try fenced block first, then bare { ... }
+    const fencedMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const bareMatch = aiResponse.match(/\{[\s\S]*\}/);
+    const jsonString = fencedMatch ? fencedMatch[1].trim() : bareMatch ? bareMatch[0] : null;
+
+    if (!jsonString) throw new Error('Failed to locate JSON in AI response');
+
+    let analysis;
+    try {
+      analysis = JSON.parse(jsonString);
+    } catch {
+      throw new Error('Failed to parse JSON from AI response');
+    }
+
+    // Auto-correct totals if they drift from the sum of items (>5% difference)
+    if (Array.isArray(analysis.items) && analysis.items.length > 0) {
+      const fields = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar', 'sodium', 'saturated_fat', 'cholesterol'];
+      for (const field of fields) {
+        const sum = analysis.items.reduce((acc, item) => acc + (Number(item[field]) || 0), 0);
+        const modelTotal = Number(analysis[`total_${field}`]);
+        if (Math.abs(sum - modelTotal) / (modelTotal || 1) > 0.05) {
+          analysis[`total_${field}`] = Math.round(sum * 10) / 10;
+        }
+      }
+    }
 
     res.json({ imageUrl, analysis });
   } catch (err) {
@@ -68,11 +111,11 @@ router.post('/analyze', authenticateToken, upload.single('photo'), async (req, r
 
 // ── POST /meals — Save a meal ────────────────────────────────────────────────
 router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => {
-  const { 
-    image_url, meal_type, 
-    total_calories, total_protein, total_carbs, total_fat, 
+  const {
+    image_url, meal_type,
+    total_calories, total_protein, total_carbs, total_fat,
     total_fiber, total_sugar, total_sodium, total_saturated_fat, total_cholesterol,
-    items 
+    items
   } = req.body;
   const client = await pool.connect();
   try {
@@ -87,7 +130,7 @@ router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => 
       )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW() AT TIME ZONE 'UTC') RETURNING *`,
       [
-        req.user.id, image_url, meal_type, 
+        req.user.id, image_url, meal_type,
         total_calories, total_protein, total_carbs, total_fat,
         total_fiber || 0, total_sugar || 0, total_sodium || 0, total_saturated_fat || 0, total_cholesterol || 0
       ]
@@ -104,7 +147,7 @@ router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => 
         )
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
-          mealId, item.item_name, item.quantity || '', 
+          mealId, item.item_name, item.quantity || '',
           item.calories, item.protein, item.carbs, item.fat,
           item.fiber || 0, item.sugar || 0, item.sodium || 0, item.saturated_fat || 0, item.cholesterol || 0
         ]
@@ -130,7 +173,6 @@ router.get('/', authenticateToken, async (req, res) => {
       [req.user.id]
     );
 
-    // Fetch items for each meal
     const results = [];
     for (const meal of meals.rows) {
       const items = await pool.query(
