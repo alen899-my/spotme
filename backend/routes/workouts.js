@@ -259,7 +259,7 @@ router.delete('/sessions/:id', authenticateToken, async (req, res) => {
 router.get('/sessions/:id/exercises', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT wse.*, e.name, e.category, e.image_url, e.target, e.equipment 
+      `SELECT wse.*, e.name, e.category, e.image_url, e.target, e.equipment, e.instructions_en, e.instruction_steps_en
        FROM workout_session_exercises wse 
        JOIN exercises e ON wse.exercise_id = e.id 
        WHERE wse.session_id = (SELECT ws.id FROM workout_sessions ws JOIN workout_splits s ON ws.split_id = s.id WHERE ws.id = $1 AND s.user_id = $2)

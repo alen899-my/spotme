@@ -19,6 +19,7 @@ import axios from 'axios';
 import { FONTS } from '../../../../constants/theme';
 import { useTheme } from '../../../../contexts/ThemeContext';
 import { useToast } from '../../../../contexts/ToastContext';
+import ExercisePreviewModal from '../../../../components/modals/ExercisePreviewModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 const LIMIT = 20;
@@ -36,6 +37,7 @@ export default function AddSessionExercisesScreen() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [previewEx, setPreviewEx] = useState<any>(null);
 
   const pageRef = useRef(0);
   const hasMoreRef = useRef(true);
@@ -160,7 +162,11 @@ export default function AddSessionExercisesScreen() {
   };
 
   const renderExercise = ({ item }: { item: any }) => (
-    <View style={[styles.exCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <TouchableOpacity 
+      style={[styles.exCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      activeOpacity={0.7}
+      onPress={() => setPreviewEx(item)}
+    >
       {item.image_url ? (
         <Image source={{ uri: item.image_url }} style={styles.exImage} />
       ) : (
@@ -187,7 +193,7 @@ export default function AddSessionExercisesScreen() {
           <Ionicons name="add" size={24} color="#FFF" />
         )}
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderEmpty = () => {
@@ -290,6 +296,12 @@ export default function AddSessionExercisesScreen() {
             }
           />
         )}
+
+        <ExercisePreviewModal
+          visible={previewEx !== null}
+          exercise={previewEx}
+          onClose={() => setPreviewEx(null)}
+        />
       </View>
     </SafeAreaView>
   );

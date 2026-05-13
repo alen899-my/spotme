@@ -26,6 +26,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmationModal from '../../../components/ui/ConfirmationModal';
 import Input from '../../../components/ui/Input';
+import ExercisePreviewModal from '../../../components/modals/ExercisePreviewModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -50,6 +51,9 @@ export default function SessionDetailScreen() {
 
   // Deletion state
   const [removeId, setRemoveId] = useState<number | null>(null);
+
+  // Preview State
+  const [previewEx, setPreviewEx] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -119,7 +123,11 @@ export default function SessionDetailScreen() {
   };
 
   const renderExercise = ({ item }: { item: any }) => (
-    <View style={[styles.exerciseCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <TouchableOpacity 
+      style={[styles.exerciseCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      activeOpacity={0.8}
+      onPress={() => setPreviewEx(item)}
+    >
       <View style={styles.exInfo}>
         <Image source={{ uri: item.image_url }} style={styles.exImage} />
         <View style={{ flex: 1 }}>
@@ -158,7 +166,7 @@ export default function SessionDetailScreen() {
           <Ionicons name="create-outline" size={18} color="#E00000" />
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -277,6 +285,12 @@ export default function SessionDetailScreen() {
           confirmText="REMOVE"
           onConfirm={onConfirmRemove}
           onCancel={() => setRemoveId(null)}
+        />
+
+        <ExercisePreviewModal
+          visible={previewEx !== null}
+          exercise={previewEx}
+          onClose={() => setPreviewEx(null)}
         />
       </View>
     </SafeAreaView>

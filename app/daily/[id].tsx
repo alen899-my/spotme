@@ -14,6 +14,7 @@ import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import ExercisePreviewModal from '../../components/modals/ExercisePreviewModal';
 import * as ImagePicker from 'expo-image-picker';
 import Slider from '@react-native-community/slider';
 import * as FileSystem from 'expo-file-system';
@@ -1027,28 +1028,11 @@ export default function ActiveWorkoutScreen() {
         onCancel={() => { setShowDeleteSetModal(false); setDeleteSetId(null); }}
       />
 
-      <Modal visible={guideModalVisible} transparent animationType="fade" onRequestClose={() => setGuideModalVisible(false)}>
-        <View style={styles.guideOverlay}>
-          <View style={[styles.guideContent, { backgroundColor: colors.card }]}>
-            <TouchableOpacity style={styles.closeGuide} onPress={() => setGuideModalVisible(false)}><Ionicons name="close-circle" size={32} color="rgba(0,0,0,0.5)" /></TouchableOpacity>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Image source={{ uri: guideExercise?.gif_url || guideExercise?.image_url }} style={styles.guideGif} resizeMode="contain" />
-              <View style={styles.guideBody}>
-                <Text style={[styles.guideName, { color: colors.text }]}>{guideExercise?.name}</Text>
-                <View style={styles.guideMetaRow}>
-                  <View style={[styles.guideBadge, { backgroundColor: colors.inputBg }]}><Text style={[styles.guideBadgeText, { color: colors.textMuted }]}>{guideExercise?.equipment}</Text></View>
-                  <View style={[styles.guideBadge, { backgroundColor: colors.inputBg }]}><Text style={[styles.guideBadgeText, { color: colors.textMuted }]}>{guideExercise?.target}</Text></View>
-                </View>
-                <Text style={[styles.guideSectionTitle, { color: colors.text }]}>Instructions</Text>
-                <Text style={[styles.guideText, { color: colors.textMuted }]}>{guideExercise?.instructions_en || 'No instructions available.'}</Text>
-              </View>
-            </ScrollView>
-            <TouchableOpacity style={styles.gotItBtn} onPress={() => setGuideModalVisible(false)}>
-              <LinearGradient colors={['#E00000', '#B00000']} style={styles.gotItBtnGrad}><Text style={styles.gotItBtnText}>GOT IT, LET'S GO!</Text></LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <ExercisePreviewModal
+        visible={guideModalVisible}
+        exercise={guideExercise}
+        onClose={() => setGuideModalVisible(false)}
+      />
 
       <Modal visible={addExModalVisible} transparent animationType="slide" onRequestClose={() => setAddExModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -1245,20 +1229,6 @@ const styles = StyleSheet.create({
   skipBtnText: { fontFamily: FONTS.bodyBold, fontSize: 11 },
   modalSkipBtn: { flex: 0.8, height: 58, borderRadius: 18, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   modalSkipBtnText: { fontFamily: FONTS.bodyBold, fontSize: 14, letterSpacing: 1 },
-  guideOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 },
-  guideContent: { borderRadius: 32, overflow: 'hidden', maxHeight: '85%' },
-  closeGuide: { position: 'absolute', top: 16, right: 16, zIndex: 10 },
-  guideGif: { width: '100%', height: 250, backgroundColor: '#FFF' },
-  guideBody: { padding: 24 },
-  guideName: { fontFamily: FONTS.heading, fontSize: 24, marginBottom: 12 },
-  guideMetaRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  guideBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  guideBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 11, textTransform: 'uppercase' },
-  guideSectionTitle: { fontFamily: FONTS.bodyBold, fontSize: 18, marginBottom: 10 },
-  guideText: { fontFamily: FONTS.body, fontSize: 15, lineHeight: 24 },
-  gotItBtn: { margin: 24, marginTop: 0, borderRadius: 16, overflow: 'hidden' },
-  gotItBtnGrad: { height: 56, justifyContent: 'center', alignItems: 'center' },
-  gotItBtnText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF', letterSpacing: 1 },
   addExFooterBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 20, borderStyle: 'dashed', borderWidth: 1.5, borderRadius: 20, marginTop: 10, marginBottom: 40 },
   addExFooterText: { fontFamily: FONTS.bodyBold, fontSize: 14, letterSpacing: 0.5 },
   catGrid: { gap: 12 },
