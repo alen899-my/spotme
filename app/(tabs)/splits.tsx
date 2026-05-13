@@ -10,6 +10,7 @@ import {
   Dimensions,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -78,54 +79,77 @@ export default function SplitsTab() {
     }
   };
 
-  const renderSplit = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={[styles.splitCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-      activeOpacity={0.8}
-      onPress={() => router.push(`/splits/${item.id}`)}
-    >
-      <LinearGradient
-        colors={['rgba(224,0,0,0.1)', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-      
-      <View style={styles.cardHeader}>
-        <View style={styles.iconWrap}>
-          <MaterialCommunityIcons name="folder-zip-outline" size={24} color="#E00000" />
+  const renderSplit = ({ item, index }: { item: any, index: number }) => {
+    // Determine card color: split color or theme primary
+    const cardColor = item.template_color || colors.primary || '#E00000';
+    
+    // Image stack logic
+    const rawImages = item.exercise_images || [];
+    const images = [...rawImages];
+    if (images.length > 2) {
+      const shift = index % images.length;
+      for (let i = 0; i < shift; i++) {
+        images.push(images.shift());
+      }
+    }
+    
+    return (
+      <TouchableOpacity 
+        style={[
+          styles.splitCard, 
+          { 
+            backgroundColor: cardColor, 
+            shadowColor: cardColor,
+            elevation: 4
+          }
+        ]}
+        activeOpacity={0.9}
+        onPress={() => router.push(`/splits/${item.id}`)}
+      >
+        <View style={styles.cardHeader}>
+          <View style={[styles.iconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+            <MaterialCommunityIcons name={item.template_icon || "folder-outline"} size={22} color="#FFF" />
+          </View>
+          <TouchableOpacity 
+            style={styles.deleteBtn} 
+            onPress={() => handleDelete(item.id)}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          >
+            <Ionicons name="trash-outline" size={16} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
         </View>
-        <View style={styles.titleArea}>
-          <Text style={[styles.splitName, { color: colors.text }]}>{item.name}</Text>
-          <Text style={[styles.splitDesc, { color: colors.textMuted }]} numberOfLines={1}>
-            {item.description || 'Workout Group'}
-          </Text>
+
+        <Text style={styles.splitName} numberOfLines={1}>{item.name}</Text>
+        
+        <View style={styles.cardFooterArea}>
+          <View style={styles.cardStatsArea}>
+            <View style={styles.miniStat}>
+              <Ionicons name="flash" size={12} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.miniStatText}>{item.session_count} Sessions</Text>
+            </View>
+            <View style={styles.miniStat}>
+              <Ionicons name="calendar" size={12} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.miniStatText}>Program</Text>
+            </View>
+          </View>
+
+          <View style={styles.miniImageStack}>
+            <Image 
+              source={{ uri: images.length > 1 ? images[1] : images[0] || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=200&auto=format&fit=crop' }} 
+              style={[styles.miniThumbnailBack, { opacity: 0.3, transform: [{ rotate: '12deg' }, { translateX: 6 }] }]} 
+            />
+            {images.length > 0 ? (
+              <Image source={{ uri: images[0] }} style={styles.miniThumbnailFront} />
+            ) : (
+              <View style={[styles.miniThumbnailFront, { backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="barbell-outline" size={12} color="rgba(255,255,255,0.5)" />
+              </View>
+            )}
+          </View>
         </View>
-        <TouchableOpacity 
-          style={styles.deleteBtn} 
-          onPress={() => handleDelete(item.id)}
-          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-        >
-          <Ionicons name="trash-outline" size={20} color={colors.textDim} />
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.cardFooter}>
-        <View style={styles.stat}>
-          <Ionicons name="list-outline" size={14} color="#E00000" />
-          <Text style={[styles.statText, { color: colors.text }]}>{item.session_count} Sessions</Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.stat}>
-          <Ionicons name="calendar-outline" size={14} color="#E00000" />
-          <Text style={[styles.statText, { color: colors.text }]}>Custom Program</Text>
-        </View>
-        <View style={styles.arrowIcon}>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -136,17 +160,25 @@ export default function SplitsTab() {
             <Text style={[styles.headerTitle, { color: colors.text }]}>My Programs</Text>
             <Text style={[styles.headerSub, { color: colors.textMuted }]}>Custom split groups</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.addBtn}
-            onPress={() => router.push('/splits/create')}
-          >
-            <LinearGradient
-              colors={['#E00000', '#B00000']}
-              style={styles.addBtnGradient}
+          <View style={styles.headerBtns}>
+            <TouchableOpacity 
+              style={[styles.templateBtn, { backgroundColor: colors.inputBg }]}
+              onPress={() => router.push('/splits/templates')}
             >
-              <Ionicons name="add" size={24} color="#FFF" />
-            </LinearGradient>
-          </TouchableOpacity>
+              <Ionicons name="albums-outline" size={20} color="#8B5CF6" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.addBtn}
+              onPress={() => router.push('/splits/create')}
+            >
+              <LinearGradient
+                colors={['#E00000', '#B00000']}
+                style={styles.addBtnGradient}
+              >
+                <Ionicons name="add" size={24} color="#FFF" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {loading ? (
@@ -160,22 +192,55 @@ export default function SplitsTab() {
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Programs Yet</Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              Organize your training into programs like "Push Pull Leg" or "Full Body."
+              Start with an expert split or build your own custom program from scratch.
             </Text>
+            <TouchableOpacity 
+              style={[styles.createNowBtn, { backgroundColor: '#7C3AED', marginBottom: 12 }]}
+              onPress={() => router.push('/splits/templates')}
+            >
+              <Ionicons name="albums-outline" size={18} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={styles.createNowText}>BROWSE EXPERT SPLITS</Text>
+            </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.createNowBtn, { backgroundColor: '#E00000' }]}
               onPress={() => router.push('/splits/create')}
             >
-              <Text style={styles.createNowText}>CREATE NEW PROGRAM</Text>
+              <Text style={styles.createNowText}>CREATE FROM SCRATCH</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <FlatList
+            key="splits-grid"
             data={splits}
             keyExtractor={(item) => String(item.id)}
-            renderItem={renderSplit}
+            renderItem={({ item, index }) => renderSplit({ item, index })}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            numColumns={2}
+            columnWrapperStyle={styles.columnWrapper}
+            ListHeaderComponent={
+              <TouchableOpacity
+                style={styles.templatesBanner}
+                onPress={() => router.push('/splits/templates')}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#7C3AED', '#4F46E5']}
+                  style={StyleSheet.absoluteFillObject}
+                  start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }}
+                />
+                <View style={styles.bannerIcon}>
+                  <Ionicons name="albums" size={22} color="#FFF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.templatesBannerTitle}>Browse Expert Splits</Text>
+                  <Text style={styles.templatesBannerSub}>Elite programs for faster results</Text>
+                </View>
+                <View style={styles.bannerBadge}>
+                  <Text style={styles.bannerBadgeText}>NEW</Text>
+                </View>
+              </TouchableOpacity>
+            }
           />
         )}
 
@@ -198,87 +263,123 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 32,
+    marginBottom: 20,
     marginTop: 10,
   },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 32 },
   headerSub: { fontFamily: FONTS.body, fontSize: 14, marginTop: 2 },
+  headerBtns: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  templateBtn: {
+    width: 44, height: 44, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+  },
   addBtn: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#E00000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    borderRadius: 12, overflow: 'hidden', elevation: 4,
+    shadowColor: '#E00000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8,
   },
-  addBtnGradient: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
+  addBtnGradient: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  templatesBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 24, padding: 18, marginBottom: 20, overflow: 'hidden',
+    width: '100%',
   },
+  bannerIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  templatesBannerTitle: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF' },
+  templatesBannerSub: { fontFamily: FONTS.body, fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  bannerBadge: {
+    backgroundColor: '#FFF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+  },
+  bannerBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 10, color: '#7C3AED' },
+  
   listContent: { paddingBottom: 40 },
+  columnWrapper: { justifyContent: 'space-between', gap: 12 },
   
   // Split Card
   splitCard: {
-    width: '100%',
+    flex: 1,
     borderRadius: 24,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
+    padding: 16,
+    marginBottom: 12,
+    minHeight: 140,
+    justifyContent: 'space-between',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   iconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: 'rgba(224,0,0,0.1)',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
-  titleArea: { flex: 1 },
-  splitName: { fontFamily: FONTS.bodyBold, fontSize: 18, marginBottom: 2 },
-  splitDesc: { fontFamily: FONTS.body, fontSize: 13 },
   deleteBtn: { padding: 4 },
+  splitName: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF', marginTop: 12 },
   
-  cardFooter: {
+  cardStatsArea: {
+    marginTop: 8,
+    gap: 4,
+  },
+  miniStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  miniStatText: { fontFamily: FONTS.body, fontSize: 11, color: 'rgba(255,255,255,0.8)' },
+  
+  cardFooterArea: {
     flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-    paddingTop: 16,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 10,
   },
-  stat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  statText: { fontFamily: FONTS.bodySemiBold, fontSize: 12 },
-  divider: {
-    width: 1,
-    height: 12,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    marginHorizontal: 16,
+  miniImageStack: {
+    width: 45,
+    height: 40,
+    position: 'relative',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
-  arrowIcon: { marginLeft: 'auto' },
+  miniThumbnailFront: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#FFF',
+    zIndex: 2,
+  },
+  miniThumbnailBack: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    position: 'absolute',
+    zIndex: 1,
+  },
 
   // States
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, paddingBottom: 100 },
   emptyIconWrap: { marginBottom: 20 },
-  emptyTitle: { fontFamily: FONTS.heading, fontSize: 24, marginBottom: 8 },
-  emptySub: { fontFamily: FONTS.body, fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+  emptyTitle: { fontFamily: FONTS.heading, fontSize: 28, marginBottom: 8 },
+  emptySub: { fontFamily: FONTS.body, fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   createNowBtn: {
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    borderRadius: 16,
+    width: '100%',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
-  createNowText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' },
+  createNowText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: '#FFF' },
 });

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Alert,
+  Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -76,21 +77,27 @@ export default function SplitSessionsScreen() {
       onPress={() => router.push(`/splits/session/${item.id}`)}
     >
       <View style={styles.cardMain}>
-        <View style={[styles.iconWrap, { backgroundColor: 'rgba(224,0,0,0.1)' }]}>
-          <Ionicons name="calendar" size={22} color="#E00000" />
+        <View style={styles.sessionImageContainer}>
+          <Image 
+            source={{ uri: item.sample_image || 'https://images.unsplash.com/photo-1517836357463-d25dfeac00ad?q=80&w=200&auto=format&fit=crop' }} 
+            style={styles.sessionImage} 
+          />
+          <View style={styles.sessionOverlay} />
         </View>
         <View style={styles.titleArea}>
           <Text style={[styles.sessionName, { color: colors.text }]}>{item.name}</Text>
-          <Text style={[styles.sessionMeta, { color: colors.textMuted }]}>{item.exercise_count} Exercises Added</Text>
+          <Text style={[styles.sessionMeta, { color: colors.textMuted }]}>
+            <Ionicons name="barbell-outline" size={12} color={colors.textDim} /> {item.exercise_count} Exercises
+          </Text>
         </View>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)}>
-          <Ionicons name="trash-outline" size={20} color={colors.textDim} />
+          <Ionicons name="trash-outline" size={18} color={colors.textDim} />
         </TouchableOpacity>
       </View>
       
-      <View style={styles.cardFooter}>
-        <Text style={[styles.actionText, { color: '#E00000' }]}>Manage Routine</Text>
-        <Ionicons name="chevron-forward" size={16} color="#E00000" />
+      <View style={[styles.cardFooter, { backgroundColor: colors.inputBg }]}>
+        <Text style={[styles.actionText, { color: colors.primary || '#E00000' }]}>Manage Routine</Text>
+        <Ionicons name="chevron-forward" size={14} color={colors.primary || '#E00000' } />
       </View>
     </TouchableOpacity>
   );
@@ -191,27 +198,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+  sessionImageContainer: {
+    width: 54,
+    height: 54,
+    borderRadius: 14,
+    overflow: 'hidden',
     marginRight: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  sessionImage: {
+    width: '100%',
+    height: '100%',
+  },
+  sessionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   titleArea: { flex: 1 },
-  sessionName: { fontFamily: FONTS.bodyBold, fontSize: 17, marginBottom: 2 },
-  sessionMeta: { fontFamily: FONTS.body, fontSize: 12 },
-  deleteBtn: { padding: 4 },
+  sessionName: { fontFamily: FONTS.bodyBold, fontSize: 17, marginBottom: 4 },
+  sessionMeta: { fontFamily: FONTS.body, fontSize: 12, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  deleteBtn: { padding: 8 },
   
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(224,0,0,0.03)',
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
     gap: 8,
+    marginTop: 4,
   },
   actionText: { fontFamily: FONTS.bodyBold, fontSize: 12 },
 
