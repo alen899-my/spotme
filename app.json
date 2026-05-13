@@ -4,17 +4,22 @@
     "slug": "spotme",
     "version": "1.0.0",
     "orientation": "portrait",
+
     "icon": "./assets/icon.png",
+
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+
     "ios": {
       "supportsTablet": true
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -23,10 +28,25 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
+
     "web": {
+      "bundler": "metro",
+      "output": "static",
+
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+
+      "themeColor": "#ef4444",
+
+      "manifest": {
+        "name": "spotme",
+        "short_name": "spotme",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#ef4444"
+      }
     },
+
     "plugins": [
       "expo-router",
       "expo-font",
