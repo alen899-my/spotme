@@ -109,9 +109,10 @@ export default function WorkoutCompleteScreen() {
       // Step 1: Upload photos if any
       if (photos.length > 0) {
         showToast(`Uploading ${photos.length} photos...`, 'info');
-        const formData = new FormData();
-        for (const [index, uri] of photos.entries()) {
+        
+        const uploadPhotoWithRetry = async (uri: string, index: number, retries = 2): Promise<any> => {
           try {
+            const formData = new FormData();
             if (Platform.OS === 'web') {
               const response = await fetch(uri);
               const blob = await response.blob();
@@ -127,23 +128,36 @@ export default function WorkoutCompleteScreen() {
                 type,
               } as any);
             }
-          } catch (e) {
-            console.error('Error processing photo:', e);
+
+            return await axios.post(`${API_URL}/daily/workouts/${workoutId}/photos`, formData, {
+              headers: { 
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data',
+              },
+              timeout: 30000, // 30s timeout per photo is plenty
+            });
+          } catch (err) {
+            if (retries > 0) {
+              console.warn(`Retry upload for photo ${index + 1}. Retries left: ${retries}`);
+              return await uploadPhotoWithRetry(uri, index, retries - 1);
+            }
+            throw err;
           }
-        }
-        
-        try {
-          await axios.post(`${API_URL}/daily/workouts/${workoutId}/photos`, formData, {
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'multipart/form-data',
-            },
-            timeout: 60000, // 60s timeout for large photos
-          });
-          showToast('Photos uploaded successfully!');
-        } catch (photoErr: any) {
-          console.error('Photo upload failed:', photoErr);
-          showToast('Photos failed to upload, but saving metrics...', 'warning');
+        };
+
+        // Upload all photos concurrently
+        const uploadPromises = photos.map((uri, index) => uploadPhotoWithRetry(uri, index));
+        const results = await Promise.allSettled(uploadPromises);
+
+        const succeeded = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+
+        if (failed === 0) {
+          showToast('All photos uploaded successfully!');
+        } else if (succeeded > 0) {
+          showToast(`Uploaded ${succeeded}/${photos.length} photos. ${failed} failed.`, 'warning');
+        } else {
+          showToast('Failed to upload photos, saving workout metrics...', 'error');
         }
       }
 

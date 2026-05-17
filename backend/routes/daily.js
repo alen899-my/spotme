@@ -489,7 +489,7 @@ router.patch('/workouts/:id/metrics', authenticateToken, async (req, res) => {
 });
 
 // ── POST /daily/workouts/:id/photos — upload and append photos ────────────────
-router.post('/workouts/:id/photos', authenticateToken, upload.array('photos', 5), async (req, res) => {
+router.post('/workouts/:id/photos', authenticateToken, upload.array('photos', 10), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
