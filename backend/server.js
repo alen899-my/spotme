@@ -9,6 +9,7 @@ const exercisesRoutes = require('./routes/exercises');
 const workoutRoutes = require('./routes/workouts');
 const dailyRoutes = require('./routes/daily');
 const mealsRoutes = require('./routes/meals');
+const waterRoutes = require('./routes/water');
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use('/api/exercises', exercisesRoutes);
 app.use('/api/workouts', workoutRoutes);
 app.use('/api/daily', dailyRoutes);
 app.use('/api/meals', mealsRoutes);
+app.use('/api/water', waterRoutes);
 
 
 const PORT = process.env.PORT || 5000;

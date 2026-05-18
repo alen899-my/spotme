@@ -13,6 +13,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
+import NutritionMeter from '../../components/ui/NutritionMeter';
+import DatePicker from '../../components/ui/DatePicker';
+import WaterTracker from '../../components/ui/WaterTracker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -36,9 +39,21 @@ export default function MealsScreen() {
   const [mealType, setMealType] = useState('Morning');
   const [saving, setSaving] = useState(false);
 
+  // New features state
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [userData, setUserData] = useState<any>(null);
+
   useEffect(() => {
+    loadUser();
     fetchMeals();
   }, []);
+
+  const loadUser = async () => {
+    try {
+      const data = await AsyncStorage.getItem('userData');
+      if (data) setUserData(JSON.parse(data));
+    } catch (e) {}
+  };
 
   const fetchMeals = async () => {
     try {
@@ -161,55 +176,103 @@ export default function MealsScreen() {
     }
   };
 
-  const renderMealCard = ({ item }: { item: any }) => {
+  const MealAccordionCard = ({ item }: { item: any }) => {
+    const [open, setOpen] = React.useState(false);
+    const anim = React.useRef(new Animated.Value(0)).current;
     const date = new Date(item.logged_at);
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+    const MEAL_COLORS: Record<string, string> = {
+      Morning: '#F59E0B', Afternoon: '#3B82F6', Evening: '#8B5CF6', Night: '#6B7280',
+    };
+    const mealColor = MEAL_COLORS[item.meal_type] || '#E00000';
+
+    const toggle = () => {
+      const toVal = open ? 0 : 1;
+      setOpen(!open);
+      Animated.spring(anim, { toValue: toVal, useNativeDriver: false, tension: 60, friction: 12 }).start();
+    };
+
+    const macros = [
+      { label: 'Protein', value: Math.round(item.total_protein), unit: 'g', color: '#10B981' },
+      { label: 'Carbs',   value: Math.round(item.total_carbs),   unit: 'g', color: '#3B82F6' },
+      { label: 'Fat',     value: Math.round(item.total_fat),     unit: 'g', color: '#F59E0B' },
+      { label: 'Fiber',   value: Math.round(item.total_fiber),   unit: 'g', color: '#34D399' },
+      { label: 'Sugar',   value: Math.round(item.total_sugar),   unit: 'g', color: '#EF4444' },
+      { label: 'Sodium',  value: Math.round(item.total_sodium),  unit: 'mg', color: '#FB923C' },
+    ];
+
+    const arrowRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
     return (
-      <View style={[styles.mealCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Image source={{ uri: item.image_url }} style={styles.mealCardImage} />
-        <View style={styles.mealCardContent}>
-          <View style={styles.mealCardHeader}>
-            <View>
-              <Text style={[styles.mealCardTitle, { color: colors.text }]}>{item.meal_type}</Text>
-              <Text style={[styles.mealCardTime, { color: colors.textMuted }]}>{dateStr} • {timeStr}</Text>
+      <View style={[styles.accCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* ── Collapsed header ── */}
+        <View style={styles.accHeader}>
+          <Image source={{ uri: item.image_url }} style={styles.accThumb} />
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <View style={[styles.mealTypePill, { backgroundColor: mealColor + '20' }]}>
+                <Text style={[styles.mealTypePillText, { color: mealColor }]}>{item.meal_type}</Text>
+              </View>
+              <Text style={[styles.accTime, { color: colors.textDim }]}>{timeStr}</Text>
             </View>
-            <TouchableOpacity onPress={() => deleteMeal(item.id)}>
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
+            <Text style={[styles.accCals, { color: colors.text }]}>
+              {Math.round(item.total_calories)}{' '}
+              <Text style={[styles.accCalsUnit, { color: colors.textMuted }]}>kcal</Text>
+            </Text>
+            <View style={styles.accMiniMacros}>
+              <Text style={[styles.miniMacro, { color: '#10B981' }]}>P {Math.round(item.total_protein)}g</Text>
+              <Text style={[styles.miniMacro, { color: '#3B82F6' }]}>C {Math.round(item.total_carbs)}g</Text>
+              <Text style={[styles.miniMacro, { color: '#F59E0B' }]}>F {Math.round(item.total_fat)}g</Text>
+            </View>
+          </View>
+          <View style={{ gap: 12 }}>
+            <TouchableOpacity onPress={() => deleteMeal(item.id)} style={styles.iconBtn}>
+              <Ionicons name="trash-outline" size={17} color="#EF4444" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggle} style={[styles.iconBtn, { backgroundColor: colors.iconCircle }]}>
+              <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
+                <Ionicons name="chevron-down" size={18} color={colors.text} />
+              </Animated.View>
             </TouchableOpacity>
           </View>
-
-          <View style={styles.nutrientRow}>
-            <NutrientBadge label="Cals" value={Math.round(item.total_calories)} color="#EF4444" unit="kcal" />
-            <NutrientBadge label="Protein" value={Math.round(item.total_protein)} color="#10B981" unit="g" />
-            <NutrientBadge label="Carbs" value={Math.round(item.total_carbs)} color="#3B82F6" unit="g" />
-            <NutrientBadge label="Fat" value={Math.round(item.total_fat)} color="#F59E0B" unit="g" />
-          </View>
-
-          <View style={[styles.nutrientRow, { marginTop: -8 }]}>
-            <NutrientBadge label="Fiber" value={Math.round(item.total_fiber)} color="#10B981" unit="g" />
-            <NutrientBadge label="Sugar" value={Math.round(item.total_sugar)} color="#EF4444" unit="g" />
-            <NutrientBadge label="Sodium" value={Math.round(item.total_sodium)} color="#F59E0B" unit="mg" />
-            <NutrientBadge label="Sat. Fat" value={Math.round(item.total_saturated_fat)} color="#EF4444" unit="g" />
-          </View>
-
-          <View style={styles.foodItemsList}>
-            {item.items?.map((food: any, idx: number) => (
-              <View key={idx} style={{ marginBottom: 4 }}>
-                <Text style={[styles.foodItemText, { color: colors.textDim }]}>
-                  • {food.item_name} ({food.quantity})
-                </Text>
-                <Text style={{ fontSize: 10, color: colors.textMuted, marginLeft: 12 }}>
-                  {Math.round(food.calories)} kcal | P:{Math.round(food.protein)}g C:{Math.round(food.carbs)}g F:{Math.round(food.fat)}g | Sugar:{Math.round(food.sugar)}g Sodium:{Math.round(food.sodium)}mg
-                </Text>
-              </View>
-            ))}
-          </View>
         </View>
+
+        {/* ── Expandable detail ── */}
+        {open && (
+          <View style={[styles.accDetail, { borderTopColor: colors.border }]}>
+            {/* Macro grid */}
+            <View style={styles.macroGrid}>
+              {macros.map((m) => (
+                <View key={m.label} style={[styles.macroPill, { backgroundColor: m.color + '12' }]}>
+                  <Text style={[styles.macroPillVal, { color: m.color }]}>{m.value}{m.unit}</Text>
+                  <Text style={[styles.macroPillLabel, { color: colors.textDim }]}>{m.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Food items */}
+            {item.items?.length > 0 && (
+              <View style={[styles.foodItemsWrap, { borderTopColor: colors.border }]}>
+                <Text style={[styles.foodItemsTitle, { color: colors.text }]}>Items detected</Text>
+                {item.items.map((food: any, idx: number) => (
+                  <View key={idx} style={[styles.foodRow, { borderBottomColor: colors.border }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.foodName, { color: colors.text }]}>{food.item_name}</Text>
+                      <Text style={[styles.foodQty, { color: colors.textMuted }]}>{food.quantity}</Text>
+                    </View>
+                    <Text style={[styles.foodCals, { color: colors.textMuted }]}>{Math.round(food.calories)} kcal</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
       </View>
     );
   };
+
+  const renderMealCard = ({ item }: { item: any }) => <MealAccordionCard item={item} />;
 
   const RenderLoadingCard = () => {
     const pulseAnim = React.useRef(new Animated.Value(0.4)).current;
@@ -257,6 +320,56 @@ export default function MealsScreen() {
     </View>
   );
 
+  // Target calculations
+  const getTargets = () => {
+    let weight = 70, height = 170, age = 30, goal = 'Maintain', activity = 'Lightly Active';
+    if (userData) {
+      if (userData.weight) weight = parseFloat(userData.weight.toString().replace(/[^0-9.]/g, '')) || 70;
+      if (userData.height) height = parseFloat(userData.height.toString().replace(/[^0-9.]/g, '')) || 170;
+      if (userData.age) age = parseInt(userData.age) || 30;
+      goal = userData.fitness_goal || 'Maintain';
+      activity = userData.activity_level || 'Lightly Active';
+    }
+
+    // Rough BMR (Mifflin)
+    let bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5; // Default male
+    
+    // Multiplier
+    let mult = 1.375;
+    if (activity.toLowerCase().includes('sedentary')) mult = 1.2;
+    if (activity.toLowerCase().includes('moderate')) mult = 1.55;
+    if (activity.toLowerCase().includes('very') || activity.toLowerCase().includes('high')) mult = 1.725;
+    
+    let tdee = bmr * mult;
+    
+    if (goal.toLowerCase().includes('lose') || goal.toLowerCase().includes('cut')) tdee -= 500;
+    if (goal.toLowerCase().includes('gain') || goal.toLowerCase().includes('bulk')) tdee += 500;
+    
+    const caloriesTarget = Math.round(tdee);
+    let proteinTarget = Math.round(weight * 2);
+    if (goal.toLowerCase().includes('gain')) proteinTarget = Math.round(weight * 2.2);
+    const fatTarget = Math.round(weight * 0.9);
+    let carbsTarget = Math.round((caloriesTarget - (proteinTarget * 4) - (fatTarget * 9)) / 4);
+    if (carbsTarget < 0) carbsTarget = 50;
+    
+    return { caloriesTarget, proteinTarget, carbsTarget, fatTarget };
+  };
+
+  const targets = getTargets();
+
+  const isSameDay = (d1: Date, d2: Date) => {
+    return d1.getDate() === d2.getDate() &&
+           d1.getMonth() === d2.getMonth() &&
+           d1.getFullYear() === d2.getFullYear();
+  };
+
+  const filteredMeals = meals.filter(m => isSameDay(new Date(m.logged_at), selectedDate));
+  
+  const calsConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_calories || 0), 0);
+  const proteinConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_protein || 0), 0);
+  const carbsConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_carbs || 0), 0);
+  const fatConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_fat || 0), 0);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
@@ -271,12 +384,26 @@ export default function MealsScreen() {
         </TouchableOpacity>
       </View>
 
+      <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+      
       {loading ? (
         <View style={styles.centered}><ActivityIndicator size="large" color="#E00000" /></View>
       ) : (
         <FlatList
-          data={uploading ? [{ id: 'loading' }, ...meals] : meals}
+          data={uploading ? [{ id: 'loading' }, ...filteredMeals] : filteredMeals}
           keyExtractor={(item) => item.id.toString()}
+          ListHeaderComponent={
+            <>
+              <NutritionMeter
+                caloriesConsumed={calsConsumed}
+                caloriesTarget={targets.caloriesTarget}
+                protein={{ label: 'Protein', icon: 'barbell-outline',    consumed: proteinConsumed, target: targets.proteinTarget, color: '#10B981', unit: 'g' }}
+                carbs={{   label: 'Carbs',   icon: 'pizza-outline',      consumed: carbsConsumed,   target: targets.carbsTarget,   color: '#3B82F6', unit: 'g' }}
+                fat={{     label: 'Fat',     icon: 'water-outline',       consumed: fatConsumed,     target: targets.fatTarget,     color: '#F59E0B', unit: 'g' }}
+              />
+              <WaterTracker selectedDate={selectedDate} />
+            </>
+          }
           renderItem={({ item }) => {
             if (item.id === 'loading') return <RenderLoadingCard />;
             return renderMealCard({ item });
@@ -455,6 +582,81 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', marginTop: 100 },
   emptyText: { fontFamily: FONTS.body, fontSize: 16, marginTop: 16 },
   emptyBtn: { marginTop: 12, padding: 10 },
+
+  // ── Accordion card ──────────────────────────────────────────
+  accCard: {
+    borderRadius: 20, borderWidth: 1, marginBottom: 14,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+  },
+  accHeader: {
+    flexDirection: 'row', alignItems: 'center', padding: 14,
+  },
+  accThumb: {
+    width: 70, height: 70, borderRadius: 14,
+  },
+  mealTypePill: {
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+  },
+  mealTypePillText: {
+    fontFamily: FONTS.bodyBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  accTime: {
+    fontFamily: FONTS.body, fontSize: 12,
+  },
+  accCals: {
+    fontFamily: FONTS.heading, fontSize: 26, lineHeight: 28,
+  },
+  accCalsUnit: {
+    fontFamily: FONTS.bodySemiBold, fontSize: 14,
+  },
+  accMiniMacros: {
+    flexDirection: 'row', gap: 10, marginTop: 4,
+  },
+  miniMacro: {
+    fontFamily: FONTS.bodyBold, fontSize: 11,
+  },
+  iconBtn: {
+    width: 32, height: 32, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  accDetail: {
+    paddingHorizontal: 14, paddingBottom: 16, borderTopWidth: 1,
+  },
+  macroGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 14,
+  },
+  macroPill: {
+    width: '30%', flexGrow: 1, borderRadius: 12,
+    padding: 10, alignItems: 'center',
+  },
+  macroPillVal: {
+    fontFamily: FONTS.heading, fontSize: 16,
+  },
+  macroPillLabel: {
+    fontFamily: FONTS.bodySemiBold, fontSize: 10,
+    textTransform: 'uppercase', marginTop: 2,
+  },
+  foodItemsWrap: {
+    marginTop: 14, paddingTop: 14, borderTopWidth: 1,
+  },
+  foodItemsTitle: {
+    fontFamily: FONTS.bodyBold, fontSize: 13, marginBottom: 10, letterSpacing: 0.3,
+  },
+  foodRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 8, borderBottomWidth: 0.5,
+  },
+  foodName: {
+    fontFamily: FONTS.bodySemiBold, fontSize: 13,
+  },
+  foodQty: {
+    fontFamily: FONTS.body, fontSize: 11, marginTop: 1,
+  },
+  foodCals: {
+    fontFamily: FONTS.bodyBold, fontSize: 13,
+  },
   
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

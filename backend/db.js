@@ -146,6 +146,16 @@ const initDB = async () => {
       );
     `);
 
+    // ── Water Intake Logging ─────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS water_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        amount_ml INT NOT NULL,
+        logged_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
     console.log("Database connected and all tables ready");
   } catch (error) {
     console.error("Database initialization failed:", error);
