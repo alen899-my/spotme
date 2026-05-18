@@ -21,7 +21,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import StreakIcon from "./StreakIcon";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.78;
+const SIDEBAR_WIDTH = SCREEN_WIDTH;
 
 interface ProfileSidebarProps {
   visible: boolean;
