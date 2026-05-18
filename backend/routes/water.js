@@ -39,6 +39,25 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/water/reset?date=YYYY-MM-DD — reset all water logs for a day
+router.delete('/reset', authenticateToken, async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date ? new Date(date) : new Date();
+    const start = new Date(targetDate); start.setHours(0, 0, 0, 0);
+    const end   = new Date(targetDate); end.setHours(23, 59, 59, 999);
+
+    await pool.query(
+      `DELETE FROM water_logs WHERE user_id = $1 AND logged_at BETWEEN $2 AND $3`,
+      [req.user.id, start.toISOString(), end.toISOString()]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Water reset error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/water/:id — undo a specific log entry
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {

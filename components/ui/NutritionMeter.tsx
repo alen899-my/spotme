@@ -4,209 +4,189 @@ import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
-interface Macro { label: string; icon: string; consumed: number; target: number; color: string; unit: string; }
-interface Props { caloriesConsumed: number; caloriesTarget: number; protein: Macro; carbs: Macro; fat: Macro; }
-
 const { width: W } = Dimensions.get('window');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pure-View donut ring — zero native modules, 100% web-safe
-// Uses the CSS "rotated half-circle" technique adapted for React Native.
-// rightRot: fills 0→50%   leftRot: fills 50→100%
-// ─────────────────────────────────────────────────────────────────────────────
+interface Macro {
+  label: string; icon: string; consumed: number;
+  target: number; color: string; unit: string;
+}
+interface Props {
+  caloriesConsumed: number; caloriesTarget: number;
+  protein: Macro; carbs: Macro; fat: Macro;
+}
+
+// ── Pure-View donut ring (zero SVG) ──────────────────────────────────────────
 function DonutRing({ pct, size, stroke, fillColor, trackColor, children }: any) {
   const half = size / 2;
   const rPct = Math.min(pct, 50);
   const lPct = Math.max(0, pct - 50);
-  const rightRot = `${-180 + rPct * 3.6}deg`;
-  const leftRot  = `${-180 + lPct * 3.6}deg`;
 
   return (
     <View style={{ width: size, height: size }}>
-      {/* Background track */}
       <View style={{ position: 'absolute', width: size, height: size, borderRadius: half, borderWidth: stroke, borderColor: trackColor }} />
-
-      {/* Right half fill (0–50%) */}
+      {/* Right fill 0→50% */}
       <View style={{ position: 'absolute', right: 0, top: 0, width: half, height: size, overflow: 'hidden' }}>
         <View style={{
-          position: 'absolute', left: -half, top: 0,
-          width: size, height: size, borderRadius: half,
-          borderWidth: stroke, borderColor: fillColor,
-          transform: [{ rotate: rightRot }],
+          position: 'absolute', left: -half, top: 0, width: size, height: size,
+          borderRadius: half, borderWidth: stroke, borderColor: fillColor,
+          transform: [{ rotate: `${-180 + rPct * 3.6}deg` }],
         }} />
       </View>
-
-      {/* Left half fill (50–100%) */}
+      {/* Left fill 50→100% */}
       <View style={{ position: 'absolute', left: 0, top: 0, width: half, height: size, overflow: 'hidden' }}>
         <View style={{
-          position: 'absolute', left: 0, top: 0,
-          width: size, height: size, borderRadius: half,
-          borderWidth: stroke, borderColor: fillColor,
-          transform: [{ rotate: leftRot }],
+          position: 'absolute', left: 0, top: 0, width: size, height: size,
+          borderRadius: half, borderWidth: stroke, borderColor: fillColor,
+          transform: [{ rotate: `${-180 + lPct * 3.6}deg` }],
         }} />
       </View>
-
-      {/* Centre label */}
-      <View style={{ position: 'absolute', inset: 0, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ position: 'absolute', width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
         {children}
       </View>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Mini pie made from stacked arcs (same technique, 3 segments)
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Mini 3-layer donut for macro breakdown ────────────────────────────────────
 function MiniPie({ protein, carbs, fat, total, size }: any) {
   const { colors } = useTheme();
-  if (total === 0) return <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 4, borderColor: colors.border }} />;
-
-  const p = (protein / total) * 100;
-  const c = (carbs   / total) * 100;
-
-  // We layer 3 DonutRings with different rotations (offsets) to simulate a pie
-  // Simpler approach: use a stepped ring with clip offsets
-  // Even simpler: show 3 colored arc segments using pure views offset by rotation
-  // For brevity, use the standard "conic" trick with border trick
-  const half = size / 2;
-  const stroke = size * 0.38; // thick border = almost-solid
-
-  const pPct  = Math.min(p, 100);
-  const cPct  = Math.min(c, 100);
-
+  if (total === 0) return <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: Math.round(size * 0.38), borderColor: colors.border }} />;
+  const stroke = Math.round(size * 0.38);
+  const p = Math.min((protein / total) * 100, 100);
+  const c = Math.min((carbs   / total) * 100, 100);
   return (
     <View style={{ width: size, height: size }}>
-      {/* Base: fat color full circle */}
-      <View style={{ position: 'absolute', width: size, height: size, borderRadius: half, borderWidth: stroke, borderColor: '#F59E0B' }} />
-      {/* Carbs layer (protein + carbs) */}
-      <DonutRing pct={pPct + cPct} size={size} stroke={stroke} fillColor="#3B82F6" trackColor="transparent">
-        <View />
-      </DonutRing>
-      {/* Protein top layer */}
-      <DonutRing pct={pPct} size={size} stroke={stroke} fillColor="#10B981" trackColor="transparent">
-        <View />
-      </DonutRing>
+      <View style={{ position: 'absolute', width: size, height: size, borderRadius: size / 2, borderWidth: stroke, borderColor: '#F59E0B' }} />
+      <DonutRing pct={p + c} size={size} stroke={stroke} fillColor="#3B82F6" trackColor="transparent"><View /></DonutRing>
+      <DonutRing pct={p}     size={size} stroke={stroke} fillColor="#10B981" trackColor="transparent"><View /></DonutRing>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Macro bar row
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Segmented tick macro bar ──────────────────────────────────────────────────
 function MacroBar({ macro }: { macro: Macro }) {
   const { colors } = useTheme();
   const pct  = Math.min((macro.consumed / (macro.target || 1)) * 100, 100);
   const over = macro.consumed > macro.target;
+  const filled = Math.round(pct / 5); // out of 20 ticks
 
   return (
     <View style={s.macroRow}>
       <View style={[s.macroIcon, { backgroundColor: macro.color + '20' }]}>
-        <Ionicons name={macro.icon as any} size={15} color={macro.color} />
+        <Ionicons name={macro.icon as any} size={14} color={macro.color} />
       </View>
       <View style={{ flex: 1 }}>
         <View style={s.macroTopRow}>
           <Text style={[s.macroLabel, { color: colors.text }]}>{macro.label}</Text>
-          <Text style={[s.macroValText, { color: colors.textMuted }]}>
+          <Text style={[s.macroVal, { color: colors.textMuted }]}>
             <Text style={{ color: macro.color, fontFamily: FONTS.bodyBold }}>{Math.round(macro.consumed)}</Text>
             {'  /  '}{macro.target}{macro.unit}
           </Text>
         </View>
-
-        {/* Segmented tick bar */}
+        {/* Ticks */}
         <View style={s.tickRow}>
-          {Array.from({ length: 20 }).map((_, i) => {
-            const filled = i < Math.round(pct / 5);
-            return (
-              <View
-                key={i}
-                style={[
-                  s.tick,
-                  {
-                    backgroundColor: filled
-                      ? over ? '#E00000' : macro.color
-                      : colors.border,
-                    opacity: filled ? (0.5 + (i / 20) * 0.5) : 1,
-                  },
-                ]}
-              />
-            );
-          })}
+          {Array.from({ length: 20 }).map((_, i) => (
+            <View
+              key={i}
+              style={[
+                s.tick,
+                {
+                  backgroundColor: i < filled
+                    ? over ? '#E00000' : macro.color
+                    : colors.border,
+                  opacity: i < filled ? 0.4 + (i / 20) * 0.6 : 1,
+                },
+              ]}
+            />
+          ))}
         </View>
-
         <View style={s.barFooter}>
           <Text style={[s.pctLabel, { color: colors.textDim }]}>{Math.round(pct)}%</Text>
-          {over && <Text style={s.overLabel}>Over target</Text>}
+          {over && <Text style={s.overTag}>Over target</Text>}
         </View>
       </View>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Component
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Main ─────────────────────────────────────────────────────────────────────
 export default function NutritionMeter({ caloriesConsumed, caloriesTarget, protein, carbs, fat }: Props) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const pct  = Math.min(Math.round((caloriesConsumed / (caloriesTarget || 1)) * 100), 100);
   const left = Math.max(caloriesTarget - caloriesConsumed, 0);
   const over = caloriesConsumed > caloriesTarget;
   const RING = Math.min(W * 0.36, 148);
-  const STROKE = Math.max(Math.round(RING * 0.1), 12);
+  const STROKE = Math.max(Math.round(RING * 0.11), 13);
   const totalMacros = protein.consumed + carbs.consumed + fat.consumed;
+  const fillColor = over ? '#E00000' : '#E00000'; // always red for calories
 
   return (
     <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={s.cardHeader}>
-        <Text style={[s.title, { color: colors.text }]}>Today's Nutrition</Text>
-        <View style={[s.statusChip, { backgroundColor: over ? '#E0000015' : '#10B98115' }]}>
-          <View style={[s.statusDot, { backgroundColor: over ? '#E00000' : '#10B981' }]} />
-          <Text style={[s.statusChipText, { color: over ? '#E00000' : '#10B981' }]}>
+
+      {/* ── Title row ── */}
+      <View style={s.titleRow}>
+        <View style={s.titleLeft}>
+          <View style={[s.titleIcon, { backgroundColor: '#E0000018' }]}>
+            <Ionicons name="flame" size={18} color="#E00000" />
+          </View>
+          <View>
+            <Text style={[s.title, { color: colors.text }]}>Today's Nutrition</Text>
+            <Text style={[s.subtitle, { color: colors.textMuted }]}>Calorie & macro progress</Text>
+          </View>
+        </View>
+        <View style={[s.chip, { backgroundColor: over ? '#E0000018' : '#10B98118' }]}>
+          <View style={[s.chipDot, { backgroundColor: over ? '#E00000' : '#10B981' }]} />
+          <Text style={[s.chipText, { color: over ? '#E00000' : '#10B981' }]}>
             {over ? 'Over limit' : 'On track'}
           </Text>
         </View>
       </View>
 
-      {/* ── Top row: Donut + stats + mini-pie ── */}
+      {/* ── Donut + side panel ── */}
       <View style={s.topRow}>
-        {/* Main calorie donut */}
-        <DonutRing pct={pct} size={RING} stroke={STROKE} fillColor="#E00000" trackColor={colors.border}>
+        <DonutRing pct={pct} size={RING} stroke={STROKE} fillColor={fillColor} trackColor={colors.border}>
           <View style={{ alignItems: 'center' }}>
             <Text style={[s.ringNum, { color: colors.text }]}>{Math.round(caloriesConsumed).toLocaleString()}</Text>
             <Text style={[s.ringUnit, { color: colors.textMuted }]}>kcal</Text>
-            <View style={[s.pctBadge, { backgroundColor: over ? '#E0000025' : '#10B98125' }]}>
+            <View style={[s.pctBadge, { backgroundColor: over ? '#E0000022' : '#10B98122' }]}>
               <Text style={[s.pctText, { color: over ? '#E00000' : '#10B981' }]}>{pct}%</Text>
             </View>
           </View>
         </DonutRing>
 
-        {/* Stat cards */}
-        <View style={{ flex: 1, gap: 8 }}>
+        {/* Right stat cards */}
+        <View style={{ flex: 1, gap: 7 }}>
+          <View style={[s.statCard, { backgroundColor: '#E000000E', borderColor: '#E0000025' }]}>
+            <Text style={[s.statLabel, { color: colors.textDim }]}>Calories Eaten</Text>
+            <Text style={[s.statVal, { color: '#E00000' }]}>{Math.round(caloriesConsumed).toLocaleString()} kcal</Text>
+          </View>
+
           <View style={[s.statCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
             <Text style={[s.statLabel, { color: colors.textDim }]}>Daily Target</Text>
             <Text style={[s.statVal, { color: colors.text }]}>{caloriesTarget.toLocaleString()} kcal</Text>
           </View>
-          <View style={[s.statCard, { backgroundColor: over ? '#E0000010' : '#10B98110', borderColor: over ? '#E0000025' : '#10B98125' }]}>
+
+          <View style={[s.statCard, {
+            backgroundColor: over ? '#E000000E' : '#10B9810E',
+            borderColor: over ? '#E0000025' : '#10B98125',
+          }]}>
             <Text style={[s.statLabel, { color: colors.textDim }]}>{over ? 'Over by' : 'Remaining'}</Text>
             <Text style={[s.statVal, { color: over ? '#E00000' : '#10B981' }]}>
               {Math.round(over ? caloriesConsumed - caloriesTarget : left)} kcal
             </Text>
           </View>
 
-          {/* Mini macro pie + legend */}
-          <View style={[s.statCard, { backgroundColor: colors.inputBg, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-            <MiniPie protein={protein.consumed} carbs={carbs.consumed} fat={fat.consumed} total={totalMacros} size={44} />
-            <View style={{ gap: 3 }}>
+          {/* Macro summary — 3 columns, no rings */}
+          <View style={[s.statCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               {[
-                { label: 'P', color: '#10B981', val: `${Math.round(protein.consumed)}g` },
-                { label: 'C', color: '#3B82F6', val: `${Math.round(carbs.consumed)}g` },
-                { label: 'F', color: '#F59E0B', val: `${Math.round(fat.consumed)}g` },
+                { label: 'Protein', color: '#10B981', val: `${Math.round(protein.consumed)}g` },
+                { label: 'Carbs',   color: '#3B82F6', val: `${Math.round(carbs.consumed)}g` },
+                { label: 'Fat',     color: '#F59E0B', val: `${Math.round(fat.consumed)}g` },
               ].map(m => (
-                <View key={m.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: m.color }} />
-                  <Text style={[s.miniLabel, { color: colors.textMuted }]}>
-                    {m.label}{' '}
-                    <Text style={{ color: m.color, fontFamily: FONTS.bodyBold }}>{m.val}</Text>
-                  </Text>
+                <View key={m.label} style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: m.color }}>{m.val}</Text>
+                  <Text style={[s.statLabel, { color: colors.textDim, marginBottom: 0 }]}>{m.label}</Text>
                 </View>
               ))}
             </View>
@@ -214,9 +194,19 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
         </View>
       </View>
 
+      {/* ── Banner ── */}
+      <View style={[s.banner, { backgroundColor: over ? '#E000000E' : '#10B9810E', borderColor: over ? '#E0000030' : '#10B98130' }]}>
+        <Ionicons name={over ? 'warning-outline' : 'checkmark-circle-outline'} size={15} color={over ? '#E00000' : '#10B981'} />
+        <Text style={[s.bannerText, { color: over ? '#E00000' : '#10B981' }]}>
+          {over
+            ? `${Math.round(caloriesConsumed - caloriesTarget)} kcal over your daily goal`
+            : `${Math.round(left)} kcal remaining to reach your goal`}
+        </Text>
+      </View>
+
       {/* ── Macro bars ── */}
       <View style={[s.macroSection, { borderTopColor: colors.border }]}>
-        <Text style={[s.macroSectionTitle, { color: colors.text }]}>Macronutrients</Text>
+        <Text style={[s.macroTitle, { color: colors.text }]}>Macronutrients</Text>
         <MacroBar macro={protein} />
         <MacroBar macro={carbs} />
         <MacroBar macro={fat} />
@@ -227,35 +217,41 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
 
 const s = StyleSheet.create({
   card: {
-    marginHorizontal: 0, marginBottom: 16,
-    borderRadius: 24, borderWidth: 1, padding: 16,
-    shadowColor: '#E00000', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08, shadowRadius: 20, elevation: 6,
+    marginHorizontal: 0, marginBottom: 16, borderRadius: 24, borderWidth: 1, padding: 18,
+    shadowColor: '#E00000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 6,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  title: { fontFamily: FONTS.heading, fontSize: Math.min(W * 0.055, 22), letterSpacing: 0.3 },
-  statusChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusChipText: { fontFamily: FONTS.bodyBold, fontSize: Math.min(W * 0.027, 11) },
-  topRow: { flexDirection: 'row', gap: 12, marginBottom: 16, alignItems: 'center' },
-  ringNum: { fontFamily: FONTS.heading, fontSize: Math.min(W * 0.065, 26), lineHeight: Math.min(W * 0.07, 28), letterSpacing: -1 },
-  ringUnit: { fontFamily: FONTS.bodySemiBold, fontSize: Math.min(W * 0.028, 11), marginTop: 2 },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
+  titleLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  titleIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  title: { fontFamily: FONTS.heading, fontSize: Math.min(W * 0.048, 20) },
+  subtitle: { fontFamily: FONTS.body, fontSize: 11, marginTop: 1 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  chipDot: { width: 6, height: 6, borderRadius: 3 },
+  chipText: { fontFamily: FONTS.bodyBold, fontSize: 10 },
+  topRow: { flexDirection: 'row', gap: 14, marginBottom: 16, alignItems: 'center' },
+  ringNum: { fontFamily: FONTS.heading, fontSize: Math.min(W * 0.062, 24), lineHeight: Math.min(W * 0.066, 26), letterSpacing: -1 },
+  ringUnit: { fontFamily: FONTS.bodySemiBold, fontSize: 10, marginTop: 2 },
   pctBadge: { marginTop: 5, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7 },
-  pctText: { fontFamily: FONTS.bodyBold, fontSize: Math.min(W * 0.027, 11) },
+  pctText: { fontFamily: FONTS.bodyBold, fontSize: 10 },
   statCard: { borderRadius: 12, borderWidth: 1, padding: 9 },
-  statLabel: { fontFamily: FONTS.body, fontSize: Math.min(W * 0.026, 11), marginBottom: 2 },
-  statVal: { fontFamily: FONTS.bodyBold, fontSize: Math.min(W * 0.035, 14) },
-  miniLabel: { fontFamily: FONTS.body, fontSize: Math.min(W * 0.026, 11) },
-  macroSection: { borderTopWidth: 1, paddingTop: 14, gap: 14 },
-  macroSectionTitle: { fontFamily: FONTS.bodyBold, fontSize: Math.min(W * 0.034, 14), letterSpacing: 0.3, marginBottom: 2 },
+  statLabel: { fontFamily: FONTS.body, fontSize: 10, marginBottom: 2 },
+  statVal: { fontFamily: FONTS.bodyBold, fontSize: Math.min(W * 0.034, 13) },
+  miniLeg: { fontFamily: FONTS.body, fontSize: 10 },
+  banner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    padding: 11, borderRadius: 14, borderWidth: 1, marginBottom: 16,
+  },
+  bannerText: { fontFamily: FONTS.bodySemiBold, fontSize: 12, flex: 1 },
+  macroSection: { borderTopWidth: 1, paddingTop: 14, gap: 13 },
+  macroTitle: { fontFamily: FONTS.bodyBold, fontSize: 13, letterSpacing: 0.3, marginBottom: 2 },
   macroRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  macroIcon: { width: 32, height: 32, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
-  macroTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7 },
-  macroLabel: { fontFamily: FONTS.bodyBold, fontSize: Math.min(W * 0.032, 13) },
-  macroValText: { fontFamily: FONTS.bodySemiBold, fontSize: Math.min(W * 0.029, 12) },
+  macroIcon: { width: 30, height: 30, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
+  macroTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  macroLabel: { fontFamily: FONTS.bodyBold, fontSize: Math.min(W * 0.031, 12) },
+  macroVal: { fontFamily: FONTS.bodySemiBold, fontSize: Math.min(W * 0.028, 11) },
   tickRow: { flexDirection: 'row', gap: 2 },
-  tick: { flex: 1, height: 8, borderRadius: 2 },
+  tick: { flex: 1, height: 7, borderRadius: 2 },
   barFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  pctLabel: { fontFamily: FONTS.body, fontSize: 10 },
-  overLabel: { fontFamily: FONTS.bodyBold, fontSize: 10, color: '#E00000' },
+  pctLabel: { fontFamily: FONTS.body, fontSize: 9 },
+  overTag: { fontFamily: FONTS.bodyBold, fontSize: 9, color: '#E00000' },
 });

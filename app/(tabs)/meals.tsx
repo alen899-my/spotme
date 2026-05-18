@@ -243,6 +243,11 @@ export default function MealsScreen() {
           <View style={[styles.accDetail, { borderTopColor: colors.border }]}>
             {/* Macro grid */}
             <View style={styles.macroGrid}>
+              {/* Full-width calories pill */}
+              <View style={[styles.macroPill, { backgroundColor: '#E0000012', width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }]}>
+                <Text style={[styles.macroPillLabel, { color: '#E00000' }]}>Total Calories</Text>
+                <Text style={[styles.macroPillVal, { color: '#E00000', fontSize: 20 }]}>{Math.round(item.total_calories)} <Text style={{ fontSize: 13 }}>kcal</Text></Text>
+              </View>
               {macros.map((m) => (
                 <View key={m.label} style={[styles.macroPill, { backgroundColor: m.color + '12' }]}>
                   <Text style={[styles.macroPillVal, { color: m.color }]}>{m.value}{m.unit}</Text>
@@ -372,36 +377,48 @@ export default function MealsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <View style={styles.header}>
-        <View>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Meal Tracker</Text>
-          <Text style={[styles.headerSub, { color: colors.textMuted }]}>AI-powered nutrition analysis</Text>
-        </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowLogForm(true)}>
-          <LinearGradient colors={['#E00000', '#B00000']} style={styles.addBtnGrad}>
-            <Ionicons name="add" size={28} color="#FFF" />
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-
-      <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
-      
-      {loading ? (
-        <View style={styles.centered}><ActivityIndicator size="large" color="#E00000" /></View>
-      ) : (
-        <FlatList
-          data={uploading ? [{ id: 'loading' }, ...filteredMeals] : filteredMeals}
-          keyExtractor={(item) => item.id.toString()}
-          ListHeaderComponent={
+      <FlatList
+        data={loading ? [] : uploading ? [{ id: 'loading' }, ...filteredMeals] : filteredMeals}
+        keyExtractor={(item) => item.id.toString()}
+        ListHeaderComponent={
             <>
+              {/* ── Header (scrolls with content) ── */}
+              <View style={styles.header}>
+                <View>
+                  <Text style={[styles.headerTitle, { color: colors.text }]}>Nutrition</Text>
+                  <Text style={[styles.headerSub, { color: colors.textMuted }]}>Track meals · hydration · macros</Text>
+                </View>
+                <TouchableOpacity style={styles.addBtn} onPress={() => setShowLogForm(true)}>
+                  <LinearGradient colors={['#E00000', '#900000']} style={styles.addBtnGrad}>
+                    <Ionicons name="add" size={26} color="#FFF" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+
+              {/* ── Date Picker (scrolls with content) ── */}
+              <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+
               <NutritionMeter
                 caloriesConsumed={calsConsumed}
                 caloriesTarget={targets.caloriesTarget}
-                protein={{ label: 'Protein', icon: 'barbell-outline',    consumed: proteinConsumed, target: targets.proteinTarget, color: '#10B981', unit: 'g' }}
-                carbs={{   label: 'Carbs',   icon: 'pizza-outline',      consumed: carbsConsumed,   target: targets.carbsTarget,   color: '#3B82F6', unit: 'g' }}
-                fat={{     label: 'Fat',     icon: 'water-outline',       consumed: fatConsumed,     target: targets.fatTarget,     color: '#F59E0B', unit: 'g' }}
+                protein={{ label: 'Protein', icon: 'barbell-outline', consumed: proteinConsumed, target: targets.proteinTarget, color: '#10B981', unit: 'g' }}
+                carbs={{   label: 'Carbs',   icon: 'pizza-outline',   consumed: carbsConsumed,   target: targets.carbsTarget,   color: '#3B82F6', unit: 'g' }}
+                fat={{     label: 'Fat',     icon: 'water-outline',   consumed: fatConsumed,     target: targets.fatTarget,     color: '#F59E0B', unit: 'g' }}
               />
               <WaterTracker selectedDate={selectedDate} />
+              {/* Meals section divider */}
+              {filteredMeals.length > 0 && (
+                <View style={styles.sectionDivider}>
+                  <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
+                  <View style={[styles.sectionLabelWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Ionicons name="restaurant-outline" size={13} color={colors.textDim} />
+                    <Text style={[styles.sectionLabel, { color: colors.textDim }]}>
+                      {filteredMeals.length} Meal{filteredMeals.length !== 1 ? 's' : ''} · {Math.round(calsConsumed)} kcal
+                    </Text>
+                  </View>
+                  <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
+                </View>
+              )}
             </>
           }
           renderItem={({ item }) => {
@@ -413,16 +430,19 @@ export default function MealsScreen() {
           ListEmptyComponent={
             uploading ? null : (
               <View style={styles.emptyContainer}>
-                <Ionicons name="restaurant-outline" size={64} color={colors.textDim} />
-                <Text style={[styles.emptyText, { color: colors.textDim }]}>No meals logged yet</Text>
-                <TouchableOpacity style={styles.emptyBtn} onPress={() => setShowLogForm(true)}>
-                  <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold }}>Log Your First Meal</Text>
+                <View style={[styles.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Ionicons name="restaurant-outline" size={40} color={colors.textDim} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>No meals logged</Text>
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>Tap + to log a meal and track your nutrition</Text>
+                <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: '#E0000015', borderColor: '#E0000030', borderWidth: 1 }]} onPress={() => setShowLogForm(true)}>
+                  <Ionicons name="add-circle-outline" size={16} color="#E00000" />
+                  <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Log Your First Meal</Text>
                 </TouchableOpacity>
               </View>
             )
           }
         />
-      )}
 
       {/* Log Meal Form Modal */}
       <Modal visible={showLogForm} animationType="fade" transparent>
@@ -579,9 +599,20 @@ const styles = StyleSheet.create({
   nutrientBadgeLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, textTransform: 'uppercase' },
   foodItemsList: { borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 12 },
   foodItemText: { fontFamily: FONTS.body, fontSize: 13, marginBottom: 4 },
-  emptyContainer: { alignItems: 'center', marginTop: 100 },
-  emptyText: { fontFamily: FONTS.body, fontSize: 16, marginTop: 16 },
-  emptyBtn: { marginTop: 12, padding: 10 },
+  emptyContainer: { alignItems: 'center', marginTop: 48, paddingBottom: 40 },
+  emptyIconWrap: { width: 80, height: 80, borderRadius: 24, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  emptyTitle: { fontFamily: FONTS.heading, fontSize: 20, marginBottom: 6 },
+  emptyText: { fontFamily: FONTS.body, fontSize: 14, textAlign: 'center', maxWidth: 220, lineHeight: 20, marginBottom: 20 },
+  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 20 },
+
+  // ── Section divider ─────────────────────────────────────────────────────────
+  sectionDivider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14, marginTop: 4 },
+  sectionLine: { flex: 1, height: 1 },
+  sectionLabelWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1,
+  },
+  sectionLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 11 },
 
   // ── Accordion card ──────────────────────────────────────────
   accCard: {
