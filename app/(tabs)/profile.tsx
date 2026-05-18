@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Image,
@@ -84,7 +83,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {/* Header Section - Centered */}
         <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
@@ -148,7 +147,7 @@ export default function ProfileScreen() {
 
         <Text style={[styles.version, { color: colors.textDim }]}>SpotMe v1.0.4 • Beta Access</Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

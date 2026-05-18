@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   Platform,
   View,
@@ -16,37 +16,31 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
+import AppHeader from "../../components/ui/AppHeader";
+import ProfileSidebar from "../../components/ui/ProfileSidebar";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
+// Profile tab removed — accessible via sidebar only
 const TABS = [
   { name: "index",     title: "Home",      icon: "home" as const,         iconOutline: "home-outline" as const,         href: "/(tabs)/" },
   { name: "exercises", title: "Exercises", icon: "fitness" as const,      iconOutline: "fitness-outline" as const,      href: "/(tabs)/exercises" },
   { name: "meals",     title: "Meals",     icon: "restaurant" as const,   iconOutline: "restaurant-outline" as const,   href: "/(tabs)/meals" },
   { name: "daily",     title: "Daily",     icon: "calendar" as const,     iconOutline: "calendar-outline" as const,     href: "/(tabs)/daily" },
   { name: "splits",    title: "Splits",    icon: "layers" as const,       iconOutline: "layers-outline" as const,       href: "/(tabs)/splits" },
-  { name: "profile",   title: "Profile",   icon: "person" as const,       iconOutline: "person-outline" as const,       href: "/(tabs)/profile" },
 ];
 
 function CustomTabBar() {
   const pathname = usePathname();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
-  const [user, setUser] = React.useState<any>(null);
+  const { colors } = useTheme();
   const scrollViewRef = useRef<ScrollView>(null);
 
-  useEffect(() => { loadUser(); }, [pathname]);
-
-  const loadUser = async () => {
-    try {
-      const data = await AsyncStorage.getItem("userData");
-      if (data) setUser(JSON.parse(data));
-    } catch (e) {}
-  };
-
   const activeIndex = TABS.findIndex((t) =>
-    t.name === "index" ? pathname === "/" || pathname === "/(tabs)" || pathname === "/(tabs)/" : pathname.includes(t.name)
+    t.name === "index"
+      ? pathname === "/" || pathname === "/(tabs)" || pathname === "/(tabs)/"
+      : pathname.includes(t.name)
   );
   const current = activeIndex < 0 ? 0 : activeIndex;
 
@@ -65,7 +59,6 @@ function CustomTabBar() {
       ...opacityAnims.map((anim, i) => Animated.timing(anim, { toValue: i === current ? 1 : 0.5, duration: 180, useNativeDriver: true })),
     ]).start();
 
-    // Auto-scroll to active tab
     if (scrollViewRef.current) {
       const scrollX = current * TAB_WIDTH + PILL_PADDING - (SCREEN_WIDTH / 2) + (TAB_WIDTH / 2);
       scrollViewRef.current.scrollTo({ x: Math.max(0, scrollX), animated: true });
@@ -94,22 +87,17 @@ function CustomTabBar() {
           {TABS.map((tab, i) => {
             const isActive = i === current;
             return (
-              <TouchableOpacity 
-                key={tab.name} 
-                style={[styles.tabItem, { width: TAB_WIDTH }]} 
-                onPress={() => router.push(tab.href as any)} 
+              <TouchableOpacity
+                key={tab.name}
+                style={[styles.tabItem, { width: TAB_WIDTH }]}
+                onPress={() => router.push(tab.href as any)}
                 activeOpacity={0.7}
               >
                 <Animated.View style={{ alignItems: "center", transform: [{ scale: scaleAnims[i] }], opacity: opacityAnims[i] }}>
-                  {tab.name === "profile" && (user?.profile_pic_url || user?.profilePicUrl) ? (
-                    <Image
-                      source={{ uri: user.profile_pic_url || user.profilePicUrl }}
-                      style={[styles.profileIcon, isActive && { borderColor: "#E00000" }, !isActive && { borderColor: colors.textDim }]}
-                    />
-                  ) : (
-                    <Ionicons name={isActive ? tab.icon : tab.iconOutline} size={22} color={isActive ? "#E00000" : colors.textMuted} />
-                  )}
-                  <Text style={[styles.label, { color: isActive ? "#E00000" : colors.textMuted }]} numberOfLines={1}>{tab.title}</Text>
+                  <Ionicons name={isActive ? tab.icon : tab.iconOutline} size={22} color={isActive ? "#E00000" : colors.textMuted} />
+                  <Text style={[styles.label, { color: isActive ? "#E00000" : colors.textMuted }]} numberOfLines={1}>
+                    {tab.title}
+                  </Text>
                 </Animated.View>
               </TouchableOpacity>
             );
@@ -121,16 +109,47 @@ function CustomTabBar() {
 }
 
 export default function TabsLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    loadUser();
+  }, [pathname]);
+
+  const loadUser = async () => {
+    try {
+      const data = await AsyncStorage.getItem("userData");
+      if (data) setUser(JSON.parse(data));
+    } catch (e) {}
+  };
+
   return (
-    <Tabs screenOptions={{ headerShown: false }} tabBar={() => <CustomTabBar />}>
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="exercises" />
-      <Tabs.Screen name="meals" />
-      <Tabs.Screen name="daily" />
-      <Tabs.Screen name="splits" />
-      <Tabs.Screen name="workout" />
-      <Tabs.Screen name="profile" />
-    </Tabs>
+    <View style={{ flex: 1 }}>
+      {/* Global Header — pinned at top like tab bar at bottom */}
+      <AppHeader user={user} onProfilePress={() => setSidebarOpen(true)} />
+
+      {/* Tab Screens */}
+      <Tabs
+        screenOptions={{ headerShown: false }}
+        tabBar={() => <CustomTabBar />}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="exercises" />
+        <Tabs.Screen name="meals" />
+        <Tabs.Screen name="daily" />
+        <Tabs.Screen name="splits" />
+        <Tabs.Screen name="workout" />
+        <Tabs.Screen name="profile" />
+      </Tabs>
+
+      {/* Profile Sidebar — floats above everything */}
+      <ProfileSidebar
+        visible={sidebarOpen}
+        user={user}
+        onClose={() => setSidebarOpen(false)}
+      />
+    </View>
   );
 }
 
@@ -176,11 +195,5 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodySemiBold,
     fontSize: 10,
     marginTop: 3,
-  },
-  profileIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
   },
 });
