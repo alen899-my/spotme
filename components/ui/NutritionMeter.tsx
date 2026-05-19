@@ -118,7 +118,13 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
   const RING = Math.min(W * 0.36, 148);
   const STROKE = Math.max(Math.round(RING * 0.11), 13);
   const totalMacros = protein.consumed + carbs.consumed + fat.consumed;
-  const fillColor = over ? '#E00000' : '#E00000'; // always red for calories
+  const ringColor = over
+    ? '#EF4444' // over target = red
+    : pct >= 100
+    ? '#10B981' // target reached = green
+    : pct >= 70
+    ? '#FF5722' // close to target = deep coral/orange
+    : '#FF9800'; // initial progress = bright orange
 
   return (
     <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -126,39 +132,39 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
       {/* ── Title row ── */}
       <View style={s.titleRow}>
         <View style={s.titleLeft}>
-          <View style={[s.titleIcon, { backgroundColor: '#E0000018' }]}>
-            <Ionicons name="flame" size={18} color="#E00000" />
+          <View style={[s.titleIcon, { backgroundColor: ringColor + '18' }]}>
+            <Ionicons name="flame" size={18} color={ringColor} />
           </View>
           <View>
             <Text style={[s.title, { color: colors.text }]}>Today's Nutrition</Text>
             <Text style={[s.subtitle, { color: colors.textMuted }]}>Calorie & macro progress</Text>
           </View>
         </View>
-        <View style={[s.chip, { backgroundColor: over ? '#E0000018' : '#10B98118' }]}>
-          <View style={[s.chipDot, { backgroundColor: over ? '#E00000' : '#10B981' }]} />
-          <Text style={[s.chipText, { color: over ? '#E00000' : '#10B981' }]}>
-            {over ? 'Over limit' : 'On track'}
+        <View style={[s.chip, { backgroundColor: over ? '#EF444418' : '#10B98118' }]}>
+          <View style={[s.chipDot, { backgroundColor: over ? '#EF4444' : '#10B981' }]} />
+          <Text style={[s.chipText, { color: over ? '#EF4444' : '#10B981' }]}>
+            {over ? 'Over target' : 'On track'}
           </Text>
         </View>
       </View>
 
       {/* ── Donut + side panel ── */}
       <View style={s.topRow}>
-        <DonutRing pct={pct} size={RING} stroke={STROKE} fillColor={fillColor} trackColor={colors.border}>
+        <DonutRing pct={pct} size={RING} stroke={STROKE} fillColor={ringColor} trackColor={colors.border}>
           <View style={{ alignItems: 'center' }}>
             <Text style={[s.ringNum, { color: colors.text }]}>{Math.round(caloriesConsumed).toLocaleString()}</Text>
             <Text style={[s.ringUnit, { color: colors.textMuted }]}>kcal</Text>
-            <View style={[s.pctBadge, { backgroundColor: over ? '#E0000022' : '#10B98122' }]}>
-              <Text style={[s.pctText, { color: over ? '#E00000' : '#10B981' }]}>{pct}%</Text>
+            <View style={[s.pctBadge, { backgroundColor: ringColor + '20' }]}>
+              <Text style={[s.pctText, { color: ringColor }]}>{pct}%</Text>
             </View>
           </View>
         </DonutRing>
 
         {/* Right stat cards */}
         <View style={{ flex: 1, gap: 7 }}>
-          <View style={[s.statCard, { backgroundColor: '#E000000E', borderColor: '#E0000025' }]}>
+          <View style={[s.statCard, { backgroundColor: ringColor + '0E', borderColor: ringColor + '25' }]}>
             <Text style={[s.statLabel, { color: colors.textDim }]}>Calories Eaten</Text>
-            <Text style={[s.statVal, { color: '#E00000' }]}>{Math.round(caloriesConsumed).toLocaleString()} kcal</Text>
+            <Text style={[s.statVal, { color: ringColor }]}>{Math.round(caloriesConsumed).toLocaleString()} kcal</Text>
           </View>
 
           <View style={[s.statCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
@@ -167,11 +173,11 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
           </View>
 
           <View style={[s.statCard, {
-            backgroundColor: over ? '#E000000E' : '#10B9810E',
-            borderColor: over ? '#E0000025' : '#10B98125',
+            backgroundColor: over ? '#EF44440E' : '#10B9810E',
+            borderColor: over ? '#EF444425' : '#10B98125',
           }]}>
             <Text style={[s.statLabel, { color: colors.textDim }]}>{over ? 'Over by' : 'Remaining'}</Text>
-            <Text style={[s.statVal, { color: over ? '#E00000' : '#10B981' }]}>
+            <Text style={[s.statVal, { color: over ? '#EF4444' : '#10B981' }]}>
               {Math.round(over ? caloriesConsumed - caloriesTarget : left)} kcal
             </Text>
           </View>
@@ -195,9 +201,9 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
       </View>
 
       {/* ── Banner ── */}
-      <View style={[s.banner, { backgroundColor: over ? '#E000000E' : '#10B9810E', borderColor: over ? '#E0000030' : '#10B98130' }]}>
-        <Ionicons name={over ? 'warning-outline' : 'checkmark-circle-outline'} size={15} color={over ? '#E00000' : '#10B981'} />
-        <Text style={[s.bannerText, { color: over ? '#E00000' : '#10B981' }]}>
+      <View style={[s.banner, { backgroundColor: over ? '#EF44440E' : '#10B9810E', borderColor: over ? '#EF444430' : '#10B98130' }]}>
+        <Ionicons name={over ? 'warning-outline' : 'checkmark-circle-outline'} size={15} color={over ? '#EF4444' : '#10B981'} />
+        <Text style={[s.bannerText, { color: over ? '#EF4444' : '#10B981' }]}>
           {over
             ? `${Math.round(caloriesConsumed - caloriesTarget)} kcal over your daily goal`
             : `${Math.round(left)} kcal remaining to reach your goal`}

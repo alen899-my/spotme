@@ -182,9 +182,15 @@ export default function WorkoutViewScreen() {
         <View style={styles.perfHeader}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.perfTitle, { color: colors.text }]}>{data.title || data.session_name || 'Workout Summary'}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
               <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
               <Text style={[styles.perfSub, { color: colors.textMuted }]}>{formatLocalDate(data.started_at || data.created_at)}</Text>
+              {data.rating !== null && data.rating !== undefined && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(245, 158, 11, 0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                  <Ionicons name="star" size={12} color="#F59E0B" />
+                  <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11, color: '#F59E0B' }}>{data.rating}/10 Satisfaction</Text>
+                </View>
+              )}
             </View>
           </View>
           <TouchableOpacity onPress={openEditMetrics} style={styles.perfEditBtn}>
@@ -228,10 +234,23 @@ export default function WorkoutViewScreen() {
         <View style={styles.summaryHeader}>
           <Image source={{ uri: item.image_url }} style={styles.summaryImage} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.summaryName, { color: colors.text }]}>{item.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <Text style={[styles.summaryName, { color: colors.text }]}>{item.name}</Text>
+              {item.avg_rating !== undefined && item.avg_rating !== null && (
+                <View style={[styles.avgRatingBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                  <Ionicons name="star" size={10} color="#F59E0B" />
+                  <Text style={[styles.avgRatingText, { color: colors.text }]}>{item.avg_rating} </Text>
+                </View>
+              )}
+            </View>
             <Text style={[styles.summarySub, { color: colors.textMuted }]}>
               {isSkipped ? 'Movement skipped' : `${completedSets.length} sets completed`}
             </Text>
+            {item.rating !== undefined && item.rating !== null && (
+              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: '#F59E0B', marginTop: 4 }}>
+                My Rating: {item.rating}/10
+              </Text>
+            )}
           </View>
           {isSkipped ? (
             <View style={styles.skippedBadge}><Text style={styles.skippedBadgeText}>SKIPPED</Text></View>
@@ -410,6 +429,20 @@ const styles = StyleSheet.create({
   perfSubLabel: { fontFamily: FONTS.body, fontSize: 10 },
 
   // Movement Summary Cards
+  avgRatingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 4,
+  },
+  avgRatingText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+  },
   summaryCard: { marginHorizontal: 20, marginBottom: 12, borderRadius: 20, padding: 16, borderWidth: 1 },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   summaryImage: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#FFF' },

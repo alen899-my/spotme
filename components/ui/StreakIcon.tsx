@@ -25,11 +25,11 @@ const StreakIcon: React.FC<StreakIconProps> = ({ streak, size = 80 }) => {
   if (streak === 0) return null;
 
   // Egg color shifts from white/cream to golden as streak grows
-  const eggColors = streak < 7 
+  const eggColors = (streak < 7 
     ? ['#FFFBEB', '#FEF3C7'] // White/Cream
     : streak < 30 
       ? ['#FDE68A', '#F59E0B'] // Bronze/Amber
-      : ['#FCD34D', '#D97706']; // Golden/Epic
+      : ['#FCD34D', '#D97706']) as [string, string]; // Golden/Epic
 
   return (
     <Animated.View style={[styles.container, { width: size, height: size * 1.25, transform: [{ scale: animatedScale }] }]}>

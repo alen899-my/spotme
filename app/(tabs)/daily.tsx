@@ -161,12 +161,20 @@ export default function DailyTab() {
           <View style={styles.cardInfo}>
             <View style={styles.cardHeader}>
               <Text style={[styles.dateText, { color: colors.textMuted }]}>{formatDate(item.started_at)}</Text>
-              <TouchableOpacity 
-                style={styles.deleteBtn} 
-                onPress={() => setDeletingId(item.id)}
-              >
-                <Ionicons name="trash-outline" size={18} color={colors.textDim} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {item.rating !== null && item.rating !== undefined && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                    <Ionicons name="star" size={12} color="#F59E0B" />
+                    <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11, color: colors.text }}>{item.rating}/10</Text>
+                  </View>
+                )}
+                <TouchableOpacity 
+                  style={styles.deleteBtn} 
+                  onPress={() => setDeletingId(item.id)}
+                >
+                  <Ionicons name="trash-outline" size={18} color={colors.textDim} />
+                </TouchableOpacity>
+              </View>
             </View>
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
               {item.title || item.session_name || 'Workout'}

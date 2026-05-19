@@ -131,7 +131,15 @@ export default function SessionDetailScreen() {
       <View style={styles.exInfo}>
         <Image source={{ uri: item.image_url }} style={styles.exImage} />
         <View style={{ flex: 1 }}>
-          <Text style={[styles.exName, { color: colors.text }]}>{item.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Text style={[styles.exName, { color: colors.text }]}>{item.name}</Text>
+            {item.avg_rating !== undefined && item.avg_rating !== null && (
+              <View style={[styles.avgRatingBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                <Ionicons name="star" size={10} color="#F59E0B" />
+                <Text style={[styles.avgRatingText, { color: colors.text }]}>{item.avg_rating}</Text>
+              </View>
+            )}
+          </View>
           <Text style={[styles.exMeta, { color: colors.textMuted }]}>{item.target} • {item.equipment}</Text>
         </View>
         <TouchableOpacity style={styles.removeIcon} onPress={() => handleRemoveExercise(item.id)}>
@@ -308,6 +316,20 @@ const styles = StyleSheet.create({
   exInfo: { flexDirection: 'row', alignItems: 'center', padding: 16 },
   exImage: { width: 54, height: 54, borderRadius: 12, backgroundColor: '#F5F5F5', marginRight: 16 },
   exName: { fontFamily: FONTS.bodyBold, fontSize: 16, marginBottom: 4 },
+  avgRatingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 4,
+  },
+  avgRatingText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+  },
   exMeta: { fontFamily: FONTS.body, fontSize: 12, textTransform: 'capitalize' },
   removeIcon: { padding: 4 },
   exControls: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 },

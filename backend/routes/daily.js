@@ -91,12 +91,16 @@ router.get('/workouts/:id', authenticateToken, async (req, res) => {
     if (workout.rows.length === 0) return res.status(404).json({ error: 'Workout not found' });
 
     const exercises = await pool.query(
-      `SELECT dwe.*, e.name, e.image_url, e.gif_url, e.instructions_en, e.target, e.equipment, e.category
+      `SELECT dwe.*, e.name, e.image_url, e.gif_url, e.instructions_en, e.target, e.equipment, e.category,
+         (SELECT ROUND(AVG(dwe2.rating), 1)::float
+          FROM daily_workout_exercises dwe2
+          JOIN daily_workouts dw2 ON dwe2.daily_workout_id = dw2.id
+          WHERE dwe2.exercise_id = dwe.exercise_id AND dw2.user_id = $2 AND dwe2.rating IS NOT NULL) AS avg_rating
        FROM daily_workout_exercises dwe
        JOIN exercises e ON dwe.exercise_id = e.id
        WHERE dwe.daily_workout_id = $1
        ORDER BY dwe.sort_order ASC`,
-      [parseInt(req.params.id)]
+      [parseInt(req.params.id), req.user.id]
     );
 
     let setsRows = [];
@@ -593,6 +597,213 @@ router.delete('/sets/:id', authenticateToken, async (req, res) => {
     res.json({ success: true, message: 'Set deleted' });
   } catch (err) {
     console.error('DELETE /daily/sets/:id error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /daily/exercises/:id/rating — rate an exercise during a workout ─────
+router.patch('/exercises/:id/rating', authenticateToken, async (req, res) => {
+  const { rating } = req.body;
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  if (rating === undefined || rating < 1 || rating > 10) {
+    return res.status(400).json({ error: 'Rating must be an integer between 1 and 10' });
+  }
+
+  try {
+    // Verify that the exercise belongs to a workout owned by the user
+    const check = await pool.query(
+      `SELECT dwe.id 
+       FROM daily_workout_exercises dwe
+       JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
+       WHERE dwe.id = $1 AND dw.user_id = $2`,
+      [parseInt(id), userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout exercise not found or unauthorized' });
+    }
+
+    const result = await pool.query(
+      `UPDATE daily_workout_exercises
+       SET rating = $1
+       WHERE id = $2
+       RETURNING *`,
+      [parseInt(rating), parseInt(id)]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('PATCH /daily/exercises/:id/rating error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /daily/workouts/:id/rating — rate an overall workout ────────────────
+router.patch('/workouts/:id/rating', authenticateToken, async (req, res) => {
+  const { rating } = req.body;
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  if (rating === undefined || rating < 1 || rating > 10) {
+    return res.status(400).json({ error: 'Rating must be an integer between 1 and 10' });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE daily_workouts
+       SET rating = $1
+       WHERE id = $2 AND user_id = $3
+       RETURNING *`,
+      [parseInt(rating), parseInt(id), userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found or unauthorized' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('PATCH /daily/workouts/:id/rating error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /daily/recommendations — get workout session recommendations ──────────
+router.get('/recommendations', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    // 1. Fetch all workout sessions available to the user (their splits + templates)
+    const sessionsRes = await pool.query(`
+      SELECT ws.id AS session_id, ws.name AS session_name, s.id AS split_id, s.name AS split_name, s.is_template
+      FROM workout_sessions ws
+      JOIN workout_splits s ON ws.split_id = s.id
+      WHERE s.user_id = $1 OR s.is_template = true
+    `, [userId]);
+
+    if (sessionsRes.rows.length === 0) {
+      return res.json([]); // No sessions available to recommend
+    }
+
+    // 2. Fetch all user ratings for exercises
+    const exerciseRatingsRes = await pool.query(`
+      SELECT dwe.exercise_id, AVG(dwe.rating) as avg_rating, COUNT(dwe.rating) as rating_count
+      FROM daily_workout_exercises dwe
+      JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
+      WHERE dw.user_id = $1 AND dwe.rating IS NOT NULL
+      GROUP BY dwe.exercise_id
+    `, [userId]);
+
+    // 3. Fetch all user ratings for sessions
+    const sessionRatingsRes = await pool.query(`
+      SELECT dw.session_id, AVG(dw.rating) as avg_rating, COUNT(dw.rating) as rating_count
+      FROM daily_workouts dw
+      WHERE dw.user_id = $1 AND dw.session_id IS NOT NULL AND dw.rating IS NOT NULL
+      GROUP BY dw.session_id
+    `, [userId]);
+
+    // 4. Fetch all exercises inside all sessions
+    const sessionExercisesRes = await pool.query(`
+      SELECT wse.session_id, wse.exercise_id, e.name, e.image_url, e.target, e.category, e.equipment
+      FROM workout_session_exercises wse
+      JOIN exercises e ON wse.exercise_id = e.id
+    `);
+
+    // Map ratings for quick lookup
+    const exerciseRatings = {};
+    exerciseRatingsRes.rows.forEach(row => {
+      exerciseRatings[row.exercise_id] = parseFloat(row.avg_rating);
+    });
+
+    const sessionRatings = {};
+    sessionRatingsRes.rows.forEach(row => {
+      sessionRatings[row.session_id] = parseFloat(row.avg_rating);
+    });
+
+    // Group exercises by session_id
+    const sessionExercises = {};
+    sessionExercisesRes.rows.forEach(row => {
+      if (!sessionExercises[row.session_id]) {
+        sessionExercises[row.session_id] = [];
+      }
+      sessionExercises[row.session_id].push(row);
+    });
+
+    // Score and rank sessions
+    const scoredSessions = sessionsRes.rows.map(session => {
+      const exercises = sessionExercises[session.session_id] || [];
+      
+      // Calculate average exercise rating
+      let exerciseScoreSum = 0;
+      let ratedExercisesCount = 0;
+      
+      exercises.forEach(ex => {
+        if (exerciseRatings[ex.exercise_id] !== undefined) {
+          exerciseScoreSum += exerciseRatings[ex.exercise_id];
+          ratedExercisesCount++;
+        } else {
+          exerciseScoreSum += 5.0; // Default score for unrated exercises
+        }
+      });
+      
+      const avgExerciseScore = exercises.length > 0 ? (exerciseScoreSum / exercises.length) : 5.0;
+      
+      // Get session rating
+      const sessionScore = sessionRatings[session.session_id] !== undefined 
+        ? sessionRatings[session.session_id] 
+        : 5.0; // Default score for unrated sessions
+      
+      // Combined rating (60% exercise-based, 40% session-based)
+      const score = (avgExerciseScore * 0.6) + (sessionScore * 0.4);
+      
+      // Determine a friendly recommendation reasoning label
+      let reason = 'Featured workout for you';
+      let scoreTag = 'Recommended';
+      
+      if (sessionRatings[session.session_id] >= 8.0) {
+        reason = 'Based on your high past ratings';
+        scoreTag = 'Highly Rated';
+      } else if (ratedExercisesCount > 0 && avgExerciseScore >= 7.5) {
+        reason = 'Includes exercises you love';
+        scoreTag = 'Top Exercises';
+      } else if (sessionRatings[session.session_id] === undefined && ratedExercisesCount === 0) {
+        reason = 'Fresh routine to try out';
+        scoreTag = 'New';
+      }
+
+      // Compile unique targets/muscles
+      const targets = [...new Set(exercises.map(e => e.target).filter(Boolean))];
+
+      return {
+        session_id: session.session_id,
+        session_name: session.session_name,
+        split_id: session.split_id,
+        split_name: session.split_name,
+        is_template: session.is_template,
+        score,
+        reason,
+        scoreTag,
+        exercise_count: exercises.length,
+        targets: targets.slice(0, 3), // Return up to 3 targets
+        sample_image: exercises[0]?.image_url || null,
+        exercises: exercises.slice(0, 5) // Return first 5 exercise previews
+      };
+    });
+
+    // Sort by score desc, but put user's own splits slightly higher than template splits if scores are equal
+    scoredSessions.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return (a.is_template ? 1 : 0) - (b.is_template ? 1 : 0);
+    });
+
+    // Return the top 3 recommendations
+    res.json(scoredSessions.slice(0, 3));
+  } catch (err) {
+    console.error('GET /daily/recommendations error:', err);
     res.status(500).json({ error: err.message });
   }
 });

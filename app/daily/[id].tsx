@@ -23,11 +23,204 @@ import * as Sharing from 'expo-sharing';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
+const EMOJIS = ['😢', '😣', '😕', '😐', '🙂', '😊', '💪', '😎', '🔥', '🏆'];
+const LABELS = [
+  'Terrible', 'Very Bad', 'Okayish', 'Decent', 'Good',
+  'Very Good', 'Strong Lift', 'Amazing', 'Beast Mode', 'Legendary!'
+];
+
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60).toString().padStart(2, '0');
   const s = (sec % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
 }
+
+const ExerciseCard = React.memo(({
+  item,
+  colors,
+  workoutStatus,
+  activeExerciseId,
+  setTimer,
+  setTimerRunning,
+  openGuide,
+  removeExercise,
+  removeSet,
+  handleSkipExercise,
+  openSetModal,
+  handleRateExercise,
+  loadingSkip,
+  loadingLogSet,
+}: {
+  item: any;
+  colors: any;
+  workoutStatus: string;
+  activeExerciseId: number | null;
+  setTimer: number;
+  setTimerRunning: boolean;
+  openGuide: (item: any) => void;
+  removeExercise: (id: number) => void;
+  removeSet: (id: number) => void;
+  handleSkipExercise: (id: number) => void;
+  openSetModal: (item: any) => void;
+  handleRateExercise: (id: number, rating: number) => Promise<void>;
+  loadingSkip: boolean;
+  loadingLogSet: boolean;
+}) => {
+  const [localRating, setLocalRating] = useState<number | null>(item.rating || null);
+
+  useEffect(() => {
+    setLocalRating(item.rating || null);
+  }, [item.rating]);
+
+  const completedSets = item.sets?.length || 0;
+  const targetSets = item.target_sets || 3;
+  const isDone = item.is_completed;
+  const isSkipped = item.is_skipped;
+
+  const onRate = (num: number) => {
+    Vibration.vibrate(30);
+    setLocalRating(num);
+    handleRateExercise(item.id, num);
+  };
+
+  return (
+    <View style={[
+      styles.exCard,
+      { backgroundColor: colors.card, borderColor: isSkipped ? colors.border : (isDone ? '#10B981' : colors.border) },
+      isSkipped && { opacity: 0.6 }
+    ]}>
+      <TouchableOpacity style={styles.exHeader} onPress={() => openGuide(item)} activeOpacity={0.7}>
+        <Image source={{ uri: item.image_url }} style={styles.exImage} />
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[styles.exName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+            <Ionicons name="information-circle-outline" size={16} color="#E00000" />
+          </View>
+          <Text style={[styles.exMeta, { color: colors.textMuted }]}>
+            {item.target_sets} sets × {item.target_reps} reps • {item.target_weight}kg target • {item.target_rest_time} rest
+          </Text>
+        </View>
+        {isDone && !isSkipped && <Ionicons name="checkmark-circle" size={24} color="#10B981" />}
+        {isSkipped && <Text style={[styles.skipLabel, { color: colors.textMuted }]}>SKIPPED</Text>}
+        {workoutStatus === 'active' && (
+          <TouchableOpacity 
+            onPress={(e) => { e.stopPropagation(); removeExercise(item.id); }} 
+            style={{ padding: 6, marginLeft: 8 }}
+          >
+            <Ionicons name="trash-outline" size={20} color={colors.textDim} />
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+
+      {item.sets && item.sets.length > 0 && (
+        <View style={[styles.setsTable, { backgroundColor: colors.inputBg }]}>
+          <View style={styles.tableHeader}>
+            {['SET', 'KG', 'REPS', 'TIME'].map(h => (
+              <Text key={h} style={[styles.tableHeaderText, { color: colors.textMuted }]}>{h}</Text>
+            ))}
+          </View>
+          {item.sets.map((s: any) => (
+            <View key={s.id} style={styles.tableRow}>
+              <Text style={[styles.tableCell, { color: colors.text }]}>{s.set_number}</Text>
+              <Text style={[styles.tableCell, { color: s.is_skipped ? colors.textDim : colors.text }]}>{s.weight}</Text>
+              <Text style={[styles.tableCell, { color: s.is_skipped ? colors.textDim : colors.text }]}>{s.is_skipped ? 'SKIPPED' : s.reps}</Text>
+              <Text style={[styles.tableCell, { color: s.is_skipped ? colors.textDim : colors.text }]}>{formatTime(s.duration_seconds || 0)}</Text>
+              {workoutStatus === 'active' && (
+                <TouchableOpacity onPress={() => removeSet(s.id)} style={{ paddingHorizontal: 8 }}>
+                  <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+
+      {isDone && !isSkipped && (
+        <View style={[styles.inlineRatingSection, { borderTopWidth: 1, borderTopColor: colors.border }]}>
+          <View style={styles.inlineRatingHeader}>
+            <Text style={[styles.inlineRatingTitle, { color: colors.text }]}>How satisfied are you after this exercise?</Text>
+          </View>
+          <View style={{ height: 18, justifyContent: 'center', marginTop: 2 }}>
+            <Text style={[styles.inlineRatingValue, { color: localRating ? '#F59E0B' : colors.textMuted }]}>
+              {localRating ? `${localRating}/10 • ${EMOJIS[localRating - 1]} ${LABELS[localRating - 1]}` : 'Tap a number to rate'}
+            </Text>
+          </View>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.inlineRatingScroll}
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+              const isSelected = localRating === num;
+              
+              let baseColor = '#E00000'; // SpotMe Red for 1-3
+              if (num >= 4 && num <= 7) baseColor = '#EAB308'; // SpotMe Yellow for 4-7
+              if (num >= 8) baseColor = '#10B981'; // SpotMe Green for 8-10
+
+              return (
+                <TouchableOpacity
+                  key={num}
+                  style={[
+                    styles.inlineRatingCircle,
+                    {
+                      backgroundColor: isSelected ? baseColor : `${baseColor}10`,
+                      borderColor: isSelected ? baseColor : `${baseColor}40`,
+                    }
+                  ]}
+                  onPress={() => onRate(num)}
+                >
+                  <Text style={[
+                    styles.inlineRatingCircleText,
+                    { color: isSelected ? '#FFF' : baseColor }
+                  ]}>
+                    {num}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      <View style={styles.exFooter}>
+        <View style={[styles.exProgress, { backgroundColor: colors.border }]}>
+          <View style={[styles.exProgressFill, {
+            width: `${Math.min((completedSets / targetSets) * 100, 100)}%` as any,
+            backgroundColor: isDone ? '#10B981' : '#E00000'
+          }]} />
+        </View>
+        <Text style={[styles.setsCount, { color: colors.textMuted }]}>{completedSets}/{targetSets}</Text>
+        {!isDone && !isSkipped && workoutStatus === 'active' && (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              style={[styles.skipBtn, { borderColor: colors.border, opacity: loadingSkip ? 0.5 : 1 }]}
+              onPress={() => handleSkipExercise(item.id)}
+              disabled={loadingSkip}
+            >
+              <Text style={[styles.skipBtnText, { color: colors.textMuted }]}>{loadingSkip ? '...' : 'SKIP'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.logSetBtn, { opacity: loadingLogSet ? 0.8 : 1 }]} 
+              onPress={() => openSetModal(item)}
+              disabled={loadingLogSet}
+            >
+              <LinearGradient colors={['#E00000', '#B00000']} style={styles.logSetBtnGrad}>
+                {loadingLogSet ? <ActivityIndicator size="small" color="#FFF" /> : (
+                  <>
+                    <Ionicons name={activeExerciseId === item.id && setTimer > 0 ? "play" : "add"} size={16} color="#FFF" />
+                    <Text style={styles.logSetBtnText}>
+                      {activeExerciseId === item.id && setTimerRunning ? 'CONTINUE SET' : `LOG SET ${completedSets + 1}`}
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+});
 
 export default function ActiveWorkoutScreen() {
   const router = useRouter();
@@ -37,6 +230,32 @@ export default function ActiveWorkoutScreen() {
 
   const [workout, setWorkout] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  const handleRateExercise = async (dailyExId: number, rating: number) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      // Update local workout state instantly
+      setWorkout((prev: any) => {
+        if (!prev || !prev.exercises) return prev;
+        return {
+          ...prev,
+          exercises: prev.exercises.map((ex: any) =>
+            ex.id === dailyExId ? { ...ex, rating } : ex
+          )
+        };
+      });
+
+      await axios.patch(`${API_URL}/daily/exercises/${dailyExId}/rating`, {
+        rating
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast('Rating saved! 🌟');
+    } catch (err) {
+      console.error('Error saving exercise rating:', err);
+      showToast('Failed to save rating', 'error');
+    }
+  };
 
   // Workout-level timer
   const [workoutElapsed, setWorkoutElapsed] = useState(0);
@@ -208,7 +427,6 @@ export default function ActiveWorkoutScreen() {
     restTimerRef.current = setInterval(() => {
       setRestTimer(prev => {
         if (prev <= 1) {
-          Vibration.vibrate([0, 500, 200, 500]);
           showToast('Rest Over! Start your next set! 🔥', 'info');
           return 0;
         }
@@ -254,6 +472,7 @@ export default function ActiveWorkoutScreen() {
       setSetModalVisible(false);
       setSetTimer(0); // Reset only after successful log
       setSetTimerRunning(false);
+      
       fetchWorkout();
       
       // Fix: Use target_rest_time instead of target_reps
@@ -666,100 +885,40 @@ export default function ActiveWorkoutScreen() {
   const completedCount = workout?.exercises?.filter((e: any) => e.is_completed).length || 0;
   const totalCount = workout?.exercises?.length || 0;
 
-  const renderExercise = ({ item }: { item: any }) => {
-    const completedSets = item.sets?.length || 0;
-    const targetSets = item.target_sets || 3;
-    const isDone = item.is_completed;
-    const isSkipped = item.is_skipped;
+  const renderExercise = useCallback(({ item }: { item: any }) => {
     return (
-      <View style={[
-        styles.exCard,
-        { backgroundColor: colors.card, borderColor: isSkipped ? colors.border : (isDone ? '#10B981' : colors.border) },
-        isSkipped && { opacity: 0.6 }
-      ]}>
-        <TouchableOpacity style={styles.exHeader} onPress={() => openGuide(item)} activeOpacity={0.7}>
-          <Image source={{ uri: item.image_url }} style={styles.exImage} />
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={[styles.exName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-              <Ionicons name="information-circle-outline" size={16} color="#E00000" />
-            </View>
-            <Text style={[styles.exMeta, { color: colors.textMuted }]}>
-              {item.target_sets} sets × {item.target_reps} reps • {item.target_weight}kg target • {item.target_rest_time} rest
-            </Text>
-          </View>
-          {isDone && !isSkipped && <Ionicons name="checkmark-circle" size={24} color="#10B981" />}
-          {isSkipped && <Text style={[styles.skipLabel, { color: colors.textMuted }]}>SKIPPED</Text>}
-          {workout?.status === 'active' && (
-            <TouchableOpacity 
-              onPress={(e) => { e.stopPropagation(); removeExercise(item.id); }} 
-              style={{ padding: 6, marginLeft: 8 }}
-            >
-              <Ionicons name="trash-outline" size={20} color={colors.textDim} />
-            </TouchableOpacity>
-          )}
-        </TouchableOpacity>
-        {item.sets && item.sets.length > 0 && (
-          <View style={[styles.setsTable, { backgroundColor: colors.inputBg }]}>
-            <View style={styles.tableHeader}>
-              {['SET', 'KG', 'REPS', 'TIME'].map(h => (
-                <Text key={h} style={[styles.tableHeaderText, { color: colors.textMuted }]}>{h}</Text>
-              ))}
-            </View>
-            {item.sets.map((s: any) => (
-              <View key={s.id} style={styles.tableRow}>
-                <Text style={[styles.tableCell, { color: colors.text }]}>{s.set_number}</Text>
-                <Text style={[styles.tableCell, { color: s.is_skipped ? colors.textDim : colors.text }]}>{s.weight}</Text>
-                <Text style={[styles.tableCell, { color: s.is_skipped ? colors.textDim : colors.text }]}>{s.is_skipped ? 'SKIPPED' : s.reps}</Text>
-                <Text style={[styles.tableCell, { color: s.is_skipped ? colors.textDim : colors.text }]}>{formatTime(s.duration_seconds || 0)}</Text>
-                {workout?.status === 'active' && (
-                  <TouchableOpacity onPress={() => removeSet(s.id)} style={{ paddingHorizontal: 8 }}>
-                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-        <View style={styles.exFooter}>
-          <View style={[styles.exProgress, { backgroundColor: colors.border }]}>
-            <View style={[styles.exProgressFill, {
-              width: `${Math.min((completedSets / targetSets) * 100, 100)}%` as any,
-              backgroundColor: isDone ? '#10B981' : '#E00000'
-            }]} />
-          </View>
-          <Text style={[styles.setsCount, { color: colors.textMuted }]}>{completedSets}/{targetSets}</Text>
-          {!isDone && !isSkipped && workout?.status === 'active' && (
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity
-                style={[styles.skipBtn, { borderColor: colors.border, opacity: loadingSkip ? 0.5 : 1 }]}
-                onPress={() => handleSkipExercise(item.id)}
-                disabled={loadingSkip}
-              >
-                <Text style={[styles.skipBtnText, { color: colors.textMuted }]}>{loadingSkip ? '...' : 'SKIP'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.logSetBtn, { opacity: loadingLogSet ? 0.8 : 1 }]} 
-                onPress={() => openSetModal(item)}
-                disabled={loadingLogSet}
-              >
-                <LinearGradient colors={['#E00000', '#B00000']} style={styles.logSetBtnGrad}>
-                  {loadingLogSet ? <ActivityIndicator size="small" color="#FFF" /> : (
-                    <>
-                      <Ionicons name={activeExercise?.id === item.id && setTimer > 0 ? "play" : "add"} size={16} color="#FFF" />
-                      <Text style={styles.logSetBtnText}>
-                        {activeExercise?.id === item.id && setTimerRunning ? 'CONTINUE SET' : `LOG SET ${completedSets + 1}`}
-                      </Text>
-                    </>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </View>
+      <ExerciseCard
+        item={item}
+        colors={colors}
+        workoutStatus={workout?.status}
+        activeExerciseId={activeExercise?.id}
+        setTimer={setTimer}
+        setTimerRunning={setTimerRunning}
+        openGuide={openGuide}
+        removeExercise={removeExercise}
+        removeSet={removeSet}
+        handleSkipExercise={handleSkipExercise}
+        openSetModal={openSetModal}
+        handleRateExercise={handleRateExercise}
+        loadingSkip={loadingSkip}
+        loadingLogSet={loadingLogSet}
+      />
     );
-  };
+  }, [
+    colors,
+    workout?.status,
+    activeExercise?.id,
+    setTimer,
+    setTimerRunning,
+    openGuide,
+    removeExercise,
+    removeSet,
+    handleSkipExercise,
+    openSetModal,
+    handleRateExercise,
+    loadingSkip,
+    loadingLogSet,
+  ]);
 
   if (loading) {
     return (
@@ -1040,7 +1199,15 @@ export default function ActiveWorkoutScreen() {
                   <TouchableOpacity style={[styles.browserItem, { borderBottomColor: colors.border }]} onPress={() => addExtraExercise(item)}>
                     <Image source={{ uri: item.image_url }} style={styles.browserImg} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.browserName, { color: colors.text }]}>{item.name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={[styles.browserName, { color: colors.text }]}>{item.name}</Text>
+                        {item.avg_rating !== undefined && item.avg_rating !== null && (
+                          <View style={[styles.avgRatingBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                            <Ionicons name="star" size={10} color="#F59E0B" />
+                            <Text style={[styles.avgRatingText, { color: colors.text }]}>{item.avg_rating}</Text>
+                          </View>
+                        )}
+                      </View>
                       <Text style={[styles.browserMeta, { color: colors.textMuted }]}>{item.equipment} • {item.target}</Text>
                     </View>
                     <Ionicons name="add-circle" size={24} color="#E00000" />
@@ -1126,7 +1293,6 @@ export default function ActiveWorkoutScreen() {
           </View>
         </View>
       </Modal>
-
 
 
       {/* Timer Detail Modal */}
@@ -1302,4 +1468,55 @@ const styles = StyleSheet.create({
   browserMeta: { fontFamily: FONTS.body, fontSize: 12 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 54, borderRadius: 16, marginBottom: 20, gap: 10, borderWidth: 0 },
   searchInput: { flex: 1, fontFamily: FONTS.body, fontSize: 15, padding: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
+  avgRatingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 4,
+  },
+  avgRatingText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+  },
+  inlineRatingSection: {
+    padding: 16,
+    gap: 8,
+  },
+  inlineRatingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+    marginBottom: 4,
+  },
+  inlineRatingTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 13,
+  },
+  inlineRatingValue: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+  },
+  inlineRatingScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  inlineRatingCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inlineRatingCircleText: {
+    fontFamily: FONTS.heading,
+    fontSize: 13,
+  },
 });

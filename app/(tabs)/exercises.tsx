@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PADDING   = 16;
@@ -158,6 +159,13 @@ const ExerciseCard = React.memo(({ item, colors, square = false }: { item: any; 
         </View>
       )}
 
+      {item.avg_rating !== undefined && item.avg_rating !== null && (
+        <View style={styles.ratingChip}>
+          <Ionicons name="star" size={10} color="#F59E0B" />
+          <Text style={styles.ratingChipText}>{item.avg_rating}</Text>
+        </View>
+      )}
+
       <View style={styles.exCardContent}>
         <Text style={styles.exNamePremium} numberOfLines={2}>{item.name}</Text>
         {square && (
@@ -223,7 +231,11 @@ export default function ExercisesScreen() {
       if (q.trim()) params.q = q.trim();
       if (cat) params.category = cat;
 
-      const res = await axios.get(`${API_URL}/exercises`, { params });
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(`${API_URL}/exercises`, {
+        params,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       const { data, pagination } = res.data;
       setSearchTotal(pagination.total);
       setHasMore(pg < pagination.totalPages);
@@ -609,4 +621,24 @@ const styles = StyleSheet.create({
   msgText: { fontFamily: FONTS.bodySemiBold, fontSize: 15, textAlign: 'center' },
   retryBtn: { paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12, marginTop: 4 },
   retryText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' },
+  ratingChip: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.15)',
+    zIndex: 3,
+  },
+  ratingChipText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: '#FFF',
+  },
 });

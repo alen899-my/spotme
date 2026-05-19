@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -34,7 +35,10 @@ export default function ExerciseDetailScreen() {
   useEffect(() => {
     const fetchDetail = async () => {
       try {
-        const res = await axios.get(`${API_URL}/exercises/${id}`);
+        const token = await AsyncStorage.getItem('userToken');
+        const res = await axios.get(`${API_URL}/exercises/${id}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined
+        });
         setExercise(res.data);
       } catch (err) {
         console.error('Failed to fetch exercise detail:', err);
@@ -131,6 +135,12 @@ export default function ExerciseDetailScreen() {
               <View style={[styles.badge, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
                 <Text style={[styles.badgeText, { color: colors.text }]}>{exercise.equipment || 'Bodyweight'}</Text>
               </View>
+              {exercise.avg_rating !== undefined && exercise.avg_rating !== null && (
+                <View style={[styles.badge, { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                  <Ionicons name="star" size={12} color="#D97706" />
+                  <Text style={[styles.badgeText, { color: '#B45309' }]}>{exercise.avg_rating} AVG</Text>
+                </View>
+              )}
             </View>
           </View>
 

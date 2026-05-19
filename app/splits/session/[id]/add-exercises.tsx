@@ -175,9 +175,17 @@ export default function AddSessionExercisesScreen() {
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text style={[styles.exName, { color: colors.text }]} numberOfLines={1}>
-          {item.name}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <Text style={[styles.exName, { color: colors.text }]} numberOfLines={1}>
+            {item.name}
+          </Text>
+          {item.avg_rating !== undefined && item.avg_rating !== null && (
+            <View style={[styles.avgRatingBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+              <Ionicons name="star" size={10} color="#F59E0B" />
+              <Text style={[styles.avgRatingText, { color: colors.text }]}>{item.avg_rating}</Text>
+            </View>
+          )}
+        </View>
         <Text style={[styles.exMeta, { color: colors.textMuted }]}>
           {[item.target, item.equipment].filter(Boolean).join(' • ')}
         </Text>
@@ -370,6 +378,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   exName: { fontFamily: FONTS.bodyBold, fontSize: 15, marginBottom: 2 },
+  avgRatingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 4,
+  },
+  avgRatingText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+  },
   exMeta: { fontFamily: FONTS.body, fontSize: 12, textTransform: 'capitalize' },
   addBtn: {
     width: 40,

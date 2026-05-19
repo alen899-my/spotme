@@ -19,6 +19,12 @@ import StreakIcon from '../../components/ui/StreakIcon';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
+const EMOJIS = ['😢', '😣', '😕', '😐', '🙂', '😊', '💪', '😎', '🔥', '🏆'];
+const LABELS = [
+  'Terrible', 'Very Bad', 'Okayish', 'Decent', 'Good',
+  'Very Good', 'Strong Lift', 'Amazing', 'Beast Mode', 'Legendary!'
+];
+
 function formatDuration(sec: number) {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
@@ -54,6 +60,7 @@ export default function WorkoutCompleteScreen() {
   const [loading, setLoading] = useState(true);
   const [newStreak, setNewStreak] = useState<number | null>(null);
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
+  const [workoutRating, setWorkoutRating] = useState<number | null>(null);
 
   useEffect(() => {
     fetchWorkout();
@@ -68,10 +75,27 @@ export default function WorkoutCompleteScreen() {
       setWorkout(response.data);
       if (response.data.post_workout_weight) setWeight(String(response.data.post_workout_weight));
       if (response.data.water_intake_liters) setWaterIntake(Number(response.data.water_intake_liters));
+      if (response.data.rating) setWorkoutRating(Number(response.data.rating));
     } catch (err) {
       console.error('Error fetching workout summary:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRateWorkout = async (rating: number) => {
+    setWorkoutRating(rating);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.patch(`${API_URL}/daily/workouts/${workoutId}/rating`, {
+        rating
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast('Workout rating updated! 🌟');
+    } catch (err) {
+      console.error('Error rating workout:', err);
+      showToast('Failed to save workout rating', 'error');
     }
   };
 
@@ -375,6 +399,45 @@ export default function WorkoutCompleteScreen() {
               maximumTrackTintColor={colors.border}
               thumbTintColor="#3B82F6"
             />
+          </View>
+
+          {/* Workout Satisfaction Section */}
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionIcon, { backgroundColor: '#F59E0B20' }]}>
+                <Ionicons name="star" size={20} color="#F59E0B" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Workout Satisfaction</Text>
+                <Text style={[styles.sectionSub, { color: colors.textMuted }]}>
+                  How satisfied are you with this workout? ({workoutRating || 'Not rated'}/10)
+                </Text>
+              </View>
+            </View>
+            
+            <View style={{ alignItems: 'center', marginVertical: 10 }}>
+              <Text style={{ fontSize: 44, marginBottom: 8 }}>
+                {workoutRating ? EMOJIS[workoutRating - 1] : '🤔'}
+              </Text>
+              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 16, color: colors.text, marginBottom: 12 }}>
+                {workoutRating ? LABELS[workoutRating - 1] : 'Slide to Rate Workout'}
+              </Text>
+              <Slider
+                style={{ width: '100%', height: 40 }}
+                minimumValue={1}
+                maximumValue={10}
+                step={1}
+                value={workoutRating || 5}
+                onValueChange={(val) => handleRateWorkout(Math.round(val))}
+                minimumTrackTintColor="#F59E0B"
+                maximumTrackTintColor={colors.border}
+                thumbTintColor="#F59E0B"
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 10 }}>
+                <Text style={{ color: colors.textMuted, fontSize: 11 }}>1 (Terrible)</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 11 }}>10 (Legendary)</Text>
+              </View>
+            </View>
           </View>
 
           {/* Photo Section */}

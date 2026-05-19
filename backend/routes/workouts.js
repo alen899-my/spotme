@@ -259,7 +259,11 @@ router.delete('/sessions/:id', authenticateToken, async (req, res) => {
 router.get('/sessions/:id/exercises', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT wse.*, e.name, e.category, e.image_url, e.target, e.equipment, e.instructions_en, e.instruction_steps_en
+      `SELECT wse.*, e.name, e.category, e.image_url, e.target, e.equipment, e.instructions_en, e.instruction_steps_en,
+         (SELECT ROUND(AVG(dwe2.rating), 1)::float
+          FROM daily_workout_exercises dwe2
+          JOIN daily_workouts dw2 ON dwe2.daily_workout_id = dw2.id
+          WHERE dwe2.exercise_id = e.id AND dw2.user_id = $2 AND dwe2.rating IS NOT NULL) AS avg_rating
        FROM workout_session_exercises wse 
        JOIN exercises e ON wse.exercise_id = e.id 
        WHERE wse.session_id = (SELECT ws.id FROM workout_sessions ws JOIN workout_splits s ON ws.split_id = s.id WHERE ws.id = $1 AND s.user_id = $2)
@@ -380,12 +384,17 @@ router.get('/exercises/search', authenticateToken, async (req, res) => {
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const queryText = `
-      SELECT * FROM exercises 
+      SELECT e.*,
+         (SELECT ROUND(AVG(dwe2.rating), 1)::float
+          FROM daily_workout_exercises dwe2
+          JOIN daily_workouts dw2 ON dwe2.daily_workout_id = dw2.id
+          WHERE dwe2.exercise_id = e.id AND dw2.user_id = $${idx + 2} AND dwe2.rating IS NOT NULL) AS avg_rating
+      FROM exercises e
       ${where}
-      ORDER BY name ASC 
+      ORDER BY e.name ASC 
       LIMIT $${idx} OFFSET $${idx + 1}
     `;
-    params.push(parseInt(limit), parseInt(offset));
+    params.push(parseInt(limit), parseInt(offset), req.user.id);
 
     const result = await pool.query(queryText, params);
     res.json(result.rows);

@@ -182,10 +182,23 @@ export default function MealsScreen() {
     const date = new Date(item.logged_at);
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    const MEAL_COLORS: Record<string, string> = {
-      Morning: '#F59E0B', Afternoon: '#3B82F6', Evening: '#8B5CF6', Night: '#6B7280',
+    const getMealIconDetails = (type: string) => {
+      switch (type) {
+        case 'Morning':
+        case 'Breakfast':
+          return { icon: 'sunny-outline', color: '#EF4444', bg: '#EF444415', label: 'Breakfast' };
+        case 'Afternoon':
+        case 'Lunch':
+          return { icon: 'sunny', color: '#3B82F6', bg: '#3B82F615', label: 'Lunch' };
+        case 'Evening':
+        case 'Dinner':
+          return { icon: 'moon-outline', color: '#8B5CF6', bg: '#8B5CF615', label: 'Dinner' };
+        default:
+          return { icon: 'nutrition-outline', color: '#F59E0B', bg: '#F59E0B15', label: 'Snack' };
+      }
     };
-    const mealColor = MEAL_COLORS[item.meal_type] || '#E00000';
+
+    const iconInfo = getMealIconDetails(item.meal_type);
 
     const toggle = () => {
       const toVal = open ? 0 : 1;
@@ -206,37 +219,62 @@ export default function MealsScreen() {
 
     return (
       <View style={[styles.accCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {/* ── Collapsed header ── */}
-        <View style={styles.accHeader}>
-          <Image source={{ uri: item.image_url }} style={styles.accThumb} />
-          <View style={{ flex: 1, marginLeft: 14 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <View style={[styles.mealTypePill, { backgroundColor: mealColor + '20' }]}>
-                <Text style={[styles.mealTypePillText, { color: mealColor }]}>{item.meal_type}</Text>
+        {/* ── Collapsed card structure (from screenshot) ── */}
+        <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
+          {/* Top Section: Icon, Meta Info, Eaten status, Chevron, Image Thumbnail */}
+          <View style={styles.cardHeaderRow}>
+            {/* Left circular icon box */}
+            <View style={[styles.mealIconBox, { backgroundColor: iconInfo.bg }]}>
+              <Ionicons name={iconInfo.icon as any} size={23} color={iconInfo.color} />
+            </View>
+
+            {/* Title & Time */}
+            <View style={styles.mealMetaInfo}>
+              <Text style={[styles.mealTitleLabel, { color: colors.text }]}>{iconInfo.label}</Text>
+              <Text style={[styles.mealTimeLabel, { color: colors.textDim }]}>{timeStr}</Text>
+            </View>
+
+            {/* Eaten Badge */}
+            <View style={[styles.eatenBadgeWrap, { backgroundColor: '#10B98115' }]}>
+              <Ionicons name="checkmark" size={11} color="#10B981" style={{ marginRight: 2 }} />
+              <Text style={styles.eatenBadgeText}>Eaten</Text>
+            </View>
+
+            {/* Subtle Chevron */}
+            <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
+              <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+            </Animated.View>
+
+            {/* Right Thumb Image */}
+            {item.image_url ? (
+              <Image source={{ uri: item.image_url }} style={styles.mealThumbImage} />
+            ) : (
+              <View style={[styles.mealThumbImagePlaceholder, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                <Ionicons name="image-outline" size={16} color={colors.textMuted} />
               </View>
-              <Text style={[styles.accTime, { color: colors.textDim }]}>{timeStr}</Text>
+            )}
+          </View>
+
+          {/* Bottom stats columns row */}
+          <View style={styles.mealStatsRow}>
+            <View style={styles.mealStatCol}>
+              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_calories)}</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>kcal</Text>
             </View>
-            <Text style={[styles.accCals, { color: colors.text }]}>
-              {Math.round(item.total_calories)}{' '}
-              <Text style={[styles.accCalsUnit, { color: colors.textMuted }]}>kcal</Text>
-            </Text>
-            <View style={styles.accMiniMacros}>
-              <Text style={[styles.miniMacro, { color: '#10B981' }]}>P {Math.round(item.total_protein)}g</Text>
-              <Text style={[styles.miniMacro, { color: '#3B82F6' }]}>C {Math.round(item.total_carbs)}g</Text>
-              <Text style={[styles.miniMacro, { color: '#F59E0B' }]}>F {Math.round(item.total_fat)}g</Text>
+            <View style={styles.mealStatCol}>
+              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_protein)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Protein</Text>
+            </View>
+            <View style={styles.mealStatCol}>
+              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_carbs)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Carbs</Text>
+            </View>
+            <View style={styles.mealStatCol}>
+              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_fat)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Fats</Text>
             </View>
           </View>
-          <View style={{ gap: 12 }}>
-            <TouchableOpacity onPress={() => deleteMeal(item.id)} style={styles.iconBtn}>
-              <Ionicons name="trash-outline" size={17} color="#EF4444" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={toggle} style={[styles.iconBtn, { backgroundColor: colors.iconCircle }]}>
-              <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
-                <Ionicons name="chevron-down" size={18} color={colors.text} />
-              </Animated.View>
-            </TouchableOpacity>
-          </View>
-        </View>
+        </TouchableOpacity>
 
         {/* ── Expandable detail ── */}
         {open && (
@@ -244,9 +282,9 @@ export default function MealsScreen() {
             {/* Macro grid */}
             <View style={styles.macroGrid}>
               {/* Full-width calories pill */}
-              <View style={[styles.macroPill, { backgroundColor: '#E0000012', width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }]}>
-                <Text style={[styles.macroPillLabel, { color: '#E00000' }]}>Total Calories</Text>
-                <Text style={[styles.macroPillVal, { color: '#E00000', fontSize: 20 }]}>{Math.round(item.total_calories)} <Text style={{ fontSize: 13 }}>kcal</Text></Text>
+              <View style={[styles.macroPill, { backgroundColor: '#EF444412', width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }]}>
+                <Text style={[styles.macroPillLabel, { color: '#EF4444' }]}>Total Calories</Text>
+                <Text style={[styles.macroPillVal, { color: '#EF4444', fontSize: 20 }]}>{Math.round(item.total_calories)} <Text style={{ fontSize: 13 }}>kcal</Text></Text>
               </View>
               {macros.map((m) => (
                 <View key={m.label} style={[styles.macroPill, { backgroundColor: m.color + '12' }]}>
@@ -271,6 +309,16 @@ export default function MealsScreen() {
                 ))}
               </View>
             )}
+
+            {/* Redesigned delete button inside expanded details */}
+            <TouchableOpacity
+              onPress={() => deleteMeal(item.id)}
+              style={[styles.deleteMealBtn, { borderColor: colors.border + '50', backgroundColor: colors.inputBg }]}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="trash-outline" size={14} color="#EF4444" style={{ marginRight: 6 }} />
+              <Text style={styles.deleteMealBtnText}>Delete Meal Entry</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -614,46 +662,63 @@ const styles = StyleSheet.create({
   },
   sectionLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 11 },
 
-  // ── Accordion card ──────────────────────────────────────────
+  // ── Redesigned Accordion Card (Screenshot Style) ──────────────────────────
   accCard: {
-    borderRadius: 20, borderWidth: 1, marginBottom: 14,
+    borderRadius: 24, borderWidth: 1, marginBottom: 14,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05, shadowRadius: 16, elevation: 3,
   },
-  accHeader: {
-    flexDirection: 'row', alignItems: 'center', padding: 14,
+  cardContentWrap: {
+    padding: 18,
   },
-  accThumb: {
-    width: 70, height: 70, borderRadius: 14,
+  cardHeaderRow: {
+    flexDirection: 'row', alignItems: 'center',
   },
-  mealTypePill: {
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
-  },
-  mealTypePillText: {
-    fontFamily: FONTS.bodyBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5,
-  },
-  accTime: {
-    fontFamily: FONTS.body, fontSize: 12,
-  },
-  accCals: {
-    fontFamily: FONTS.heading, fontSize: 26, lineHeight: 28,
-  },
-  accCalsUnit: {
-    fontFamily: FONTS.bodySemiBold, fontSize: 14,
-  },
-  accMiniMacros: {
-    flexDirection: 'row', gap: 10, marginTop: 4,
-  },
-  miniMacro: {
-    fontFamily: FONTS.bodyBold, fontSize: 11,
-  },
-  iconBtn: {
-    width: 32, height: 32, borderRadius: 10,
+  mealIconBox: {
+    width: 48, height: 48, borderRadius: 16,
     justifyContent: 'center', alignItems: 'center',
   },
+  mealMetaInfo: {
+    flex: 1, marginLeft: 14, justifyContent: 'center',
+  },
+  mealTitleLabel: {
+    fontFamily: FONTS.heading, fontSize: 18,
+  },
+  mealTimeLabel: {
+    fontFamily: FONTS.body, fontSize: 11, marginTop: 1,
+  },
+  eatenBadgeWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12,
+    marginRight: 6,
+  },
+  eatenBadgeText: {
+    fontFamily: FONTS.bodyBold, fontSize: 11, color: '#10B981',
+  },
+  mealThumbImage: {
+    width: 60, height: 60, borderRadius: 16,
+  },
+  mealThumbImagePlaceholder: {
+    width: 60, height: 60, borderRadius: 16, borderWidth: 1,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  mealStatsRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    marginTop: 18, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.03)',
+    paddingTop: 14, paddingHorizontal: 4,
+  },
+  mealStatCol: {
+    flex: 1,
+  },
+  mealStatNum: {
+    fontFamily: FONTS.heading, fontSize: 16, letterSpacing: -0.3,
+  },
+  mealStatUnit: {
+    fontFamily: FONTS.body, fontSize: 10, marginTop: 2,
+  },
   accDetail: {
-    paddingHorizontal: 14, paddingBottom: 16, borderTopWidth: 1,
+    paddingHorizontal: 18, paddingBottom: 18, borderTopWidth: 1,
   },
   macroGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 14,
@@ -687,6 +752,13 @@ const styles = StyleSheet.create({
   },
   foodCals: {
     fontFamily: FONTS.bodyBold, fontSize: 13,
+  },
+  deleteMealBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderRadius: 16, paddingVertical: 12, marginTop: 16,
+  },
+  deleteMealBtnText: {
+    fontFamily: FONTS.bodyBold, fontSize: 12, color: '#EF4444',
   },
   
   // Modal

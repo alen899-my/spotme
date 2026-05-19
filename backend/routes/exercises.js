@@ -101,16 +101,39 @@ router.get('/', async (req, res) => {
     const offset  = (Number(page) - 1) * Number(limit);
     const pgLimit = Number(limit);
 
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userId = decoded.id;
+      } catch (e) {}
+    }
+
+    const selectQuery = userId ? 
+      `SELECT e.id, e.name, e.category, e.body_part, e.equipment,
+              e.muscle_group, e.secondary_muscles, e.target,
+              e.image_url, e.gif_url,
+              (SELECT ROUND(AVG(dwe2.rating), 1)::float
+               FROM daily_workout_exercises dwe2
+               JOIN daily_workouts dw2 ON dwe2.daily_workout_id = dw2.id
+               WHERE dwe2.exercise_id = e.id AND dw2.user_id = $${idx + 2} AND dwe2.rating IS NOT NULL) AS avg_rating
+       FROM exercises e ${where}
+       ORDER BY e.name ASC
+       LIMIT $${idx} OFFSET $${idx + 1}`
+      :
+      `SELECT id, name, category, body_part, equipment,
+              muscle_group, secondary_muscles, target,
+              image_url, gif_url
+       FROM exercises ${where}
+       ORDER BY name ASC
+       LIMIT $${idx} OFFSET $${idx + 1}`;
+
+    const queryParams = userId ? [...params, pgLimit, offset, userId] : [...params, pgLimit, offset];
+
     const [rowsResult, countResult] = await Promise.all([
-      pool.query(
-        `SELECT id, name, category, body_part, equipment,
-                muscle_group, secondary_muscles, target,
-                image_url, gif_url
-         FROM exercises ${where}
-         ORDER BY name ASC
-         LIMIT $${idx} OFFSET $${idx + 1}`,
-        [...params, pgLimit, offset]
-      ),
+      pool.query(selectQuery, queryParams),
       pool.query(`SELECT COUNT(*) FROM exercises ${where}`, params),
     ]);
 
@@ -135,7 +158,31 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('SELECT * FROM exercises WHERE id = $1', [id]);
+
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userId = decoded.id;
+      } catch (e) {}
+    }
+
+    const queryText = userId ?
+      `SELECT e.*,
+         (SELECT ROUND(AVG(dwe2.rating), 1)::float
+          FROM daily_workout_exercises dwe2
+          JOIN daily_workouts dw2 ON dwe2.daily_workout_id = dw2.id
+          WHERE dwe2.exercise_id = e.id AND dw2.user_id = $2 AND dwe2.rating IS NOT NULL) AS avg_rating
+       FROM exercises e
+       WHERE e.id = $1`
+      :
+      `SELECT * FROM exercises WHERE id = $1`;
+
+    const params = userId ? [id, userId] : [id];
+    const result = await pool.query(queryText, params);
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Exercise not found' });
     }
