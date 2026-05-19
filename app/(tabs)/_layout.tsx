@@ -25,7 +25,6 @@ const TABS = [
   { name: "meals",       title: "Nutrition",   icon: "restaurant" as const,     iconOutline: "restaurant-outline" as const,     href: "/(tabs)/meals" },
   { name: "daily",       title: "Daily",       icon: "calendar" as const,       iconOutline: "calendar-outline" as const,       href: "/(tabs)/daily" },
   { name: "leaderboard", title: "Ranks",       icon: "trophy" as const,         iconOutline: "trophy-outline" as const,         href: "/(tabs)/leaderboard" },
-  { name: "splits",      title: "Splits",      icon: "layers" as const,         iconOutline: "layers-outline" as const,         href: "/(tabs)/splits" },
 ];
 
 // Module-level animated values — always in sync with TABS array length
