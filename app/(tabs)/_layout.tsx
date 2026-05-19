@@ -20,12 +20,19 @@ import ProfileSidebar from "../../components/ui/ProfileSidebar";
 const { width: W } = Dimensions.get("window");
 
 const TABS = [
-  { name: "index",     title: "Home",      icon: "home" as const,         iconOutline: "home-outline" as const,         href: "/(tabs)/" },
-  { name: "exercises", title: "Exercises", icon: "fitness" as const,      iconOutline: "fitness-outline" as const,      href: "/(tabs)/exercises" },
-  { name: "meals",     title: "Nutrition", icon: "restaurant" as const,   iconOutline: "restaurant-outline" as const,   href: "/(tabs)/meals" },
-  { name: "daily",     title: "Daily",     icon: "calendar" as const,     iconOutline: "calendar-outline" as const,     href: "/(tabs)/daily" },
-  { name: "splits",    title: "Splits",    icon: "layers" as const,       iconOutline: "layers-outline" as const,       href: "/(tabs)/splits" },
+  { name: "index",       title: "Home",        icon: "home" as const,           iconOutline: "home-outline" as const,           href: "/(tabs)/" },
+  { name: "exercises",   title: "Exercises",   icon: "fitness" as const,        iconOutline: "fitness-outline" as const,        href: "/(tabs)/exercises" },
+  { name: "meals",       title: "Nutrition",   icon: "restaurant" as const,     iconOutline: "restaurant-outline" as const,     href: "/(tabs)/meals" },
+  { name: "daily",       title: "Daily",       icon: "calendar" as const,       iconOutline: "calendar-outline" as const,       href: "/(tabs)/daily" },
+  { name: "leaderboard", title: "Ranks",       icon: "trophy" as const,         iconOutline: "trophy-outline" as const,         href: "/(tabs)/leaderboard" },
+  { name: "splits",      title: "Splits",      icon: "layers" as const,         iconOutline: "layers-outline" as const,         href: "/(tabs)/splits" },
 ];
+
+// Module-level animated values — always in sync with TABS array length
+// (inside useRef they can become stale across hot-reloads when tabs are added)
+const _scaleAnims   = TABS.map(() => new Animated.Value(0.85));
+const _opacityAnims = TABS.map(() => new Animated.Value(0.55));
+const _dotAnims     = TABS.map(() => new Animated.Value(0));
 
 function CustomTabBar() {
   const pathname = usePathname();
@@ -40,10 +47,10 @@ function CustomTabBar() {
   );
   const current = activeIndex < 0 ? 0 : activeIndex;
 
-  // Per-tab animated values
-  const scaleAnims = useRef(TABS.map((_, i) => new Animated.Value(i === current ? 1 : 0.85))).current;
-  const opacityAnims = useRef(TABS.map((_, i) => new Animated.Value(i === current ? 1 : 0.55))).current;
-  const dotAnims = useRef(TABS.map((_, i) => new Animated.Value(i === current ? 1 : 0))).current;
+  // Per-tab animated values (module-level — always matches TABS.length)
+  const scaleAnims   = _scaleAnims;
+  const opacityAnims = _opacityAnims;
+  const dotAnims     = _dotAnims;
 
   useEffect(() => {
     Animated.parallel([
@@ -151,6 +158,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="exercises" />
         <Tabs.Screen name="meals" />
         <Tabs.Screen name="daily" />
+        <Tabs.Screen name="leaderboard" />
         <Tabs.Screen name="splits" />
         <Tabs.Screen name="workout" />
         <Tabs.Screen name="profile" />

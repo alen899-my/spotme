@@ -4,6 +4,7 @@ const { pool } = require('../db');
 const authenticateToken = require('../middleware/auth');
 const { validate, schemas } = require('../middleware/validate');
 const upload = require('../uploadConfig');
+const { awardXP } = require('../utils/xp');
 
 // ── GET /daily/workouts — list past workouts for user ─────────────────────────
 router.get('/workouts', authenticateToken, async (req, res) => {
@@ -408,27 +409,14 @@ router.patch(
           const streakMultiplier = 1 + Math.min((newStreak * 0.05), 0.5);
           earnedXP = Math.round(earnedXP * streakMultiplier);
 
-          // Update User XP and Level
-          const userXpRes = await pool.query('SELECT total_xp, level FROM users WHERE id = $1', [userId]);
-          let { total_xp, level } = userXpRes.rows[0];
-          
-          total_xp = (total_xp || 0) + earnedXP;
-          
-          // Leveling logic: Level * 1000 XP per level
-          let xpForNext = level * 1000;
-          let leveledUp = false;
-          while (total_xp >= xpForNext) {
-            level += 1;
-            xpForNext = level * 1000;
-            leveledUp = true;
-          }
-
-          await pool.query('UPDATE users SET total_xp = $1, level = $2 WHERE id = $3', [total_xp, level, userId]);
+          // Delegate unified XP and Tier update
+          const awardRes = await awardXP(pool, userId, earnedXP, 'Completed workout');
           
           result.rows[0].earned_xp = earnedXP;
-          result.rows[0].new_level = level;
-          result.rows[0].leveled_up = leveledUp;
-          result.rows[0].total_xp = total_xp;
+          result.rows[0].new_level = awardRes.level;
+          result.rows[0].leveled_up = awardRes.leveledUp;
+          result.rows[0].total_xp = awardRes.newXP;
+          result.rows[0].league_tier = awardRes.tier;
         }
 
         result.rows[0].new_streak = newStreak;

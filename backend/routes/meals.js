@@ -5,6 +5,7 @@ const authenticateToken = require('../middleware/auth');
 const { validate, schemas } = require('../middleware/validate');
 const upload = require('../uploadConfig');
 const { callAI } = require('../utils/ai');
+const { awardXP, XP_VALUES } = require('../utils/xp');
 
 // ── POST /meals/analyze — Analyze meal image using AI ────────────────────────
 router.post('/analyze', authenticateToken, upload.single('photo'), async (req, res) => {
@@ -139,8 +140,16 @@ router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => 
       );
     }
 
+    // Award XP for logging a meal
+    const awardRes = await awardXP(client, req.user.id, XP_VALUES.LOG_MEAL, 'Logged a meal');
+
     await client.query('COMMIT');
-    res.status(201).json(mealResult.rows[0]);
+    res.status(201).json({ 
+      ...mealResult.rows[0], 
+      xp_awarded: XP_VALUES.LOG_MEAL, 
+      new_tier: awardRes.tier, 
+      leveled_up: awardRes.leveledUp 
+    });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error saving meal:', err);

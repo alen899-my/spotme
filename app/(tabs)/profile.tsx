@@ -102,6 +102,20 @@ export default function ProfileScreen() {
           <Text style={[styles.userName, { color: colors.text }]}>{user?.full_name || "Gym Warrior"}</Text>
           <Text style={[styles.userEmail, { color: colors.textMuted }]}>{user?.email || "warrior@spotme.com"}</Text>
 
+          {user && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 }}>
+              {user.league_tier && (
+                <View style={[styles.badge, { backgroundColor: 'rgba(224,0,0,0.1)', paddingVertical: 4, paddingHorizontal: 10 }]}>
+                  <Ionicons name="trophy" size={12} color="#E00000" />
+                  <Text style={styles.badgeText}>{user.league_tier}</Text>
+                </View>
+              )}
+              <Text style={{ fontFamily: FONTS.bodyBold, color: colors.textMuted, fontSize: 13 }}>
+                {user.total_xp?.toLocaleString() || 0} XP
+              </Text>
+            </View>
+          )}
+
           {user?.current_streak > 0 && (
             <View style={{ marginTop: 12 }}>
               <StreakIcon streak={user.current_streak} size={50} />
