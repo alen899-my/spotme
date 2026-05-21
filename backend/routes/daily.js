@@ -796,4 +796,150 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
   }
 });
 
+// ── GET /daily/dashboard — Home screen aggregate data ─────────────────────────
+router.get('/dashboard', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+
+  try {
+    // ── 1. User stats ─────────────────────────────────────────────────────────
+    const userRes = await pool.query(
+      `SELECT full_name, fitness_goal, experience_level, total_xp, level, league_tier,
+              current_streak, weight, profile_pic_url
+       FROM users WHERE id = $1`,
+      [userId]
+    );
+    const user = userRes.rows[0] || {};
+    const weightKg = parseFloat(user.weight) || 70;
+
+    // ── 2. Today's completed workouts ─────────────────────────────────────────
+    const todayWorkoutsRes = await pool.query(
+      `SELECT id, title, total_duration_seconds, total_volume, status, completed_at, post_workout_weight
+       FROM daily_workouts
+       WHERE user_id = $1 AND status = 'completed'
+         AND completed_at BETWEEN $2 AND $3
+       ORDER BY completed_at DESC`,
+      [userId, todayStart.toISOString(), todayEnd.toISOString()]
+    );
+
+    // Calories burned using MET formula: kcal = MET × weight_kg × duration_hours
+    // MET 5 = vigorous weight training
+    let totalCaloriesBurned = 0;
+    let totalDurationToday = 0;
+    let totalVolumeToday = 0;
+    todayWorkoutsRes.rows.forEach(w => {
+      const durationHours = (parseInt(w.total_duration_seconds) || 0) / 3600;
+      const kcal = Math.round(5 * weightKg * durationHours);
+      totalCaloriesBurned += kcal;
+      totalDurationToday += parseInt(w.total_duration_seconds) || 0;
+      totalVolumeToday += parseFloat(w.total_volume) || 0;
+    });
+
+    // ── 3. Today's water intake ───────────────────────────────────────────────
+    const waterRes = await pool.query(
+      `SELECT COALESCE(SUM(amount_ml), 0) AS total_ml
+       FROM water_logs
+       WHERE user_id = $1 AND logged_at BETWEEN $2 AND $3`,
+      [userId, todayStart.toISOString(), todayEnd.toISOString()]
+    );
+    const waterMl = parseInt(waterRes.rows[0]?.total_ml) || 0;
+
+    // ── 4. Today's calories consumed ──────────────────────────────────────────
+    const mealsRes = await pool.query(
+      `SELECT COALESCE(SUM(total_calories), 0) AS total_cals
+       FROM meals
+       WHERE user_id = $1 AND logged_at BETWEEN $2 AND $3`,
+      [userId, todayStart.toISOString(), todayEnd.toISOString()]
+    );
+    const caloriesConsumed = Math.round(parseFloat(mealsRes.rows[0]?.total_cals) || 0);
+
+    // ── 5. Weekly workout stats (last 7 days) ─────────────────────────────────
+    const weeklyRes = await pool.query(
+      `SELECT
+         DATE(completed_at AT TIME ZONE 'UTC') AS day,
+         COUNT(*) AS workouts,
+         COALESCE(SUM(total_duration_seconds), 0) AS total_seconds,
+         COALESCE(SUM(total_volume), 0) AS total_volume
+       FROM daily_workouts
+       WHERE user_id = $1 AND status = 'completed'
+         AND completed_at >= NOW() - INTERVAL '7 days'
+       GROUP BY DATE(completed_at AT TIME ZONE 'UTC')
+       ORDER BY day ASC`,
+      [userId]
+    );
+
+    // Build 7-day grid (fill missing days with 0)
+    const weeklyStats = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toISOString().split('T')[0];
+      const found = weeklyRes.rows.find(r => r.day === dayStr);
+      weeklyStats.push({
+        date: dayStr,
+        label: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()],
+        workouts: parseInt(found?.workouts) || 0,
+        duration_seconds: parseInt(found?.total_seconds) || 0,
+        volume: parseFloat(found?.total_volume) || 0,
+      });
+    }
+
+    // ── 6. Weight progress (last 7 post_workout weights) ──────────────────────
+    const weightRes = await pool.query(
+      `SELECT post_workout_weight AS weight, DATE(completed_at) AS day
+       FROM daily_workouts
+       WHERE user_id = $1 AND post_workout_weight IS NOT NULL AND status = 'completed'
+       ORDER BY completed_at DESC LIMIT 7`,
+      [userId]
+    );
+    const weightProgress = weightRes.rows.reverse();
+
+    // ── 7. Top recommended exercise ───────────────────────────────────────────
+    const topExerciseRes = await pool.query(
+      `SELECT e.id AS exercise_id, e.name AS exercise_name, e.target, e.category, e.image_url, e.equipment,
+              COALESCE(AVG(dwe.rating), 5.0) as avg_rating
+       FROM exercises e
+       LEFT JOIN daily_workout_exercises dwe ON e.id = dwe.exercise_id AND dwe.rating IS NOT NULL
+       GROUP BY e.id
+       ORDER BY avg_rating DESC, RANDOM()
+       LIMIT 1`
+    );
+    
+    let topRec = topExerciseRes.rows[0] || null;
+    if (topRec) {
+      topRec.scoreTag = parseFloat(topRec.avg_rating) >= 8.0 ? 'Highly Rated' : 'Recommended';
+    }
+
+    res.json({
+      user: {
+        full_name: user.full_name,
+        fitness_goal: user.fitness_goal,
+        experience_level: user.experience_level,
+        total_xp: parseInt(user.total_xp) || 0,
+        level: parseInt(user.level) || 1,
+        league_tier: user.league_tier || 'Bronze',
+        current_streak: parseInt(user.current_streak) || 0,
+        weight: weightKg,
+        profile_pic_url: user.profile_pic_url,
+      },
+      today: {
+        workouts_completed: todayWorkoutsRes.rows.length,
+        calories_burned: totalCaloriesBurned,
+        duration_seconds: totalDurationToday,
+        volume: totalVolumeToday,
+        water_ml: waterMl,
+        calories_consumed: caloriesConsumed,
+      },
+      weekly_stats: weeklyStats,
+      weight_progress: weightProgress,
+      top_recommendation: topRec,
+    });
+  } catch (err) {
+    console.error('GET /daily/dashboard error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
