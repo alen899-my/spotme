@@ -255,6 +255,28 @@ export default function MealsScreen() {
     }
   };
 
+  const loadAlternativeFoods = async (ing: any) => {
+    setSelectorLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(`${API_URL}/meals/food-alternatives`, {
+        params: { 
+          p: ing.protein || 0,
+          c: ing.carbs || 0,
+          f: ing.fat || 0,
+          exclude_name: ing.name || '',
+          limit: 30
+        },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSelectorFoods(res.data.results || []);
+    } catch (err) {
+      console.error('Alternative foods load error:', err);
+    } finally {
+      setSelectorLoading(false);
+    }
+  };
+
   const handleSelectFood = (food: any) => {
     if (activeMealIdx === null || !recommendationData || !recommendationData.recommendedMeals) return;
 
@@ -840,7 +862,7 @@ export default function MealsScreen() {
                         setSelectorSearch('');
                         setSelectorFoods([]);
                         setShowItemSelector(true);
-                        loadSelectorFoods('');
+                        loadAlternativeFoods(ing);
                       }}
                       style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.inputBg }}
                       activeOpacity={0.7}
@@ -858,33 +880,6 @@ export default function MealsScreen() {
                   </View>
                 </View>
               ))}
-
-              <TouchableOpacity
-                onPress={() => {
-                  setActiveMealIdx(mealIndex);
-                  setActiveIngredientIdx(null);
-                  setSelectorSearch('');
-                  setSelectorFoods([]);
-                  setShowItemSelector(true);
-                  loadSelectorFoods('');
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingVertical: 10,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderStyle: 'dashed',
-                  borderColor: '#E00000',
-                  marginTop: 10,
-                  backgroundColor: '#E0000005'
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add-circle-outline" size={16} color="#E00000" style={{ marginRight: 6 }} />
-                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: '#E00000' }}>Add Ingredient</Text>
-              </TouchableOpacity>
             </View>
 
             <View style={{ marginTop: 12 }}>
@@ -928,7 +923,7 @@ export default function MealsScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.emptyBtn, { backgroundColor: '#E0000015', borderColor: '#E0000030', borderWidth: 1 }]}
-            onPress={fetchRecommendations}
+            onPress={() => fetchRecommendations(true)}
           >
             <Ionicons name="refresh-outline" size={16} color="#E00000" />
             <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Retry Loading Coach</Text>
@@ -1218,10 +1213,10 @@ export default function MealsScreen() {
           <View style={[styles.fsHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.fsTitle, { color: colors.text }]}>
-                {activeIngredientIdx === null ? 'Add Ingredient' : 'Change Ingredient'}
+                Replace Ingredient
               </Text>
               <Text style={{ fontFamily: FONTS.body, fontSize: 11, color: colors.textMuted, marginTop: 1 }}>
-                Choose from 300k+ database items (images prioritized)
+                Suggested items with similar nutritional values
               </Text>
             </View>
             <TouchableOpacity
@@ -1230,30 +1225,6 @@ export default function MealsScreen() {
             >
               <Ionicons name="close" size={20} color={colors.text} />
             </TouchableOpacity>
-          </View>
-
-          {/* Search Bar */}
-          <View style={[styles.fsSearchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-            <Ionicons name="search-outline" size={18} color={colors.textDim} style={{ marginRight: 10 }} />
-            <TextInput
-              style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 15, color: colors.text }}
-              placeholder="Search ingredient (e.g. chicken, rice, banana)..."
-              placeholderTextColor={colors.textDim}
-              value={selectorSearch}
-              onChangeText={(text) => {
-                setSelectorSearch(text);
-                if ((global as any)._selectorSearchTimer) clearTimeout((global as any)._selectorSearchTimer);
-                (global as any)._selectorSearchTimer = setTimeout(() => loadSelectorFoods(text), 400);
-              }}
-              returnKeyType="search"
-              onSubmitEditing={() => loadSelectorFoods(selectorSearch)}
-            />
-            {selectorLoading && <ActivityIndicator size="small" color="#E00000" style={{ marginLeft: 8 }} />}
-            {selectorSearch.length > 0 && !selectorLoading && (
-              <TouchableOpacity onPress={() => { setSelectorSearch(''); loadSelectorFoods(''); }}>
-                <Ionicons name="close-circle" size={18} color={colors.textDim} />
-              </TouchableOpacity>
-            )}
           </View>
 
           {/* Results or Loading / Empty */}
@@ -1267,8 +1238,8 @@ export default function MealsScreen() {
               <View style={[styles.fsEmptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Ionicons name="search-outline" size={36} color={colors.textDim} />
               </View>
-              <Text style={[styles.fsEmptyTitle, { color: colors.text }]}>No foods found</Text>
-              <Text style={[styles.fsEmptyText, { color: colors.textMuted }]}>Try a different search term</Text>
+              <Text style={[styles.fsEmptyTitle, { color: colors.text }]}>No alternatives found</Text>
+              <Text style={[styles.fsEmptyText, { color: colors.textMuted }]}>Could not find similar items</Text>
             </View>
           ) : (
             <FlatList

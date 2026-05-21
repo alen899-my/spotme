@@ -721,4 +721,77 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// ── GET /meals/food-alternatives — Find similar items by macros ─────────────
+router.get('/food-alternatives', authenticateToken, async (req, res) => {
+  try {
+    const { p = 0, c = 0, f = 0, exclude_name = '', limit = 20 } = req.query;
+    const lim = Math.min(parseInt(limit) || 20, 50);
+
+    const targetProtein = parseFloat(p) || 0;
+    const targetCarbs = parseFloat(c) || 0;
+    const targetFat = parseFloat(f) || 0;
+
+    const totalMacros = targetProtein + targetCarbs + targetFat;
+    
+    // If no macros provided or total is 0, fallback to basic search
+    if (totalMacros === 0) {
+      const result = await pool.query(
+        `SELECT
+          id, food_name, category, meal_type, nutrition_grade, serving_size,
+          calories_kcal, protein_g, carbohydrates_g, fat_g, fiber_g,
+          sugars_g, sodium_mg, saturated_fat_g, nutrition_density, image_url, image_small_url
+         FROM food_database
+         WHERE calories_kcal > 0 AND (image_url IS NOT NULL AND image_url != '')
+           AND food_name NOT ILIKE $1
+         ORDER BY nutrition_density DESC NULLS LAST, food_name ASC
+         LIMIT $2`,
+        [`%${exclude_name}%`, lim]
+      );
+      return res.json({
+        results: result.rows.map(r => ({ ...r, food_name: cleanFoodName(r.food_name) }))
+      });
+    }
+
+    const pctProtein = targetProtein / totalMacros;
+    const pctCarbs = targetCarbs / totalMacros;
+    const pctFat = targetFat / totalMacros;
+
+    const query = `
+      WITH valid_foods AS (
+        SELECT
+          id, food_name, category, meal_type, nutrition_grade, serving_size,
+          calories_kcal, protein_g, carbohydrates_g, fat_g, fiber_g,
+          sugars_g, sodium_mg, saturated_fat_g, nutrition_density, image_url, image_small_url,
+          (COALESCE(protein_g, 0) + COALESCE(carbohydrates_g, 0) + COALESCE(fat_g, 0)) AS total_macros
+        FROM food_database
+        WHERE calories_kcal > 0 
+          AND (COALESCE(protein_g, 0) + COALESCE(carbohydrates_g, 0) + COALESCE(fat_g, 0)) > 0
+          AND (image_url IS NOT NULL AND image_url != '')
+      )
+      SELECT 
+        id, food_name, category, meal_type, nutrition_grade, serving_size,
+        calories_kcal, protein_g, carbohydrates_g, fat_g, fiber_g,
+        sugars_g, sodium_mg, saturated_fat_g, nutrition_density, image_url, image_small_url,
+        (
+          ABS((COALESCE(protein_g, 0) / total_macros) - $1) + 
+          ABS((COALESCE(carbohydrates_g, 0) / total_macros) - $2) + 
+          ABS((COALESCE(fat_g, 0) / total_macros) - $3)
+        ) AS distance
+      FROM valid_foods
+      WHERE food_name NOT ILIKE $4
+      ORDER BY distance ASC, nutrition_density DESC NULLS LAST
+      LIMIT $5;
+    `;
+
+    const result = await pool.query(query, [pctProtein, pctCarbs, pctFat, `%${exclude_name}%`, lim]);
+
+    res.json({
+      results: result.rows.map(r => ({ ...r, food_name: cleanFoodName(r.food_name) }))
+    });
+  } catch (err) {
+    console.error('Food alternatives error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
