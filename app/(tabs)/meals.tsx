@@ -42,11 +42,94 @@ export default function MealsScreen() {
   // New features state
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [userData, setUserData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'tracker' | 'recommendations'>('tracker');
+  const [recommendationData, setRecommendationData] = useState<any>(null);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
   useEffect(() => {
     loadUser();
     fetchMeals();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'recommendations' && !recommendationData) {
+      fetchRecommendations();
+    }
+  }, [activeTab]);
+
+  const fetchRecommendations = async () => {
+    setRecommendationLoading(true);
+    setRecommendationError(null);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(`${API_URL}/meals/recommendation`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setRecommendationData(res.data);
+    } catch (err: any) {
+      console.error('Error fetching recommendations:', err);
+      if (err.response?.data?.message || err.response?.data?.error) {
+        setRecommendationError(err.response.data.message || err.response.data.error);
+      } else {
+        setRecommendationError('Failed to load recommendation data');
+      }
+    } finally {
+      setRecommendationLoading(false);
+    }
+  };
+
+  const handleLogRecommendedMeal = async (meal: any) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      
+      // Choose high-fidelity food category image for the log
+      let imageUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop'; // fallback
+      if (meal.meal_type === 'Breakfast') {
+        imageUrl = 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=500&auto=format&fit=crop';
+      } else if (meal.meal_type === 'Lunch') {
+        imageUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop';
+      } else if (meal.meal_type === 'Dinner') {
+        imageUrl = 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=500&auto=format&fit=crop';
+      } else if (meal.meal_type === 'Snack') {
+        imageUrl = 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=500&auto=format&fit=crop';
+      }
+
+      const items = meal.ingredients.map((ing: any) => ({
+        item_name: ing.name,
+        quantity: ing.quantity || '1 portion',
+        calories: Math.round(meal.calories / meal.ingredients.length),
+        protein: Math.round(meal.protein / meal.ingredients.length),
+        carbs: Math.round(meal.carbs / meal.ingredients.length),
+        fat: Math.round(meal.fat / meal.ingredients.length)
+      }));
+
+      const mealTypeMap = meal.meal_type === 'Snack' ? 'Snack' : (meal.meal_type === 'Breakfast' ? 'Morning' : (meal.meal_type === 'Lunch' ? 'Afternoon' : 'Evening'));
+
+      await axios.post(`${API_URL}/meals`, {
+        image_url: imageUrl,
+        meal_type: mealTypeMap,
+        total_calories: meal.calories,
+        total_protein: meal.protein,
+        total_carbs: meal.carbs,
+        total_fat: meal.fat,
+        total_fiber: 0,
+        total_sugar: 0,
+        total_sodium: 0,
+        total_saturated_fat: 0,
+        total_cholesterol: 0,
+        items
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      showToast(`${meal.meal_type} logged successfully! 🎉`);
+      fetchMeals(); // Refresh daily list
+    } catch (err) {
+      console.error('Error logging recommended meal:', err);
+      showToast('Failed to log recommended meal', 'error');
+    }
+  };
 
   const loadUser = async () => {
     try {
@@ -410,6 +493,246 @@ export default function MealsScreen() {
 
   const targets = getTargets();
 
+  const getBmiColor = (category: string) => {
+    switch (category) {
+      case 'Underweight': return '#3B82F6';
+      case 'Normal weight': return '#10B981';
+      case 'Overweight': return '#F59E0B';
+      case 'Obesity': return '#EF4444';
+      default: return '#10B981';
+    }
+  };
+
+  const RecommendedMealCard = ({ meal }: { meal: any }) => {
+    const [open, setOpen] = useState(false);
+    const anim = React.useRef(new Animated.Value(0)).current;
+    
+    const toggle = () => {
+      const toVal = open ? 0 : 1;
+      setOpen(!open);
+      Animated.spring(anim, { toValue: toVal, useNativeDriver: false, tension: 60, friction: 12 }).start();
+    };
+
+    const arrowRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+
+    return (
+      <View style={[styles.accCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
+          <View style={styles.cardHeaderRow}>
+            <View style={[styles.mealIconBox, { backgroundColor: '#E0000010' }]}>
+              <Ionicons name="sparkles" size={20} color="#E00000" />
+            </View>
+            <View style={styles.mealMetaInfo}>
+              <Text style={[styles.mealTitleLabel, { color: colors.text, fontSize: 16 }]}>{meal.meal_type}</Text>
+              <Text style={[styles.mealTimeLabel, { color: colors.textDim, fontSize: 12, marginTop: 2 }]} numberOfLines={1}>{meal.title}</Text>
+            </View>
+            <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
+              <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+            </Animated.View>
+          </View>
+
+          <View style={styles.mealStatsRow}>
+            <View style={styles.mealStatCol}>
+              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.calories)}</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>kcal</Text>
+            </View>
+            <View style={styles.mealStatCol}>
+              <Text style={[styles.mealStatNum, { color: '#10B981' }]}>{Math.round(meal.protein)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Protein</Text>
+            </View>
+            <View style={styles.mealStatCol}>
+              <Text style={[styles.mealStatNum, { color: '#3B82F6' }]}>{Math.round(meal.carbs)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Carbs</Text>
+            </View>
+            <View style={styles.mealStatCol}>
+              <Text style={[styles.mealStatNum, { color: '#F59E0B' }]}>{Math.round(meal.fat)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Fats</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {open && (
+          <View style={[styles.accDetail, { borderTopColor: colors.border }]}>
+            <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: colors.textDim, lineHeight: 18, marginTop: 10 }}>
+              {meal.description}
+            </Text>
+
+            <View style={{ marginTop: 12 }}>
+              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: colors.text, marginBottom: 6 }}>Ingredients</Text>
+              {meal.ingredients?.map((ing: any, i: number) => (
+                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+                  <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.text }}>{ing.name}</Text>
+                  <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12, color: colors.textDim }}>{ing.quantity}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={{ marginTop: 12 }}>
+              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: colors.text, marginBottom: 4 }}>Preparation Instructions</Text>
+              <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim, lineHeight: 18 }}>{meal.instructions}</Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => handleLogRecommendedMeal(meal)}
+              style={[styles.deleteMealBtn, { borderColor: '#E0000030', backgroundColor: '#E0000010' }]}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="checkmark-circle-outline" size={16} color="#E00000" style={{ marginRight: 6 }} />
+              <Text style={[styles.deleteMealBtnText, { color: '#E00000' }]}>Quick Log Meal</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderRecommendations = () => {
+    if (recommendationLoading) {
+      return (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#E00000" />
+          <Text style={{ marginTop: 14, fontFamily: FONTS.bodySemiBold, color: colors.textDim }}>AI Diet Coach is preparing your personalized plan...</Text>
+        </View>
+      );
+    }
+
+    if (recommendationError) {
+      return (
+        <View style={[styles.emptyContainer, { paddingHorizontal: 20 }]}>
+          <View style={[styles.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name="alert-circle-outline" size={40} color={colors.textDim} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text, textAlign: 'center' }]}>Onboarding Incomplete</Text>
+          <Text style={[styles.emptyText, { color: colors.textMuted, maxWidth: 280, textAlign: 'center' }]}>
+            {recommendationError.includes('height') || recommendationError.includes('onboarding') ? 'Please complete your physical measurements (height, weight, and fitness goal) inside onboarding/profile to generate AI meal recommendations!' : recommendationError}
+          </Text>
+          <TouchableOpacity
+            style={[styles.emptyBtn, { backgroundColor: '#E0000015', borderColor: '#E0000030', borderWidth: 1 }]}
+            onPress={fetchRecommendations}
+          >
+            <Ionicons name="refresh-outline" size={16} color="#E00000" />
+            <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Retry Loading Coach</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (!recommendationData) return null;
+
+    return (
+      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        {recommendationData.profileIncomplete && (
+          <View style={[styles.recCard, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30', padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 14 }]}>
+            <Ionicons name="warning-outline" size={20} color="#F59E0B" style={{ marginRight: 10 }} />
+            <Text style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 12, color: colors.text, lineHeight: 18 }}>
+              Profile incomplete. We're using standard values (70kg, 170cm). Please complete your height/weight in Profile for fully personalized targets!
+            </Text>
+          </View>
+        )}
+
+        {/* welcome banner */}
+        <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 18, borderLeftWidth: 4, borderLeftColor: '#E00000', marginBottom: 14 }]}>
+          <Text style={{ fontFamily: FONTS.heading, fontSize: 18, color: colors.text }}>Meet Your AI Diet Coach 🥗</Text>
+          <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: colors.textMuted, marginTop: 4, lineHeight: 18 }}>
+            Grounded in scientific targets and your custom preferences.
+          </Text>
+        </View>
+
+        {/* BMI gauge */}
+        <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 16, marginBottom: 14 }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 14, fontFamily: FONTS.heading, color: colors.text }}>Your Body Mass Index (BMI)</Text>
+            <View style={[styles.eatenBadgeWrap, { backgroundColor: getBmiColor(recommendationData.bmiCategory) + '20' }]}>
+              <Text style={[styles.eatenBadgeText, { color: getBmiColor(recommendationData.bmiCategory) }]}>{recommendationData.bmiCategory}</Text>
+            </View>
+          </View>
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ fontSize: 32, fontFamily: FONTS.heading, color: colors.text }}>
+              {recommendationData.bmi} <Text style={{ fontSize: 14, fontFamily: FONTS.body, color: colors.textMuted }}>kg/m²</Text>
+            </Text>
+            {/* Beautiful progress indicator bar */}
+            <View style={styles.bmiGaugeTrack}>
+              <View style={[styles.bmiGaugeFill, { width: `${Math.min(100, (recommendationData.bmi / 40) * 100)}%`, backgroundColor: getBmiColor(recommendationData.bmiCategory) }]} />
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: colors.textMuted }}>15.0</Text>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: colors.textMuted }}>Under</Text>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: colors.textMuted }}>Normal</Text>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: colors.textMuted }}>Over</Text>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: colors.textMuted }}>Obesity</Text>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: colors.textMuted }}>40.0</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* daily macro targets */}
+        <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 16, marginBottom: 14 }]}>
+          <Text style={{ fontSize: 14, fontFamily: FONTS.heading, color: colors.text, marginBottom: 12 }}>AI Daily Target Recommendation</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
+            <View>
+              <Text style={{ fontSize: 24, fontFamily: FONTS.heading, color: '#EF4444' }}>{recommendationData.targets.calories} <Text style={{ fontSize: 12, fontFamily: FONTS.body, color: colors.textMuted }}>kcal</Text></Text>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.bodySemiBold, color: colors.textMuted, marginTop: 2 }}>DAILY CALORIE BUDGET</Text>
+            </View>
+            <View style={{ height: 40, width: 1, backgroundColor: colors.border }} />
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 14, fontFamily: FONTS.bodySemiBold, color: colors.text }}>Goal: {userData?.fitness_goal || 'Maintain'}</Text>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.body, color: colors.textMuted, marginTop: 4 }}>Based on physical profile</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1, backgroundColor: '#10B98115', padding: 10, borderRadius: 12, alignItems: 'center' }}>
+              <Text style={{ color: '#10B981', fontFamily: FONTS.heading, fontSize: 16 }}>{recommendationData.targets.protein}g</Text>
+              <Text style={{ color: colors.textMuted, fontFamily: FONTS.bodyBold, fontSize: 8, marginTop: 2, textTransform: 'uppercase' }}>Protein</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: '#3B82F615', padding: 10, borderRadius: 12, alignItems: 'center' }}>
+              <Text style={{ color: '#3B82F6', fontFamily: FONTS.heading, fontSize: 16 }}>{recommendationData.targets.carbs}g</Text>
+              <Text style={{ color: colors.textMuted, fontFamily: FONTS.bodyBold, fontSize: 8, marginTop: 2, textTransform: 'uppercase' }}>Carbs</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: '#F59E0B15', padding: 10, borderRadius: 12, alignItems: 'center' }}>
+              <Text style={{ color: '#F59E0B', fontFamily: FONTS.heading, fontSize: 16 }}>{recommendationData.targets.fat}g</Text>
+              <Text style={{ color: colors.textMuted, fontFamily: FONTS.bodyBold, fontSize: 8, marginTop: 2, textTransform: 'uppercase' }}>Fats</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* CSV dataset alignment */}
+        <View style={[styles.groundingCard, { borderColor: '#E0000030', marginBottom: 20 }]}>
+          <LinearGradient colors={isDark ? ['#300000', '#150000'] : ['#FFF5F5', '#FFEBEB']} style={{ padding: 16, borderRadius: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Ionicons name="shield-checkmark" size={20} color="#E00000" style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 14, fontFamily: FONTS.heading, color: '#E00000' }}>GYM.csv Dataset Alignment</Text>
+            </View>
+            <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.text, lineHeight: 18, marginBottom: 12 }}>
+              We've matched your profile (Gender: {recommendationData.csvGrounding.gender === 'female' ? 'Female' : 'Male'}, Goal: {recommendationData.csvGrounding.goal === 'muscle_gain' ? 'Muscle Gain' : 'Fat Burn'}, Category: {recommendationData.bmiCategory}) to our dataset. Here is your structured guidance:
+            </Text>
+            <View style={{ gap: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <Ionicons name="barbell-outline" size={16} color="#E00000" style={{ marginTop: 2, marginRight: 8 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: colors.text }}>Recommended Exercise Schedule</Text>
+                  <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim, marginTop: 2 }}>{recommendationData.csvGrounding.schedule}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <Ionicons name="restaurant-outline" size={16} color="#E00000" style={{ marginTop: 2, marginRight: 8 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: colors.text }}>Dietary Target Theme</Text>
+                  <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim, marginTop: 2 }}>{recommendationData.csvGrounding.mealPlan}</Text>
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 14 }]}>Your AI Diet Plan</Text>
+
+        {recommendationData.recommendedMeals?.map((meal: any, idx: number) => (
+          <RecommendedMealCard key={idx} meal={meal} />
+        ))}
+      </ScrollView>
+    );
+  };
+
   const isSameDay = (d1: Date, d2: Date) => {
     return d1.getDate() === d2.getDate() &&
            d1.getMonth() === d2.getMonth() &&
@@ -425,72 +748,95 @@ export default function MealsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <FlatList
-        data={loading ? [] : uploading ? [{ id: 'loading' }, ...filteredMeals] : filteredMeals}
-        keyExtractor={(item) => item.id.toString()}
-        ListHeaderComponent={
-            <>
-              {/* ── Header (scrolls with content) ── */}
-              <View style={styles.header}>
-                <View>
-                  <Text style={[styles.headerTitle, { color: colors.text }]}>Nutrition</Text>
-                  <Text style={[styles.headerSub, { color: colors.textMuted }]}>Track meals · hydration · macros</Text>
-                </View>
-                <TouchableOpacity style={styles.addBtn} onPress={() => setShowLogForm(true)}>
-                  <LinearGradient colors={['#E00000', '#900000']} style={styles.addBtnGrad}>
-                    <Ionicons name="add" size={26} color="#FFF" />
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+      {/* ── Header ── */}
+      <View style={styles.header}>
+        <View>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Nutrition</Text>
+          <Text style={[styles.headerSub, { color: colors.textMuted }]}>Track meals · hydration · macros</Text>
+        </View>
+        <TouchableOpacity style={styles.addBtn} onPress={() => setShowLogForm(true)}>
+          <LinearGradient colors={['#E00000', '#900000']} style={styles.addBtnGrad}>
+            <Ionicons name="add" size={26} color="#FFF" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
 
-              {/* ── Date Picker (scrolls with content) ── */}
-              <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+      {/* ── Tab Selector ── */}
+      <View style={[styles.tabSelectorContainer, { backgroundColor: colors.inputBg }]}>
+        <TouchableOpacity
+          style={[styles.tabSelectorBtn, activeTab === 'tracker' && [styles.tabSelectorActiveBtn, { backgroundColor: '#E00000' }]]}
+          onPress={() => setActiveTab('tracker')}
+        >
+          <Ionicons name="nutrition-outline" size={16} color={activeTab === 'tracker' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabSelectorText, activeTab === 'tracker' ? { color: '#FFF' } : { color: colors.textMuted }]}>Daily Tracker</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.tabSelectorBtn, activeTab === 'recommendations' && [styles.tabSelectorActiveBtn, { backgroundColor: '#E00000' }]]}
+          onPress={() => setActiveTab('recommendations')}
+        >
+          <Ionicons name="sparkles-outline" size={16} color={activeTab === 'recommendations' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabSelectorText, activeTab === 'recommendations' ? { color: '#FFF' } : { color: colors.textMuted }]}>AI Diet Coach</Text>
+        </TouchableOpacity>
+      </View>
 
-              <NutritionMeter
-                caloriesConsumed={calsConsumed}
-                caloriesTarget={targets.caloriesTarget}
-                protein={{ label: 'Protein', icon: 'barbell-outline', consumed: proteinConsumed, target: targets.proteinTarget, color: '#10B981', unit: 'g' }}
-                carbs={{   label: 'Carbs',   icon: 'pizza-outline',   consumed: carbsConsumed,   target: targets.carbsTarget,   color: '#3B82F6', unit: 'g' }}
-                fat={{     label: 'Fat',     icon: 'water-outline',   consumed: fatConsumed,     target: targets.fatTarget,     color: '#F59E0B', unit: 'g' }}
-              />
-              <WaterTracker selectedDate={selectedDate} />
-              {/* Meals section divider */}
-              {filteredMeals.length > 0 && (
-                <View style={styles.sectionDivider}>
-                  <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
-                  <View style={[styles.sectionLabelWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Ionicons name="restaurant-outline" size={13} color={colors.textDim} />
-                    <Text style={[styles.sectionLabel, { color: colors.textDim }]}>
-                      {filteredMeals.length} Meal{filteredMeals.length !== 1 ? 's' : ''} · {Math.round(calsConsumed)} kcal
-                    </Text>
+      {activeTab === 'tracker' ? (
+        <FlatList
+          data={loading ? [] : uploading ? [{ id: 'loading' }, ...filteredMeals] : filteredMeals}
+          keyExtractor={(item) => item.id.toString()}
+          ListHeaderComponent={
+              <>
+                {/* ── Date Picker ── */}
+                <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+
+                <NutritionMeter
+                  caloriesConsumed={calsConsumed}
+                  caloriesTarget={targets.caloriesTarget}
+                  protein={{ label: 'Protein', icon: 'barbell-outline', consumed: proteinConsumed, target: targets.proteinTarget, color: '#10B981', unit: 'g' }}
+                  carbs={{   label: 'Carbs',   icon: 'pizza-outline',   consumed: carbsConsumed,   target: targets.carbsTarget,   color: '#3B82F6', unit: 'g' }}
+                  fat={{     label: 'Fat',     icon: 'water-outline',   consumed: fatConsumed,     target: targets.fatTarget,     color: '#F59E0B', unit: 'g' }}
+                />
+                <WaterTracker selectedDate={selectedDate} />
+                {/* Meals section divider */}
+                {filteredMeals.length > 0 && (
+                  <View style={styles.sectionDivider}>
+                    <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
+                    <View style={[styles.sectionLabelWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <Ionicons name="restaurant-outline" size={13} color={colors.textDim} />
+                      <Text style={[styles.sectionLabel, { color: colors.textDim }]}>
+                        {filteredMeals.length} Meal{filteredMeals.length !== 1 ? 's' : ''} · {Math.round(calsConsumed)} kcal
+                      </Text>
+                    </View>
+                    <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
                   </View>
-                  <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
+                )}
+              </>
+            }
+            renderItem={({ item }) => {
+              if (item.id === 'loading') return <RenderLoadingCard />;
+              return renderMealCard({ item });
+            }}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              uploading ? null : (
+                <View style={styles.emptyContainer}>
+                  <View style={[styles.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Ionicons name="restaurant-outline" size={40} color={colors.textDim} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No meals logged</Text>
+                  <Text style={[styles.emptyText, { color: colors.textMuted }]}>Tap + to log a meal and track your nutrition</Text>
+                  <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: '#E0000015', borderColor: '#E0000030', borderWidth: 1 }]} onPress={() => setShowLogForm(true)}>
+                    <Ionicons name="add-circle-outline" size={16} color="#E00000" />
+                    <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Log Your First Meal</Text>
+                  </TouchableOpacity>
                 </View>
-              )}
-            </>
-          }
-          renderItem={({ item }) => {
-            if (item.id === 'loading') return <RenderLoadingCard />;
-            return renderMealCard({ item });
-          }}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            uploading ? null : (
-              <View style={styles.emptyContainer}>
-                <View style={[styles.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Ionicons name="restaurant-outline" size={40} color={colors.textDim} />
-                </View>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>No meals logged</Text>
-                <Text style={[styles.emptyText, { color: colors.textMuted }]}>Tap + to log a meal and track your nutrition</Text>
-                <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: '#E0000015', borderColor: '#E0000030', borderWidth: 1 }]} onPress={() => setShowLogForm(true)}>
-                  <Ionicons name="add-circle-outline" size={16} color="#E00000" />
-                  <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Log Your First Meal</Text>
-                </TouchableOpacity>
-              </View>
-            )
-          }
-        />
+              )
+            }
+          />
+        ) : (
+          renderRecommendations()
+        )}
 
       {/* Log Meal Form Modal */}
       <Modal visible={showLogForm} animationType="fade" transparent>
@@ -788,4 +1134,66 @@ const styles = StyleSheet.create({
   saveBtn: { borderRadius: 20, overflow: 'hidden' },
   saveBtnGrad: { paddingVertical: 18, alignItems: 'center' },
   saveBtnText: { color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 16, letterSpacing: 1 },
+
+  // Tab Selector
+  tabSelectorContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginBottom: 14,
+    padding: 4,
+    borderRadius: 16,
+  },
+  tabSelectorBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  tabSelectorActiveBtn: {
+    shadowColor: '#E00000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabSelectorText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 13,
+  },
+  // AI Coach Card Styles
+  recCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 14,
+    marginHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  groundingCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    marginHorizontal: 20,
+    overflow: 'hidden',
+  },
+  groundingTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 15,
+  },
+  bmiGaugeTrack: {
+    height: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 4,
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  bmiGaugeFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
 });

@@ -5,31 +5,26 @@
     "version": "1.0.0",
     "description": "Your ultimate fitness companion for tracking workouts and progress.",
     "orientation": "portrait",
-
     "icon": "./assets/icon.png",
-
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-
     "ios": {
       "supportsTablet": true
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.alen899993.spotme"
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -65,7 +60,6 @@
         ]
       }
     },
-
     "plugins": [
       "expo-router",
       "expo-font",

@@ -154,6 +154,34 @@ const initDB = async () => {
         amount_ml INT NOT NULL,
         logged_at TIMESTAMP DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS meal_recommendations (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+        bmi NUMERIC(4,1),
+        bmi_category VARCHAR(50),
+        calories_target INT,
+        protein_target INT,
+        carbs_target INT,
+        fat_target INT,
+        user_weight VARCHAR(50),
+        user_height VARCHAR(50),
+        user_goal VARCHAR(100),
+        csv_schedule TEXT,
+        csv_meal_plan TEXT,
+        recommended_meals JSONB NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS gym_csv_recommendations (
+        id SERIAL PRIMARY KEY,
+        gender VARCHAR(50) NOT NULL,
+        goal VARCHAR(100) NOT NULL,
+        bmi_category VARCHAR(50) NOT NULL,
+        schedule TEXT,
+        meal_plan TEXT,
+        UNIQUE(gender, goal, bmi_category)
+      );
     `);
 
     console.log("Database connected and all tables ready");
