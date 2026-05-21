@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,14 @@ export default function CreateSessionScreen() {
   const { showToast } = useToast();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -59,7 +67,7 @@ export default function CreateSessionScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -72,12 +80,12 @@ export default function CreateSessionScreen() {
           <ScrollView>
             <Text style={[styles.label, { color: colors.text }]}>Session Name</Text>
             <TextInput
+              ref={inputRef}
               style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
               placeholder="e.g. Push Day, Back & Bi, Leg Session"
               placeholderTextColor={colors.textDim}
               value={name}
               onChangeText={setName}
-              autoFocus
             />
             
             <View style={styles.tipCard}>

@@ -77,6 +77,17 @@ export default function MealsScreen() {
   const [formMealsPerDay, setFormMealsPerDay] = useState(4);
   const [savingDietForm, setSavingDietForm] = useState(false);
 
+  const searchInputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (showFoodSearch) {
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [showFoodSearch]);
+
   useEffect(() => {
     loadUser();
     fetchMeals();
@@ -1337,10 +1348,10 @@ export default function MealsScreen() {
           <View style={[styles.fsSearchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
             <Ionicons name="search-outline" size={18} color={colors.textDim} style={{ marginRight: 10 }} />
             <TextInput
+              ref={searchInputRef}
               style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 15, color: colors.text }}
               placeholder="Search chicken, rice, apple..."
               placeholderTextColor={colors.textDim}
-              autoFocus
               value={foodSearchQuery}
               onChangeText={(text) => {
                 setFoodSearchQuery(text);
@@ -1501,7 +1512,7 @@ export default function MealsScreen() {
 
       {/* Log Meal Form Modal */}
       <Modal visible={showLogForm} animationType="fade" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card, height: 'auto', maxHeight: '80%' }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>New Meal</Text>
@@ -1628,7 +1639,7 @@ export default function MealsScreen() {
       ══════════════════════════════════════════════ */}
       <Modal visible={showDietForm} animationType="slide" transparent statusBarTranslucent>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' }}
         >
           <View style={[styles.dietFormSheet, { backgroundColor: colors.card }]}>

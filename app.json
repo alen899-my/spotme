@@ -8,6 +8,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "jsEngine": "hermes",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -64,6 +65,19 @@
       "expo-router",
       "expo-font",
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/75aa2fe6-48c8-46b8-a855-670ba9abce05"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "75aa2fe6-48c8-46b8-a855-670ba9abce05"
+      }
+    },
+    "owner": "alen899993"
   }
 }

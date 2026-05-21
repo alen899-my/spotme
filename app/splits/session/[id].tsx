@@ -233,7 +233,7 @@ export default function SessionDetailScreen() {
         >
           <View style={styles.modalOverlay}>
             <KeyboardAvoidingView 
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
               style={styles.modalContentWrap}
             >
               <View style={[styles.modalContent, { backgroundColor: colors.card }]}>

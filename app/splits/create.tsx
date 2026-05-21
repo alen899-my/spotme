@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,14 @@ export default function CreateSplitGroupScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -60,7 +68,7 @@ export default function CreateSplitGroupScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
         <View style={styles.container}>
@@ -77,12 +85,12 @@ export default function CreateSplitGroupScreen() {
             <View style={styles.form}>
               <Text style={[styles.label, { color: colors.text }]}>Program Name</Text>
               <TextInput
+                ref={inputRef}
                 style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
                 placeholder="e.g. Push Pull Leg, Upper/Lower, Bro Split"
                 placeholderTextColor={colors.textDim}
                 value={name}
                 onChangeText={setName}
-                autoFocus
               />
 
               <Text style={[styles.label, { color: colors.text, marginTop: 24 }]}>Short Description</Text>
