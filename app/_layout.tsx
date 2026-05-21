@@ -13,6 +13,7 @@ import { BebasNeue_400Regular } from "@expo-google-fonts/bebas-neue";
 import { useEffect } from "react";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { ToastProvider } from "../contexts/ToastContext";
+import SilentUpdateManager from "../components/SilentUpdateManager";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,6 +41,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ToastProvider>
           <Stack screenOptions={{ headerShown: false }} />
+          <SilentUpdateManager />
         </ToastProvider>
       </SafeAreaProvider>
     </ThemeProvider>
