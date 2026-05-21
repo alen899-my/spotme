@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList,
   TouchableOpacity, ActivityIndicator, Image, Modal,
@@ -47,6 +47,22 @@ export default function MealsScreen() {
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
+  // Food Search State
+  const [showFoodSearch, setShowFoodSearch] = useState(false);
+  const [foodSearchQuery, setFoodSearchQuery] = useState('');
+  const [foodSearchResults, setFoodSearchResults] = useState<any[]>([]);
+  const [foodSearchLoading, setFoodSearchLoading] = useState(false);
+  const [foodSearchTotal, setFoodSearchTotal] = useState(0);
+  const [selectedFoodDetail, setSelectedFoodDetail] = useState<any>(null);
+
+  // Ingredient Customizer State
+  const [showItemSelector, setShowItemSelector] = useState(false);
+  const [activeMealIdx, setActiveMealIdx] = useState<number | null>(null);
+  const [activeIngredientIdx, setActiveIngredientIdx] = useState<number | null>(null);
+  const [selectorFoods, setSelectorFoods] = useState<any[]>([]);
+  const [selectorLoading, setSelectorLoading] = useState(false);
+  const [selectorSearch, setSelectorSearch] = useState('');
+
   // AI Diet Coach Profile Form State
   const [showDietForm, setShowDietForm] = useState(false);
   const [formGender, setFormGender] = useState('Male');
@@ -72,7 +88,7 @@ export default function MealsScreen() {
     }
   }, [activeTab]);
 
-  const fetchRecommendations = async () => {
+  const fetchRecommendations = async (forceRefresh = false) => {
     setRecommendationLoading(true);
     setRecommendationError(null);
     try {
@@ -80,6 +96,9 @@ export default function MealsScreen() {
       const res = await axios.get(`${API_URL}/meals/recommendation`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.data && res.data.recommendedMeals) {
+        res.data.recommendedMeals = ensureIngredientsHaveMacros(res.data.recommendedMeals);
+      }
       setRecommendationData(res.data);
     } catch (err: any) {
       console.error('Error fetching recommendations:', err);
@@ -90,6 +109,28 @@ export default function MealsScreen() {
       }
     } finally {
       setRecommendationLoading(false);
+    }
+  };
+
+  const searchFoods = async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setFoodSearchResults([]);
+      setFoodSearchTotal(0);
+      return;
+    }
+    setFoodSearchLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(`${API_URL}/meals/food-search`, {
+        params: { q: query.trim(), limit: 30 },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setFoodSearchResults(res.data.results || []);
+      setFoodSearchTotal(res.data.total || 0);
+    } catch (err) {
+      console.error('Food search error:', err);
+    } finally {
+      setFoodSearchLoading(false);
     }
   };
 
@@ -130,6 +171,9 @@ export default function MealsScreen() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      if (res.data && res.data.recommendedMeals) {
+        res.data.recommendedMeals = ensureIngredientsHaveMacros(res.data.recommendedMeals);
+      }
       setRecommendationData(res.data);
       
       // Update global user data so other tabs keep alignment
@@ -147,6 +191,137 @@ export default function MealsScreen() {
       showToast('Failed to save diet settings', 'error');
     } finally {
       setSavingDietForm(false);
+    }
+  };
+
+  const ensureIngredientsHaveMacros = (mealsList: any[]) => {
+    if (!mealsList || !Array.isArray(mealsList)) return [];
+    return mealsList.map(meal => {
+      if (!meal.ingredients || !Array.isArray(meal.ingredients)) return meal;
+      const updatedIngredients = meal.ingredients.map((ing: any) => {
+        if (ing.calories === undefined) {
+          return {
+            ...ing,
+            calories: Math.round(meal.calories / meal.ingredients.length),
+            protein: Math.round(meal.protein / meal.ingredients.length),
+            carbs: Math.round(meal.carbs / meal.ingredients.length),
+            fat: Math.round(meal.fat / meal.ingredients.length)
+          };
+        }
+        return ing;
+      });
+      return {
+        ...meal,
+        ingredients: updatedIngredients
+      };
+    });
+  };
+
+  const recalculateMealMacros = (meal: any) => {
+    let calories = 0;
+    let protein = 0;
+    let carbs = 0;
+    let fat = 0;
+
+    meal.ingredients.forEach((ing: any) => {
+      calories += Number(ing.calories) || 0;
+      protein += Number(ing.protein) || 0;
+      carbs += Number(ing.carbs) || 0;
+      fat += Number(ing.fat) || 0;
+    });
+
+    return {
+      ...meal,
+      calories: Math.round(calories),
+      protein: Math.round(protein),
+      carbs: Math.round(carbs),
+      fat: Math.round(fat)
+    };
+  };
+
+  const loadSelectorFoods = async (query = '') => {
+    setSelectorLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(`${API_URL}/meals/food-search`, {
+        params: { q: query, limit: 100 },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSelectorFoods(res.data.results || []);
+    } catch (err) {
+      console.error('Selector foods load error:', err);
+    } finally {
+      setSelectorLoading(false);
+    }
+  };
+
+  const handleSelectFood = (food: any) => {
+    if (activeMealIdx === null || !recommendationData || !recommendationData.recommendedMeals) return;
+
+    const mealsCopy = JSON.parse(JSON.stringify(recommendationData.recommendedMeals));
+    const meal = mealsCopy[activeMealIdx];
+
+    const quantity = food.serving_size || '100g';
+    const newIngredient = {
+      name: food.food_name,
+      quantity: quantity,
+      calories: Math.round(food.calories_kcal || 0),
+      protein: Math.round(food.protein_g || 0),
+      carbs: Math.round(food.carbohydrates_g || 0),
+      fat: Math.round(food.fat_g || 0),
+      fiber: Math.round(food.fiber_g || 0),
+      sugar: Math.round(food.sugars_g || 0),
+      sodium: Math.round(food.sodium_mg || 0),
+      saturated_fat: Math.round(food.saturated_fat_g || 0)
+    };
+
+    if (activeIngredientIdx === null) {
+      if (!meal.ingredients) meal.ingredients = [];
+      meal.ingredients.push(newIngredient);
+    } else {
+      meal.ingredients[activeIngredientIdx] = newIngredient;
+    }
+
+    mealsCopy[activeMealIdx] = recalculateMealMacros(meal);
+
+    setShowItemSelector(false);
+    syncRecommendedMeals(mealsCopy);
+  };
+
+  const handleDeleteIngredient = (mealIndex: number, ingredientIndex: number) => {
+    if (!recommendationData || !recommendationData.recommendedMeals) return;
+
+    const mealsCopy = JSON.parse(JSON.stringify(recommendationData.recommendedMeals));
+    const meal = mealsCopy[mealIndex];
+
+    if (meal.ingredients && meal.ingredients.length > ingredientIndex) {
+      meal.ingredients.splice(ingredientIndex, 1);
+    }
+
+    mealsCopy[mealIndex] = recalculateMealMacros(meal);
+
+    syncRecommendedMeals(mealsCopy);
+  };
+
+  const syncRecommendedMeals = async (updatedMeals: any[]) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.put(`${API_URL}/meals/recommendation/meals`, {
+        recommendedMeals: updatedMeals
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data && res.data.recommendedMeals) {
+        const processed = ensureIngredientsHaveMacros(res.data.recommendedMeals);
+        setRecommendationData((prev: any) => ({
+          ...prev,
+          recommendedMeals: processed
+        }));
+      }
+      showToast('Meal plan updated! 🥗');
+    } catch (err) {
+      console.error('Failed to sync recommended meals:', err);
+      showToast('Failed to save changes to server', 'error');
     }
   };
 
@@ -169,13 +344,22 @@ export default function MealsScreen() {
       const items = meal.ingredients.map((ing: any) => ({
         item_name: ing.name,
         quantity: ing.quantity || '1 portion',
-        calories: Math.round(meal.calories / meal.ingredients.length),
-        protein: Math.round(meal.protein / meal.ingredients.length),
-        carbs: Math.round(meal.carbs / meal.ingredients.length),
-        fat: Math.round(meal.fat / meal.ingredients.length)
+        calories: ing.calories !== undefined ? ing.calories : Math.round(meal.calories / meal.ingredients.length),
+        protein: ing.protein !== undefined ? ing.protein : Math.round(meal.protein / meal.ingredients.length),
+        carbs: ing.carbs !== undefined ? ing.carbs : Math.round(meal.carbs / meal.ingredients.length),
+        fat: ing.fat !== undefined ? ing.fat : Math.round(meal.fat / meal.ingredients.length),
+        fiber: ing.fiber !== undefined ? ing.fiber : 0,
+        sugar: ing.sugar !== undefined ? ing.sugar : 0,
+        sodium: ing.sodium !== undefined ? ing.sodium : 0,
+        saturated_fat: ing.saturated_fat !== undefined ? ing.saturated_fat : 0
       }));
 
       const mealTypeMap = meal.meal_type === 'Snack' ? 'Snack' : (meal.meal_type === 'Breakfast' ? 'Morning' : (meal.meal_type === 'Lunch' ? 'Afternoon' : 'Evening'));
+
+      const totalFiber = meal.ingredients.reduce((sum: number, ing: any) => sum + (ing.fiber || 0), 0);
+      const totalSugar = meal.ingredients.reduce((sum: number, ing: any) => sum + (ing.sugar || 0), 0);
+      const totalSodium = meal.ingredients.reduce((sum: number, ing: any) => sum + (ing.sodium || 0), 0);
+      const totalSaturatedFat = meal.ingredients.reduce((sum: number, ing: any) => sum + (ing.saturated_fat || 0), 0);
 
       await axios.post(`${API_URL}/meals`, {
         image_url: imageUrl,
@@ -184,10 +368,10 @@ export default function MealsScreen() {
         total_protein: meal.protein,
         total_carbs: meal.carbs,
         total_fat: meal.fat,
-        total_fiber: 0,
-        total_sugar: 0,
-        total_sodium: 0,
-        total_saturated_fat: 0,
+        total_fiber: totalFiber,
+        total_sugar: totalSugar,
+        total_sodium: totalSodium,
+        total_saturated_fat: totalSaturatedFat,
         total_cholesterol: 0,
         items
       }, {
@@ -527,8 +711,19 @@ export default function MealsScreen() {
     </View>
   );
 
-  // Target calculations
+  // Target calculations — prefer backend-computed targets (AI coach) for accuracy
   const getTargets = () => {
+    // ✅ Use backend scientific targets if available (Katch-McArdle or Mifflin-St Jeor)
+    if (recommendationData?.targets) {
+      return {
+        caloriesTarget: recommendationData.targets.calories,
+        proteinTarget:  recommendationData.targets.protein,
+        carbsTarget:    recommendationData.targets.carbs,
+        fatTarget:      recommendationData.targets.fat,
+      };
+    }
+
+    // Fallback: local rough Mifflin estimate when no server data yet
     let weight = 70, height = 170, age = 30, goal = 'Maintain', activity = 'Lightly Active';
     if (userData) {
       if (userData.weight) weight = parseFloat(userData.weight.toString().replace(/[^0-9.]/g, '')) || 70;
@@ -538,27 +733,23 @@ export default function MealsScreen() {
       activity = userData.activity_level || 'Lightly Active';
     }
 
-    // Rough BMR (Mifflin)
-    let bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5; // Default male
-    
-    // Multiplier
+    let bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
     let mult = 1.375;
     if (activity.toLowerCase().includes('sedentary')) mult = 1.2;
     if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     if (activity.toLowerCase().includes('very') || activity.toLowerCase().includes('high')) mult = 1.725;
-    
+
     let tdee = bmr * mult;
-    
     if (goal.toLowerCase().includes('lose') || goal.toLowerCase().includes('cut')) tdee -= 500;
     if (goal.toLowerCase().includes('gain') || goal.toLowerCase().includes('bulk')) tdee += 500;
-    
+
     const caloriesTarget = Math.round(tdee);
     let proteinTarget = Math.round(weight * 2);
     if (goal.toLowerCase().includes('gain')) proteinTarget = Math.round(weight * 2.2);
     const fatTarget = Math.round(weight * 0.9);
     let carbsTarget = Math.round((caloriesTarget - (proteinTarget * 4) - (fatTarget * 9)) / 4);
     if (carbsTarget < 0) carbsTarget = 50;
-    
+
     return { caloriesTarget, proteinTarget, carbsTarget, fatTarget };
   };
 
@@ -574,7 +765,7 @@ export default function MealsScreen() {
     }
   };
 
-  const RecommendedMealCard = ({ meal }: { meal: any }) => {
+  const RecommendedMealCard = ({ meal, mealIndex }: { meal: any, mealIndex: number }) => {
     const [open, setOpen] = useState(false);
     const anim = React.useRef(new Animated.Value(0)).current;
     
@@ -631,11 +822,69 @@ export default function MealsScreen() {
             <View style={{ marginTop: 12 }}>
               <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: colors.text, marginBottom: 6 }}>Ingredients</Text>
               {meal.ingredients?.map((ing: any, i: number) => (
-                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
-                  <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.text }}>{ing.name}</Text>
-                  <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12, color: colors.textDim }}>{ing.quantity}</Text>
+                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.text }}>{ing.name}</Text>
+                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: colors.textDim, marginTop: 1 }}>{ing.quantity}</Text>
+                    {ing.calories !== undefined && (
+                      <Text style={{ fontFamily: FONTS.body, fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
+                        {ing.calories} kcal · P: {ing.protein}g · C: {ing.carbs}g · F: {ing.fat}g
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setActiveMealIdx(mealIndex);
+                        setActiveIngredientIdx(i);
+                        setSelectorSearch('');
+                        setSelectorFoods([]);
+                        setShowItemSelector(true);
+                        loadSelectorFoods('');
+                      }}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.inputBg }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="create-outline" size={14} color={colors.text} style={{ marginRight: 2 }} />
+                      <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: colors.text }}>Change</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteIngredient(mealIndex, i)}
+                      style={{ padding: 6, borderRadius: 8, backgroundColor: '#EF444415' }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
+
+              <TouchableOpacity
+                onPress={() => {
+                  setActiveMealIdx(mealIndex);
+                  setActiveIngredientIdx(null);
+                  setSelectorSearch('');
+                  setSelectorFoods([]);
+                  setShowItemSelector(true);
+                  loadSelectorFoods('');
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderStyle: 'dashed',
+                  borderColor: '#E00000',
+                  marginTop: 10,
+                  backgroundColor: '#E0000005'
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle-outline" size={16} color="#E00000" style={{ marginRight: 6 }} />
+                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: '#E00000' }}>Add Ingredient</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={{ marginTop: 12 }}>
@@ -838,7 +1087,7 @@ export default function MealsScreen() {
               <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
             </View>
             {recommendationData.recommendedMeals.map((meal: any, idx: number) => (
-              <RecommendedMealCard key={idx} meal={meal} />
+              <RecommendedMealCard key={idx} meal={meal} mealIndex={idx} />
             ))}
           </>
         )}
@@ -867,11 +1116,20 @@ export default function MealsScreen() {
           <Text style={[styles.headerTitle, { color: colors.text }]}>Nutrition</Text>
           <Text style={[styles.headerSub, { color: colors.textMuted }]}>Track meals · hydration · macros</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowLogForm(true)}>
-          <LinearGradient colors={['#E00000', '#900000']} style={styles.addBtnGrad}>
-            <Ionicons name="add" size={26} color="#FFF" />
-          </LinearGradient>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          {/* Food Database Search Button */}
+          <TouchableOpacity
+            onPress={() => { setShowFoodSearch(true); setFoodSearchQuery(''); setFoodSearchResults([]); setFoodSearchTotal(0); }}
+            style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <Ionicons name="search-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addBtn} onPress={() => setShowLogForm(true)}>
+            <LinearGradient colors={['#E00000', '#900000']} style={styles.addBtnGrad}>
+              <Ionicons name="add" size={26} color="#FFF" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── Tab Selector ── */}
@@ -950,6 +1208,325 @@ export default function MealsScreen() {
         ) : (
           renderRecommendations()
         )}
+
+      {/* ══════════════════════════════════════════════
+           INGREDIENT SELECTOR MODAL (100 items w/ images)
+      ══════════════════════════════════════════════ */}
+      <Modal visible={showItemSelector} animationType="slide" transparent statusBarTranslucent>
+        <View style={{ flex: 1, backgroundColor: colors.bg }}>
+          {/* Header */}
+          <View style={[styles.fsHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.fsTitle, { color: colors.text }]}>
+                {activeIngredientIdx === null ? 'Add Ingredient' : 'Change Ingredient'}
+              </Text>
+              <Text style={{ fontFamily: FONTS.body, fontSize: 11, color: colors.textMuted, marginTop: 1 }}>
+                Choose from 300k+ database items (images prioritized)
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => { setShowItemSelector(false); }}
+              style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center' }}
+            >
+              <Ionicons name="close" size={20} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Search Bar */}
+          <View style={[styles.fsSearchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+            <Ionicons name="search-outline" size={18} color={colors.textDim} style={{ marginRight: 10 }} />
+            <TextInput
+              style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 15, color: colors.text }}
+              placeholder="Search ingredient (e.g. chicken, rice, banana)..."
+              placeholderTextColor={colors.textDim}
+              value={selectorSearch}
+              onChangeText={(text) => {
+                setSelectorSearch(text);
+                if ((global as any)._selectorSearchTimer) clearTimeout((global as any)._selectorSearchTimer);
+                (global as any)._selectorSearchTimer = setTimeout(() => loadSelectorFoods(text), 400);
+              }}
+              returnKeyType="search"
+              onSubmitEditing={() => loadSelectorFoods(selectorSearch)}
+            />
+            {selectorLoading && <ActivityIndicator size="small" color="#E00000" style={{ marginLeft: 8 }} />}
+            {selectorSearch.length > 0 && !selectorLoading && (
+              <TouchableOpacity onPress={() => { setSelectorSearch(''); loadSelectorFoods(''); }}>
+                <Ionicons name="close-circle" size={18} color={colors.textDim} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Results or Loading / Empty */}
+          {selectorLoading && selectorFoods.length === 0 ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color="#E00000" />
+              <Text style={{ marginTop: 14, fontFamily: FONTS.bodySemiBold, color: colors.textDim }}>Loading ingredients...</Text>
+            </View>
+          ) : selectorFoods.length === 0 ? (
+            <View style={styles.fsEmptyWrap}>
+              <View style={[styles.fsEmptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Ionicons name="search-outline" size={36} color={colors.textDim} />
+              </View>
+              <Text style={[styles.fsEmptyTitle, { color: colors.text }]}>No foods found</Text>
+              <Text style={[styles.fsEmptyText, { color: colors.textMuted }]}>Try a different search term</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={selectorFoods}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => handleSelectFood(item)}
+                  style={[styles.selectorFoodCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {/* Food Image */}
+                    {item.image_url || item.image_small_url ? (
+                      <Image
+                        source={{ uri: item.image_url || item.image_small_url }}
+                        style={styles.selectorFoodImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[styles.selectorFoodImagePlaceholder, { backgroundColor: colors.inputBg }]}>
+                        <Ionicons name="nutrition-outline" size={24} color={colors.textMuted} />
+                      </View>
+                    )}
+
+                    {/* Food Info */}
+                    <View style={styles.selectorFoodContent}>
+                      <Text style={[styles.selectorFoodName, { color: colors.text }]} numberOfLines={2}>
+                        {item.food_name}
+                      </Text>
+                      
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+                        {item.category ? (
+                          <View style={{ backgroundColor: colors.inputBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 10, color: colors.textDim }}>{item.category}</Text>
+                          </View>
+                        ) : null}
+                        <Text style={{ fontFamily: FONTS.body, fontSize: 10, color: colors.textMuted }}>
+                          {item.serving_size ? `per ${item.serving_size}` : 'per 100g'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Macro Badges Row */}
+                  <View style={styles.selectorFoodMacroRow}>
+                    <View style={[styles.selectorFoodMacroChip, { backgroundColor: '#EF444408' }]}>
+                      <Text style={[styles.selectorFoodMacroVal, { color: '#EF4444' }]}>{Math.round(item.calories_kcal || 0)}</Text>
+                      <Text style={styles.selectorFoodMacroLbl}>kcal</Text>
+                    </View>
+                    <View style={[styles.selectorFoodMacroChip, { backgroundColor: '#10B98108' }]}>
+                      <Text style={[styles.selectorFoodMacroVal, { color: '#10B981' }]}>{Math.round(item.protein_g || 0)}g</Text>
+                      <Text style={styles.selectorFoodMacroLbl}>protein</Text>
+                    </View>
+                    <View style={[styles.selectorFoodMacroChip, { backgroundColor: '#3B82F608' }]}>
+                      <Text style={[styles.selectorFoodMacroVal, { color: '#3B82F6' }]}>{Math.round(item.carbohydrates_g || 0)}g</Text>
+                      <Text style={styles.selectorFoodMacroLbl}>carbs</Text>
+                    </View>
+                    <View style={[styles.selectorFoodMacroChip, { backgroundColor: '#F59E0B08' }]}>
+                      <Text style={[styles.selectorFoodMacroVal, { color: '#F59E0B' }]}>{Math.round(item.fat_g || 0)}g</Text>
+                      <Text style={styles.selectorFoodMacroLbl}>fat</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* ══════════════════════════════════════════════
+           FOOD DATABASE SEARCH MODAL (300k foods)
+      ══════════════════════════════════════════════ */}
+      <Modal visible={showFoodSearch} animationType="slide" transparent statusBarTranslucent>
+        <View style={{ flex: 1, backgroundColor: colors.bg }}>
+          {/* Header */}
+          <View style={[styles.fsHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.fsTitle, { color: colors.text }]}>Food Database</Text>
+              <Text style={{ fontFamily: FONTS.body, fontSize: 11, color: colors.textMuted, marginTop: 1 }}>
+                {foodSearchTotal > 0 ? `${foodSearchTotal.toLocaleString()} matches · ` : ''}300k+ foods indexed
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => { setShowFoodSearch(false); setSelectedFoodDetail(null); }}
+              style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center' }}
+            >
+              <Ionicons name="close" size={20} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Search Bar */}
+          <View style={[styles.fsSearchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+            <Ionicons name="search-outline" size={18} color={colors.textDim} style={{ marginRight: 10 }} />
+            <TextInput
+              style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 15, color: colors.text }}
+              placeholder="Search chicken, rice, apple..."
+              placeholderTextColor={colors.textDim}
+              autoFocus
+              value={foodSearchQuery}
+              onChangeText={(text) => {
+                setFoodSearchQuery(text);
+                // Inline debounce: clear previous timer, fire after 400ms
+                if ((global as any)._foodSearchTimer) clearTimeout((global as any)._foodSearchTimer);
+                (global as any)._foodSearchTimer = setTimeout(() => searchFoods(text), 400);
+              }}
+              returnKeyType="search"
+              onSubmitEditing={() => searchFoods(foodSearchQuery)}
+            />
+            {foodSearchLoading && <ActivityIndicator size="small" color="#E00000" style={{ marginLeft: 8 }} />}
+            {foodSearchQuery.length > 0 && !foodSearchLoading && (
+              <TouchableOpacity onPress={() => { setFoodSearchQuery(''); setFoodSearchResults([]); setFoodSearchTotal(0); }}>
+                <Ionicons name="close-circle" size={18} color={colors.textDim} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Results or Empty */}
+          {foodSearchResults.length === 0 && !foodSearchLoading ? (
+            <View style={styles.fsEmptyWrap}>
+              {foodSearchQuery.length < 2 ? (
+                <>
+                  <View style={[styles.fsEmptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Ionicons name="library-outline" size={36} color={colors.textDim} />
+                  </View>
+                  <Text style={[styles.fsEmptyTitle, { color: colors.text }]}>300,000+ Foods</Text>
+                  <Text style={[styles.fsEmptyText, { color: colors.textMuted }]}>
+                    Search any food to get full nutrition data from OpenFoodFacts, USDA, and curated datasets.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <View style={[styles.fsEmptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Ionicons name="search-outline" size={36} color={colors.textDim} />
+                  </View>
+                  <Text style={[styles.fsEmptyTitle, { color: colors.text }]}>No results found</Text>
+                  <Text style={[styles.fsEmptyText, { color: colors.textMuted }]}>Try a different spelling or shorter keyword</Text>
+                </>
+              )}
+            </View>
+          ) : (
+            <FlatList
+              data={foodSearchResults}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => {
+                const isExpanded = selectedFoodDetail?.id === item.id;
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setSelectedFoodDetail(isExpanded ? null : item)}
+                    style={[styles.fsFoodCard, { backgroundColor: colors.card, borderColor: isExpanded ? '#E00000' : colors.border }]}
+                  >
+                    {/* Top row */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.fsFoodName, { color: colors.text }]} numberOfLines={2}>{item.food_name}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 8 }}>
+                          {item.category ? (
+                            <View style={{ backgroundColor: colors.inputBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                              <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 10, color: colors.textDim }}>{item.category}</Text>
+                            </View>
+                          ) : null}
+                          {item.serving_size ? (
+                            <Text style={{ fontFamily: FONTS.body, fontSize: 10, color: colors.textMuted }}>per {item.serving_size}</Text>
+                          ) : (
+                            <Text style={{ fontFamily: FONTS.body, fontSize: 10, color: colors.textMuted }}>per 100g</Text>
+                          )}
+                        </View>
+                      </View>
+                      {/* Nutrition Grade Badge */}
+                      {item.nutrition_grade ? (
+                        <View style={[styles.fsGradeBadge, { backgroundColor: item.nutrition_grade.toLowerCase() === 'a' ? '#10B98120' : item.nutrition_grade.toLowerCase() === 'b' ? '#3B82F620' : item.nutrition_grade.toLowerCase() === 'c' ? '#F59E0B20' : '#EF444420' }]}>
+                          <Text style={{ fontFamily: FONTS.heading, fontSize: 14, color: item.nutrition_grade.toLowerCase() === 'a' ? '#10B981' : item.nutrition_grade.toLowerCase() === 'b' ? '#3B82F6' : item.nutrition_grade.toLowerCase() === 'c' ? '#F59E0B' : '#EF4444' }}>{item.nutrition_grade.toUpperCase()}</Text>
+                        </View>
+                      ) : null}
+                      <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMuted} style={{ marginLeft: 8 }} />
+                    </View>
+
+                    {/* Macro mini-row */}
+                    <View style={styles.fsMacroRow}>
+                      <View style={styles.fsMacroChip}>
+                        <Text style={[styles.fsMacroVal, { color: '#EF4444' }]}>{Math.round(item.calories_kcal || 0)}</Text>
+                        <Text style={styles.fsMacroLbl}>kcal</Text>
+                      </View>
+                      <View style={styles.fsMacroChip}>
+                        <Text style={[styles.fsMacroVal, { color: '#10B981' }]}>{Math.round(item.protein_g || 0)}g</Text>
+                        <Text style={styles.fsMacroLbl}>protein</Text>
+                      </View>
+                      <View style={styles.fsMacroChip}>
+                        <Text style={[styles.fsMacroVal, { color: '#3B82F6' }]}>{Math.round(item.carbohydrates_g || 0)}g</Text>
+                        <Text style={styles.fsMacroLbl}>carbs</Text>
+                      </View>
+                      <View style={styles.fsMacroChip}>
+                        <Text style={[styles.fsMacroVal, { color: '#F59E0B' }]}>{Math.round(item.fat_g || 0)}g</Text>
+                        <Text style={styles.fsMacroLbl}>fat</Text>
+                      </View>
+                    </View>
+
+                    {/* Expanded Detail */}
+                    {isExpanded && (
+                      <View style={[styles.fsDetailWrap, { borderTopColor: colors.border }]}>
+                        {/* Extra nutrients */}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                          {item.fiber_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#34D39915' }]}><Text style={{ color: '#34D399', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.fiber_g)}g fiber</Text></View>}
+                          {item.sugars_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#EF444415' }]}><Text style={{ color: '#EF4444', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.sugars_g)}g sugar</Text></View>}
+                          {item.sodium_mg != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#FB923C15' }]}><Text style={{ color: '#FB923C', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.sodium_mg)}mg sodium</Text></View>}
+                          {item.saturated_fat_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#8B5CF615' }]}><Text style={{ color: '#8B5CF6', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.saturated_fat_g)}g sat.fat</Text></View>}
+                        </View>
+                        {/* Quick log button */}
+                        <TouchableOpacity
+                          onPress={async () => {
+                            try {
+                              const token = await AsyncStorage.getItem('userToken');
+                              const hour = new Date().getHours();
+                              let mealTypeMap = 'Night';
+                              if (hour >= 5 && hour < 11) mealTypeMap = 'Morning';
+                              else if (hour >= 11 && hour < 16) mealTypeMap = 'Afternoon';
+                              else if (hour >= 16 && hour < 20) mealTypeMap = 'Evening';
+                              await axios.post(`${API_URL}/meals`, {
+                                image_url: '',
+                                meal_type: mealTypeMap,
+                                total_calories: Math.round(item.calories_kcal || 0),
+                                total_protein: Math.round(item.protein_g || 0),
+                                total_carbs: Math.round(item.carbohydrates_g || 0),
+                                total_fat: Math.round(item.fat_g || 0),
+                                total_fiber: Math.round(item.fiber_g || 0),
+                                total_sugar: Math.round(item.sugars_g || 0),
+                                total_sodium: Math.round(item.sodium_mg || 0),
+                                total_saturated_fat: Math.round(item.saturated_fat_g || 0),
+                                total_cholesterol: 0,
+                                items: [{ item_name: item.food_name, quantity: item.serving_size || '100g', calories: Math.round(item.calories_kcal || 0), protein: Math.round(item.protein_g || 0), carbs: Math.round(item.carbohydrates_g || 0), fat: Math.round(item.fat_g || 0) }]
+                              }, { headers: { Authorization: `Bearer ${token}` } });
+                              showToast(`${item.food_name} logged! 🎉`);
+                              fetchMeals();
+                              setShowFoodSearch(false);
+                            } catch (e) {
+                              showToast('Failed to log food', 'error');
+                            }
+                          }}
+                          style={[styles.fsLogBtn, { backgroundColor: '#E0000012', borderColor: '#E0000030' }]}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="add-circle-outline" size={16} color="#E00000" style={{ marginRight: 6 }} />
+                          <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: '#E00000' }}>Quick Log This Food</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
+        </View>
+      </Modal>
 
       {/* Log Meal Form Modal */}
       <Modal visible={showLogForm} animationType="fade" transparent>
@@ -1323,7 +1900,8 @@ const SummaryItem = ({ label, value, unit, color }: any) => (
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
+  iconBtn: { width: 46, height: 46, borderRadius: 16, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 28 },
   headerSub: { fontFamily: FONTS.body, fontSize: 14, marginTop: 2 },
   addBtn: { width: 56, height: 56, borderRadius: 20, overflow: 'hidden', elevation: 5, shadowColor: '#E00000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
@@ -1634,5 +2212,99 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  // ── Food Search Modal ─────────────────────────────────────────────────────
+  fsHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
+    borderBottomWidth: 1,
+  },
+  fsTitle: { fontFamily: FONTS.heading, fontSize: 22 },
+  fsSearchBar: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginTop: 12, marginBottom: 4,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderRadius: 18, borderWidth: 1.5,
+  },
+  fsEmptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 80 },
+  fsEmptyIcon: { width: 72, height: 72, borderRadius: 22, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  fsEmptyTitle: { fontFamily: FONTS.heading, fontSize: 20, marginBottom: 6 },
+  fsEmptyText: { fontFamily: FONTS.body, fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  fsFoodCard: {
+    borderRadius: 20, borderWidth: 1.5,
+    padding: 14, marginBottom: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.04, shadowRadius: 8,
+    elevation: 2,
+  },
+  fsFoodName: { fontFamily: FONTS.bodyBold, fontSize: 14, lineHeight: 20 },
+  fsMacroRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
+  fsMacroChip: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.03)' },
+  fsMacroVal: { fontFamily: FONTS.heading, fontSize: 13 },
+  fsMacroLbl: { fontFamily: FONTS.body, fontSize: 9, color: '#888', marginTop: 1 },
+  fsGradeBadge: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  fsDetailWrap: { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
+  fsNutrientPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  fsLogBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderRadius: 14, paddingVertical: 12, marginTop: 4,
+  },
+
+  // ── Ingredient Selector Modal Styles ──
+  selectorFoodCard: {
+    borderRadius: 20,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  selectorFoodImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 14,
+  },
+  selectorFoodImagePlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectorFoodContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  selectorFoodName: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  selectorFoodMacroRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.03)',
+    paddingTop: 10,
+  },
+  selectorFoodMacroChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  selectorFoodMacroVal: {
+    fontFamily: FONTS.heading,
+    fontSize: 13,
+  },
+  selectorFoodMacroLbl: {
+    fontFamily: FONTS.body,
+    fontSize: 9,
+    color: '#888',
+    marginTop: 1,
   },
 });

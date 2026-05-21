@@ -513,6 +513,199 @@ router.post('/recommendation', authenticateToken, async (req, res) => {
   }
 });
 
+function cleanFoodName(name) {
+  if (!name) return '';
+  let decoded = name
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&deg;/g, '°');
+  try { decoded = decodeURIComponent(escape(decoded)); } catch (e) {}
+  decoded = decoded.replace(/\\"/g, '"').replace(/\\'/g, "'");
+  decoded = decoded.replace(/["*]/g, '');
+  decoded = decoded.replace(/^['\s,\-]+|['\s,\-]+$/g, '');
+  decoded = decoded.replace(/\s+/g, ' ');
+  return decoded.trim();
+}
+
+// ── GET /meals/food-search — Search the 300k food database ───────────────────
+router.get('/food-search', authenticateToken, async (req, res) => {
+  try {
+    const { q = '', meal_type = '', limit = 20, offset = 0 } = req.query;
+    const lim = Math.min(parseInt(limit) || 20, 100); // cap at 100
+    const off = parseInt(offset) || 0;
+
+    const searchTerm = q.trim();
+
+    if (!searchTerm || searchTerm.length < 2) {
+      // Return 100 default items, prioritizing those with images
+      const params = [lim, off];
+      let mealTypeFilter = '';
+      if (meal_type && meal_type !== 'All') {
+        params.push(meal_type);
+        mealTypeFilter = `AND meal_type ILIKE $${params.length}`;
+      }
+
+      const query = `
+        SELECT
+          id,
+          food_name,
+          category,
+          meal_type,
+          nutrition_grade,
+          serving_size,
+          source_file,
+          calories_kcal,
+          protein_g,
+          carbohydrates_g,
+          fat_g,
+          fiber_g,
+          sugars_g,
+          sodium_mg,
+          saturated_fat_g,
+          nutrition_density,
+          image_url,
+          image_small_url,
+          1 AS relevance_rank
+        FROM food_database
+        WHERE calories_kcal IS NOT NULL
+          AND calories_kcal > 0
+          AND calories_kcal < 2000
+          ${mealTypeFilter}
+        ORDER BY (image_url IS NOT NULL AND image_url != '') DESC, nutrition_density DESC NULLS LAST, food_name ASC
+        LIMIT $1 OFFSET $2
+      `;
+
+      const result = await pool.query(query, params);
+
+      const countParams = [];
+      let countMealFilter = '';
+      if (meal_type && meal_type !== 'All') {
+        countParams.push(meal_type);
+        countMealFilter = `AND meal_type ILIKE $${countParams.length}`;
+      }
+      const countResult = await pool.query(
+        `SELECT COUNT(*) FROM food_database
+         WHERE calories_kcal IS NOT NULL AND calories_kcal > 0 AND calories_kcal < 2000
+           ${countMealFilter}`,
+        countParams
+      );
+
+      return res.json({
+        results: result.rows.map(r => ({ ...r, food_name: cleanFoodName(r.food_name) })),
+        total: parseInt(countResult.rows[0].count),
+        limit: lim,
+        offset: off,
+        query: searchTerm,
+      });
+    }
+
+    // Build dynamic query with optional meal_type filter for active search
+    const params = [`%${searchTerm}%`, lim, off];
+    let mealTypeFilter = '';
+    if (meal_type && meal_type !== 'All') {
+      params.push(meal_type);
+      mealTypeFilter = `AND meal_type ILIKE $${params.length}`;
+    }
+
+    const query = `
+      SELECT
+        id,
+        food_name,
+        category,
+        meal_type,
+        nutrition_grade,
+        serving_size,
+        source_file,
+        calories_kcal,
+        protein_g,
+        carbohydrates_g,
+        fat_g,
+        fiber_g,
+        sugars_g,
+        sodium_mg,
+        saturated_fat_g,
+        nutrition_density,
+        image_url,
+        image_small_url,
+        -- Relevance ranking: exact match = 1, prefix = 2, contains = 3
+        CASE
+          WHEN food_name ILIKE $1 THEN 1
+          WHEN food_name ILIKE '${searchTerm}%' THEN 2
+          ELSE 3
+        END AS relevance_rank
+      FROM food_database
+      WHERE food_name ILIKE $1
+        AND calories_kcal IS NOT NULL
+        AND calories_kcal > 0
+        AND calories_kcal < 2000
+        ${mealTypeFilter}
+      ORDER BY relevance_rank ASC, (image_url IS NOT NULL AND image_url != '') DESC, nutrition_density DESC NULLS LAST, food_name ASC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const result = await pool.query(query, params);
+
+    // Count total matches for pagination
+    const countParams = [`%${searchTerm}%`];
+    let countMealFilter = '';
+    if (meal_type && meal_type !== 'All') {
+      countParams.push(meal_type);
+      countMealFilter = `AND meal_type ILIKE $${countParams.length}`;
+    }
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM food_database
+       WHERE food_name ILIKE $1
+         AND calories_kcal IS NOT NULL AND calories_kcal > 0 AND calories_kcal < 2000
+         ${countMealFilter}`,
+      countParams
+    );
+
+    res.json({
+      results: result.rows.map(r => ({ ...r, food_name: cleanFoodName(r.food_name) })),
+      total: parseInt(countResult.rows[0].count),
+      limit: lim,
+      offset: off,
+      query: searchTerm,
+    });
+  } catch (err) {
+    console.error('Food search error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PUT /meals/recommendation/meals — Update recommended meals list ──────────
+router.put('/recommendation/meals', authenticateToken, async (req, res) => {
+  try {
+    const { recommendedMeals } = req.body;
+    if (!recommendedMeals || !Array.isArray(recommendedMeals)) {
+      return res.status(400).json({ error: 'recommendedMeals array is required' });
+    }
+
+    // Update the JSONB recommended_meals column
+    const result = await pool.query(
+      `UPDATE meal_recommendations
+       SET recommended_meals = $1, updated_at = NOW()
+       WHERE user_id = $2
+       RETURNING *`,
+      [JSON.stringify(recommendedMeals), req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No cached meal recommendations found for this user.' });
+    }
+
+    res.json({ success: true, recommendedMeals: result.rows[0].recommended_meals });
+  } catch (err) {
+    console.error('Error updating recommended meals:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ── DELETE /meals/:id — Delete a meal ────────────────────────────────────────
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {

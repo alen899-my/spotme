@@ -194,6 +194,88 @@ const initDB = async () => {
       ADD COLUMN IF NOT EXISTS food_preference VARCHAR(100);
     `);
 
+    // ── Food Database (merged from food1new, food2, food3 CSVs) ─────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS food_database (
+        id SERIAL PRIMARY KEY,
+
+        -- Source tracking
+        source_file        VARCHAR(20)  NOT NULL DEFAULT 'unknown',
+        source_group       VARCHAR(100),
+
+        -- Identity
+        food_name          TEXT,
+        category           TEXT,
+        meal_type          TEXT,
+        nutrition_grade    TEXT,
+        serving_size       TEXT,
+        ingredients_text   TEXT,
+        image_url          TEXT,
+        image_small_url    TEXT,
+
+        -- Core Macros (all per 100g or per serving depending on source)
+        calories_kcal      NUMERIC,
+        energy_kj          NUMERIC,
+        protein_g          NUMERIC,
+        carbohydrates_g    NUMERIC,
+        fat_g              NUMERIC,
+        fiber_g            NUMERIC,
+        sugars_g           NUMERIC,
+
+        -- Detailed Fats
+        saturated_fat_g    NUMERIC,
+        monounsaturated_fat_g  NUMERIC,
+        polyunsaturated_fat_g  NUMERIC,
+        trans_fat_g        NUMERIC,
+        omega3_fat_g       NUMERIC,
+        omega6_fat_g       NUMERIC,
+
+        -- Salt, Sodium & Hydration
+        salt_g             NUMERIC,
+        sodium_mg          NUMERIC,
+        cholesterol_mg     NUMERIC,
+        water_g            NUMERIC,
+        water_intake_ml    NUMERIC,
+
+        -- Vitamins
+        vitamin_a          NUMERIC,
+        vitamin_b1         NUMERIC,
+        vitamin_b2         NUMERIC,
+        vitamin_b3_niacin  NUMERIC,
+        vitamin_b5         NUMERIC,
+        vitamin_b6         NUMERIC,
+        vitamin_b11_folate NUMERIC,
+        vitamin_b12        NUMERIC,
+        vitamin_c          NUMERIC,
+        vitamin_d          NUMERIC,
+        vitamin_e          NUMERIC,
+        vitamin_k          NUMERIC,
+        vitamin_pp         NUMERIC,
+
+        -- Minerals
+        calcium_mg         NUMERIC,
+        phosphorus_mg      NUMERIC,
+        potassium_mg       NUMERIC,
+        iron_mg            NUMERIC,
+        magnesium_mg       NUMERIC,
+        zinc_mg            NUMERIC,
+        copper_mg          NUMERIC,
+        manganese_mg       NUMERIC,
+        selenium_ug        NUMERIC,
+
+        -- Quality score
+        nutrition_density  NUMERIC,
+
+        created_at         TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Indexes for fast food search
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_food_db_name ON food_database (food_name);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_food_db_meal_type ON food_database (meal_type);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_food_db_category ON food_database (category);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_food_db_source ON food_database (source_file);`);
+
     console.log("Database connected and all tables ready");
   } catch (error) {
     console.error("Database initialization failed:", error);
