@@ -807,12 +807,22 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     // ── 1. User stats ─────────────────────────────────────────────────────────
     const userRes = await pool.query(
       `SELECT full_name, fitness_goal, experience_level, total_xp, level, league_tier,
-              current_streak, weight, profile_pic_url
+              current_streak, weight, profile_pic_url, gender, height, body_fat, water_intake
        FROM users WHERE id = $1`,
       [userId]
     );
     const user = userRes.rows[0] || {};
-    const weightKg = parseFloat(user.weight) || 70;
+    const profileWeightKg = parseFloat(user.weight) || 70;
+
+    // ── 1b. Latest post-workout weight (fallback to profile weight) ──────────
+    const latestWeightRes = await pool.query(
+      `SELECT post_workout_weight FROM daily_workouts
+       WHERE user_id = $1 AND post_workout_weight IS NOT NULL AND status = 'completed'
+       ORDER BY completed_at DESC LIMIT 1`,
+      [userId]
+    );
+    const latestLogWeight = latestWeightRes.rows[0]?.post_workout_weight;
+    const weightKg = latestLogWeight ? parseFloat(latestLogWeight) : profileWeightKg;
 
     // ── 2. Today's completed workouts ─────────────────────────────────────────
     const todayWorkoutsRes = await pool.query(
@@ -912,6 +922,55 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       topRec.scoreTag = parseFloat(topRec.avg_rating) >= 8.0 ? 'Highly Rated' : 'Recommended';
     }
 
+    // ── 8. Muscle Activity (last 7 days) ───────────────────────────────────────
+    const muscleRes = await pool.query(
+      `SELECT e.target, COUNT(*) as count
+       FROM daily_workout_exercises dwe
+       JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
+       JOIN exercises e ON dwe.exercise_id = e.id
+       WHERE dw.user_id = $1 AND dw.status = 'completed'
+         AND dw.completed_at >= NOW() - INTERVAL '7 days'
+       GROUP BY e.target`,
+      [userId]
+    );
+    
+    // Map db targets to react-native-body-highlighter slugs
+    const targetToSlug = {
+      'Chest': 'chest',
+      'Back': 'upper-back',
+      'Lats': 'upper-back',
+      'Lower Back': 'lower-back',
+      'Shoulders': 'deltoids',
+      'Biceps': 'biceps',
+      'Triceps': 'triceps',
+      'Forearms': 'forearm',
+      'Abs': 'abs',
+      'Obliques': 'obliques',
+      'Glutes': 'gluteal',
+      'Quads': 'quadriceps',
+      'Hamstrings': 'hamstring',
+      'Calves': 'calves',
+      'Traps': 'trapezius',
+      'Neck': 'neck',
+      'Adductors': 'adductors'
+    };
+
+    const muscleActivity = [];
+    muscleRes.rows.forEach(r => {
+      if (!r.target) return;
+      // Normalise to match dictionary keys (e.g., "chest" -> "Chest")
+      const targetStr = r.target.charAt(0).toUpperCase() + r.target.slice(1).toLowerCase();
+      const slug = targetToSlug[targetStr];
+      if (slug) {
+        const intensity = parseInt(r.count) >= 3 ? 2 : 1;
+        const existing = muscleActivity.find(m => m.slug === slug);
+        if (existing) {
+          existing.intensity = Math.min(2, existing.intensity + intensity);
+        } else {
+          muscleActivity.push({ slug, intensity });
+        }
+      }
+    });
     res.json({
       user: {
         full_name: user.full_name,
@@ -923,6 +982,10 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         current_streak: parseInt(user.current_streak) || 0,
         weight: weightKg,
         profile_pic_url: user.profile_pic_url,
+        gender: user.gender,
+        height: user.height,
+        body_fat: user.body_fat,
+        water_intake: user.water_intake,
       },
       today: {
         workouts_completed: todayWorkoutsRes.rows.length,
@@ -935,6 +998,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       weekly_stats: weeklyStats,
       weight_progress: weightProgress,
       top_recommendation: topRec,
+      muscle_activity: muscleActivity,
     });
   } catch (err) {
     console.error('GET /daily/dashboard error:', err);

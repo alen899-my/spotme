@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { FONTS } from "../constants/theme";
 import { useTheme } from "../contexts/ThemeContext";
 import axios from "axios";
+import Body from "react-native-body-highlighter";
 import Svg, { Path, Circle, Text as SvgText } from "react-native-svg";
 
 const { width: SW } = Dimensions.get("window");
@@ -173,11 +174,24 @@ function WeightSparkline({ data, colors }: { data: any[]; colors: any }) {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   const [dashboard, setDashboard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [gender, setGender] = useState<"male" | "female">("male");
+  const [selectedMuscles, setSelectedMuscles] = useState<string[]>([]);
+  const [bodySide, setBodySide] = useState<"front" | "back">("front");
+
+  // Sync gender from DB once dashboard loads
+  useEffect(() => {
+    if (dashboard?.user?.gender) {
+      const dbGender = dashboard.user.gender.toLowerCase();
+      if (dbGender === "female" || dbGender === "male") {
+        setGender(dbGender as "male"|"female");
+      }
+    }
+  }, [dashboard?.user?.gender]);
 
   const fetchDashboard = async () => {
     try {
@@ -215,6 +229,14 @@ export default function HomeScreen() {
     }
   };
 
+  const handleMusclePress = (part: any) => {
+    setSelectedMuscles(prev => 
+      prev.includes(part.slug) 
+        ? prev.filter(m => m !== part.slug) 
+        : [...prev, part.slug]
+    );
+  };
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.bg }}>
@@ -238,6 +260,57 @@ export default function HomeScreen() {
   const waterPct = Math.min((today.water_ml || 0) / waterGoalMl, 1);
   const weeklyWorkouts = weekly.filter((d: any) => d.workouts > 0).length;
   const weeklyMinutes = Math.round(weekly.reduce((s: number, d: any) => s + d.duration_seconds, 0) / 60);
+  const dbMuscleActivity = dashboard?.muscle_activity || [];
+  
+  // Combine DB muscle activity with manually selected muscles
+  const muscleActivity = [
+    ...dbMuscleActivity.filter((m: any) => !selectedMuscles.includes(m.slug)),
+    ...selectedMuscles.map((slug) => ({ slug, intensity: 2 }))
+  ];
+
+  // ── Dynamic Body Calculation ──
+  const heightStr = u.height || "175";
+  const weightVal = parseFloat(u.weight) || 75;
+  const heightCm = heightStr.includes("'")
+    ? (parseFloat(heightStr.split("'")[0]) * 30.48 + parseFloat(heightStr.split("'")[1] || "0") * 2.54)
+    : (parseFloat(heightStr) || 175);
+
+  const bmi = weightVal / Math.pow(heightCm / 100, 2);
+
+  // BMI-based body shape (more dramatic)
+  let dynamicScaleX: number;
+  if      (bmi < 17)  dynamicScaleX = 0.78;   // severely underweight
+  else if (bmi < 18.5) dynamicScaleX = 0.88;  // underweight
+  else if (bmi < 25)  dynamicScaleX = 1.0;    // normal
+  else if (bmi < 30)  dynamicScaleX = 1.18;   // overweight
+  else if (bmi < 35)  dynamicScaleX = 1.32;   // obese
+  else                 dynamicScaleX = 1.45;   // severely obese
+
+  // Height-based Y stretch (average ~175cm)
+  let dynamicScaleY = 1.0 + (heightCm - 175) * 0.003;
+  dynamicScaleY = Math.max(0.88, Math.min(dynamicScaleY, 1.15));
+
+  // Fitness status label & color
+  let fitnessStatus: string;
+  let fitnessColor: string;
+  let fitnessEmoji: string;
+  if      (bmi < 17)   { fitnessStatus = "Severely Underweight"; fitnessColor = "#F59E0B"; fitnessEmoji = "⚠️"; }
+  else if (bmi < 18.5) { fitnessStatus = "Underweight";          fitnessColor = "#FBBF24"; fitnessEmoji = "📉"; }
+  else if (bmi < 22)   { fitnessStatus = "Lean & Athletic";       fitnessColor = "#10B981"; fitnessEmoji = "💪"; }
+  else if (bmi < 25)   { fitnessStatus = "Healthy Weight";        fitnessColor = "#34D399"; fitnessEmoji = "✅"; }
+  else if (bmi < 30)   { fitnessStatus = "Overweight";            fitnessColor = "#F97316"; fitnessEmoji = "📈"; }
+  else if (bmi < 35)   { fitnessStatus = "Obese";                 fitnessColor = "#EF4444"; fitnessEmoji = "🔴"; }
+  else                  { fitnessStatus = "Severely Obese";        fitnessColor = "#DC2626"; fitnessEmoji = "🚨"; }
+
+  // Body skin color — theme-aware + fitness tint
+  const bodySkinLight = bmi < 18.5 ? "#E8D5C4" : bmi < 25 ? "#D4A96A" : bmi < 30 ? "#C8965A" : "#B5824A";
+  const bodySkinDark  = bmi < 18.5 ? "#4A3728" : bmi < 25 ? "#5C3D1E" : bmi < 30 ? "#6B3A18" : "#7A3010";
+  const bodyFill = isDark ? bodySkinDark : bodySkinLight;
+  const bodyStroke = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)";
+
+  // Workout activity score (how active this week)
+  const activityScore = Math.min(weeklyWorkouts / 7, 1);
+  // Highlighted muscles are shown in red gradient — intensity = 1 (light) or 2 (heavy)
 
   return (
     <ScrollView
@@ -375,6 +448,87 @@ export default function HomeScreen() {
         </TouchableOpacity>
       )}
 
+      {/* ── Muscle Heatmap ── */}
+      <View style={[styles.sectionHeaderRow, { marginTop: 8 }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Body Status</Text>
+        {/* Front / Back toggle */}
+        <View style={[styles.sideToggleTrack, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={() => setBodySide("front")}
+            style={[styles.sideToggleBtn, bodySide === "front" && { backgroundColor: "#E00000" }]}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.sideToggleTxt, bodySide === "front" && { color: "#FFF" }]}>Front</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setBodySide("back")}
+            style={[styles.sideToggleBtn, bodySide === "back" && { backgroundColor: "#E00000" }]}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.sideToggleTxt, bodySide === "back" && { color: "#FFF" }]}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Body Card */}
+      <View style={[styles.bodyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* Fitness status badge at top */}
+        <View style={[styles.fitnessBadge, { backgroundColor: `${fitnessColor}18`, borderColor: `${fitnessColor}35` }]}>
+          <Text style={{ fontSize: 14 }}>{fitnessEmoji}</Text>
+          <Text style={[styles.fitnessBadgeText, { color: fitnessColor }]}>{fitnessStatus}</Text>
+          <View style={[styles.fitnessBmi, { backgroundColor: `${fitnessColor}25` }]}>
+            <Text style={[styles.fitnessBmiText, { color: fitnessColor }]}>BMI {bmi.toFixed(1)}</Text>
+          </View>
+        </View>
+
+        {/* The body SVG */}
+        <View style={{ alignItems: "center", paddingVertical: 12 }}>
+          <View style={{ transform: [{ scaleX: dynamicScaleX }, { scaleY: dynamicScaleY }] }}>
+            <Body
+              data={muscleActivity}
+              gender={gender}
+              side={bodySide}
+              scale={1.15}
+              colors={["#E0000055", "#E00000AA", "#E00000"]}
+              defaultFill={bodyFill}
+              defaultStroke={bodyStroke}
+              defaultStrokeWidth={0.5}
+              onBodyPartPress={handleMusclePress}
+            />
+          </View>
+        </View>
+
+        {/* Stats row below body */}
+        <View style={styles.bodyStatsRow}>
+          <View style={styles.bodyStat}>
+            <Text style={[styles.bodyStatVal, { color: colors.text }]}>{weightVal}kg</Text>
+            <Text style={[styles.bodyStatLabel, { color: colors.textMuted }]}>Weight</Text>
+          </View>
+          <View style={[styles.bodyStatDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.bodyStat}>
+            <Text style={[styles.bodyStatVal, { color: colors.text }]}>{heightCm.toFixed(0)}cm</Text>
+            <Text style={[styles.bodyStatLabel, { color: colors.textMuted }]}>Height</Text>
+          </View>
+          <View style={[styles.bodyStatDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.bodyStat}>
+            <Text style={[styles.bodyStatVal, { color: colors.text }]}>
+              {u.body_fat ? `${parseFloat(u.body_fat).toFixed(1)}%` : "--"}
+            </Text>
+            <Text style={[styles.bodyStatLabel, { color: colors.textMuted }]}>Body Fat</Text>
+          </View>
+          <View style={[styles.bodyStatDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.bodyStat}>
+            <Text style={[styles.bodyStatVal, { color: activityScore >= 0.7 ? "#10B981" : activityScore >= 0.4 ? "#F59E0B" : "#EF4444" }]}>
+              {weeklyWorkouts}/7
+            </Text>
+            <Text style={[styles.bodyStatLabel, { color: colors.textMuted }]}>Active days</Text>
+          </View>
+        </View>
+
+        {/* Tap hint */}
+        <Text style={[styles.tapHint, { color: colors.textMuted }]}>Tap a muscle to highlight it</Text>
+      </View>
+
       {/* ── Weekly Stats Chart ── */}
       <View style={styles.sectionHeaderRow}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Weekly Activity</Text>
@@ -485,6 +639,24 @@ const styles = StyleSheet.create({
   seeAll: { fontFamily: FONTS.bodySemiBold, fontSize: 13, color: "#E00000" },
   weeklyBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   weeklyBadgeText: { fontFamily: FONTS.bodySemiBold, fontSize: 11, color: "#E00000" },
+  // Side toggle pill
+  sideToggleTrack: { flexDirection: "row", borderRadius: 20, borderWidth: 1, overflow: "hidden", padding: 2 },
+  sideToggleBtn: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 18 },
+  sideToggleTxt: { fontFamily: FONTS.bodyBold, fontSize: 12, color: "rgba(150,150,150,0.9)" },
+  genderBtn: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: "rgba(150,150,150,0.3)", justifyContent: "center", alignItems: "center" },
+  genderBtnText: { fontFamily: FONTS.bodyBold, fontSize: 12, color: "rgba(150,150,150,0.8)" },
+  // Body card
+  bodyCard: { borderRadius: 24, borderWidth: 1, padding: 16, marginBottom: 24, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 5 },
+  fitnessBadge: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "center", borderWidth: 1, borderRadius: 30, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 4 },
+  fitnessBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 13 },
+  fitnessBmi: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 4 },
+  fitnessBmiText: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  bodyStatsRow: { flexDirection: "row", justifyContent: "space-around", alignItems: "center", marginTop: 8, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(128,128,128,0.2)" },
+  bodyStat: { alignItems: "center", flex: 1 },
+  bodyStatVal: { fontFamily: FONTS.heading, fontSize: 16, letterSpacing: -0.3 },
+  bodyStatLabel: { fontFamily: FONTS.body, fontSize: 10, marginTop: 2 },
+  bodyStatDivider: { width: 1, height: 28 },
+  tapHint: { fontFamily: FONTS.body, fontSize: 11, textAlign: "center", marginTop: 10, opacity: 0.5 },
 
   // Recommendation card
   recCard: { borderRadius: 24, borderWidth: 1.5, padding: 20, marginBottom: 28, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 4 },
