@@ -47,6 +47,20 @@ export default function MealsScreen() {
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
+  // AI Diet Coach Profile Form State
+  const [showDietForm, setShowDietForm] = useState(false);
+  const [formGender, setFormGender] = useState('Male');
+  const [formAge, setFormAge] = useState('');
+  const [formHeight, setFormHeight] = useState('');
+  const [formWeight, setFormWeight] = useState('');
+  const [formBodyFat, setFormBodyFat] = useState('');
+  const [formFitnessGoal, setFormFitnessGoal] = useState('Maintain');
+  const [formActivityLevel, setFormActivityLevel] = useState('Lightly Active');
+  const [formDietType, setFormDietType] = useState('Standard');
+  const [formFoodPreference, setFormFoodPreference] = useState('');
+  const [formMealsPerDay, setFormMealsPerDay] = useState(4);
+  const [savingDietForm, setSavingDietForm] = useState(false);
+
   useEffect(() => {
     loadUser();
     fetchMeals();
@@ -76,6 +90,63 @@ export default function MealsScreen() {
       }
     } finally {
       setRecommendationLoading(false);
+    }
+  };
+
+  const openDietForm = () => {
+    const profile = recommendationData?.user || userData || {};
+    setFormGender(profile.gender || 'Male');
+    setFormAge(profile.age ? profile.age.toString() : '');
+    setFormHeight(profile.height ? profile.height.toString() : '');
+    setFormWeight(profile.weight ? profile.weight.toString() : '');
+    setFormBodyFat(profile.body_fat ? profile.body_fat.toString() : '');
+    setFormFitnessGoal(profile.fitness_goal || 'Maintain');
+    setFormActivityLevel(profile.activity_level || 'Lightly Active');
+    setFormDietType(profile.diet_type || 'Standard');
+    setFormFoodPreference(profile.food_preference || '');
+    setFormMealsPerDay(profile.meals_per_day || 4);
+    
+    setShowDietForm(true);
+  };
+
+  const handleSaveDietPlan = async () => {
+    setSavingDietForm(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const payload = {
+        gender: formGender,
+        age: formAge ? parseInt(formAge) : null,
+        height: formHeight,
+        weight: formWeight,
+        body_fat: formBodyFat,
+        fitness_goal: formFitnessGoal,
+        activity_level: formActivityLevel,
+        diet_type: formDietType,
+        food_preference: formFoodPreference,
+        meals_per_day: formMealsPerDay,
+      };
+
+      const res = await axios.post(`${API_URL}/meals/recommendation`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setRecommendationData(res.data);
+      
+      // Update global user data so other tabs keep alignment
+      const updatedUser = {
+        ...(userData || {}),
+        ...payload
+      };
+      setUserData(updatedUser);
+      await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+
+      showToast('Diet settings saved & meal plan updated! 🥗');
+      setShowDietForm(false);
+    } catch (err: any) {
+      console.error('Error saving diet settings:', err);
+      showToast('Failed to save diet settings', 'error');
+    } finally {
+      setSavingDietForm(false);
     }
   };
 
@@ -724,11 +795,53 @@ export default function MealsScreen() {
           </LinearGradient>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 14 }]}>Your AI Diet Plan</Text>
+        {/* ── Tailored AI Meal Plan CTA Card ── */}
+        <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: '#E0000040', borderWidth: 1.5, marginBottom: 14, overflow: 'hidden' }]}>
+          <LinearGradient
+            colors={isDark ? ['rgba(224,0,0,0.12)', 'rgba(100,0,0,0.06)'] : ['rgba(255,235,235,0.9)', 'rgba(255,220,220,0.5)']}
+            style={{ padding: 18, borderRadius: 22 }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: '#E0000018', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                <Ionicons name="sparkles" size={22} color="#E00000" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: FONTS.heading, fontSize: 16, color: colors.text }}>Tailored AI Meal Plan</Text>
+                <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                  {recommendationData.recommendedMeals?.length
+                    ? `${recommendationData.recommendedMeals.length} meals · Tap to reconfigure`
+                    : 'Configure your profile to generate meals'}
+                </Text>
+              </View>
+            </View>
+            <Text style={{ fontFamily: FONTS.body, fontSize: 12.5, color: colors.textDim, lineHeight: 18, marginBottom: 14 }}>
+              Set your gender, age, body fat, diet type, food preferences & meal frequency — we'll scientifically scale clean recipes to hit your exact targets.
+            </Text>
+            <TouchableOpacity onPress={openDietForm} activeOpacity={0.85} style={{ borderRadius: 16, overflow: 'hidden' }}>
+              <LinearGradient colors={['#E00000', '#960000']} style={{ paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+                <Ionicons name="options-outline" size={18} color="#FFF" />
+                <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 14, letterSpacing: 0.5 }}>Configure & View Diet Meals 🥗</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
 
-        {recommendationData.recommendedMeals?.map((meal: any, idx: number) => (
-          <RecommendedMealCard key={idx} meal={meal} />
-        ))}
+        {/* ── Recommended Meals (shown after configuration) ── */}
+        {recommendationData.recommendedMeals?.length > 0 && (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 12 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#E0000012', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, marginHorizontal: 10 }}>
+                <Ionicons name="restaurant-outline" size={12} color="#E00000" style={{ marginRight: 4 }} />
+                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11, color: '#E00000' }}>YOUR AI DIET PLAN</Text>
+              </View>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+            </View>
+            {recommendationData.recommendedMeals.map((meal: any, idx: number) => (
+              <RecommendedMealCard key={idx} meal={meal} />
+            ))}
+          </>
+        )}
       </ScrollView>
     );
   };
@@ -961,6 +1074,242 @@ export default function MealsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ══════════════════════════════════════════════
+           DIET PROFILE FORM MODAL
+      ══════════════════════════════════════════════ */}
+      <Modal visible={showDietForm} animationType="slide" transparent statusBarTranslucent>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' }}
+        >
+          <View style={[styles.dietFormSheet, { backgroundColor: colors.card }]}>
+            {/* ── Form Header ── */}
+            <View style={styles.dietFormHeader}>
+              <LinearGradient colors={['#E00000', '#800000']} style={styles.dietFormHeaderGrad}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <Ionicons name="body-outline" size={20} color="#FFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: FONTS.heading, fontSize: 18, color: '#FFF' }}>Customize Diet Profile</Text>
+                    <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1 }}>Your plan will be perfectly scaled to these details</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowDietForm(false)} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+                    <Ionicons name="close" size={18} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+
+              {/* ── Section: Physical Profile ── */}
+              <Text style={[styles.dietFormSectionTitle, { color: colors.text }]}>📐 Physical Profile</Text>
+
+              {/* Gender */}
+              <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>Gender</Text>
+              <View style={styles.dietFormSelectRow}>
+                {['Male', 'Female', 'Other'].map((g) => (
+                  <TouchableOpacity
+                    key={g}
+                    onPress={() => setFormGender(g)}
+                    style={[styles.dietFormSelectBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }, formGender === g && styles.dietFormSelectBtnActive]}
+                  >
+                    <Text style={[styles.dietFormSelectBtnText, { color: formGender === g ? '#FFF' : colors.textDim }]}>
+                      {g === 'Male' ? '♂ Male' : g === 'Female' ? '♀ Female' : '⊕ Other'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Age / Height / Weight / Body Fat grid */}
+              <View style={styles.dietFormGrid}>
+                <View style={styles.dietFormGridCell}>
+                  <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>Age</Text>
+                  <TextInput
+                    style={[styles.dietFormInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+                    placeholder="30"
+                    placeholderTextColor={colors.textDim}
+                    keyboardType="numeric"
+                    value={formAge}
+                    onChangeText={setFormAge}
+                  />
+                </View>
+                <View style={styles.dietFormGridCell}>
+                  <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>Height (cm)</Text>
+                  <TextInput
+                    style={[styles.dietFormInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+                    placeholder="170"
+                    placeholderTextColor={colors.textDim}
+                    keyboardType="numeric"
+                    value={formHeight}
+                    onChangeText={setFormHeight}
+                  />
+                </View>
+                <View style={styles.dietFormGridCell}>
+                  <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>Weight (kg)</Text>
+                  <TextInput
+                    style={[styles.dietFormInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+                    placeholder="70"
+                    placeholderTextColor={colors.textDim}
+                    keyboardType="numeric"
+                    value={formWeight}
+                    onChangeText={setFormWeight}
+                  />
+                </View>
+                <View style={styles.dietFormGridCell}>
+                  <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>Body Fat (%)</Text>
+                  <TextInput
+                    style={[styles.dietFormInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+                    placeholder="20"
+                    placeholderTextColor={colors.textDim}
+                    keyboardType="numeric"
+                    value={formBodyFat}
+                    onChangeText={setFormBodyFat}
+                  />
+                </View>
+              </View>
+
+              {/* ── Section: Goals & Lifestyle ── */}
+              <Text style={[styles.dietFormSectionTitle, { color: colors.text, marginTop: 20 }]}>🎯 Goals & Lifestyle</Text>
+
+              {/* Fitness Goal */}
+              <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>Fitness Goal</Text>
+              <View style={styles.dietFormSelectRow}>
+                {[['Lose Fat', '🔥'], ['Maintain', '⚖️'], ['Gain Muscle', '💪']].map(([g, icon]) => (
+                  <TouchableOpacity
+                    key={g}
+                    onPress={() => setFormFitnessGoal(g)}
+                    style={[styles.dietFormSelectBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }, formFitnessGoal === g && styles.dietFormSelectBtnActive]}
+                  >
+                    <Text style={[styles.dietFormSelectBtnText, { color: formFitnessGoal === g ? '#FFF' : colors.textDim }]}>{icon} {g}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Activity Level */}
+              <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted, marginTop: 14 }]}>Activity Level</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active', 'Extremely Active'].map((a) => (
+                  <TouchableOpacity
+                    key={a}
+                    onPress={() => setFormActivityLevel(a)}
+                    style={[
+                      { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5 },
+                      { backgroundColor: colors.inputBg, borderColor: colors.border },
+                      formActivityLevel === a && { backgroundColor: '#E00000', borderColor: '#E00000' }
+                    ]}
+                  >
+                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12, color: formActivityLevel === a ? '#FFF' : colors.textDim }}>{a}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* ── Section: Diet Preferences ── */}
+              <Text style={[styles.dietFormSectionTitle, { color: colors.text, marginTop: 20 }]}>🥗 Diet Preferences</Text>
+
+              {/* Diet Type */}
+              <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>Diet Type</Text>
+              <View style={styles.dietFormSelectRow}>
+                {[['Standard', '🍗'], ['Vegetarian', '🥦'], ['Vegan', '🌱']].map(([d, icon]) => (
+                  <TouchableOpacity
+                    key={d}
+                    onPress={() => setFormDietType(d)}
+                    style={[styles.dietFormSelectBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }, formDietType === d && styles.dietFormSelectBtnActive]}
+                  >
+                    <Text style={[styles.dietFormSelectBtnText, { color: formDietType === d ? '#FFF' : colors.textDim }]}>{icon} {d}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Food Preferences / Allergies */}
+              <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted, marginTop: 14 }]}>Food Preferences / Allergies</Text>
+              <TextInput
+                style={[styles.dietFormInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, height: 80, textAlignVertical: 'top', paddingTop: 12 }]}
+                placeholder="e.g. No gluten, love nuts, avoid dairy..."
+                placeholderTextColor={colors.textDim}
+                multiline
+                numberOfLines={3}
+                value={formFoodPreference}
+                onChangeText={setFormFoodPreference}
+              />
+
+              {/* ── Section: Meal Frequency ── */}
+              <Text style={[styles.dietFormSectionTitle, { color: colors.text, marginTop: 20 }]}>🍽️ Meal Frequency</Text>
+              <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>How many meals per day?</Text>
+
+              <View style={styles.dietFormMealFreqRow}>
+                <TouchableOpacity
+                  onPress={() => setFormMealsPerDay(Math.max(2, formMealsPerDay - 1))}
+                  style={[styles.dietFormStepBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
+                >
+                  <Ionicons name="remove" size={20} color={colors.text} />
+                </TouchableOpacity>
+
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontFamily: FONTS.heading, fontSize: 36, color: '#E00000' }}>{formMealsPerDay}</Text>
+                  <Text style={{ fontFamily: FONTS.body, fontSize: 11, color: colors.textMuted, textAlign: 'center', marginTop: 2 }}>
+                    {formMealsPerDay === 2 ? 'Lunch + Dinner'
+                      : formMealsPerDay === 3 ? 'Breakfast · Lunch · Dinner'
+                      : formMealsPerDay === 4 ? 'Breakfast · Lunch · Dinner · Snack'
+                      : formMealsPerDay === 5 ? 'Breakfast · Snack · Lunch · Dinner · Snack'
+                      : '6 meals: Full athlete split'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => setFormMealsPerDay(Math.min(6, formMealsPerDay + 1))}
+                  style={[styles.dietFormStepBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
+                >
+                  <Ionicons name="add" size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Meal frequency visual pills */}
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 10, justifyContent: 'center' }}>
+                {Array.from({ length: 6 }, (_, i) => (
+                  <TouchableOpacity key={i + 1} onPress={() => setFormMealsPerDay(i + 1 < 2 ? 2 : i + 1 > 6 ? 6 : i + 1)}>
+                    <View style={[
+                      { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5 },
+                      i + 1 >= 2 && i + 1 <= 6
+                        ? (formMealsPerDay === i + 1
+                            ? { backgroundColor: '#E00000', borderColor: '#E00000' }
+                            : { backgroundColor: colors.inputBg, borderColor: colors.border })
+                        : { backgroundColor: colors.inputBg, borderColor: colors.border, opacity: 0.3 }
+                    ]}>
+                      <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: formMealsPerDay === i + 1 ? '#FFF' : colors.textDim }}>{i + 1}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={{ height: 16 }} />
+
+              {/* ── Save Button ── */}
+              <TouchableOpacity
+                onPress={handleSaveDietPlan}
+                disabled={savingDietForm}
+                style={{ borderRadius: 20, overflow: 'hidden', marginTop: 8 }}
+                activeOpacity={0.85}
+              >
+                <LinearGradient colors={['#E00000', '#900000']} style={{ paddingVertical: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 10 }}>
+                  {savingDietForm
+                    ? <ActivityIndicator color="#FFF" />
+                    : <>
+                        <Ionicons name="sparkles" size={18} color="#FFF" />
+                        <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 15, letterSpacing: 0.8 }}>GENERATE & SAVE MEAL PLAN</Text>
+                      </>
+                  }
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <View style={{ height: 30 }} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -1195,5 +1544,95 @@ const styles = StyleSheet.create({
   bmiGaugeFill: {
     height: '100%',
     borderRadius: 4,
+  },
+
+  // ── Diet Profile Form Modal ───────────────────────────────────────────────
+  dietFormSheet: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    maxHeight: '92%',
+    minHeight: '60%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  dietFormHeader: {
+    overflow: 'hidden',
+  },
+  dietFormHeaderGrad: {
+    padding: 20,
+    paddingTop: 22,
+  },
+  dietFormSectionTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 15,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  dietFormFieldLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  dietFormSelectRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4,
+  },
+  dietFormSelectBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dietFormSelectBtnActive: {
+    backgroundColor: '#E00000',
+    borderColor: '#E00000',
+  },
+  dietFormSelectBtnText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+  },
+  dietFormGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 4,
+  },
+  dietFormGridCell: {
+    width: '47%',
+  },
+  dietFormInput: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 15,
+  },
+  dietFormMealFreqRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  dietFormStepBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

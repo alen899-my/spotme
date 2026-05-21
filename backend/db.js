@@ -48,7 +48,8 @@ const initDB = async () => {
       ADD COLUMN IF NOT EXISTS front_photo_url VARCHAR(500),
       ADD COLUMN IF NOT EXISTS back_photo_url VARCHAR(500),
       ADD COLUMN IF NOT EXISTS side_photo_url VARCHAR(500),
-      ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE;
+      ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS meals_per_day INT DEFAULT 4;
     `);
 
     // Create exercises table
@@ -182,6 +183,15 @@ const initDB = async () => {
         meal_plan TEXT,
         UNIQUE(gender, goal, bmi_category)
       );
+
+      ALTER TABLE meal_recommendations 
+      ADD COLUMN IF NOT EXISTS meals_per_day INT DEFAULT 4,
+      ADD COLUMN IF NOT EXISTS gender VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS age INT,
+      ADD COLUMN IF NOT EXISTS activity_level VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS body_fat VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS diet_type VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS food_preference VARCHAR(100);
     `);
 
     console.log("Database connected and all tables ready");
