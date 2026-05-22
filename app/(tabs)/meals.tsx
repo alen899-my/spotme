@@ -767,10 +767,12 @@ export default function MealsScreen() {
     }
 
     let bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
-    let mult = 1.375;
-    if (activity.toLowerCase().includes('sedentary')) mult = 1.2;
-    if (activity.toLowerCase().includes('moderate')) mult = 1.55;
-    if (activity.toLowerCase().includes('very') || activity.toLowerCase().includes('high')) mult = 1.725;
+    // ✅ FIXED - match backend logic exactly
+let mult = 1.375; // Lightly Active default
+if (activity.toLowerCase().includes('sedentary')) mult = 1.2;
+else if (activity.toLowerCase().includes('extreme') || activity.toLowerCase().includes('extra')) mult = 1.9;
+else if (activity.toLowerCase().includes('very')) mult = 1.725;
+else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
 
     let tdee = bmr * mult;
     if (goal.toLowerCase().includes('lose') || goal.toLowerCase().includes('cut')) tdee -= 500;
