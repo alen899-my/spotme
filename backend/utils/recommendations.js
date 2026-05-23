@@ -163,12 +163,12 @@ function calculateNutrientTargets(user) {
   }
 
   // Activity Multipliers
-  let multiplier = 1.375;
-  if (activity.includes('sedentary')) multiplier = 1.2;
-  else if (activity.includes('moderate')) multiplier = 1.55;
-  else if (activity.includes('very') || activity.includes('high') || activity.includes('active')) multiplier = 1.725;
-  else if (activity.includes('extreme') || activity.includes('extra')) multiplier = 1.9;
-
+  // ✅ FIXED - removed catch-all 'active' check
+let multiplier = 1.375; // Lightly Active default
+if (activity.includes('sedentary')) multiplier = 1.2;
+else if (activity.includes('extreme') || activity.includes('extra')) multiplier = 1.9;
+else if (activity.includes('very')) multiplier = 1.725;
+else if (activity.includes('moderate')) multiplier = 1.55;
   let tdee = bmr * multiplier;
 
   // Adjust for Goal
