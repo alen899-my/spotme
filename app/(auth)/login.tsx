@@ -145,7 +145,7 @@ export default function AuthScreen() {
 
         {/* Background image */}
         <Image
-          source={require("../../assets/authscreenimages/authback2.png")}
+          source={require("../../assets/authscreenimages/authback3.png")}
           style={StyleSheet.absoluteFillObject}
           resizeMode="cover"
         />
@@ -253,6 +253,7 @@ locations={[0.4, 0.75, 1]}
 
             <Input
               tone="light"
+              
               label={isLogin ? "Email or Phone" : "Email Address"}
               placeholder="you@example.com"
               icon={<Ionicons name="mail-outline" size={17} color={AUTH_INPUT_ICON} />}
