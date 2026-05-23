@@ -13,10 +13,12 @@ import {
   Modal,
   ImageBackground,
   StatusBar,
+  Alert,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import StreakIcon from "./StreakIcon";
 
@@ -24,10 +26,9 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const SIDEBAR_WIDTH = SCREEN_WIDTH;
 
 // ─── Responsive scale helper ─────────────────────────────────────────────────
-// Base design at 390px wide (iPhone 14). Clamp so tablets don't go wild.
 const BASE_W = 390;
 const scale = (n: number) => Math.round((SCREEN_WIDTH / BASE_W) * n);
-const vs = (n: number) => Math.round((SCREEN_HEIGHT / 844) * n); // vertical scale, base iPhone 14
+const vs = (n: number) => Math.round((SCREEN_HEIGHT / 844) * n);
 
 const P = {
   sun:     "#F7CB16",
@@ -38,6 +39,8 @@ const P = {
   ink:     "#04282B",
   inkDeep: "#021518",
   white:   "#FFFFFF",
+  danger:  "#FF4D4D",
+  dangerDark: "#cc2222",
 };
 
 interface ProfileSidebarProps {
@@ -103,6 +106,46 @@ function MenuItem({
   );
 }
 
+// ─── Logout button ────────────────────────────────────────────────────────────
+function LogoutButton({
+  onPress,
+  entranceAnim,
+}: {
+  onPress: () => void;
+  entranceAnim: Animated.Value;
+}) {
+  const pressAnim = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () =>
+    Animated.spring(pressAnim, { toValue: 0.97, useNativeDriver: true, tension: 300, friction: 20 }).start();
+  const onPressOut = () =>
+    Animated.spring(pressAnim, { toValue: 1, useNativeDriver: true, tension: 300, friction: 20 }).start();
+
+  const translateY = entranceAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
+  const opacity    = entranceAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+
+  return (
+    <Animated.View style={{ transform: [{ translateY }, { scale: pressAnim }], opacity }}>
+      <TouchableOpacity
+        style={styles.logoutBtn}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        activeOpacity={1}
+      >
+        <View style={styles.logoutIconWrap}>
+          <Ionicons name="log-out-outline" size={scale(20)} color={P.danger} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.logoutTitle}>Logout</Text>
+          <Text style={styles.logoutSub}>Sign out of your account</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={scale(15)} color="rgba(255,77,77,0.4)" />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function ProfileSidebar({ visible, user, onClose }: ProfileSidebarProps) {
   const insets = useSafeAreaInsets();
@@ -112,7 +155,12 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const [shouldRender, setShouldRender] = React.useState(visible);
 
-  const menuAnims = useRef(MENU_ITEMS.map(() => new Animated.Value(0))).current;
+  // MENU_ITEMS.length entries + 1 for logout
+  const TOTAL_ANIM_COUNT = MENU_ITEMS.length + 1;
+  const LOGOUT_ANIM_IDX  = MENU_ITEMS.length; // last slot
+  const menuAnims = useRef(
+    Array.from({ length: TOTAL_ANIM_COUNT }, () => new Animated.Value(0))
+  ).current;
 
   useEffect(() => {
     if (visible) {
@@ -142,6 +190,36 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
     onClose();
     if (!href) { setTimeout(() => alert("Coming soon!"), 300); return; }
     setTimeout(() => router.push(href as any), 250);
+  };
+
+  // ── Logout handler ─────────────────────────────────────────────────────────
+  const handleLogout = () => {
+    const doLogout = async () => {
+      try {
+        onClose();
+        // Small delay so sidebar closes cleanly before clearing storage
+        setTimeout(async () => {
+          await AsyncStorage.removeItem("userToken");
+          await AsyncStorage.removeItem("userData");
+          router.replace("/" as any);
+        }, 300);
+      } catch (e) {
+        console.error("Logout error:", e);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm("Are you sure you want to logout?")) doLogout();
+    } else {
+      Alert.alert(
+        "Logout",
+        "Are you sure you want to sign out?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Logout", style: "destructive", onPress: doLogout },
+        ]
+      );
+    }
   };
 
   if (!shouldRender) return null;
@@ -246,7 +324,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
               </View>
             )}
 
-            {/* ── Stats row — solid background ── */}
+            {/* ── Stats row ── */}
             <View style={[styles.statsRow, { marginBottom: vs(18) }]}>
               {[
                 { label: "Workouts",    value: user?.total_workouts ?? "—" },
@@ -266,7 +344,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
             {/* ── Thin rule before menu ── */}
             <View style={[styles.sectionRule, { marginBottom: vs(16) }]} />
 
-            {/* ── Menu items — no divider, no logout ── */}
+            {/* ── Menu items ── */}
             <View style={{ gap: scale(8) }}>
               {MENU_ITEMS.map((item) => {
                 const currentIdx = animIdx++;
@@ -281,8 +359,17 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
               })}
             </View>
 
+            {/* ── Divider before logout ── */}
+            <View style={[styles.sectionRule, { marginTop: vs(16), marginBottom: vs(12) }]} />
+
+            {/* ── Logout button ── */}
+            <LogoutButton
+              onPress={handleLogout}
+              entranceAnim={menuAnims[LOGOUT_ANIM_IDX]}
+            />
+
             {/* ── Version ── */}
-            <Text style={[styles.versionText, { marginTop: vs(24) }]}>spotME v1.0.0</Text>
+            <Text style={[styles.versionText, { marginTop: vs(20) }]}>spotME v1.0.0</Text>
 
           </ScrollView>
         </Animated.View>
@@ -323,7 +410,7 @@ const styles = StyleSheet.create({
   // ── Close ──────────────────────────────────────────────────────────────────
   closeBtn: {
     position: "absolute",
-    right: scale(20),          // matches H_PAD
+    right: scale(20),
     width: scale(34),
     height: scale(34),
     borderRadius: scale(17),
@@ -414,7 +501,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: scale(8),
-    backgroundColor: P.ctaDeep,        // solid deep teal
+    backgroundColor: P.ctaDeep,
     alignSelf: "flex-start",
     paddingHorizontal: scale(14),
     paddingVertical: vs(7),
@@ -434,7 +521,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: P.ctaDeep,        // solid — no transparency
+    backgroundColor: P.ctaDeep,
     borderRadius: scale(16),
     borderWidth: 1,
     borderColor: P.ctaDark,
@@ -481,14 +568,14 @@ const styles = StyleSheet.create({
     paddingVertical: vs(13),
     paddingHorizontal: scale(14),
     borderRadius: scale(14),
-    backgroundColor: P.cta,            // solid #2596BE
+    backgroundColor: P.cta,
     gap: scale(14),
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
 
   menuItemAccent: {
-    backgroundColor: P.ctaDark,        // solid #1a6e8a
+    backgroundColor: P.ctaDark,
     borderColor: "rgba(247,203,22,0.30)",
   },
 
@@ -519,6 +606,42 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: scale(11),
     color: "rgba(255,255,255,0.55)",
+    marginTop: 1,
+  },
+
+  // ── Logout button ──────────────────────────────────────────────────────────
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: vs(13),
+    paddingHorizontal: scale(14),
+    borderRadius: scale(14),
+    backgroundColor: "rgba(255,77,77,0.10)",
+    gap: scale(14),
+    borderWidth: 1,
+    borderColor: "rgba(255,77,77,0.28)",
+  },
+
+  logoutIconWrap: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(12),
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,77,77,0.15)",
+  },
+
+  logoutTitle: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: scale(14),
+    color: P.danger,
+    letterSpacing: 0.1,
+  },
+
+  logoutSub: {
+    fontFamily: FONTS.body,
+    fontSize: scale(11),
+    color: "rgba(255,77,77,0.6)",
     marginTop: 1,
   },
 
