@@ -1,0 +1,328 @@
+import React from "react";
+import {
+  View, Text, Image, TouchableOpacity, StyleSheet,
+} from "react-native";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { FONTS } from "../../constants/theme";
+import { scale, vs } from "../../constants/homeTheme";
+
+// ── Palette (mirrors homeTheme P, kept local for portability) ────────────────
+const C = {
+  cardBg:      "#2596BE",
+  cardDeep:    "#0d4d65",
+  iconBg:      "#1a6e8a",
+  tagBg:       "#1a6e8a",
+  sun:         "#F7CB16",
+  sunDeep:     "#E7B100",
+  ink:         "#04282B",
+  white:       "#FFFFFF",
+  lightText:   "#a8dff0",
+  lightBorder: "rgba(255,255,255,0.12)",
+  // empty state
+  emptyBg:     "#F7CB16",
+  emptyIconBg: "#E7B100",
+  emptyInk:    "#04282B",
+  emptyMuted:  "#5a4200",
+};
+
+// ── Types ────────────────────────────────────────────────────────────────────
+interface Recommendation {
+  exercise_name: string;
+  category: string;
+  scoreTag?: string;
+  rating?: number;
+  target?: string;
+  equipment?: string;
+  caloriesPerHour?: string;
+  duration?: string;
+  difficulty?: string;
+  image_url?: string;
+}
+
+interface Props {
+  rec: Recommendation | null;
+  onBrowsePress: () => void;
+}
+
+// ── Stars helper ─────────────────────────────────────────────────────────────
+function StarRating({ rating }: { rating: number }) {
+  const full    = Math.floor(rating);
+  const hasHalf = rating - full >= 0.5;
+  return (
+    <View style={sr.row}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Ionicons
+          key={i}
+          name={
+            i < full
+              ? "star"
+              : i === full && hasHalf
+              ? "star-half"
+              : "star-outline"
+          }
+          size={scale(11)}
+          color={C.sun}
+        />
+      ))}
+      <Text style={sr.label}>{rating.toFixed(1)}</Text>
+    </View>
+  );
+}
+
+const sr = StyleSheet.create({
+  row:   { flexDirection: "row", alignItems: "center", gap: scale(2) },
+  label: { fontFamily: FONTS.bodyBold, fontSize: scale(11), color: C.ink, marginLeft: scale(4) },
+});
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function RecommendationCard({ rec, onBrowsePress }: Props) {
+  if (!rec) {
+    return (
+      <TouchableOpacity
+        style={styles.emptyCard}
+        onPress={onBrowsePress}
+        activeOpacity={0.88}
+      >
+        <View style={styles.emptyIconWrap}>
+          <Ionicons name="fitness-outline" size={scale(28)} color={C.emptyInk} />
+        </View>
+        <Text style={styles.emptyTitle}>Browse exercises</Text>
+        <Text style={styles.emptySub}>Find exercises to build your routine</Text>
+        <View style={styles.emptyBtn}>
+          <Ionicons name="search-outline" size={scale(14)} color={C.sun} />
+          <Text style={styles.emptyBtnText}>Explore library</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  const rating = rec.rating ?? 4.8;
+
+  return (
+    <View style={styles.card}>
+
+      {/* ── Top pill row ─────────────────────────────────────────── */}
+      <View style={styles.pillRow}>
+        <View style={styles.scorePill}>
+          <Ionicons name="sparkles" size={scale(11)} color={C.sun} />
+          <Text style={styles.scorePillText}>{rec.scoreTag || "Top pick"}</Text>
+        </View>
+        <View style={styles.ratingPill}>
+          <Ionicons name="star" size={scale(11)} color={C.ink} />
+          <Text style={styles.ratingPillText}>{rating.toFixed(1)}</Text>
+        </View>
+      </View>
+
+      {/* ── Body row ─────────────────────────────────────────────── */}
+      <View style={styles.body}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.name} numberOfLines={2}>{rec.exercise_name}</Text>
+          <Text style={styles.category}>{rec.category}</Text>
+
+          {/* Star rating */}
+          <StarRating rating={rating} />
+
+          {/* Tags */}
+          <View style={styles.tags}>
+            {rec.target && (
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>{rec.target}</Text>
+              </View>
+            )}
+            {rec.equipment && rec.equipment !== "body weight" && (
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>{rec.equipment}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {rec.image_url ? (
+          <Image source={{ uri: rec.image_url }} style={styles.thumb} />
+        ) : (
+          <View style={[styles.thumb, styles.thumbPlaceholder]}>
+            <MaterialCommunityIcons name="dumbbell" size={scale(30)} color={C.sun} />
+          </View>
+        )}
+      </View>
+
+      {/* ── Divider ──────────────────────────────────────────────── */}
+      <View style={styles.divider} />
+
+      {/* ── Meta row ─────────────────────────────────────────────── */}
+      <View style={styles.metaRow}>
+        <View style={styles.metaItem}>
+          <Ionicons name="flame-outline" size={scale(14)} color={C.sun} />
+          <Text style={styles.metaText}>{rec.caloriesPerHour ?? "~280 kcal/hr"}</Text>
+        </View>
+        <View style={styles.metaItem}>
+          <Ionicons name="time-outline" size={scale(14)} color={C.sun} />
+          <Text style={styles.metaText}>{rec.duration ?? "30–45 min"}</Text>
+        </View>
+        <View style={styles.metaItem}>
+          <Ionicons name="bar-chart-outline" size={scale(14)} color={C.sun} />
+          <Text style={styles.metaText}>{rec.difficulty ?? "Intermediate"}</Text>
+        </View>
+      </View>
+
+    </View>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+
+  // Filled card
+  card: {
+    backgroundColor: C.cardBg,
+    borderRadius: scale(20),
+    padding: scale(18),
+    marginBottom: vs(20),
+  },
+  pillRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: vs(10),
+  },
+  scorePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(5),
+    backgroundColor: C.iconBg,
+    borderRadius: 20,
+    paddingHorizontal: scale(10),
+    paddingVertical: vs(4),
+  },
+  scorePillText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(10),
+    color: "#D6EEF7",
+    letterSpacing: 0.5,
+  },
+  ratingPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(4),
+    backgroundColor: C.sun,
+    borderRadius: 20,
+    paddingHorizontal: scale(10),
+    paddingVertical: vs(4),
+    marginLeft: "auto",
+  },
+  ratingPillText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(11),
+    color: C.ink,
+  },
+  body: {
+    flexDirection: "row",
+    gap: scale(12),
+  },
+  name: {
+    fontFamily: FONTS.heading,
+    fontSize: scale(20),
+    color: C.white,
+    letterSpacing: -0.4,
+    lineHeight: scale(24),
+    marginBottom: vs(2),
+  },
+  category: {
+    fontFamily: FONTS.body,
+    fontSize: scale(12),
+    color: C.lightText,
+    marginBottom: vs(8),
+  },
+  tags: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: scale(6),
+    marginTop: vs(10),
+  },
+  tag: {
+    backgroundColor: C.tagBg,
+    borderRadius: scale(8),
+    paddingHorizontal: scale(10),
+    paddingVertical: vs(4),
+  },
+  tagText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(10),
+    color: "#D6EEF7",
+    letterSpacing: 0.3,
+  },
+  thumb: {
+    width: scale(82),
+    height: scale(82),
+    borderRadius: scale(14),
+    resizeMode: "cover",
+    flexShrink: 0,
+  },
+  thumbPlaceholder: {
+    backgroundColor: C.iconBg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: C.lightBorder,
+    marginVertical: vs(14),
+  },
+  metaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(5),
+  },
+  metaText: {
+    fontFamily: FONTS.body,
+    fontSize: scale(11),
+    color: C.lightText,
+  },
+
+  // Empty state card
+  emptyCard: {
+    backgroundColor: C.emptyBg,
+    borderRadius: scale(20),
+    padding: scale(28),
+    marginBottom: vs(20),
+    alignItems: "center",
+    gap: vs(8),
+  },
+  emptyIconWrap: {
+    width: scale(56),
+    height: scale(56),
+    borderRadius: scale(18),
+    backgroundColor: C.emptyIconBg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: scale(17),
+    color: C.emptyInk,
+  },
+  emptySub: {
+    fontFamily: FONTS.body,
+    fontSize: scale(12),
+    color: C.emptyMuted,
+    textAlign: "center",
+  },
+  emptyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(6),
+    backgroundColor: C.ink,
+    borderRadius: scale(12),
+    paddingHorizontal: scale(20),
+    paddingVertical: vs(10),
+    marginTop: vs(4),
+  },
+  emptyBtnText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(13),
+    color: C.white,
+  },
+});
