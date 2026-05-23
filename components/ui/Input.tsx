@@ -1,16 +1,36 @@
 import React from "react";
 import {
-  View,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
-  StyleSheet,
   TextInputProps,
-  ViewStyle,
-  Platform,
   TouchableOpacity,
+  View,
+  ViewStyle,
 } from "react-native";
 import { FONTS } from "../../constants/theme";
-import { useTheme } from "../../contexts/ThemeContext";
+
+const BASE_PALETTE = {
+  sun: "#F7CB16",
+  error: "#FF4D4D",
+  darkInputBg: "#0E3C44",
+  darkInputFocusBg: "#0A4F5C",
+  darkBorder: "rgba(37, 150, 190, 0.30)",
+  darkBorderFocus: "rgba(247, 203, 22, 0.70)",
+  darkLabelIdle: "rgba(247, 251, 248, 0.45)",
+  darkLabelActive: "#F7CB16",
+  darkPlaceholder: "rgba(247, 251, 248, 0.32)",
+  darkText: "#F7FBF8",
+  lightInputBg: "#FFFFFF",
+  lightInputFocusBg: "#FFFFFF",
+  lightBorder: "rgba(4, 40, 43, 0.16)",
+  lightBorderFocus: "rgba(247, 203, 22, 0.95)",
+  lightLabelIdle: "rgba(255, 255, 255, 0.82)",
+  lightLabelActive: "#F7CB16",
+  lightPlaceholder: "#90A0AA",
+  lightText: "#0C2E35",
+};
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -22,11 +42,46 @@ interface InputProps extends TextInputProps {
   unitOptions?: string[];
   unitValue?: string;
   onUnitChange?: (unit: string) => void;
+  tone?: "dark" | "light";
 }
 
-const Input = ({ label, error, containerStyle, icon, rightIcon, type, unitOptions, unitValue, onUnitChange, ...props }: InputProps) => {
+export default function Input({
+  label,
+  error,
+  containerStyle,
+  icon,
+  rightIcon,
+  type,
+  unitOptions,
+  unitValue,
+  onUnitChange,
+  tone = "dark",
+  ...props
+}: InputProps) {
   const [isFocused, setIsFocused] = React.useState(false);
-  const { colors, isDark } = useTheme();
+  const isLight = tone === "light";
+
+  const palette = isLight
+    ? {
+        inputBg: BASE_PALETTE.lightInputBg,
+        inputFocusBg: BASE_PALETTE.lightInputFocusBg,
+        border: BASE_PALETTE.lightBorder,
+        borderFocus: BASE_PALETTE.lightBorderFocus,
+        labelIdle: BASE_PALETTE.lightLabelIdle,
+        labelActive: BASE_PALETTE.lightLabelActive,
+        placeholder: BASE_PALETTE.lightPlaceholder,
+        text: BASE_PALETTE.lightText,
+      }
+    : {
+        inputBg: BASE_PALETTE.darkInputBg,
+        inputFocusBg: BASE_PALETTE.darkInputFocusBg,
+        border: BASE_PALETTE.darkBorder,
+        borderFocus: BASE_PALETTE.darkBorderFocus,
+        labelIdle: BASE_PALETTE.darkLabelIdle,
+        labelActive: BASE_PALETTE.darkLabelActive,
+        placeholder: BASE_PALETTE.darkPlaceholder,
+        text: BASE_PALETTE.darkText,
+      };
 
   const handleUnitToggle = () => {
     if (unitOptions && unitValue && onUnitChange) {
@@ -38,42 +93,43 @@ const Input = ({ label, error, containerStyle, icon, rightIcon, type, unitOption
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && (
-        <Text style={[styles.label, { color: isDark ? 'rgba(255,255,255,0.6)' : '#333333' }]}>{label}</Text>
-      )}
+      {label ? (
+        <Text
+          style={[
+            styles.label,
+            { color: isFocused ? palette.labelActive : palette.labelIdle },
+          ]}
+        >
+          {label}
+        </Text>
+      ) : null}
+
       <View
         style={[
           styles.inputWrapper,
           {
-            backgroundColor: isDark
-              ? (isFocused ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)')
-              : (isFocused ? '#FFFFFF' : '#F7F7F7'),
-            borderColor: isFocused
-              ? '#E00000'
-              : isDark ? 'rgba(255,255,255,0.1)' : '#EBEBEB',
-           shadowColor: '#E00000',
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: isFocused ? 0.15 : 0,
-            shadowRadius: 6,
-            elevation: isFocused ? 2 : 0,
+            backgroundColor: isFocused ? palette.inputFocusBg : palette.inputBg,
+            borderColor: isFocused ? palette.borderFocus : palette.border,
           },
-          !!error && { borderColor: '#E00000' },
+          !!error && styles.inputWrapperError,
         ]}
       >
-        {icon && <View style={styles.iconWrapper}>{icon}</View>}
+        {icon ? <View style={styles.iconWrapper}>{icon}</View> : null}
+
         <TextInput
-          style={[styles.input, { color: isDark ? '#FFFFFF' : '#1A1A1A' }]}
-          placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#BBBBBB'}
+          style={[styles.input, { color: palette.text }]}
+          placeholderTextColor={palette.placeholder}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           {...props}
           {...(Platform.OS === "web" ? { type } : {})}
         />
+
         {unitOptions && unitOptions.length > 0 && unitValue && onUnitChange ? (
           <TouchableOpacity
-            style={[styles.unitToggleBtn, { backgroundColor: isDark ? 'rgba(224,0,0,0.15)' : '#FFF0F0' }]}
+            style={styles.unitToggleBtn}
             onPress={handleUnitToggle}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
             <Text style={styles.unitToggleText}>{unitValue}</Text>
           </TouchableOpacity>
@@ -81,65 +137,73 @@ const Input = ({ label, error, containerStyle, icon, rightIcon, type, unitOption
           <View style={styles.rightIconWrapper}>{rightIcon}</View>
         ) : null}
       </View>
+
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: 14,
     width: "100%",
   },
   label: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 13,
+    fontSize: 10,
+    letterSpacing: 1.8,
+    textTransform: "uppercase",
     marginBottom: 7,
   },
   inputWrapper: {
-    borderWidth: 1,
-    borderRadius: 12,
-    minHeight: 52,
     flexDirection: "row",
     alignItems: "center",
+    borderWidth: 1.5,
+    borderRadius: 14,
+    minHeight: 52,
     paddingHorizontal: 14,
+  },
+  inputWrapperError: {
+    borderColor: BASE_PALETTE.error,
   },
   iconWrapper: {
     marginRight: 10,
-    opacity: 0.7,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  rightIconWrapper: {
-    marginLeft: 10,
     justifyContent: "center",
     alignItems: "center",
   },
   input: {
     flex: 1,
     fontFamily: FONTS.body,
-    fontSize: 14,
+    fontSize: 15,
     paddingVertical: 0,
-    // Android: vertically centre placeholder & typed text inside fixed-height row
     textAlignVertical: "center",
+    backgroundColor: "transparent",
+  },
+  rightIconWrapper: {
+    marginLeft: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  unitToggleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: "rgba(247, 203, 22, 0.14)",
+    marginLeft: 10,
+    borderWidth: 1,
+    borderColor: "rgba(247, 203, 22, 0.3)",
+  },
+  unitToggleText: {
+    fontFamily: FONTS.bodySemiBold,
+    color: BASE_PALETTE.sun,
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   errorText: {
     fontFamily: FONTS.body,
     fontSize: 12,
-    color: '#E00000',
-    marginTop: 5,
-  },
-  unitToggleBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginLeft: 10,
-  },
-  unitToggleText: {
-    fontFamily: FONTS.bodySemiBold,
-    color: "#E00000",
-    fontSize: 12,
+    color: BASE_PALETTE.error,
+    marginTop: 6,
+    marginLeft: 2,
   },
 });
-
-export default Input;
