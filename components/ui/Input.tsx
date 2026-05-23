@@ -51,7 +51,7 @@ const Input = ({ label, error, containerStyle, icon, rightIcon, type, unitOption
             borderColor: isFocused
               ? '#E00000'
               : isDark ? 'rgba(255,255,255,0.1)' : '#EBEBEB',
-            shadowColor: isFocused ? '#E00000' : 'transparent',
+           shadowColor: '#E00000',
             shadowOffset: { width: 0, height: 0 },
             shadowOpacity: isFocused ? 0.15 : 0,
             shadowRadius: 6,
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   inputWrapper: {
     borderWidth: 1,
     borderRadius: 12,
-    height: 52,
+    minHeight: 52,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
@@ -119,9 +119,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: FONTS.body,
     fontSize: 14,
-    height: "100%",
     paddingVertical: 0,
-    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
+    // Android: vertically centre placeholder & typed text inside fixed-height row
+    textAlignVertical: "center",
   },
   errorText: {
     fontFamily: FONTS.body,

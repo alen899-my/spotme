@@ -341,7 +341,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: 15,
     padding: 0,
-    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
   },
   filterWrap: { marginBottom: 16 },
   filterScroll: { paddingHorizontal: 20, gap: 10 },

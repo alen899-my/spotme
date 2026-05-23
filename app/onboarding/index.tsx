@@ -980,7 +980,6 @@ const styles = StyleSheet.create({
     paddingTop: 0, 
     paddingBottom: 0, 
     margin: 0,
-    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {})
   },
 
   // Custom Radios

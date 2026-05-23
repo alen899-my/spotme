@@ -1,151 +1,288 @@
 import React, { useEffect } from "react";
 import {
-  View,
-  Text,
   Image,
-  StyleSheet,
-  Dimensions,
   Platform,
-  TouchableOpacity,
+  ScrollView,
   StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { COLORS, FONTS } from "../constants/theme";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { FONTS } from "../constants/theme";
 
-const { width, height } = Dimensions.get("window");
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type IconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PALETTE = {
+  sun:      "#F7CB16",
+  sunDeep:  "#E7B100",
+  cta:      "#2596BE",
+  ink:      "#04282B",
+  inkCard:  "rgba(10, 86, 91, 0.9)",
+  mist:     "#F7FBF8",
+  mistSoft: "rgba(247, 251, 248, 0.88)",
+  border:   "rgba(255, 255, 255, 0.12)",
+};
+
+
+
+const COMMUNITY_AVATARS: Array<{
+  initials: string;
+  backgroundColor: string;
+  textColor: string;
+}> = [
+  { initials: "AN", backgroundColor: "#F5C94F", textColor: PALETTE.ink },
+  { initials: "JR", backgroundColor: "#B7F4FF", textColor: PALETTE.ink },
+  { initials: "MK", backgroundColor: "#FFD7CC", textColor: PALETTE.ink },
+];
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LandingScreen() {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const insets            = useSafeAreaInsets();
+  const router            = useRouter();
+  const { width, height } = useWindowDimensions();
 
+  // ── Layout breakpoints
+  const isShort   = height < 740;
+  const isCompact = !isShort && (width < 390 || height < 820);
+
+  // ── Dynamic sizing
+  const headlineFontSize   = isShort ? 44 : isCompact ? 54 : 64;
+  const headlineLineHeight = isShort ? 40 : isCompact ? 48 : 57;
+  const featureIconSize    = isShort ? 26 : 32;
+  const featureCardHeight  = isShort ? 110 : isCompact ? 128 : 144;
+
+  // ── Top bar height reserve (wordmark ~32px + top inset + 14 padding + 20 gap below)
+  const topBarReserve = insets.top + 14 + 32 + 24;
+
+  // ── Auth check
   useEffect(() => {
-    checkAuth();
-  }, []);
+    let isMounted = true;
 
-  const checkAuth = async () => {
-    try {
-      const token = await AsyncStorage.getItem("userToken");
-      if (token) {
-        router.replace("/(tabs)");
+    const checkAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem("userToken");
+        if (token && isMounted) {
+          router.replace("/(tabs)");
+        }
+      } catch (error) {
+        console.log(error);
       }
-    } catch (e) {
-      console.log(e);
-    }
-  };
+    };
+
+    void checkAuth();
+    return () => { isMounted = false; };
+  }, [router]);
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Full bleed background image */}
+      {/* ── Status Bar ─────────────────────────────────────────── */}
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
+
+      {/* ── Background Image ───────────────────────────────────── */}
       <Image
         source={require("../assets/home/firstscreenbg.png")}
         style={styles.bgImage}
         resizeMode="cover"
       />
 
-      {/* Dark overlay — bottom heavy, so top stays visible */}
+      {/* ── Gradient Overlays ──────────────────────────────────── */}
       <LinearGradient
         colors={[
-          "rgba(0,0,0,0.15)",
-          "rgba(10,0,0,0.35)",
-          "rgba(10,0,0,0.72)",
-          "rgba(8,0,0,0.96)",
+          "rgba(3, 30, 33, 0.82)",
+          "rgba(3, 30, 33, 0.4)",
+          "rgba(3, 30, 33, 0.1)",
         ]}
-        locations={[0, 0.35, 0.65, 1]}
-        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0.26 }}
+        end={{ x: 1, y: 0.54 }}
+        style={StyleSheet.absoluteFillObject}
       />
-
-      {/* Red glow accent — bottom center */}
       <LinearGradient
-        colors={["transparent", "rgba(224,0,0,0.18)", "transparent"]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={styles.redGlow}
+        colors={[
+          "rgba(2, 10, 11, 0.04)",
+          "rgba(2, 10, 11, 0.4)",
+          "rgba(2, 10, 11, 0.97)",
+        ]}
+        locations={[0, 0.58, 1]}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <LinearGradient
+        colors={[
+          "rgba(247, 203, 22, 0.15)",
+          "rgba(247, 203, 22, 0.03)",
+          "transparent",
+        ]}
+        start={{ x: 0.45, y: 0 }}
+        end={{ x: 1, y: 0.34 }}
+        style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Top — Logo bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
-        <Image
-          source={require("../assets/logo.png")}
-          style={styles.logoImage}
-          resizeMode="contain"
-        />
-        <View style={styles.pillBadge}>
-          <Text style={styles.pillText}>BETA</Text>
+      {/* ── Full-height layout container ───────────────────────── */}
+      {/*
+        KEY FIX: Instead of two absolutely-positioned layers fighting for
+        space, we use a single flex column that:
+          1. Renders the top bar in normal flow (with safe-area padding)
+          2. Uses flex: 1 spacer to push content to the bottom
+          3. Renders the bottom content block anchored to the bottom
+        This guarantees the headline is always visible below the top bar.
+      */}
+      <View style={[styles.layout, { paddingTop: insets.top + 14 }]}>
+
+        {/* ── Top Bar ──────────────────────────────────────────── */}
+        <View style={[styles.topBar, { paddingHorizontal: 26 }]}>
+
+          {/* Wordmark */}
+          <View style={styles.wordmark}>
+            <Text style={styles.wordmarkSpot}>spot</Text>
+            <Text style={styles.wordmarkMe}>ME</Text>
+          </View>
+
+         
+
         </View>
-      </View>
 
-      {/* Bottom content block */}
-      <View style={[styles.bottomBlock, { paddingBottom: Math.max(insets.bottom, 40) }]}>
+        {/* ── Flex spacer — pushes content to the bottom ───────── */}
+        <View style={styles.spacer} />
 
-        {/* Eyebrow */}
-        <View style={styles.eyebrowRow}>
-          <View style={styles.eyebrowLine} />
-          <Text style={styles.eyebrow}>YOUR JOURNEY STARTS HERE</Text>
-        </View>
-
-        {/* Headline */}
-        <Text style={styles.headline}>
-          TRAIN{"\n"}
-          <Text style={styles.headlineAccent}>SMARTER.</Text>{"\n"}
-          WIN EVERY{"\n"}DAY.
-        </Text>
-
-        {/* Sub */}
-        <Text style={styles.sub}>
-          Expert coaching · Personalized plans{"\n"}
-          Real results, zero excuses.
-        </Text>
-
-        {/* CTA */}
-        <TouchableOpacity
-          style={styles.ctaBtn}
-          activeOpacity={0.85}
-          onPress={() => router.push("/login")}
+        {/* ── Bottom Content Block ──────────────────────────────── */}
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={[
+            styles.bottomBlock,
+            { paddingBottom: Math.max(insets.bottom, 22) + 10 },
+          ]}
+          scrollEnabled={false}
+          showsVerticalScrollIndicator={false}
         >
-          <LinearGradient
-            colors={[COLORS.primary, COLORS.primaryDark]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.ctaGradient}
+
+          {/* Headline */}
+          <View style={styles.headlineBlock}>
+            {["MAKE", "YOUR"].map((word) => (
+              <Text
+                key={word}
+                style={[
+                  styles.headline,
+                  { fontSize: headlineFontSize, lineHeight: headlineLineHeight },
+                ]}
+              >
+                {word}
+              </Text>
+            ))}
+            {["BODY", "HEALTHIER"].map((word) => (
+              <Text
+                key={word}
+                style={[
+                  styles.headline,
+                  styles.headlineAccent,
+                  { fontSize: headlineFontSize, lineHeight: headlineLineHeight },
+                ]}
+              >
+                {word}
+              </Text>
+            ))}
+            <Text
+              style={[
+                styles.headline,
+                { fontSize: headlineFontSize, lineHeight: headlineLineHeight },
+              ]}
+            >
+              AND
+            </Text>
+            <Text
+              style={[
+                styles.headline,
+                styles.headlineAccent,
+                { fontSize: headlineFontSize, lineHeight: headlineLineHeight },
+              ]}
+            >
+              STRONGER
+            </Text>
+          </View>
+
+          {/* Accent Divider */}
+          <View style={styles.accentBar} />
+
+          {/* Subheadline */}
+          <Text
+            style={[
+              styles.subhead,
+              isShort   && styles.subheadShort,
+              isCompact && styles.subheadCompact,
+            ]}
           >
-            <Text style={styles.ctaText}>GET STARTED</Text>
-            <Text style={styles.ctaArrow}>→</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Secondary link */}
-        <TouchableOpacity 
-          style={styles.secondaryBtn} 
-          activeOpacity={0.7}
-          onPress={() => router.push("/login")}
-        >
-          <Text style={styles.secondaryText}>
-            Already a member?{" "}
-            <Text style={styles.secondaryAccent}>Sign in</Text>
+            Personalized workouts, nutrition plans, and expert coaching to help
+            you reach your goals faster.
           </Text>
-        </TouchableOpacity>
+
+          
+
+          {/* CTA Button */}
+          <TouchableOpacity
+            style={styles.ctaButton}
+            activeOpacity={0.88}
+            onPress={() => router.push("/login")}
+          >
+            <View style={[styles.ctaInner, isShort && styles.ctaInnerShort]}>
+              <Text style={[styles.ctaText, isShort && styles.ctaTextShort]}>
+                Get Started
+              </Text>
+              <View style={[styles.ctaArrowWrap, isShort && styles.ctaArrowWrapShort]}>
+                <Ionicons
+                  name="chevron-forward"
+                  size={isShort ? 26 : 30}
+                  color={PALETTE.sun}
+                />
+              </View>
+            </View>
+          </TouchableOpacity>
+
+        
+
+          {/* Sign In Link */}
+          <TouchableOpacity
+            style={[styles.signInLink, isShort && styles.signInLinkShort]}
+            activeOpacity={0.7}
+            onPress={() => router.push("/login")}
+          >
+            <Text style={[styles.signInText, isShort && styles.signInTextShort]}>
+              Already a member?{" "}
+              <Text style={styles.signInAccent}>Sign in</Text>
+            </Text>
+          </TouchableOpacity>
+
+        </ScrollView>
       </View>
     </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+
+  // ── Root & Layout ──────────────────────────────────────────────────────────
+
   root: {
     flex: 1,
-    backgroundColor: "#000000", // Fixed black for the root
+    backgroundColor: "#031516",
     ...(Platform.OS === "web"
-      ? {
-          maxWidth: 430,
-          alignSelf: "center" as any,
-          width: "100%",
-          height: "100vh" as any,
-          overflow: "hidden" as any,
-        }
+      ? { maxWidth: 430, alignSelf: "center", width: "100%" }
       : {}),
   },
 
@@ -155,126 +292,374 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 
-  redGlow: {
-    position: "absolute",
-    bottom: height * 0.28,
-    left: 0,
-    right: 0,
-    height: 180,
+  // Full-height flex column — top bar at top, content at bottom
+  layout: {
+    flex: 1,
+    flexDirection: "column",
   },
 
-  // Top bar
+  // Pushes bottom block down so it stays anchored at the bottom
+  spacer: {
+    flex: 1,
+  },
+
+  scrollArea: {
+    flexGrow: 0,
+  },
+
+  // ── Top Bar ────────────────────────────────────────────────────────────────
+
   topBar: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  wordmark: {
+    flexDirection: "row",
+    alignItems: "baseline",
+  },
+
+  wordmarkSpot: {
+    fontFamily: "Outfit_900Black",
+    fontSize: 32,
+    color: "#FFFFFF",
+    letterSpacing: -1.2,
+  },
+
+  wordmarkMe: {
+    fontFamily: "Outfit_900Black",
+    fontSize: 32,
+    color: PALETTE.sun,
+    letterSpacing: -1.2,
+  },
+
+  planBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingLeft: 10,
+    paddingRight: 16,
+    paddingVertical: 10,
+    backgroundColor: "rgba(4, 40, 43, 0.85)",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+  },
+
+  planIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: PALETTE.sun,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  planText: {
+    flexShrink: 1,
+    color: "#FFFFFF",
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+
+  // ── Bottom Block ───────────────────────────────────────────────────────────
+
+  bottomBlock: {
+    paddingHorizontal: 26,
+  },
+
+  // ── Headline ───────────────────────────────────────────────────────────────
+
+  headlineBlock: {
+    marginBottom: 12,
+  },
+
+  headline: {
+    fontFamily: FONTS.heading,
+    color: "#FFFFFF",
+    letterSpacing: 0.6,
+  },
+
+  headlineAccent: {
+    color: PALETTE.sun,
+  },
+
+  // ── Accent Bar ─────────────────────────────────────────────────────────────
+
+  accentBar: {
+    width: 62,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: PALETTE.sun,
+    marginBottom: 14,
+  },
+
+  // ── Subhead ────────────────────────────────────────────────────────────────
+
+  subhead: {
+    maxWidth: 312,
+    color: PALETTE.mist,
+    fontFamily: FONTS.body,
+    fontSize: 15,
+    lineHeight: 24,
+    marginBottom: 18,
+  },
+
+  subheadCompact: {
+    fontSize: 14,
+    lineHeight: 22,
+    maxWidth: 290,
+  },
+
+  subheadShort: {
+    fontSize: 13,
+    lineHeight: 20,
+    maxWidth: 272,
+    marginBottom: 14,
+  },
+
+  // ── Feature Cards ──────────────────────────────────────────────────────────
+
+  featureRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+
+  featureCard: {
+    flex: 1,
+    backgroundColor: PALETTE.inkCard,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    shadowColor: "#000000",
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 7,
+  },
+
+  featureCardCompact: {
+    paddingHorizontal: 13,
+    paddingVertical: 13,
+  },
+
+  featureIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: PALETTE.sun,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+
+  featureIconShort: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginBottom: 8,
+  },
+
+  featureTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 17,
+    lineHeight: 22,
+    color: "#FFFFFF",
+    marginBottom: 6,
+  },
+
+  featureTitleCompact: {
+    fontSize: 15,
+    lineHeight: 20,
+  },
+
+  featureDescription: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    lineHeight: 18,
+    color: PALETTE.mistSoft,
+  },
+
+  featureDescriptionCompact: {
+    fontSize: 11,
+    lineHeight: 17,
+  },
+
+  featureDescriptionShort: {
+    fontSize: 10.5,
+    lineHeight: 15,
+  },
+
+  // ── CTA Button ─────────────────────────────────────────────────────────────
+
+  ctaButton: {
+    borderRadius: 22,
+    overflow: "hidden",
+    marginBottom: 16,
+    shadowColor: PALETTE.cta,
+    shadowOpacity: 0.26,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 9,
+  },
+
+  ctaInner: {
+    backgroundColor: PALETTE.cta,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    paddingLeft: 24,
+    paddingRight: 14,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 24,
-    zIndex: 10,
-  },
-  logoImage: {
-    width: 240,
-    height: 68,
-    marginLeft: -10,
-  },
-  pillBadge: {
-    backgroundColor: "rgba(224,0,0,0.2)",
-    borderWidth: 0.5,
-    borderColor: "rgba(224,0,0,0.6)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  pillText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 10,
-    color: "#FF4444",
-    letterSpacing: 2,
   },
 
-  // Bottom
-  bottomBlock: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 28,
-    zIndex: 10,
-  },
-  eyebrowRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 14,
-  },
-  eyebrowLine: {
-    width: 24,
-    height: 2,
-    backgroundColor: "#E00000",
-    borderRadius: 2,
-  },
-  eyebrow: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 11,
-    color: "rgba(255,255,255,0.5)",
-    letterSpacing: 2.5,
-  },
-  headline: {
-    fontFamily: FONTS.heading,
-    fontSize: 68,
-    color: "#FFFFFF", // Always white
-    lineHeight: 66,
-    letterSpacing: 1,
-    marginBottom: 16,
-  },
-  headlineAccent: {
-    color: "#E00000", // Primary red
-  },
-  sub: {
-    fontFamily: FONTS.body,
-    fontSize: 14,
-    color: "rgba(255,255,255,0.55)",
-    lineHeight: 22,
-    marginBottom: 32,
+  ctaInnerShort: {
+    paddingLeft: 20,
+    paddingVertical: 13,
   },
 
-  // CTA
-  ctaBtn: {
-    borderRadius: 6,
-    overflow: "hidden",
-    marginBottom: 16,
+  ctaText: {
+    fontFamily: "Outfit_900Black",
+    fontSize: 24,
+    color: "#FFFFFF",
+    letterSpacing: -0.8,
   },
-  ctaGradient: {
-    flexDirection: "row",
+
+  ctaTextShort: {
+    fontSize: 21,
+  },
+
+  ctaArrowWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: PALETTE.ink,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 18,
-    gap: 10,
-  },
-  ctaText: {
-    fontFamily: FONTS.heading,
-    fontSize: 20,
-    color: "#FFFFFF", // Always white
-    letterSpacing: 3,
-  },
-  ctaArrow: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 18,
-    color: "rgba(255,255,255,0.7)",
   },
 
-  // Secondary
-  secondaryBtn: {
-    alignItems: "center",
-    paddingVertical: 4,
+  ctaArrowWrapShort: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
   },
-  secondaryText: {
+
+  // ── Community Row ──────────────────────────────────────────────────────────
+
+  communityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  avatarStack: {
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 100,
+  },
+
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 3,
+    borderColor: "rgba(255, 255, 255, 0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  avatarShort: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+  },
+
+  avatarText: {
+    fontFamily: "Outfit_900Black",
+    fontSize: 13,
+    letterSpacing: -0.3,
+  },
+
+  avatarTextShort: {
+    fontSize: 11,
+  },
+
+  communityDivider: {
+    width: 1,
+    height: 50,
+    backgroundColor: "rgba(255, 255, 255, 0.26)",
+    marginHorizontal: 16,
+  },
+
+  communityDividerShort: {
+    height: 44,
+    marginHorizontal: 14,
+  },
+
+  communityCopy: {
+    flex: 1,
+  },
+
+  starRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 4,
+  },
+
+  communityTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 18,
+    color: PALETTE.sun,
+    marginBottom: 1,
+  },
+
+  communityTitleShort: {
+    fontSize: 16,
+  },
+
+  communitySubtitle: {
     fontFamily: FONTS.body,
     fontSize: 13,
-    color: "rgba(255,255,255,0.4)", // Dim text
+    color: "#FFFFFF",
   },
-  secondaryAccent: {
+
+  communitySubtitleShort: {
+    fontSize: 12,
+  },
+
+  // ── Sign In Link ───────────────────────────────────────────────────────────
+
+  signInLink: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+
+  signInLinkShort: {
+    marginTop: 5,
+    paddingVertical: 5,
+  },
+
+  signInText: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.78)",
+  },
+
+  signInTextShort: {
+    fontSize: 12,
+  },
+
+  signInAccent: {
     fontFamily: FONTS.bodyBold,
-    color: "rgba(255,255,255,0.75)",
-    textDecorationLine: "underline",
+    color: "#FFFFFF",
   },
 });

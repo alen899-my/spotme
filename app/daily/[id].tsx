@@ -1467,7 +1467,7 @@ const styles = StyleSheet.create({
   browserName: { fontFamily: FONTS.bodyBold, fontSize: 15, marginBottom: 2 },
   browserMeta: { fontFamily: FONTS.body, fontSize: 12 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 54, borderRadius: 16, marginBottom: 20, gap: 10, borderWidth: 0 },
-  searchInput: { flex: 1, fontFamily: FONTS.body, fontSize: 15, padding: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
+  searchInput: { flex: 1, fontFamily: FONTS.body, fontSize: 15, padding: 0 },
   avgRatingBadge: {
     flexDirection: 'row',
     alignItems: 'center',

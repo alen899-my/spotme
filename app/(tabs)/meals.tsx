@@ -1123,13 +1123,6 @@ export default function MealsScreen() {
           <Text style={[styles.headerSub, { color: colors.textMuted }]}>Track meals · hydration · macros</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-          {/* Food Database Search Button */}
-          <TouchableOpacity
-            onPress={() => { setShowFoodSearch(true); setFoodSearchQuery(''); setFoodSearchResults([]); setFoodSearchTotal(0); }}
-            style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-          >
-            <Ionicons name="search-outline" size={22} color={colors.text} />
-          </TouchableOpacity>
           <TouchableOpacity style={styles.addBtn} onPress={() => setShowLogForm(true)}>
             <LinearGradient colors={['#E00000', '#900000']} style={styles.addBtnGrad}>
               <Ionicons name="add" size={26} color="#FFF" />
@@ -1883,7 +1876,6 @@ const SummaryItem = ({ label, value, unit, color }: any) => (
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
-  iconBtn: { width: 46, height: 46, borderRadius: 16, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 28 },
   headerSub: { fontFamily: FONTS.body, fontSize: 14, marginTop: 2 },
   addBtn: { width: 56, height: 56, borderRadius: 20, overflow: 'hidden', elevation: 5, shadowColor: '#E00000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },

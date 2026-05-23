@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "spotme",
+    "scheme": "spotme",
     "slug": "spotme",
     "version": "1.0.0",
     "description": "Your ultimate fitness companion for tracking workouts and progress.",

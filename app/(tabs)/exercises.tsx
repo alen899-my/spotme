@@ -366,7 +366,6 @@ export default function ExercisesScreen() {
           onChangeText={handleQueryChange}
           returnKeyType="search"
           autoCorrect={false}
-          {...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {})}
         />
         {query.length > 0 && (
           <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

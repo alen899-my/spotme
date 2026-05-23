@@ -13,6 +13,7 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -115,7 +116,10 @@ export default function AuthScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* ── Hero ── */}
@@ -337,7 +341,7 @@ export default function AuthScreen() {
                   <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
                     {rememberMe && <Ionicons name="checkmark" size={12} color="#FFF" />}
                   </View>
-                  <Text style={styles.rememberText}>Remember me</Text>
+                 <Text style={[styles.rememberText, { marginLeft: 8 }]}>Remember me</Text>
                 </TouchableOpacity>
                 <TouchableOpacity activeOpacity={0.7}>
                   <Text style={styles.forgotText}>Forgot password?</Text>
@@ -360,7 +364,7 @@ export default function AuthScreen() {
                     <Text style={styles.ctaText}>
                       {isLogin ? "Login" : "Create Account"}
                     </Text>
-                    <Ionicons name="arrow-forward" size={18} color="#fff" />
+<Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 10 }} />
                   </>
                 )}
               </LinearGradient>
@@ -408,7 +412,7 @@ export default function AuthScreen() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -421,8 +425,6 @@ const styles = StyleSheet.create({
           maxWidth: 430,
           alignSelf: "center" as any,
           width: "100%",
-          height: "100vh" as any,
-          overflow: "hidden" as any,
         }
       : {}),
   },
@@ -433,7 +435,6 @@ const styles = StyleSheet.create({
     left: 22,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
     zIndex: 10,
   },
   logoDot: {
@@ -447,6 +448,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#FFFFFF",
     letterSpacing: 3,
+    marginLeft: 8,
   },
   heroTextWrap: {
     position: "absolute",
@@ -556,7 +558,6 @@ const styles = StyleSheet.create({
   rememberRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
   },
   checkbox: {
     width: 17,
@@ -637,7 +638,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 16,
-    gap: 10,
   },
   ctaText: {
     fontFamily: FONTS.bodyBold,
