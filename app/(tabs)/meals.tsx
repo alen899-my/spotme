@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, FlatList,
+  View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Image, Modal,
   ScrollView, Platform, Dimensions, TextInput, KeyboardAvoidingView,
   Animated,
@@ -557,7 +557,7 @@ export default function MealsScreen() {
       switch (type) {
         case 'Morning':
         case 'Breakfast':
-          return { icon: 'sunny-outline', color: '#EF4444', bg: '#EF444415', label: 'Breakfast' };
+          return { icon: 'sunny-outline', color: '#E7B100', bg: '#E7B10015', label: 'Breakfast' };
         case 'Afternoon':
         case 'Lunch':
           return { icon: 'sunny', color: '#3B82F6', bg: '#3B82F615', label: 'Lunch' };
@@ -582,7 +582,7 @@ export default function MealsScreen() {
       { label: 'Carbs',   value: Math.round(item.total_carbs),   unit: 'g', color: '#3B82F6' },
       { label: 'Fat',     value: Math.round(item.total_fat),     unit: 'g', color: '#F59E0B' },
       { label: 'Fiber',   value: Math.round(item.total_fiber),   unit: 'g', color: '#34D399' },
-      { label: 'Sugar',   value: Math.round(item.total_sugar),   unit: 'g', color: '#EF4444' },
+      { label: 'Sugar',   value: Math.round(item.total_sugar),   unit: 'g', color: '#E7B100' },
       { label: 'Sodium',  value: Math.round(item.total_sodium),  unit: 'mg', color: '#FB923C' },
     ];
 
@@ -653,9 +653,9 @@ export default function MealsScreen() {
             {/* Macro grid */}
             <View style={styles.macroGrid}>
               {/* Full-width calories pill */}
-              <View style={[styles.macroPill, { backgroundColor: '#EF444412', width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }]}>
-                <Text style={[styles.macroPillLabel, { color: '#EF4444' }]}>Total Calories</Text>
-                <Text style={[styles.macroPillVal, { color: '#EF4444', fontSize: 20 }]}>{Math.round(item.total_calories)} <Text style={{ fontSize: 13 }}>kcal</Text></Text>
+              <View style={[styles.macroPill, { backgroundColor: '#E7B10012', width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }]}>
+                <Text style={[styles.macroPillLabel, { color: '#E7B100' }]}>Total Calories</Text>
+                <Text style={[styles.macroPillVal, { color: '#E7B100', fontSize: 20 }]}>{Math.round(item.total_calories)} <Text style={{ fontSize: 13 }}>kcal</Text></Text>
               </View>
               {macros.map((m) => (
                 <View key={m.label} style={[styles.macroPill, { backgroundColor: m.color + '12' }]}>
@@ -687,7 +687,7 @@ export default function MealsScreen() {
               style={[styles.deleteMealBtn, { borderColor: colors.border + '50', backgroundColor: colors.inputBg }]}
               activeOpacity={0.7}
             >
-              <Ionicons name="trash-outline" size={14} color="#EF4444" style={{ marginRight: 6 }} />
+              <Ionicons name="trash-outline" size={14} color="#E7B100" style={{ marginRight: 6 }} />
               <Text style={styles.deleteMealBtnText}>Delete Meal Entry</Text>
             </TouchableOpacity>
           </View>
@@ -795,7 +795,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
       case 'Underweight': return '#3B82F6';
       case 'Normal weight': return '#10B981';
       case 'Overweight': return '#F59E0B';
-      case 'Obesity': return '#EF4444';
+      case 'Obesity': return '#E7B100';
       default: return '#10B981';
     }
   };
@@ -816,8 +816,8 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
       <View style={[styles.accCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
           <View style={styles.cardHeaderRow}>
-            <View style={[styles.mealIconBox, { backgroundColor: '#E0000010' }]}>
-              <Ionicons name="sparkles" size={20} color="#E00000" />
+            <View style={[styles.mealIconBox, { backgroundColor: '#2596BE10' }]}>
+              <Ionicons name="sparkles" size={20} color="#2596BE" />
             </View>
             <View style={styles.mealMetaInfo}>
               <Text style={[styles.mealTitleLabel, { color: colors.text, fontSize: 16 }]}>{meal.meal_type}</Text>
@@ -885,10 +885,10 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDeleteIngredient(mealIndex, i)}
-                      style={{ padding: 6, borderRadius: 8, backgroundColor: '#EF444415' }}
+                      style={{ padding: 6, borderRadius: 8, backgroundColor: '#E7B10015' }}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                      <Ionicons name="trash-outline" size={14} color="#E7B100" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -902,11 +902,11 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
 
             <TouchableOpacity
               onPress={() => handleLogRecommendedMeal(meal)}
-              style={[styles.deleteMealBtn, { borderColor: '#E0000030', backgroundColor: '#E0000010' }]}
+              style={[styles.deleteMealBtn, { borderColor: '#2596BE30', backgroundColor: '#2596BE10' }]}
               activeOpacity={0.7}
             >
-              <Ionicons name="checkmark-circle-outline" size={16} color="#E00000" style={{ marginRight: 6 }} />
-              <Text style={[styles.deleteMealBtnText, { color: '#E00000' }]}>Quick Log Meal</Text>
+              <Ionicons name="checkmark-circle-outline" size={16} color="#2596BE" style={{ marginRight: 6 }} />
+              <Text style={[styles.deleteMealBtnText, { color: '#2596BE' }]}>Quick Log Meal</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -918,7 +918,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     if (recommendationLoading) {
       return (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#E00000" />
+          <ActivityIndicator size="large" color="#2596BE" />
           <Text style={{ marginTop: 14, fontFamily: FONTS.bodySemiBold, color: colors.textDim }}>AI Diet Coach is preparing your personalized plan...</Text>
         </View>
       );
@@ -935,11 +935,11 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
             {recommendationError.includes('height') || recommendationError.includes('onboarding') ? 'Please complete your physical measurements (height, weight, and fitness goal) inside onboarding/profile to generate AI meal recommendations!' : recommendationError}
           </Text>
           <TouchableOpacity
-            style={[styles.emptyBtn, { backgroundColor: '#E0000015', borderColor: '#E0000030', borderWidth: 1 }]}
+            style={[styles.emptyBtn, { backgroundColor: '#2596BE15', borderColor: '#2596BE30', borderWidth: 1 }]}
             onPress={() => fetchRecommendations(true)}
           >
-            <Ionicons name="refresh-outline" size={16} color="#E00000" />
-            <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Retry Loading Coach</Text>
+            <Ionicons name="refresh-outline" size={16} color="#2596BE" />
+            <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Retry Loading Coach</Text>
           </TouchableOpacity>
         </View>
       );
@@ -959,7 +959,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         )}
 
         {/* welcome banner */}
-        <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 18, borderLeftWidth: 4, borderLeftColor: '#E00000', marginBottom: 14 }]}>
+        <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 18, borderLeftWidth: 4, borderLeftColor: '#2596BE', marginBottom: 14 }]}>
           <Text style={{ fontFamily: FONTS.heading, fontSize: 18, color: colors.text }}>Meet Your AI Diet Coach 🥗</Text>
           <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: colors.textMuted, marginTop: 4, lineHeight: 18 }}>
             Grounded in scientific targets and your custom preferences.
@@ -998,7 +998,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           <Text style={{ fontSize: 14, fontFamily: FONTS.heading, color: colors.text, marginBottom: 12 }}>AI Daily Target Recommendation</Text>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
             <View>
-              <Text style={{ fontSize: 24, fontFamily: FONTS.heading, color: '#EF4444' }}>{recommendationData.targets.calories} <Text style={{ fontSize: 12, fontFamily: FONTS.body, color: colors.textMuted }}>kcal</Text></Text>
+              <Text style={{ fontSize: 24, fontFamily: FONTS.heading, color: '#E7B100' }}>{recommendationData.targets.calories} <Text style={{ fontSize: 12, fontFamily: FONTS.body, color: colors.textMuted }}>kcal</Text></Text>
               <Text style={{ fontSize: 10, fontFamily: FONTS.bodySemiBold, color: colors.textMuted, marginTop: 2 }}>DAILY CALORIE BUDGET</Text>
             </View>
             <View style={{ height: 40, width: 1, backgroundColor: colors.border }} />
@@ -1024,25 +1024,25 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         </View>
 
         {/* CSV dataset alignment */}
-        <View style={[styles.groundingCard, { borderColor: '#E0000030', marginBottom: 20 }]}>
+        <View style={[styles.groundingCard, { borderColor: '#2596BE30', marginBottom: 20 }]}>
           <LinearGradient colors={isDark ? ['#300000', '#150000'] : ['#FFF5F5', '#FFEBEB']} style={{ padding: 16, borderRadius: 20 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-              <Ionicons name="shield-checkmark" size={20} color="#E00000" style={{ marginRight: 8 }} />
-              <Text style={{ fontSize: 14, fontFamily: FONTS.heading, color: '#E00000' }}>GYM.csv Dataset Alignment</Text>
+              <Ionicons name="shield-checkmark" size={20} color="#2596BE" style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 14, fontFamily: FONTS.heading, color: '#2596BE' }}>GYM.csv Dataset Alignment</Text>
             </View>
             <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.text, lineHeight: 18, marginBottom: 12 }}>
               We've matched your profile (Gender: {recommendationData.csvGrounding.gender === 'female' ? 'Female' : 'Male'}, Goal: {recommendationData.csvGrounding.goal === 'muscle_gain' ? 'Muscle Gain' : 'Fat Burn'}, Category: {recommendationData.bmiCategory}) to our dataset. Here is your structured guidance:
             </Text>
             <View style={{ gap: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                <Ionicons name="barbell-outline" size={16} color="#E00000" style={{ marginTop: 2, marginRight: 8 }} />
+                <Ionicons name="barbell-outline" size={16} color="#2596BE" style={{ marginTop: 2, marginRight: 8 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: colors.text }}>Recommended Exercise Schedule</Text>
                   <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim, marginTop: 2 }}>{recommendationData.csvGrounding.schedule}</Text>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                <Ionicons name="restaurant-outline" size={16} color="#E00000" style={{ marginTop: 2, marginRight: 8 }} />
+                <Ionicons name="restaurant-outline" size={16} color="#2596BE" style={{ marginTop: 2, marginRight: 8 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: colors.text }}>Dietary Target Theme</Text>
                   <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim, marginTop: 2 }}>{recommendationData.csvGrounding.mealPlan}</Text>
@@ -1053,14 +1053,14 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         </View>
 
         {/* ── Tailored AI Meal Plan CTA Card ── */}
-        <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: '#E0000040', borderWidth: 1.5, marginBottom: 14, overflow: 'hidden' }]}>
+        <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: '#2596BE40', borderWidth: 1.5, marginBottom: 14, overflow: 'hidden' }]}>
           <LinearGradient
             colors={isDark ? ['rgba(224,0,0,0.12)', 'rgba(100,0,0,0.06)'] : ['rgba(255,235,235,0.9)', 'rgba(255,220,220,0.5)']}
             style={{ padding: 18, borderRadius: 22 }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: '#E0000018', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
-                <Ionicons name="sparkles" size={22} color="#E00000" />
+              <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: '#2596BE18', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                <Ionicons name="sparkles" size={22} color="#2596BE" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: FONTS.heading, fontSize: 16, color: colors.text }}>Tailored AI Meal Plan</Text>
@@ -1075,7 +1075,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               Set your gender, age, body fat, diet type, food preferences & meal frequency — we'll scientifically scale clean recipes to hit your exact targets.
             </Text>
             <TouchableOpacity onPress={openDietForm} activeOpacity={0.85} style={{ borderRadius: 16, overflow: 'hidden' }}>
-              <LinearGradient colors={['#E00000', '#960000']} style={{ paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+              <LinearGradient colors={['#2596BE', '#960000']} style={{ paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
                 <Ionicons name="options-outline" size={18} color="#FFF" />
                 <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 14, letterSpacing: 0.5 }}>Configure & View Diet Meals 🥗</Text>
               </LinearGradient>
@@ -1088,9 +1088,9 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 12 }}>
               <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#E0000012', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, marginHorizontal: 10 }}>
-                <Ionicons name="restaurant-outline" size={12} color="#E00000" style={{ marginRight: 4 }} />
-                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11, color: '#E00000' }}>YOUR AI DIET PLAN</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2596BE12', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, marginHorizontal: 10 }}>
+                <Ionicons name="restaurant-outline" size={12} color="#2596BE" style={{ marginRight: 4 }} />
+                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11, color: '#2596BE' }}>YOUR AI DIET PLAN</Text>
               </View>
               <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
             </View>
@@ -1117,16 +1117,16 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   const fatConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_fat || 0), 0);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* ── Header ── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { marginTop: 6 }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Nutrition</Text>
           <Text style={[styles.headerSub, { color: colors.textMuted }]}>Track meals · hydration · macros</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
           <TouchableOpacity style={styles.addBtn} onPress={() => setShowLogForm(true)}>
-            <LinearGradient colors={['#E00000', '#900000']} style={styles.addBtnGrad}>
+            <LinearGradient colors={['#2596BE', '#1a6e8a']} style={styles.addBtnGrad}>
               <Ionicons name="add" size={26} color="#FFF" />
             </LinearGradient>
           </TouchableOpacity>
@@ -1134,9 +1134,9 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
       </View>
 
       {/* ── Tab Selector ── */}
-      <View style={[styles.tabSelectorContainer, { backgroundColor: colors.inputBg }]}>
+      <View style={[styles.tabSelectorContainer, { backgroundColor: colors.inputBg, marginTop: 2 }]}>
         <TouchableOpacity
-          style={[styles.tabSelectorBtn, activeTab === 'tracker' && [styles.tabSelectorActiveBtn, { backgroundColor: '#E00000' }]]}
+          style={[styles.tabSelectorBtn, activeTab === 'tracker' && [styles.tabSelectorActiveBtn, { backgroundColor: '#2596BE' }]]}
           onPress={() => setActiveTab('tracker')}
         >
           <Ionicons name="nutrition-outline" size={16} color={activeTab === 'tracker' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
@@ -1144,7 +1144,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.tabSelectorBtn, activeTab === 'recommendations' && [styles.tabSelectorActiveBtn, { backgroundColor: '#E00000' }]]}
+          style={[styles.tabSelectorBtn, activeTab === 'recommendations' && [styles.tabSelectorActiveBtn, { backgroundColor: '#2596BE' }]]}
           onPress={() => setActiveTab('recommendations')}
         >
           <Ionicons name="sparkles-outline" size={16} color={activeTab === 'recommendations' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
@@ -1198,9 +1198,9 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                   </View>
                   <Text style={[styles.emptyTitle, { color: colors.text }]}>No meals logged</Text>
                   <Text style={[styles.emptyText, { color: colors.textMuted }]}>Tap + to log a meal and track your nutrition</Text>
-                  <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: '#E0000015', borderColor: '#E0000030', borderWidth: 1 }]} onPress={() => setShowLogForm(true)}>
-                    <Ionicons name="add-circle-outline" size={16} color="#E00000" />
-                    <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Log Your First Meal</Text>
+                  <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: '#2596BE15', borderColor: '#2596BE30', borderWidth: 1 }]} onPress={() => setShowLogForm(true)}>
+                    <Ionicons name="add-circle-outline" size={16} color="#2596BE" />
+                    <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Log Your First Meal</Text>
                   </TouchableOpacity>
                 </View>
               )
@@ -1236,7 +1236,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           {/* Results or Loading / Empty */}
           {selectorLoading && selectorFoods.length === 0 ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color="#E00000" />
+              <ActivityIndicator size="large" color="#2596BE" />
               <Text style={{ marginTop: 14, fontFamily: FONTS.bodySemiBold, color: colors.textDim }}>Loading ingredients...</Text>
             </View>
           ) : selectorFoods.length === 0 ? (
@@ -1294,8 +1294,8 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
 
                   {/* Macro Badges Row */}
                   <View style={styles.selectorFoodMacroRow}>
-                    <View style={[styles.selectorFoodMacroChip, { backgroundColor: '#EF444408' }]}>
-                      <Text style={[styles.selectorFoodMacroVal, { color: '#EF4444' }]}>{Math.round(item.calories_kcal || 0)}</Text>
+                    <View style={[styles.selectorFoodMacroChip, { backgroundColor: '#E7B10008' }]}>
+                      <Text style={[styles.selectorFoodMacroVal, { color: '#E7B100' }]}>{Math.round(item.calories_kcal || 0)}</Text>
                       <Text style={styles.selectorFoodMacroLbl}>kcal</Text>
                     </View>
                     <View style={[styles.selectorFoodMacroChip, { backgroundColor: '#10B98108' }]}>
@@ -1357,7 +1357,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               returnKeyType="search"
               onSubmitEditing={() => searchFoods(foodSearchQuery)}
             />
-            {foodSearchLoading && <ActivityIndicator size="small" color="#E00000" style={{ marginLeft: 8 }} />}
+            {foodSearchLoading && <ActivityIndicator size="small" color="#2596BE" style={{ marginLeft: 8 }} />}
             {foodSearchQuery.length > 0 && !foodSearchLoading && (
               <TouchableOpacity onPress={() => { setFoodSearchQuery(''); setFoodSearchResults([]); setFoodSearchTotal(0); }}>
                 <Ionicons name="close-circle" size={18} color={colors.textDim} />
@@ -1400,7 +1400,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                   <TouchableOpacity
                     activeOpacity={0.85}
                     onPress={() => setSelectedFoodDetail(isExpanded ? null : item)}
-                    style={[styles.fsFoodCard, { backgroundColor: colors.card, borderColor: isExpanded ? '#E00000' : colors.border }]}
+                    style={[styles.fsFoodCard, { backgroundColor: colors.card, borderColor: isExpanded ? '#2596BE' : colors.border }]}
                   >
                     {/* Top row */}
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1421,8 +1421,8 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                       </View>
                       {/* Nutrition Grade Badge */}
                       {item.nutrition_grade ? (
-                        <View style={[styles.fsGradeBadge, { backgroundColor: item.nutrition_grade.toLowerCase() === 'a' ? '#10B98120' : item.nutrition_grade.toLowerCase() === 'b' ? '#3B82F620' : item.nutrition_grade.toLowerCase() === 'c' ? '#F59E0B20' : '#EF444420' }]}>
-                          <Text style={{ fontFamily: FONTS.heading, fontSize: 14, color: item.nutrition_grade.toLowerCase() === 'a' ? '#10B981' : item.nutrition_grade.toLowerCase() === 'b' ? '#3B82F6' : item.nutrition_grade.toLowerCase() === 'c' ? '#F59E0B' : '#EF4444' }}>{item.nutrition_grade.toUpperCase()}</Text>
+                        <View style={[styles.fsGradeBadge, { backgroundColor: item.nutrition_grade.toLowerCase() === 'a' ? '#10B98120' : item.nutrition_grade.toLowerCase() === 'b' ? '#3B82F620' : item.nutrition_grade.toLowerCase() === 'c' ? '#F59E0B20' : '#E7B10020' }]}>
+                          <Text style={{ fontFamily: FONTS.heading, fontSize: 14, color: item.nutrition_grade.toLowerCase() === 'a' ? '#10B981' : item.nutrition_grade.toLowerCase() === 'b' ? '#3B82F6' : item.nutrition_grade.toLowerCase() === 'c' ? '#F59E0B' : '#E7B100' }}>{item.nutrition_grade.toUpperCase()}</Text>
                         </View>
                       ) : null}
                       <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMuted} style={{ marginLeft: 8 }} />
@@ -1431,7 +1431,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                     {/* Macro mini-row */}
                     <View style={styles.fsMacroRow}>
                       <View style={styles.fsMacroChip}>
-                        <Text style={[styles.fsMacroVal, { color: '#EF4444' }]}>{Math.round(item.calories_kcal || 0)}</Text>
+                        <Text style={[styles.fsMacroVal, { color: '#E7B100' }]}>{Math.round(item.calories_kcal || 0)}</Text>
                         <Text style={styles.fsMacroLbl}>kcal</Text>
                       </View>
                       <View style={styles.fsMacroChip}>
@@ -1454,7 +1454,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                         {/* Extra nutrients */}
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                           {item.fiber_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#34D39915' }]}><Text style={{ color: '#34D399', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.fiber_g)}g fiber</Text></View>}
-                          {item.sugars_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#EF444415' }]}><Text style={{ color: '#EF4444', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.sugars_g)}g sugar</Text></View>}
+                          {item.sugars_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#E7B10015' }]}><Text style={{ color: '#E7B100', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.sugars_g)}g sugar</Text></View>}
                           {item.sodium_mg != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#FB923C15' }]}><Text style={{ color: '#FB923C', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.sodium_mg)}mg sodium</Text></View>}
                           {item.saturated_fat_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#8B5CF615' }]}><Text style={{ color: '#8B5CF6', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.saturated_fat_g)}g sat.fat</Text></View>}
                         </View>
@@ -1489,11 +1489,11 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                               showToast('Failed to log food', 'error');
                             }
                           }}
-                          style={[styles.fsLogBtn, { backgroundColor: '#E0000012', borderColor: '#E0000030' }]}
+                          style={[styles.fsLogBtn, { backgroundColor: '#2596BE12', borderColor: '#2596BE30' }]}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="add-circle-outline" size={16} color="#E00000" style={{ marginRight: 6 }} />
-                          <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: '#E00000' }}>Quick Log This Food</Text>
+                          <Ionicons name="add-circle-outline" size={16} color="#2596BE" style={{ marginRight: 6 }} />
+                          <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: '#2596BE' }}>Quick Log This Food</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1544,7 +1544,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                 onPress={startAnalysis}
                 disabled={!selectedImage || uploading}
               >
-                <LinearGradient colors={['#E00000', '#B00000']} style={styles.saveBtnGrad}>
+                <LinearGradient colors={['#2596BE', '#1a6e8a']} style={styles.saveBtnGrad}>
                   {uploading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>ANALYZE & LOG</Text>}
                 </LinearGradient>
               </TouchableOpacity>
@@ -1577,7 +1577,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                     style={[
                       styles.typeBtn, 
                       { backgroundColor: colors.inputBg },
-                      mealType === t && { backgroundColor: '#E00000' }
+                      mealType === t && { backgroundColor: '#2596BE' }
                     ]}
                   >
                     <Text style={[styles.typeBtnText, { color: colors.textMuted }, mealType === t && { color: '#FFF' }]}>{t}</Text>
@@ -1586,7 +1586,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               </View>
 
               <View style={styles.summaryGrid}>
-                <SummaryItem label="Calories" value={Math.round(analysisData?.total_calories || 0)} unit="kcal" color="#EF4444" />
+                <SummaryItem label="Calories" value={Math.round(analysisData?.total_calories || 0)} unit="kcal" color="#E7B100" />
                 <SummaryItem label="Protein" value={Math.round(analysisData?.total_protein || 0)} unit="g" color="#10B981" />
                 <SummaryItem label="Carbs" value={Math.round(analysisData?.total_carbs || 0)} unit="g" color="#3B82F6" />
                 <SummaryItem label="Fat" value={Math.round(analysisData?.total_fat || 0)} unit="g" color="#F59E0B" />
@@ -1594,9 +1594,9 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
 
               <View style={[styles.summaryGrid, { marginTop: -12 }]}>
                 <SummaryItem label="Fiber" value={Math.round(analysisData?.total_fiber || 0)} unit="g" color="#10B981" />
-                <SummaryItem label="Sugar" value={Math.round(analysisData?.total_sugar || 0)} unit="g" color="#EF4444" />
+                <SummaryItem label="Sugar" value={Math.round(analysisData?.total_sugar || 0)} unit="g" color="#E7B100" />
                 <SummaryItem label="Sodium" value={Math.round(analysisData?.total_sodium || 0)} unit="mg" color="#F59E0B" />
-                <SummaryItem label="Sat. Fat" value={Math.round(analysisData?.total_saturated_fat || 0)} unit="g" color="#EF4444" />
+                <SummaryItem label="Sat. Fat" value={Math.round(analysisData?.total_saturated_fat || 0)} unit="g" color="#E7B100" />
               </View>
 
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Detected Items</Text>
@@ -1620,7 +1620,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
 
             <View style={[styles.modalFooter, { backgroundColor: colors.card }]}>
               <TouchableOpacity style={styles.saveBtn} onPress={handleSaveMeal} disabled={saving}>
-                <LinearGradient colors={['#E00000', '#B00000']} style={styles.saveBtnGrad}>
+                <LinearGradient colors={['#2596BE', '#1a6e8a']} style={styles.saveBtnGrad}>
                   {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>SAVE MEAL</Text>}
                 </LinearGradient>
               </TouchableOpacity>
@@ -1640,7 +1640,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           <View style={[styles.dietFormSheet, { backgroundColor: colors.card }]}>
             {/* ── Form Header ── */}
             <View style={styles.dietFormHeader}>
-              <LinearGradient colors={['#E00000', '#800000']} style={styles.dietFormHeaderGrad}>
+              <LinearGradient colors={['#2596BE', '#0d4d65']} style={styles.dietFormHeaderGrad}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
                     <Ionicons name="body-outline" size={20} color="#FFF" />
@@ -1752,7 +1752,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                     style={[
                       { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5 },
                       { backgroundColor: colors.inputBg, borderColor: colors.border },
-                      formActivityLevel === a && { backgroundColor: '#E00000', borderColor: '#E00000' }
+                      formActivityLevel === a && { backgroundColor: '#2596BE', borderColor: '#2596BE' }
                     ]}
                   >
                     <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12, color: formActivityLevel === a ? '#FFF' : colors.textDim }}>{a}</Text>
@@ -1802,7 +1802,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                 </TouchableOpacity>
 
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontFamily: FONTS.heading, fontSize: 36, color: '#E00000' }}>{formMealsPerDay}</Text>
+                  <Text style={{ fontFamily: FONTS.heading, fontSize: 36, color: '#2596BE' }}>{formMealsPerDay}</Text>
                   <Text style={{ fontFamily: FONTS.body, fontSize: 11, color: colors.textMuted, textAlign: 'center', marginTop: 2 }}>
                     {formMealsPerDay === 2 ? 'Lunch + Dinner'
                       : formMealsPerDay === 3 ? 'Breakfast · Lunch · Dinner'
@@ -1828,7 +1828,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                       { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5 },
                       i + 1 >= 2 && i + 1 <= 6
                         ? (formMealsPerDay === i + 1
-                            ? { backgroundColor: '#E00000', borderColor: '#E00000' }
+                            ? { backgroundColor: '#2596BE', borderColor: '#2596BE' }
                             : { backgroundColor: colors.inputBg, borderColor: colors.border })
                         : { backgroundColor: colors.inputBg, borderColor: colors.border, opacity: 0.3 }
                     ]}>
@@ -1847,7 +1847,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                 style={{ borderRadius: 20, overflow: 'hidden', marginTop: 8 }}
                 activeOpacity={0.85}
               >
-                <LinearGradient colors={['#E00000', '#900000']} style={{ paddingVertical: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 10 }}>
+                <LinearGradient colors={['#2596BE', '#1a6e8a']} style={{ paddingVertical: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 10 }}>
                   {savingDietForm
                     ? <ActivityIndicator color="#FFF" />
                     : <>
@@ -1864,7 +1864,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         </KeyboardAvoidingView>
       </Modal>
 
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -1880,10 +1880,10 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 28 },
   headerSub: { fontFamily: FONTS.body, fontSize: 14, marginTop: 2 },
-  addBtn: { width: 56, height: 56, borderRadius: 20, overflow: 'hidden', elevation: 5, shadowColor: '#E00000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+  addBtn: { width: 56, height: 56, borderRadius: 20, overflow: 'hidden', elevation: 5, shadowColor: '#2596BE', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
   addBtnGrad: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent: { padding: 20, paddingBottom: 100 },
+  listContent: { padding: 20, paddingBottom: 32 },
   mealCard: { borderRadius: 24, borderWidth: 1, marginBottom: 20, overflow: 'hidden', elevation: 2 },
   mealCardImage: { width: '100%', height: 200 },
   mealCardContent: { padding: 16 },
@@ -1896,7 +1896,7 @@ const styles = StyleSheet.create({
   nutrientBadgeLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, textTransform: 'uppercase' },
   foodItemsList: { borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', paddingTop: 12 },
   foodItemText: { fontFamily: FONTS.body, fontSize: 13, marginBottom: 4 },
-  emptyContainer: { alignItems: 'center', marginTop: 48, paddingBottom: 40 },
+  emptyContainer: { alignItems: 'center', marginTop: 32, paddingBottom: 20 },
   emptyIconWrap: { width: 80, height: 80, borderRadius: 24, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   emptyTitle: { fontFamily: FONTS.heading, fontSize: 20, marginBottom: 6 },
   emptyText: { fontFamily: FONTS.body, fontSize: 14, textAlign: 'center', maxWidth: 220, lineHeight: 20, marginBottom: 20 },
@@ -2007,7 +2007,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderRadius: 16, paddingVertical: 12, marginTop: 16,
   },
   deleteMealBtnText: {
-    fontFamily: FONTS.bodyBold, fontSize: 12, color: '#EF4444',
+    fontFamily: FONTS.bodyBold, fontSize: 12, color: '#E7B100',
   },
   
   // Modal
@@ -2055,7 +2055,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   tabSelectorActiveBtn: {
-    shadowColor: '#E00000',
+    shadowColor: '#2596BE',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -2148,8 +2148,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dietFormSelectBtnActive: {
-    backgroundColor: '#E00000',
-    borderColor: '#E00000',
+    backgroundColor: '#2596BE',
+    borderColor: '#2596BE',
   },
   dietFormSelectBtnText: {
     fontFamily: FONTS.bodySemiBold,
@@ -2284,3 +2284,4 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 });
+

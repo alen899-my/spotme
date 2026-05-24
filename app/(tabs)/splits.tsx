@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -152,7 +151,7 @@ export default function SplitsTab() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -253,7 +252,7 @@ export default function SplitsTab() {
           onCancel={() => setDeleteId(null)}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

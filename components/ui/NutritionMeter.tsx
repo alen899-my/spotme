@@ -56,9 +56,9 @@ function MiniPie({ protein, carbs, fat, total, size }: any) {
   const c = Math.min((carbs   / total) * 100, 100);
   return (
     <View style={{ width: size, height: size }}>
-      <View style={{ position: 'absolute', width: size, height: size, borderRadius: size / 2, borderWidth: stroke, borderColor: '#F59E0B' }} />
-      <DonutRing pct={p + c} size={size} stroke={stroke} fillColor="#3B82F6" trackColor="transparent"><View /></DonutRing>
-      <DonutRing pct={p}     size={size} stroke={stroke} fillColor="#10B981" trackColor="transparent"><View /></DonutRing>
+      <View style={{ position: 'absolute', width: size, height: size, borderRadius: size / 2, borderWidth: stroke, borderColor: '#E7B100' }} />
+      <DonutRing pct={p + c} size={size} stroke={stroke} fillColor="#1a6e8a" trackColor="transparent"><View /></DonutRing>
+      <DonutRing pct={p}     size={size} stroke={stroke} fillColor="#2596BE" trackColor="transparent"><View /></DonutRing>
     </View>
   );
 }
@@ -92,7 +92,7 @@ function MacroBar({ macro }: { macro: Macro }) {
                 s.tick,
                 {
                   backgroundColor: i < filled
-                    ? over ? '#E00000' : macro.color
+                    ? over ? '#2596BE' : macro.color
                     : colors.border,
                   opacity: i < filled ? 0.4 + (i / 20) * 0.6 : 1,
                 },
@@ -119,12 +119,12 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
   const STROKE = Math.max(Math.round(RING * 0.11), 13);
   const totalMacros = protein.consumed + carbs.consumed + fat.consumed;
   const ringColor = over
-    ? '#EF4444' // over target = red
+    ? '#E7B100' // over target = red
     : pct >= 100
-    ? '#10B981' // target reached = green
+    ? '#2596BE' // target reached = green
     : pct >= 70
-    ? '#FF5722' // close to target = deep coral/orange
-    : '#FF9800'; // initial progress = bright orange
+    ? '#E7B100' // close to target = deep coral/orange
+    : '#F7CB16'; // initial progress = bright orange
 
   return (
     <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -140,9 +140,9 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
             <Text style={[s.subtitle, { color: colors.textMuted }]}>Calorie & macro progress</Text>
           </View>
         </View>
-        <View style={[s.chip, { backgroundColor: over ? '#EF444418' : '#10B98118' }]}>
-          <View style={[s.chipDot, { backgroundColor: over ? '#EF4444' : '#10B981' }]} />
-          <Text style={[s.chipText, { color: over ? '#EF4444' : '#10B981' }]}>
+        <View style={[s.chip, { backgroundColor: over ? '#E7B10018' : '#2596BE18' }]}>
+          <View style={[s.chipDot, { backgroundColor: over ? '#E7B100' : '#2596BE' }]} />
+          <Text style={[s.chipText, { color: over ? '#E7B100' : '#2596BE' }]}>
             {over ? 'Over target' : 'On track'}
           </Text>
         </View>
@@ -173,11 +173,11 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
           </View>
 
           <View style={[s.statCard, {
-            backgroundColor: over ? '#EF44440E' : '#10B9810E',
-            borderColor: over ? '#EF444425' : '#10B98125',
+            backgroundColor: over ? '#E7B1000E' : '#2596BE0E',
+            borderColor: over ? '#E7B10025' : '#2596BE25',
           }]}>
             <Text style={[s.statLabel, { color: colors.textDim }]}>{over ? 'Over by' : 'Remaining'}</Text>
-            <Text style={[s.statVal, { color: over ? '#EF4444' : '#10B981' }]}>
+            <Text style={[s.statVal, { color: over ? '#E7B100' : '#2596BE' }]}>
               {Math.round(over ? caloriesConsumed - caloriesTarget : left)} kcal
             </Text>
           </View>
@@ -186,9 +186,9 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
           <View style={[s.statCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               {[
-                { label: 'Protein', color: '#10B981', val: `${Math.round(protein.consumed)}g` },
-                { label: 'Carbs',   color: '#3B82F6', val: `${Math.round(carbs.consumed)}g` },
-                { label: 'Fat',     color: '#F59E0B', val: `${Math.round(fat.consumed)}g` },
+                { label: 'Protein', color: '#2596BE', val: `${Math.round(protein.consumed)}g` },
+                { label: 'Carbs',   color: '#1a6e8a', val: `${Math.round(carbs.consumed)}g` },
+                { label: 'Fat',     color: '#E7B100', val: `${Math.round(fat.consumed)}g` },
               ].map(m => (
                 <View key={m.label} style={{ alignItems: 'center', flex: 1 }}>
                   <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: m.color }}>{m.val}</Text>
@@ -201,9 +201,9 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
       </View>
 
       {/* ── Banner ── */}
-      <View style={[s.banner, { backgroundColor: over ? '#EF44440E' : '#10B9810E', borderColor: over ? '#EF444430' : '#10B98130' }]}>
-        <Ionicons name={over ? 'warning-outline' : 'checkmark-circle-outline'} size={15} color={over ? '#EF4444' : '#10B981'} />
-        <Text style={[s.bannerText, { color: over ? '#EF4444' : '#10B981' }]}>
+      <View style={[s.banner, { backgroundColor: over ? '#E7B1000E' : '#2596BE0E', borderColor: over ? '#E7B10030' : '#2596BE30' }]}>
+        <Ionicons name={over ? 'warning-outline' : 'checkmark-circle-outline'} size={15} color={over ? '#E7B100' : '#2596BE'} />
+        <Text style={[s.bannerText, { color: over ? '#E7B100' : '#2596BE' }]}>
           {over
             ? `${Math.round(caloriesConsumed - caloriesTarget)} kcal over your daily goal`
             : `${Math.round(left)} kcal remaining to reach your goal`}
@@ -224,7 +224,7 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
 const s = StyleSheet.create({
   card: {
     marginHorizontal: 0, marginBottom: 16, borderRadius: 24, borderWidth: 1, padding: 18,
-    shadowColor: '#E00000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 6,
+    shadowColor: '#2596BE', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 6,
   },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
   titleLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -259,5 +259,7 @@ const s = StyleSheet.create({
   tick: { flex: 1, height: 7, borderRadius: 2 },
   barFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   pctLabel: { fontFamily: FONTS.body, fontSize: 9 },
-  overTag: { fontFamily: FONTS.bodyBold, fontSize: 9, color: '#E00000' },
+  overTag: { fontFamily: FONTS.bodyBold, fontSize: 9, color: '#2596BE' },
 });
+
+

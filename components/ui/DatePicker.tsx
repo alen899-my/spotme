@@ -125,8 +125,8 @@ function CalendarModal({
                   key={idx}
                   style={[
                     cal.cell,
-                    selected && { backgroundColor: '#E00000', borderRadius: 12 },
-                    !selected && todayC && { borderRadius: 12, borderWidth: 1.5, borderColor: '#E00000' },
+                    selected && { backgroundColor: '#2596BE', borderRadius: 12 },
+                    !selected && todayC && { borderRadius: 12, borderWidth: 1.5, borderColor: '#2596BE' },
                     future && { opacity: 0.25 },
                   ]}
                   onPress={() => {
@@ -141,7 +141,7 @@ function CalendarModal({
                 >
                   <Text style={[
                     cal.dayNum,
-                    { color: selected ? '#FFF' : todayC ? '#E00000' : colors.text },
+                    { color: selected ? '#FFF' : todayC ? '#2596BE' : colors.text },
                   ]}>
                     {day}
                   </Text>
@@ -155,7 +155,7 @@ function CalendarModal({
             style={[cal.todayBtn, { borderColor: colors.border }]}
             onPress={() => { onSelect(today()); onClose(); }}
           >
-            <Text style={[cal.todayBtnText, { color: colors.primary }]}>Jump to Today</Text>
+            <Text style={[cal.todayBtnText, { color: '#2596BE' }]}>Jump to Today</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -229,9 +229,9 @@ export default function DatePicker({ selectedDate, onSelectDate }: DatePickerPro
           style={[styles.todayPill, { backgroundColor: colors.iconCircle }]}
           activeOpacity={0.75}
         >
-          <Ionicons name="calendar-outline" size={13} color={colors.primary} />
-          <Text style={[styles.todayPillText, { color: colors.primary }]}>{selectedLabel}</Text>
-          {!inStrip && <View style={[styles.dot, { backgroundColor: colors.primary }]} />}
+          <Ionicons name="calendar-outline" size={13} color="#2596BE" />
+          <Text style={[styles.todayPillText, { color: '#2596BE' }]}>{selectedLabel}</Text>
+          {!inStrip && <View style={[styles.dot, { backgroundColor: '#2596BE' }]} />}
         </TouchableOpacity>
       </View>
 
@@ -245,7 +245,7 @@ export default function DatePicker({ selectedDate, onSelectDate }: DatePickerPro
         {/* If selected date is outside the strip, show it as an extra pill at the start */}
         {!inStrip && (
           <TouchableOpacity
-            style={[styles.pill, { backgroundColor: '#E00000', borderColor: '#E00000' }]}
+            style={[styles.pill, { backgroundColor: '#2596BE', borderColor: '#2596BE' }]}
             activeOpacity={0.8}
             onPress={() => setShowCal(true)}
           >
@@ -269,9 +269,9 @@ export default function DatePicker({ selectedDate, onSelectDate }: DatePickerPro
               style={[
                 styles.pill,
                 {
-                  backgroundColor: active ? '#E00000' : colors.card,
-                  borderColor: active ? '#E00000' : colors.border,
-                  shadowColor: active ? '#E00000' : 'transparent',
+                  backgroundColor: active ? '#2596BE' : colors.card,
+                  borderColor: active ? '#2596BE' : colors.border,
+                  shadowColor: active ? '#2596BE' : 'transparent',
                 },
               ]}
             >
@@ -325,3 +325,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.7)', marginTop: 4,
   },
 });
+

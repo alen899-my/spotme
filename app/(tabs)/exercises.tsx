@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   Image,
@@ -481,7 +480,7 @@ export default function ExercisesScreen() {
           : 'Loading your library';
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <View style={styles.screen}>
       <ImageBackground
         source={HEADER_IMAGE}
         style={[styles.hero, { paddingTop: heroTopPadding }]}
@@ -622,7 +621,7 @@ export default function ExercisesScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

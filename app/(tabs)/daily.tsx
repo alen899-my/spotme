@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, FlatList,
+  View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Dimensions, Image,
   Alert, ScrollView,
 } from 'react-native';
@@ -209,7 +209,7 @@ export default function DailyTab() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.container}>
         <View style={styles.header}>
           <View>
@@ -304,7 +304,7 @@ export default function DailyTab() {
         onConfirm={handleDeleteWorkout}
         onCancel={() => setDeletingId(null)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

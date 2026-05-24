@@ -43,7 +43,7 @@ function getWaterTarget(userData: any): { target: number; maxSafe: number } {
 function WaterBar({ pct, isOver, isGoal }: { pct: number; isOver: boolean; isGoal: boolean }) {
   const { colors } = useTheme();
   const fillAnim = useRef(new Animated.Value(0)).current;
-  const color = isOver ? '#EF4444' : isGoal ? '#10B981' : '#3B82F6';
+  const color = isOver ? '#E7B100' : isGoal ? '#2596BE' : '#1a6e8a';
 
   useEffect(() => {
     Animated.spring(fillAnim, { toValue: Math.min(pct / 100, 1), useNativeDriver: false, friction: 7, tension: 35 }).start();
@@ -56,23 +56,23 @@ function WaterBar({ pct, isOver, isGoal }: { pct: number; isOver: boolean; isGoa
       <View style={[bar.track, { backgroundColor: colors.border }]}>
         <Animated.View style={[bar.fill, { width: fillW, backgroundColor: color }]} />
         {/* Max limit marker at target position (= 62.5% of maxSafe) */}
-        <View style={[bar.marker, { left: '62.5%', borderColor: '#10B981' }]}>
-          <View style={[bar.markerLine, { backgroundColor: '#10B981' }]} />
+        <View style={[bar.marker, { left: '62.5%', borderColor: '#2596BE' }]}>
+          <View style={[bar.markerLine, { backgroundColor: '#2596BE' }]} />
         </View>
         {/* Over-limit marker at 100% */}
-        <View style={[bar.marker, { right: 2, borderColor: '#EF4444' }]}>
-          <View style={[bar.markerLine, { backgroundColor: '#EF4444' }]} />
+        <View style={[bar.marker, { right: 2, borderColor: '#E7B100' }]}>
+          <View style={[bar.markerLine, { backgroundColor: '#E7B100' }]} />
         </View>
       </View>
       <View style={bar.labelRow}>
         <Text style={[bar.label, { color: colors.textDim }]}>0 ml</Text>
         <View style={bar.goalBadge}>
-          <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#10B981', marginRight: 4 }} />
-          <Text style={[bar.label, { color: '#10B981' }]}>Goal</Text>
+          <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#2596BE', marginRight: 4 }} />
+          <Text style={[bar.label, { color: '#2596BE' }]}>Goal</Text>
         </View>
         <View style={bar.goalBadge}>
-          <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#EF4444', marginRight: 4 }} />
-          <Text style={[bar.label, { color: '#EF4444' }]}>Max</Text>
+          <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#E7B100', marginRight: 4 }} />
+          <Text style={[bar.label, { color: '#E7B100' }]}>Max</Text>
         </View>
       </View>
     </View>
@@ -104,18 +104,18 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   if (!lastLog) {
     return (
-      <View style={[rb.banner, { backgroundColor: '#3B82F615', borderColor: '#3B82F630' }]}>
-        <Ionicons name="water-outline" size={18} color="#3B82F6" />
-        <Text style={[rb.text, { color: '#3B82F6' }]}>Start your hydration journey! Log your first drink. 💧</Text>
+      <View style={[rb.banner, { backgroundColor: '#1a6e8a15', borderColor: '#1a6e8a30' }]}>
+        <Ionicons name="water-outline" size={18} color="#1a6e8a" />
+        <Text style={[rb.text, { color: '#1a6e8a' }]}>Start your hydration journey! Log your first drink. 💧</Text>
       </View>
     );
   }
 
   if (totalWater >= waterTarget) {
     return (
-      <View style={[rb.banner, { backgroundColor: '#10B98115', borderColor: '#10B98130' }]}>
-        <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-        <Text style={[rb.text, { color: '#10B981' }]}>Amazing! Daily hydration goal achieved! 🎉</Text>
+      <View style={[rb.banner, { backgroundColor: '#2596BE15', borderColor: '#2596BE30' }]}>
+        <Ionicons name="checkmark-circle" size={18} color="#2596BE" />
+        <Text style={[rb.text, { color: '#2596BE' }]}>Amazing! Daily hydration goal achieved! 🎉</Text>
       </View>
     );
   }
@@ -125,10 +125,10 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   if (elapsedMin < interval) {
     return (
-      <View style={[rb.banner, { backgroundColor: '#10B98110', borderColor: '#10B98125' }]}>
-        <Ionicons name="time-outline" size={18} color="#10B981" />
+      <View style={[rb.banner, { backgroundColor: '#2596BE10', borderColor: '#2596BE25' }]}>
+        <Ionicons name="time-outline" size={18} color="#2596BE" />
         <Text style={[rb.text, { color: colors.text }]}>
-          Next drink in <Text style={{ color: '#10B981', fontFamily: FONTS.bodyBold }}>{nextIn} min</Text>
+          Next drink in <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold }}>{nextIn} min</Text>
           {' '}· Stay consistent! 🚀
         </Text>
       </View>
@@ -138,9 +138,9 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
   // Overdue
   const urgency = elapsedMin > interval * 1.5;
   return (
-    <View style={[rb.banner, { backgroundColor: urgency ? '#EF444415' : '#F59E0B15', borderColor: urgency ? '#EF444430' : '#F59E0B30' }]}>
-      <Ionicons name={urgency ? 'warning-outline' : 'notifications-outline'} size={18} color={urgency ? '#EF4444' : '#F59E0B'} />
-      <Text style={[rb.text, { color: urgency ? '#EF4444' : '#F59E0B' }]}>
+    <View style={[rb.banner, { backgroundColor: urgency ? '#E7B10015' : '#E7B10015', borderColor: urgency ? '#E7B10030' : '#E7B10030' }]}>
+      <Ionicons name={urgency ? 'warning-outline' : 'notifications-outline'} size={18} color={urgency ? '#E7B100' : '#E7B100'} />
+      <Text style={[rb.text, { color: urgency ? '#E7B100' : '#E7B100' }]}>
         {urgency ? `⚠️ ${elapsedMin} min since last drink! Drink now!` : `Time to hydrate! It's been ${elapsedMin} min. 🙏`}
       </Text>
     </View>
@@ -232,12 +232,12 @@ export default function WaterTracker({ selectedDate }: Props) {
 
   // 4-state water color
   const waterColor = isOver
-    ? '#EF4444'
+    ? '#E7B100'
     : isGoal
-    ? '#10B981'
+    ? '#2596BE'
     : pct >= 30
-    ? '#3B82F6'
-    : '#F59E0B'; // low = amber
+    ? '#1a6e8a'
+    : '#E7B100'; // low = amber
 
   // Animated fill for cup
   const fillAnim = useRef(new Animated.Value(0)).current;
@@ -255,7 +255,7 @@ export default function WaterTracker({ selectedDate }: Props) {
   if (loading) {
     return (
       <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border, height: 180, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color="#1a6e8a" />
       </View>
     );
   }
@@ -296,7 +296,7 @@ export default function WaterTracker({ selectedDate }: Props) {
             { height: cupFillH, backgroundColor: waterColor + '90' },
           ]} />
           {/* Goal line marker */}
-          <View style={[s.goalLine, { bottom: '62.5%', borderColor: waterColor === '#EF4444' ? '#10B981' : waterColor }]} />
+          <View style={[s.goalLine, { bottom: '62.5%', borderColor: waterColor === '#E7B100' ? '#2596BE' : waterColor }]} />
           {/* Center label */}
           <View style={s.cupLabel}>
             <Text style={[s.cupNum, { color: colors.text }]}>{totalWater.toLocaleString()}</Text>
@@ -310,17 +310,17 @@ export default function WaterTracker({ selectedDate }: Props) {
             <Text style={[s.miniCardLabel, { color: colors.textDim }]}>Consumed</Text>
             <Text style={[s.miniCardVal, { color: waterColor }]}>{totalWater.toLocaleString()} ml</Text>
           </View>
-          <View style={[s.miniCard, { backgroundColor: '#10B98110', borderColor: '#10B98125' }]}>
+          <View style={[s.miniCard, { backgroundColor: '#2596BE10', borderColor: '#2596BE25' }]}>
             <Text style={[s.miniCardLabel, { color: colors.textDim }]}>Goal</Text>
-            <Text style={[s.miniCardVal, { color: '#10B981' }]}>{target.toLocaleString()} ml</Text>
+            <Text style={[s.miniCardVal, { color: '#2596BE' }]}>{target.toLocaleString()} ml</Text>
           </View>
-          <View style={[s.miniCard, { backgroundColor: '#EF444410', borderColor: '#EF444425' }]}>
+          <View style={[s.miniCard, { backgroundColor: '#E7B10010', borderColor: '#E7B10025' }]}>
             <Text style={[s.miniCardLabel, { color: colors.textDim }]}>Max Safe</Text>
-            <Text style={[s.miniCardVal, { color: '#EF4444' }]}>{maxSafe.toLocaleString()} ml</Text>
+            <Text style={[s.miniCardVal, { color: '#E7B100' }]}>{maxSafe.toLocaleString()} ml</Text>
           </View>
           <View style={[s.miniCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
             <Text style={[s.miniCardLabel, { color: colors.textDim }]}>{isOver ? 'Over by' : 'Remaining'}</Text>
-            <Text style={[s.miniCardVal, { color: isOver ? '#EF4444' : '#10B981' }]}>
+            <Text style={[s.miniCardVal, { color: isOver ? '#E7B100' : '#2596BE' }]}>
               {Math.abs(target - totalWater).toLocaleString()} ml
             </Text>
           </View>
@@ -381,7 +381,7 @@ export default function WaterTracker({ selectedDate }: Props) {
           <Text style={[s.logListTitle, { color: colors.text }]}>Today's Log</Text>
           {waterLogs.map((log, idx) => {
             const t = new Date(log.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const logColor = log.amount_ml >= 500 ? '#10B981' : log.amount_ml >= 250 ? '#3B82F6' : colors.textMuted;
+            const logColor = log.amount_ml >= 500 ? '#2596BE' : log.amount_ml >= 250 ? '#1a6e8a' : colors.textMuted;
             return (
               <View key={log.id} style={[s.logRow, { borderBottomColor: colors.border, opacity: idx > 4 ? 0.6 : 1 }]}>
                 <View style={[s.logIcon, { backgroundColor: logColor + '20' }]}>
@@ -392,7 +392,7 @@ export default function WaterTracker({ selectedDate }: Props) {
                   <Text style={[s.logTime, { color: colors.textDim }]}>{t}</Text>
                 </View>
                 <TouchableOpacity onPress={() => handleDelete(log.id, log.amount_ml)} style={s.deleteBtn}>
-                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                  <Ionicons name="trash-outline" size={15} color="#E7B100" />
                 </TouchableOpacity>
               </View>
             );
@@ -406,7 +406,7 @@ export default function WaterTracker({ selectedDate }: Props) {
 const s = StyleSheet.create({
   card: {
     marginHorizontal: 0, marginBottom: 16, borderRadius: 24, borderWidth: 1, padding: 18,
-    shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 6,
+    shadowColor: '#1a6e8a', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 6,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -420,7 +420,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 9, paddingVertical: 5, borderRadius: 20, borderWidth: 1,
   },
-  resetBtnText: { fontFamily: FONTS.bodyBold, fontSize: 10, color: '#EF4444' },
+  resetBtnText: { fontFamily: FONTS.bodyBold, fontSize: 10, color: '#E7B100' },
   // Cup styles
   cupRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
   cup: {
@@ -478,3 +478,5 @@ const s = StyleSheet.create({
   logTime: { fontFamily: FONTS.body, fontSize: 11, marginTop: 1 },
   deleteBtn: { padding: 6 },
 });
+
+

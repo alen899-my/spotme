@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, FlatList,
+  View, Text, StyleSheet, FlatList,
   TouchableOpacity, Image, ActivityIndicator,
   Dimensions, Animated, ScrollView, Platform,
 } from 'react-native';
@@ -210,7 +210,7 @@ export default function LeaderboardScreen() {
       {isDark && <LinearGradient colors={['#0A0A0A', '#111', '#1A0000']} style={StyleSheet.absoluteFill} />}
       {!isDark && <LinearGradient colors={[colors.bg, colors.inputBg, colors.bg]} style={StyleSheet.absoluteFill} />}
 
-      <SafeAreaView style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
         <FlatList
           data={loading ? [] : leaders}
           keyExtractor={(item) => String(item.id)}
@@ -316,7 +316,7 @@ export default function LeaderboardScreen() {
           }
           renderItem={({ item, index }) => <LeaderRow item={item} isMe={item.id === myId} index={index} />}
         />
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
