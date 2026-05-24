@@ -262,7 +262,7 @@ export default function DatePicker({ selectedDate, onSelectDate, variant = 'defa
   const selectedLabel = isToday
     ? 'Today'
     : `${DAYS[selectedDate.getDay()]}, ${selectedDate.getDate()} ${MONTHS[selectedDate.getMonth()]}`;
-  const todayLabel = `Today • ${DAYS[today().getDay()]}, ${today().getDate()} ${MONTHS[today().getMonth()]}`;
+  const todayLabel = `Today - ${DAYS[today().getDay()]}, ${today().getDate()} ${MONTHS[today().getMonth()]}`;
 
   // Check if selected date is in the visible 7-day strip
   const inStrip = dates.some((d) => isSameDay(d, selectedDate));
