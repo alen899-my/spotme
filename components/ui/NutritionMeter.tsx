@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { FONTS } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { PieChart } from 'react-native-gifted-charts';
 
 const { width: W } = Dimensions.get('window');
 
@@ -20,51 +21,6 @@ interface Props {
   protein: Macro;
   carbs: Macro;
   fat: Macro;
-}
-
-function DonutRing({ pct, size, stroke, fillColor, trackColor, children }: any) {
-  const half = size / 2;
-  const rPct = Math.min(pct, 50);
-  const lPct = Math.max(0, pct - 50);
-
-  return (
-    <View style={{ width: size, height: size }}>
-      <View style={{ position: 'absolute', width: size, height: size, borderRadius: half, borderWidth: stroke, borderColor: trackColor }} />
-      <View style={{ position: 'absolute', right: 0, top: 0, width: half, height: size, overflow: 'hidden' }}>
-        <View
-          style={{
-            position: 'absolute',
-            left: -half,
-            top: 0,
-            width: size,
-            height: size,
-            borderRadius: half,
-            borderWidth: stroke,
-            borderColor: fillColor,
-            transform: [{ rotate: `${-180 + rPct * 3.6}deg` }],
-          }}
-        />
-      </View>
-      <View style={{ position: 'absolute', left: 0, top: 0, width: half, height: size, overflow: 'hidden' }}>
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width: size,
-            height: size,
-            borderRadius: half,
-            borderWidth: stroke,
-            borderColor: fillColor,
-            transform: [{ rotate: `${-180 + lPct * 3.6}deg` }],
-          }}
-        />
-      </View>
-      <View style={{ position: 'absolute', width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
-        {children}
-      </View>
-    </View>
-  );
 }
 
 function macroTheme(label: string) {
@@ -163,16 +119,44 @@ function MacroBar({ macro }: { macro: Macro }) {
 }
 
 export default function NutritionMeter({ caloriesConsumed, caloriesTarget, protein, carbs, fat }: Props) {
+  const [expanded, setExpanded] = useState(true);
   const pct = Math.min(Math.round((caloriesConsumed / (caloriesTarget || 1)) * 100), 100);
   const left = Math.max(caloriesTarget - caloriesConsumed, 0);
   const over = caloriesConsumed > caloriesTarget;
   const RING = Math.min(W * 0.36, 148);
-  const STROKE = Math.max(Math.round(RING * 0.11), 13);
-  const ringColor = over ? '#E7B100' : pct >= 100 ? '#2596BE' : pct >= 70 ? '#E7B100' : '#F7CB16';
+  const innerRadius = Math.max(RING * 0.32, 42);
+  const ringColor =
+    caloriesConsumed <= 0
+      ? '#E14B4B'
+      : over
+        ? '#D88900'
+        : pct >= 100
+          ? '#10B981'
+          : pct >= 70
+            ? '#F7CB16'
+            : pct >= 35
+              ? '#F28C28'
+              : '#E14B4B';
+  const innerRingColor =
+    caloriesConsumed <= 0
+      ? 'rgba(102,22,22,0.92)'
+      : over
+        ? 'rgba(101,64,0,0.92)'
+        : pct >= 100
+          ? 'rgba(7,98,68,0.92)'
+          : pct >= 70
+            ? 'rgba(110,91,10,0.92)'
+            : pct >= 35
+              ? 'rgba(120,63,8,0.92)'
+              : 'rgba(102,22,22,0.92)';
+  const chartData = [
+    { value: Math.max(pct, 1), color: ringColor, gradientCenterColor: ringColor },
+    { value: Math.max(100 - pct, 1), color: 'rgba(255,255,255,0.18)', gradientCenterColor: 'rgba(255,255,255,0.18)' },
+  ];
 
   return (
     <View style={s.card}>
-      <View style={s.titleRow}>
+      <TouchableOpacity style={s.titleRow} activeOpacity={0.88} onPress={() => setExpanded((prev) => !prev)}>
         <View style={s.titleLeft}>
           <View style={s.titleIcon}>
             <Ionicons name="flame" size={18} color="#FFF" />
@@ -182,60 +166,98 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
             <Text style={s.subtitle}>Calorie and macro progress</Text>
           </View>
         </View>
-      </View>
+        <View style={s.accordionIconWrap}>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#FFF" />
+        </View>
+      </TouchableOpacity>
 
-      <View style={s.topRow}>
-        <DonutRing pct={pct} size={RING} stroke={STROKE} fillColor={ringColor} trackColor="rgba(255,255,255,0.24)">
-          <View style={{ alignItems: 'center' }}>
-            <Text style={s.ringNum}>{Math.round(caloriesConsumed).toLocaleString()}</Text>
-            <Text style={s.ringUnit}>kcal</Text>
-            <View style={s.pctBadge}>
-              <Text style={s.pctText}>{pct}%</Text>
-            </View>
+      {!expanded && (
+        <View style={s.collapsedSummaryRow}>
+          <View style={[s.summaryChip, s.summaryChipLight]}>
+            <Text style={s.summaryLabelLight}>Consumed</Text>
+            <Text style={s.summaryValueLight}>{Math.round(caloriesConsumed).toLocaleString()} kcal</Text>
           </View>
-        </DonutRing>
-
-        <View style={{ flex: 1, gap: 7 }}>
-          <View style={[s.statCard, s.caloriesCard]}>
-            <View style={s.statHeader}>
-              <View style={s.statIconDark}>
-                <Ionicons name="flame-outline" size={16} color="#04282B" />
-              </View>
-              <Text style={s.statLabelDark}>Calories Eaten</Text>
-            </View>
-            <Text style={s.statValueDark}>{Math.round(caloriesConsumed).toLocaleString()} kcal</Text>
+          <View style={[s.summaryChip, s.summaryChipSuccess]}>
+            <Text style={s.summaryLabelLight}>Target</Text>
+            <Text style={s.summaryValueLight}>{caloriesTarget.toLocaleString()} kcal</Text>
           </View>
-
-          <View style={[s.statCard, s.targetCard]}>
-            <View style={s.statHeader}>
-              <View style={s.statIconLight}>
-                <Ionicons name="flag-outline" size={16} color="#FFF" />
-              </View>
-              <Text style={s.statLabelLight}>Daily Target</Text>
-            </View>
-            <Text style={s.statValueLight}>{caloriesTarget.toLocaleString()} kcal</Text>
-          </View>
-
-          <View style={[s.statCard, over ? s.overCard : s.remainingCard]}>
-            <View style={s.statHeader}>
-              <View style={s.statIconLight}>
-                <Ionicons name={over ? 'warning-outline' : 'checkmark-circle-outline'} size={16} color="#FFF" />
-              </View>
-              <Text style={s.statLabelLight}>{over ? 'Over by' : 'Remaining'}</Text>
-            </View>
-            <Text style={s.statValueLight}>
-              {Math.round(over ? caloriesConsumed - caloriesTarget : left)} kcal
-            </Text>
+          <View style={[s.summaryChip, over ? s.summaryChipAlert : s.summaryChipWarm]}>
+            <Text style={s.summaryLabelDark}>{over ? 'Over' : 'Left'}</Text>
+            <Text style={s.summaryValueDark}>{Math.round(over ? caloriesConsumed - caloriesTarget : left)} kcal</Text>
           </View>
         </View>
-      </View>
+      )}
 
-      <View style={s.macroSection}>
-        <Text style={s.macroTitle}>Macronutrients</Text>
-        <MacroBar macro={protein} />
-        <MacroBar macro={carbs} />
-        <MacroBar macro={fat} />
-      </View>
+      {expanded && (
+        <>
+          <View style={s.topRow}>
+            <View style={s.chartWrap}>
+              <PieChart
+                donut
+                isAnimated
+                animationDuration={900}
+                radius={RING / 2}
+                innerRadius={innerRadius}
+                data={chartData}
+                showText={false}
+                strokeWidth={0}
+                innerCircleColor={innerRingColor}
+                centerLabelComponent={() => (
+                  <View style={s.chartCenter}>
+                    <Text style={s.ringNum}>{Math.round(caloriesConsumed).toLocaleString()}</Text>
+                    <Text style={s.ringUnit}>kcal</Text>
+                    <View style={s.pctBadge}>
+                      <Text style={s.pctText}>{pct}%</Text>
+                    </View>
+                  </View>
+                )}
+              />
+              <View style={[s.chartGlow, { borderColor: ringColor }]} />
+            </View>
+
+            <View style={{ flex: 1, gap: 7 }}>
+              <View style={[s.statCard, s.caloriesCard]}>
+                <View style={s.statHeader}>
+                  <View style={s.statIconDark}>
+                    <Ionicons name="flame-outline" size={16} color="#04282B" />
+                  </View>
+                  <Text style={s.statLabelDark}>Calories Eaten</Text>
+                </View>
+                <Text style={s.statValueDark}>{Math.round(caloriesConsumed).toLocaleString()} kcal</Text>
+              </View>
+
+              <View style={[s.statCard, s.targetCard]}>
+                <View style={s.statHeader}>
+                  <View style={s.statIconLight}>
+                    <Ionicons name="flag-outline" size={16} color="#FFF" />
+                  </View>
+                  <Text style={s.statLabelLight}>Daily Target</Text>
+                </View>
+                <Text style={s.statValueLight}>{caloriesTarget.toLocaleString()} kcal</Text>
+              </View>
+
+              <View style={[s.statCard, over ? s.overCard : s.remainingCard]}>
+                <View style={s.statHeader}>
+                  <View style={s.statIconLight}>
+                    <Ionicons name={over ? 'warning-outline' : 'checkmark-circle-outline'} size={16} color="#FFF" />
+                  </View>
+                  <Text style={s.statLabelLight}>{over ? 'Over by' : 'Remaining'}</Text>
+                </View>
+                <Text style={s.statValueLight}>
+                  {Math.round(over ? caloriesConsumed - caloriesTarget : left)} kcal
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={s.macroSection}>
+            <Text style={s.macroTitle}>Macronutrients</Text>
+            <MacroBar macro={protein} />
+            <MacroBar macro={carbs} />
+            <MacroBar macro={fat} />
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -257,10 +279,38 @@ const s = StyleSheet.create({
   },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
   titleLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  accordionIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  collapsedSummaryRow: { flexDirection: 'row', gap: 8, marginBottom: 2 },
+  summaryChip: { flex: 1, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 10 },
+  summaryChipLight: { backgroundColor: '#1A6E8A' },
+  summaryChipSuccess: { backgroundColor: '#10B981' },
+  summaryChipWarm: { backgroundColor: '#F7CB16' },
+  summaryChipAlert: { backgroundColor: '#D88900' },
+  summaryLabelLight: { fontFamily: FONTS.bodyBold, fontSize: 10, color: 'rgba(255,255,255,0.82)', marginBottom: 2 },
+  summaryValueLight: { fontFamily: FONTS.heading, fontSize: 12, color: '#FFF' },
+  summaryLabelDark: { fontFamily: FONTS.bodyBold, fontSize: 10, color: 'rgba(4,40,43,0.72)', marginBottom: 2 },
+  summaryValueDark: { fontFamily: FONTS.heading, fontSize: 12, color: '#04282B' },
   titleIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.16)' },
   title: { fontFamily: FONTS.heading, fontSize: Math.min(W * 0.048, 20), color: '#FFF' },
   subtitle: { fontFamily: FONTS.body, fontSize: 11, marginTop: 1, color: 'rgba(255,255,255,0.82)' },
   topRow: { flexDirection: 'row', gap: 14, marginBottom: 16, alignItems: 'center' },
+  chartWrap: { position: 'relative', justifyContent: 'center', alignItems: 'center' },
+  chartCenter: { alignItems: 'center', justifyContent: 'center' },
+  chartGlow: {
+    position: 'absolute',
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    borderWidth: 1,
+    opacity: 0.25,
+  },
   ringNum: { fontFamily: FONTS.heading, fontSize: Math.min(W * 0.062, 24), lineHeight: Math.min(W * 0.066, 26), letterSpacing: -1, color: '#FFF' },
   ringUnit: { fontFamily: FONTS.bodySemiBold, fontSize: 10, marginTop: 2, color: 'rgba(255,255,255,0.78)' },
   pctBadge: { marginTop: 5, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.14)' },
