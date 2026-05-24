@@ -114,7 +114,7 @@ router.get('/', async (req, res) => {
     const selectQuery = userId ? 
       `SELECT e.id, e.name, e.category, e.body_part, e.equipment,
               e.muscle_group, e.secondary_muscles, e.target,
-              e.image_url, e.gif_url,
+              e.image_url, e.gif_url, e.instructions_en,
               (SELECT ROUND(AVG(dwe2.rating), 1)::float
                FROM daily_workout_exercises dwe2
                JOIN daily_workouts dw2 ON dwe2.daily_workout_id = dw2.id
@@ -125,7 +125,7 @@ router.get('/', async (req, res) => {
       :
       `SELECT id, name, category, body_part, equipment,
               muscle_group, secondary_muscles, target,
-              image_url, gif_url
+              image_url, gif_url, instructions_en
        FROM exercises ${where}
        ORDER BY name ASC
        LIMIT $${idx} OFFSET $${idx + 1}`;

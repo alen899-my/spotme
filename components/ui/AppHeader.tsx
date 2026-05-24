@@ -4,7 +4,6 @@ import {
   Text,
   Image,
   StyleSheet,
-  Platform,
   Dimensions,
   TouchableOpacity,
   Animated,
@@ -15,13 +14,10 @@ import { FONTS } from "../../constants/theme";
 
 const P = {
   sun:     "#F7CB16",
-  sunDeep: "#E7B100",
   cta:     "#2596BE",
   ctaDark: "#1a6e8a",
-  ctaDeep: "#0d4d65",
-  ink:     "#04282B",
-  inkDeep: "#021518",
   white:   "#FFFFFF",
+  ink:     "#04282B",
 };
 
 const { width: W } = Dimensions.get("window");
@@ -43,181 +39,182 @@ export default function AppHeader({
   actionBadge,
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
-
   const profileScale = useRef(new Animated.Value(1)).current;
-  const onPressIn  = () => Animated.spring(profileScale, { toValue: 0.91, useNativeDriver: true, tension: 300, friction: 20 }).start();
-  const onPressOut = () => Animated.spring(profileScale, { toValue: 1,    useNativeDriver: true, tension: 300, friction: 20 }).start();
 
-  const topPad = Math.max(insets.top, Platform.OS === "ios" ? 44 : 24);
+  const onPressIn = () =>
+    Animated.spring(profileScale, {
+      toValue: 0.94,
+      useNativeDriver: true,
+      tension: 280,
+      friction: 18,
+    }).start();
+
+  const onPressOut = () =>
+    Animated.spring(profileScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 280,
+      friction: 18,
+    }).start();
+
   const hasPhoto = !!(user?.profile_pic_url || user?.profilePicUrl);
-  const photoUri  = user?.profile_pic_url || user?.profilePicUrl;
+  const photoUri = user?.profile_pic_url || user?.profilePicUrl;
 
   return (
-    <View style={[styles.container, { paddingTop: topPad + scale(6) }]}>
-
-      {/* ── Left: avatar ── */}
-      <Animated.View style={{ transform: [{ scale: profileScale }] }}>
-        <TouchableOpacity
-          onPress={onProfilePress}
-          onPressIn={onPressIn}
-          onPressOut={onPressOut}
-          activeOpacity={1}
-          style={styles.avatarBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          {hasPhoto ? (
-            <Image source={{ uri: photoUri }} style={styles.avatarImg} />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <Ionicons name="person" size={scale(18)} color={P.cta} />
-            </View>
-          )}
-          <View style={styles.activeDot} />
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* ── Centre: wordmark ── */}
-      <View style={styles.wordmarkWrap} pointerEvents="none">
-        <Text style={styles.wordmarkSpot} allowFontScaling={false}>spot</Text>
-        <Text style={styles.wordmarkMe}   allowFontScaling={false}>ME</Text>
-      </View>
-
-      {/* ── Right: action button ── */}
-      <View style={styles.rightSlot}>
-        {onActionPress ? (
+    <View style={[styles.container, { paddingTop: insets.top + scale(6) }]}>
+      <View style={styles.row}>
+        <Animated.View style={{ transform: [{ scale: profileScale }] }}>
           <TouchableOpacity
-            onPress={onActionPress}
-            style={styles.iconBtn}
-            activeOpacity={0.8}
+            onPress={onProfilePress}
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+            activeOpacity={1}
+            style={styles.avatarBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name={actionIcon as any} size={scale(20)} color={P.white} />
-            {!!actionBadge && actionBadge > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText} allowFontScaling={false}>
-                  {actionBadge > 9 ? "9+" : String(actionBadge)}
-                </Text>
+            {hasPhoto ? (
+              <Image source={{ uri: photoUri }} style={styles.avatarImg} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Ionicons name="person" size={scale(16)} color={P.cta} />
               </View>
             )}
+            <View style={styles.activeDot} />
           </TouchableOpacity>
-        ) : (
-          <View style={styles.iconBtn} />
-        )}
-      </View>
+        </Animated.View>
 
+        <View style={styles.wordmarkWrap} pointerEvents="none">
+          <Text style={styles.wordmarkSpot} allowFontScaling={false}>spot</Text>
+          <Text style={styles.wordmarkMe} allowFontScaling={false}>ME</Text>
+        </View>
+
+        <View style={styles.rightSlot}>
+          {onActionPress ? (
+            <TouchableOpacity
+              onPress={onActionPress}
+              style={styles.iconBtn}
+              activeOpacity={0.82}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name={actionIcon as any} size={scale(18)} color={P.white} />
+              {!!actionBadge && actionBadge > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText} allowFontScaling={false}>
+                    {actionBadge > 9 ? "9+" : String(actionBadge)}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.iconBtn} />
+          )}
+        </View>
+      </View>
     </View>
   );
 }
 
-const AVATAR = scale(38);
-const BTN    = scale(38);
+const AVATAR = scale(36);
+const BTN = scale(36);
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection:   "row",
-    alignItems:      "center",
-    paddingHorizontal: scale(18),
-    paddingBottom:   scale(10),
+    paddingHorizontal: scale(16),
+    paddingBottom: scale(10),
     backgroundColor: P.cta,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
     zIndex: 100,
   },
-
-  // ── Avatar ──────────────────────────────────────────────────────────────────
+  row: {
+    minHeight: scale(42),
+    flexDirection: "row",
+    alignItems: "center",
+  },
   avatarBtn: {
-    width:          AVATAR,
-    height:         AVATAR,
-    borderRadius:   AVATAR / 2,
-    borderWidth:    2.5,
-    borderColor:    P.white,
-    overflow:       "visible",
+    width: AVATAR,
+    height: AVATAR,
+    borderRadius: AVATAR / 2,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.45)",
     justifyContent: "center",
-    alignItems:     "center",
+    alignItems: "center",
+    overflow: "visible",
   },
-
   avatarImg: {
-    width:        AVATAR - 5,
-    height:       AVATAR - 5,
-    borderRadius: (AVATAR - 5) / 2,
+    width: AVATAR - 4,
+    height: AVATAR - 4,
+    borderRadius: (AVATAR - 4) / 2,
   },
-
   avatarFallback: {
-    width:           AVATAR - 5,
-    height:          AVATAR - 5,
-    borderRadius:    (AVATAR - 5) / 2,
+    width: AVATAR - 4,
+    height: AVATAR - 4,
+    borderRadius: (AVATAR - 4) / 2,
     backgroundColor: P.white,
-    justifyContent:  "center",
-    alignItems:      "center",
+    justifyContent: "center",
+    alignItems: "center",
   },
-
   activeDot: {
-    position:        "absolute",
-    bottom:          0,
-    right:           0,
-    width:           scale(10),
-    height:          scale(10),
-    borderRadius:    scale(5),
-    backgroundColor: P.sun,           // yellow active dot
-    borderWidth:     2,
-    borderColor:     P.cta,
+    position: "absolute",
+    bottom: scale(1),
+    right: scale(1),
+    width: scale(9),
+    height: scale(9),
+    borderRadius: scale(4.5),
+    backgroundColor: P.sun,
+    borderWidth: 1.5,
+    borderColor: P.cta,
   },
-
-  // ── Wordmark ─────────────────────────────────────────────────────────────────
   wordmarkWrap: {
-    flex:           1,
-    flexDirection:  "row",
-    alignItems:     "baseline",
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "baseline",
     justifyContent: "center",
   },
-
   wordmarkSpot: {
-    fontFamily:         "Outfit_900Black",
-    fontSize:           scale(25),
-    color:              P.white,
-    letterSpacing:      -0.8,
+    fontFamily: "Outfit_900Black",
+    fontSize: scale(21),
+    color: P.white,
+    letterSpacing: -0.8,
     includeFontPadding: false,
   },
-
   wordmarkMe: {
-    fontFamily:         "Outfit_900Black",
-    fontSize:           scale(25),
-    color:              P.sun,         // yellow ME
-    letterSpacing:      -0.8,
+    fontFamily: "Outfit_900Black",
+    fontSize: scale(21),
+    color: P.sun,
+    letterSpacing: -0.8,
     includeFontPadding: false,
   },
-
-  // ── Right slot ───────────────────────────────────────────────────────────────
   rightSlot: {
-    width:      BTN,
+    width: BTN,
     alignItems: "flex-end",
   },
-
   iconBtn: {
-    width:          BTN,
-    height:         BTN,
+    width: BTN,
+    height: BTN,
+    borderRadius: BTN / 2,
     justifyContent: "center",
-    alignItems:     "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
-
-  // ── Notification badge ───────────────────────────────────────────────────────
   badge: {
-    position:         "absolute",
-    top:              -3,
-    right:            -3,
-    minWidth:         scale(16),
-    height:           scale(16),
-    borderRadius:     scale(8),
-    backgroundColor:  P.sun,
-    justifyContent:   "center",
-    alignItems:       "center",
+    position: "absolute",
+    top: -3,
+    right: -3,
+    minWidth: scale(16),
+    height: scale(16),
+    borderRadius: scale(8),
+    backgroundColor: P.sun,
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 3,
-    borderWidth:      1.5,
-    borderColor:      P.cta,
+    borderWidth: 1.5,
+    borderColor: P.cta,
   },
-
   badgeText: {
-    fontFamily:    FONTS.bodyBold,
-    fontSize:      scale(9),
-    color:         P.ink,
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(9),
+    color: P.ink,
     letterSpacing: 0.2,
   },
 });

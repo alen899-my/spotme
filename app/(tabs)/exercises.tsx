@@ -7,205 +7,260 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  ImageBackground,
   ActivityIndicator,
   TextInput,
   Dimensions,
+  Modal,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FONTS } from '../../constants/theme';
-import { useTheme } from '../../contexts/ThemeContext';
+import Body, { ExtendedBodyPart, Slug } from 'react-native-body-highlighter';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { FONTS } from '../../constants/theme';
+import { P } from '../../constants/homeTheme';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const H_PADDING   = 16;
-const CARD_GAP    = 12;
-const CARD_WIDTH  = (SCREEN_WIDTH - H_PADDING * 2 - CARD_GAP) / 2;
+const H_PADDING = 16;
+const CARD_GAP = 12;
+const CARD_WIDTH = (SCREEN_WIDTH - H_PADDING * 2 - CARD_GAP) / 2;
 const CARD_HEIGHT = CARD_WIDTH * 1.2;
-const PAGE_SIZE   = 20;
-const API_URL     = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+const PAGE_SIZE = 20;
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+const HEADER_IMAGE = require('../../assets/home/firstscreenbg.png');
 
-// ─── Per-category accent colours ──────────────────────────────────────────────
-const ACCENTS: Record<string, [string, string]> = {
-  back:           ['#E00000', '#8B0000'],
-  chest:          ['#FF6B35', '#C0392B'],
-  waist:          ['#7C3AED', '#4C1D95'],
-  'upper legs':   ['#0891B2', '#164E63'],
-  'lower legs':   ['#059669', '#064E3B'],
-  shoulders:      ['#D97706', '#78350F'],
-  'upper arms':   ['#DC2626', '#7F1D1D'],
-  'lower arms':   ['#7C3AED', '#3B0764'],
-  neck:           ['#6366F1', '#312E81'],
-  cardio:         ['#EC4899', '#831843'],
+type AccentTheme = {
+  gradient: [string, string];
+  glow: string;
 };
-const accentFor = (cat: string): [string, string] =>
-  ACCENTS[cat?.toLowerCase()] ?? ['#E00000', '#8B0000'];
 
-// ─── Skeleton ────────────────────────────────────────────────────────────────
-const SkeletonCard = ({ colors, tall = true }: { colors: any; tall?: boolean }) => (
-  <View style={[
-    styles.card,
-    {
-      width: CARD_WIDTH,
-      height: tall ? CARD_HEIGHT : CARD_WIDTH * 0.72,
-      backgroundColor: '#222', // Dark placeholder
-      borderColor: 'transparent',
-    },
-  ]} />
+const ACCENTS: Record<string, AccentTheme> = {
+  back: { gradient: [P.ctaDeep, P.ctaDark], glow: 'rgba(247,203,22,0.18)' },
+  chest: { gradient: [P.cta, P.ctaDark], glow: 'rgba(255,255,255,0.10)' },
+  waist: { gradient: [P.ctaDark, P.ctaDeep], glow: 'rgba(247,203,22,0.14)' },
+  'upper legs': { gradient: [P.cta, P.ctaDeep], glow: 'rgba(247,203,22,0.16)' },
+  'lower legs': { gradient: [P.ctaDark, P.cta], glow: 'rgba(255,255,255,0.10)' },
+  shoulders: { gradient: [P.ctaDeep, P.cta], glow: 'rgba(247,203,22,0.20)' },
+  'upper arms': { gradient: [P.ctaDark, P.ctaDeep], glow: 'rgba(255,255,255,0.10)' },
+  'lower arms': { gradient: [P.cta, P.ctaDark], glow: 'rgba(247,203,22,0.14)' },
+  neck: { gradient: [P.ctaDeep, P.ctaDark], glow: 'rgba(247,203,22,0.16)' },
+  cardio: { gradient: [P.cta, P.ctaDeep], glow: 'rgba(255,255,255,0.08)' },
+};
+
+const accentFor = (category?: string | null): AccentTheme =>
+  ACCENTS[category?.toLowerCase() ?? ''] ?? { gradient: [P.cta, P.ctaDark], glow: 'rgba(247,203,22,0.14)' };
+
+const BODY_CATEGORY_MAP: Record<string, { label: string; categories: string[] }> = {
+  chest: { label: 'Chest', categories: ['chest'] },
+  'upper-back': { label: 'Upper Back', categories: ['back'] },
+  'lower-back': { label: 'Lower Back', categories: ['back'] },
+  trapezius: { label: 'Traps', categories: ['back', 'shoulders'] },
+  deltoids: { label: 'Shoulders', categories: ['shoulders'] },
+  biceps: { label: 'Biceps', categories: ['upper arms'] },
+  triceps: { label: 'Triceps', categories: ['upper arms'] },
+  forearm: { label: 'Forearms', categories: ['lower arms'] },
+  abs: { label: 'Abs', categories: ['waist'] },
+  obliques: { label: 'Obliques', categories: ['waist'] },
+  gluteal: { label: 'Glutes', categories: ['upper legs'] },
+  quadriceps: { label: 'Quads', categories: ['upper legs'] },
+  hamstring: { label: 'Hamstrings', categories: ['upper legs'] },
+  adductors: { label: 'Adductors', categories: ['upper legs'] },
+  calves: { label: 'Calves', categories: ['lower legs'] },
+  neck: { label: 'Neck', categories: ['neck'] },
+};
+
+const formatLabel = (value?: string | null) =>
+  (value || '')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const getExerciseDescription = (item: any) => {
+  const raw = typeof item?.instructions_en === 'string'
+    ? item.instructions_en.replace(/\s+/g, ' ').trim()
+    : '';
+
+  if (!raw) return '';
+
+  const firstSentence = raw.match(/.*?[.!?](\s|$)/)?.[0]?.trim() || raw;
+  return firstSentence.length > 118
+    ? `${firstSentence.slice(0, 115).trim()}...`
+    : firstSentence;
+};
+
+const SkeletonCard = ({ tall = true }: { tall?: boolean }) => (
+  <View
+    style={[
+      styles.card,
+      styles.skeletonCard,
+      {
+        width: CARD_WIDTH,
+        height: tall ? CARD_HEIGHT : CARD_WIDTH,
+      },
+    ]}
+  >
+    <View style={styles.skeletonGlow} />
+  </View>
 );
 
-// ─── Category card (Uber-Premium Look) ─────────────────────────────────────────
-const CategoryCard = React.memo(({ item, colors, onPress }: { item: any; colors: any; onPress: () => void }) => {
+const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => void }) => {
   const [imgError, setImgError] = useState(false);
-  const [start, end] = accentFor(item.category);
-  const label = item.category.charAt(0).toUpperCase() + item.category.slice(1);
-
-  return (
-    <TouchableOpacity activeOpacity={0.88}
-      onPress={onPress}
-      style={[
-        styles.card,
-        {
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-          backgroundColor: start,
-          borderColor: 'transparent',
-        }
-      ]}
-    >
-      <LinearGradient
-        colors={[start, end]}
-        style={StyleSheet.absoluteFillObject}
-      />
-
-      {/* Decorative large text behind */}
-      <Text style={styles.cardBgLabel}>{label.slice(0, 3).toUpperCase()}</Text>
-
-      {/* Image placement - shifted for a dynamic 'Uber' look */}
-      <View style={styles.imageContainer}>
-        {item.image_url && !imgError ? (
-          <Image
-            source={{ uri: item.image_url }}
-            style={styles.floatingImage}
-            resizeMode="contain"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <Ionicons name="fitness-outline" size={60} color="rgba(255,255,255,0.15)" />
-        )}
-      </View>
-
-      <View style={styles.cardContent}>
-        <Text style={styles.cardLabelPremium}>{label}</Text>
-        <View style={styles.cardInfoRow}>
-          <Text style={styles.cardCountPremium}>{item.exercise_count || 0} exercises</Text>
-          <View style={styles.miniArrow}>
-            <Ionicons name="arrow-forward" size={12} color="#FFF" />
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-// ─── Exercise card (Uber-Premium Square Look) ──────────────────────────────────
-const ExerciseCard = React.memo(({ item, colors, square = false }: { item: any; colors: any; square?: boolean }) => {
-  const router = useRouter();
-  const [imgError, setImgError] = useState(false);
-  const [accent] = accentFor(item.category);
-  const bgLabel = item.name.slice(0, 3).toUpperCase();
+  const theme = accentFor(item.category);
+  const label = formatLabel(item.category);
 
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={() => router.push(`/exercises/${item.id}`)}
-      style={[
-        styles.card,
-        {
-          width: CARD_WIDTH,
-          height: square ? CARD_WIDTH : CARD_WIDTH * 0.75,
-          backgroundColor: '#1A1A1A',
-          borderColor: 'transparent',
-        }
-      ]}
+      activeOpacity={0.9}
+      onPress={onPress}
+      style={[styles.card, styles.categoryCard, { width: CARD_WIDTH, height: CARD_HEIGHT }]}
     >
-      {/* Decorative background label */}
-      <Text style={[styles.cardBgLabel, { fontSize: 60, opacity: 0.1 }]}>{bgLabel}</Text>
-
-      {item.image_url && !imgError ? (
-        <Image
-          source={{ uri: item.image_url }}
-          style={[StyleSheet.absoluteFillObject, { opacity: 0.75 }]}
-          resizeMode="cover"
-          onError={() => setImgError(true)}
+      <View style={styles.cardMedia}>
+        <LinearGradient
+          colors={[P.offWhite, P.ctaLight]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
         />
-      ) : (
-        <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center' }]}>
-          <Ionicons name="barbell-outline" size={32} color="rgba(255,255,255,0.2)" />
+        <View style={[styles.mediaGlow, { backgroundColor: theme.glow }]} />
+
+        <View style={styles.imageContainer}>
+          {item.image_url && !imgError ? (
+            <Image
+              source={{ uri: item.image_url }}
+              style={styles.floatingImage}
+              resizeMode="contain"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <Ionicons name="fitness-outline" size={64} color={P.cta} />
+          )}
         </View>
-      )}
+      </View>
 
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.95)']}
-        style={StyleSheet.absoluteFillObject}
-      />
-
-      {!square && (
-        <View style={[styles.premiumChip, { backgroundColor: accent }]}>
-          <Text style={styles.premiumChipText}>{item.category}</Text>
-        </View>
-      )}
-
-      {item.avg_rating !== undefined && item.avg_rating !== null && (
-        <View style={styles.ratingChip}>
-          <Ionicons name="star" size={10} color="#F59E0B" />
-          <Text style={styles.ratingChipText}>{item.avg_rating}</Text>
-        </View>
-      )}
-
-      <View style={styles.exCardContent}>
-        <Text style={styles.exNamePremium} numberOfLines={2}>{item.name}</Text>
-        {square && (
-          <View style={styles.exTagRow}>
-            <Text style={styles.exTargetPremium}>{item.target}</Text>
-            <View style={styles.dot} />
-            <Text style={styles.exTargetPremium}>{item.equipment}</Text>
+      <View style={styles.cardFooter}>
+        <Text style={styles.cardLabel}>{label}</Text>
+        <View style={styles.cardInfoRow}>
+          <Text style={styles.cardCountText}>{item.exercise_count || 0} exercises</Text>
+          <View style={styles.categoryArrow}>
+            <Ionicons name="arrow-forward" size={14} color={P.ink} />
           </View>
-        )}
+        </View>
       </View>
     </TouchableOpacity>
   );
 });
 
-// ─── Main screen ──────────────────────────────────────────────────────────────
-export default function ExercisesScreen() {
-  const { colors } = useTheme();
+const ExerciseCard = React.memo(({ item }: { item: any }) => {
+  const router = useRouter();
+  const [imgError, setImgError] = useState(false);
+  const theme = accentFor(item.category);
+  const description = getExerciseDescription(item);
+  const tagItems = [item.target, item.equipment]
+    .filter(Boolean)
+    .map((value) => formatLabel(value));
+  const imageUri = item.image_url || item.gif_url || null;
 
-  // Mode: 'categories' | 'exercises'
+  return (
+    <TouchableOpacity
+      activeOpacity={0.86}
+      onPress={() => router.push(`/exercises/${item.id}`)}
+      style={[styles.card, styles.exerciseTryCard]}
+    >
+      <View style={styles.exercisePillRow}>
+        {item.category ? (
+          <View style={styles.exerciseScorePill}>
+            <Ionicons name="fitness-outline" size={11} color={P.sun} />
+            <Text style={styles.exerciseScorePillText}>{formatLabel(item.category)}</Text>
+          </View>
+        ) : (
+          <View />
+        )}
+
+        {item.avg_rating !== undefined && item.avg_rating !== null && (
+          <View style={styles.exerciseRatingPill}>
+            <Ionicons name="star" size={11} color={P.ink} />
+            <Text style={styles.exerciseRatingPillText}>{item.avg_rating}</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.exerciseBodyRow}>
+        <View style={styles.exerciseTextBlock}>
+          <Text style={styles.exName} numberOfLines={2}>
+            {item.name}
+          </Text>
+
+          {description ? (
+            <Text style={styles.exerciseDescription} numberOfLines={2}>
+              {description}
+            </Text>
+          ) : null}
+
+          {tagItems.length > 0 ? (
+            <View style={styles.exerciseTagsRow}>
+              {tagItems.map((tag) => (
+                <View key={`${item.id}-${tag}`} style={styles.exerciseTag}>
+                  <Text style={styles.exerciseTagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
+
+        {imageUri && !imgError ? (
+          <Image
+            source={{ uri: imageUri }}
+            style={styles.exerciseThumb}
+            onError={() => setImgError(true)}
+          />
+        ) : null}
+        {!imageUri || imgError ? (
+          <View style={[styles.exerciseThumb, styles.exerciseThumbPlaceholder]}>
+            <LinearGradient
+              colors={[P.ctaDark, P.ctaDeep]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={[styles.exerciseThumbGlow, { backgroundColor: theme.glow }]} />
+            <Ionicons name="barbell-outline" size={30} color={P.sun} />
+          </View>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+export default function ExercisesScreen() {
+  const insets = useSafeAreaInsets();
   const [viewMode, setViewMode] = useState<'categories' | 'exercises'>('categories');
   const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
 
-  // Categories (default view)
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCats, setLoadingCats] = useState(true);
   const [catError, setCatError] = useState(false);
 
-  // Search / Drilldown state
-  const [query, setQuery]                     = useState('');
-  const [searchResults, setSearchResults]     = useState<any[]>([]);
-  const [searching, setSearching]             = useState(false);
-  const [loadingMore, setLoadingMore]         = useState(false);
-  const [searchPage, setSearchPage]           = useState(1);
-  const [hasMore, setHasMore]                 = useState(true);
-  const [searchTotal, setSearchTotal]         = useState(0);
+  const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [searchPage, setSearchPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [searchTotal, setSearchTotal] = useState(0);
+  const [bodySide, setBodySide] = useState<'front' | 'back'>('front');
+  const [bodyGender, setBodyGender] = useState<'male' | 'female'>('male');
+  const [selectedMuscles, setSelectedMuscles] = useState<Slug[]>([]);
+  const [selectedRegion, setSelectedRegion] = useState<{ slug: Slug; label: string; categories: string[] } | null>(null);
+  const [regionModalVisible, setRegionModalVisible] = useState(false);
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activeQuery   = useRef('');
 
-  // ── Fetch categories ──────────────────────────────────────────────────────
   const fetchCategories = useCallback(async () => {
     setLoadingCats(true);
     setCatError(false);
@@ -219,12 +274,31 @@ export default function ExercisesScreen() {
     }
   }, []);
 
-  useEffect(() => { fetchCategories(); }, []);
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
-  // ── Search/Drilldown exercises ───────────────────────────────────────────
+  useEffect(() => {
+    const fetchBodyProfile = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) return;
+        const res = await axios.get(`${API_URL}/daily/dashboard`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const gender = String(res.data?.user?.gender || '').toLowerCase();
+        if (gender === 'male' || gender === 'female') {
+          setBodyGender(gender);
+        }
+      } catch {}
+    };
+
+    fetchBodyProfile();
+  }, []);
+
   const doFetchExercises = useCallback(async (q: string, cat: string | null, pg: number, append: boolean) => {
     if (pg === 1) setSearching(true);
-    else          setLoadingMore(true);
+    else setLoadingMore(true);
 
     try {
       const params: any = { page: pg, limit: PAGE_SIZE };
@@ -239,8 +313,8 @@ export default function ExercisesScreen() {
       const { data, pagination } = res.data;
       setSearchTotal(pagination.total);
       setHasMore(pg < pagination.totalPages);
-      if (append) setSearchResults(prev => [...prev, ...data]);
-      else        setSearchResults(data);
+      if (append) setSearchResults((prev) => [...prev, ...data]);
+      else setSearchResults(data);
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
@@ -252,6 +326,7 @@ export default function ExercisesScreen() {
   const handleQueryChange = (text: string) => {
     setQuery(text);
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
+
     if (!text.trim()) {
       if (viewMode === 'exercises' && drilldownCategory) {
         doFetchExercises('', drilldownCategory, 1, false);
@@ -261,8 +336,8 @@ export default function ExercisesScreen() {
       setSearchPage(1);
       return;
     }
+
     debounceTimer.current = setTimeout(() => {
-      activeQuery.current = text;
       setSearchPage(1);
       setHasMore(true);
       doFetchExercises(text, drilldownCategory, 1, false);
@@ -286,12 +361,14 @@ export default function ExercisesScreen() {
     doFetchExercises(query, drilldownCategory, next, true);
   };
 
-  const handleCategoryPress = (cat: string) => {
+  const handleCategoryPress = (category: string) => {
     setViewMode('exercises');
-    setDrilldownCategory(cat);
+    setDrilldownCategory(category);
+    setQuery('');
     setSearchPage(1);
     setHasMore(true);
-    doFetchExercises('', cat, 1, false);
+    setRegionModalVisible(false);
+    doFetchExercises('', category, 1, false);
   };
 
   const handleBack = () => {
@@ -299,69 +376,145 @@ export default function ExercisesScreen() {
     setDrilldownCategory(null);
     setQuery('');
     setSearchResults([]);
+    setSearchPage(1);
+    setHasMore(true);
   };
 
-  // ── Renderers ─────────────────────────────────────────────────────────────
-  const renderCategory  = useCallback(({ item }: any) => (
-    <CategoryCard
-      item={item}
-      colors={colors}
-      onPress={() => handleCategoryPress(item.category)}
-    />
-  ), [colors]);
+  const handleBodyPartPress = (part: ExtendedBodyPart) => {
+    const slug = part.slug as Slug | undefined;
+    if (!slug) return;
 
-  const renderExercise  = useCallback(({ item }: any) => (
-    <ExerciseCard
-      item={item}
-      colors={colors}
-      square={viewMode === 'exercises'} // Square in category view
-    />
-  ), [colors, viewMode]);
+    const region = BODY_CATEGORY_MAP[String(slug)];
+    if (!region) return;
+
+    setSelectedMuscles([slug]);
+    setSelectedRegion({
+      slug,
+      label: region.label,
+      categories: Array.from(new Set(region.categories)),
+    });
+    setRegionModalVisible(true);
+  };
+
+  const highlightedBodyParts: ExtendedBodyPart[] = selectedMuscles.map((slug) => ({
+    slug,
+    intensity: 3 as const,
+  }));
+
+  const modalCategories = (selectedRegion?.categories || []).map((category) => {
+    const match = categories.find((item) => item.category?.toLowerCase() === category.toLowerCase());
+    return {
+      key: category,
+      label: formatLabel(category),
+      count: match?.exercise_count ?? null,
+    };
+  });
+
+  const renderExercise = useCallback(
+    ({ item }: any) => <ExerciseCard item={item} />,
+    []
+  );
 
   const renderSearchFooter = () => {
     if (!loadingMore) return null;
-    return <ActivityIndicator size="small" color="#E00000" style={{ paddingVertical: 20 }} />;
+    return <ActivityIndicator size="small" color={P.cta} style={{ paddingVertical: 20 }} />;
   };
 
-  const inSearchMode = query.length > 0;
-
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          {viewMode === 'exercises' && (
-            <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-              <Ionicons name="chevron-back" size={24} color={colors.text} />
-            </TouchableOpacity>
-          )}
-          <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {viewMode === 'exercises' ? drilldownCategory : 'Exercises'}
-            </Text>
-            <Text style={[styles.headerSub, { color: colors.textMuted }]}>
-              {inSearchMode && !searching
-                ? `${searchTotal.toLocaleString()} results`
-                : viewMode === 'exercises' && !searching
-                ? `${searchTotal.toLocaleString()} movements`
-                : !loadingCats
-                ? `${categories.length} categories`
-                : ''}
-            </Text>
-          </View>
+  const renderBodyExplorer = () => (
+    <View style={styles.bodySection}>
+      <View style={styles.bodySectionHeader}>
+        <View>
+          <Text style={styles.bodySectionTitle}>Browse by body area</Text>
+          <Text style={styles.bodySectionSub}>Tap a muscle, see the mapped category, then jump into exercises.</Text>
         </View>
-        <View style={[styles.headerIcon, { backgroundColor: colors.inputBg }]}>
-          <Ionicons name="fitness-outline" size={22} color="#E00000" />
+
+        <View style={styles.toggleTrack}>
+          {(['front', 'back'] as const).map((side) => (
+            <TouchableOpacity
+              key={side}
+              onPress={() => setBodySide(side)}
+              style={[styles.toggleBtn, bodySide === side && styles.toggleBtnActive]}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.toggleTxt, bodySide === side && styles.toggleTxtActive]}>
+                {side.charAt(0).toUpperCase() + side.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
-      {/* ── Search bar ─────────────────────────────────────────────────── */}
-      <View style={[styles.searchWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-        <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+      <View style={styles.bodyExplorerCard}>
+        <View style={styles.bodyWrap}>
+          <Body
+            data={highlightedBodyParts}
+            gender={bodyGender}
+            side={bodySide}
+            scale={1.15}
+            colors={['#F7CB1644', '#F7CB16AA', '#F7CB16']}
+            defaultFill={'#1a3a45'}
+            defaultStroke={'rgba(255,255,255,0.2)'}
+            defaultStrokeWidth={0.5}
+            onBodyPartPress={handleBodyPartPress}
+          />
+        </View>
+
+        <Text style={styles.bodyHint}>
+          Selected muscles glow yellow. Tap again on another area to open the linked exercise category.
+        </Text>
+      </View>
+    </View>
+  );
+
+  const inSearchMode = query.length > 0;
+  const title = viewMode === 'exercises' ? formatLabel(drilldownCategory) : 'Exercises';
+  const appHeaderTopPad = insets.top;
+  const appHeaderHeight = appHeaderTopPad + Math.round((SCREEN_WIDTH / 390) * 52);
+  const heroTopPadding = appHeaderHeight - appHeaderTopPad + 12;
+  const subtitle =
+    inSearchMode && !searching
+      ? `${searchTotal.toLocaleString()} results`
+      : viewMode === 'exercises' && !searching
+        ? `${searchTotal.toLocaleString()} movements`
+        : !loadingCats
+          ? `${categories.length} categories`
+          : 'Loading your library';
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <ImageBackground
+        source={HEADER_IMAGE}
+        style={[styles.hero, { paddingTop: heroTopPadding }]}
+        imageStyle={styles.heroImage}
+      >
+        <View style={styles.heroOverlay} />
+        <View style={styles.header}>
+          <View style={styles.headerTitleRow}>
+            {viewMode === 'exercises' && (
+              <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
+                <Ionicons name="chevron-back" size={22} color={P.sun} />
+              </TouchableOpacity>
+            )}
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.headerTitle}>{title}</Text>
+              <Text style={styles.headerSub}>{subtitle}</Text>
+            </View>
+          </View>
+
+          <View style={styles.headerIcon}>
+            <Ionicons name="fitness" size={24} color={P.ink} />
+          </View>
+        </View>
+      </ImageBackground>
+
+      <View style={styles.searchWrap}>
+        <View style={styles.searchIconWrap}>
+          <Ionicons name="search-outline" size={16} color={P.ctaDark} />
+        </View>
         <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search exercises…"
-          placeholderTextColor={colors.textMuted}
+          style={styles.searchInput}
+          placeholder="Search exercises..."
+          placeholderTextColor={P.muted}
           value={query}
           onChangeText={handleQueryChange}
           returnKeyType="search"
@@ -369,275 +522,618 @@ export default function ExercisesScreen() {
         />
         {query.length > 0 && (
           <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            <Ionicons name="close-circle" size={18} color={P.cta} />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* ── Grid Content ───────────────────────────────────────────────── */}
       {!inSearchMode && viewMode === 'categories' && (
-        loadingCats ? (
-          <FlatList
-            data={Array.from({ length: 10 }, (_, i) => i)}
-            keyExtractor={(i) => String(i)}
-            renderItem={() => <SkeletonCard colors={colors} />}
-            numColumns={2}
-            columnWrapperStyle={styles.row}
-            contentContainerStyle={styles.listContent}
-            scrollEnabled={false}
-          />
-        ) : catError ? (
+        catError ? (
           <View style={styles.centeredMsg}>
-            <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
-            <Text style={[styles.msgText, { color: colors.textMuted }]}>Failed to load</Text>
-            <TouchableOpacity onPress={fetchCategories}
-              style={[styles.retryBtn, { backgroundColor: '#E00000' }]}>
+            <View style={styles.messageIconWrap}>
+              <Ionicons name="cloud-offline-outline" size={30} color={P.ctaDark} />
+            </View>
+            <Text style={styles.msgTitle}>Could not load categories</Text>
+            <Text style={styles.msgText}>Please try again and we will pull the exercise library back in.</Text>
+            <TouchableOpacity onPress={fetchCategories} style={styles.retryBtn}>
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <FlatList
-            data={categories}
-            keyExtractor={(item) => item.category}
-            renderItem={renderCategory}
-            numColumns={2}
-            columnWrapperStyle={styles.row}
+            data={[] as number[]}
+            keyExtractor={(_, index) => String(index)}
+            renderItem={() => null}
+            ListHeaderComponent={renderBodyExplorer}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
-            removeClippedSubviews
-            maxToRenderPerBatch={10}
-            windowSize={5}
           />
         )
       )}
 
-      {/* ── Results (Search or Category Exercises) ────────────────────── */}
       {(inSearchMode || viewMode === 'exercises') && (
         searching ? (
           <View style={styles.centeredMsg}>
-            <ActivityIndicator size="large" color="#E00000" />
+            <ActivityIndicator size="large" color={P.cta} />
+            <Text style={styles.msgText}>Loading exercises...</Text>
           </View>
         ) : searchResults.length === 0 ? (
           <View style={styles.centeredMsg}>
-            <Ionicons name="search-outline" size={48} color={colors.border} />
-            <Text style={[styles.msgText, { color: colors.textMuted }]}>No exercises found</Text>
+            <View style={styles.messageIconWrap}>
+              <Ionicons name="search-outline" size={30} color={P.ctaDark} />
+            </View>
+            <Text style={styles.msgTitle}>No exercises found</Text>
+            <Text style={styles.msgText}>Try a different keyword or browse one of the blue library cards.</Text>
           </View>
         ) : (
           <FlatList
             data={searchResults}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => String(item.id)}
             renderItem={renderExercise}
-            numColumns={2}
-            columnWrapperStyle={styles.row}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={styles.exerciseListContent}
             showsVerticalScrollIndicator={false}
             onEndReached={handleLoadMore}
             onEndReachedThreshold={0.4}
             ListFooterComponent={renderSearchFooter}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
             removeClippedSubviews
             maxToRenderPerBatch={10}
             windowSize={5}
           />
         )
       )}
+
+      <Modal
+        visible={regionModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRegionModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setRegionModalVisible(false)}
+            style={StyleSheet.absoluteFillObject}
+          />
+
+          <View style={styles.modalCard}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>{selectedRegion?.label || 'Muscle Group'}</Text>
+            <Text style={styles.modalSub}>Choose a mapped category to open its exercises.</Text>
+
+            {modalCategories.map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={styles.modalCategoryBtn}
+                activeOpacity={0.86}
+                onPress={() => handleCategoryPress(item.key)}
+              >
+                <View>
+                  <Text style={styles.modalCategoryTitle}>{item.label}</Text>
+                  <Text style={styles.modalCategoryCount}>
+                    {item.count !== null ? `${item.count} exercises` : 'Open category'}
+                  </Text>
+                </View>
+                <View style={styles.modalArrow}>
+                  <Ionicons name="arrow-forward" size={15} color={P.ink} />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: P.offWhite,
+  },
+
+  hero: {
+    paddingHorizontal: H_PADDING,
+    paddingTop: 10,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+  },
+  heroImage: {
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(4,40,43,0.56)',
+  },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: H_PADDING,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+    justifyContent: 'space-between',
+    gap: 12,
+    zIndex: 2,
   },
-  headerTitle: { fontFamily: FONTS.heading, fontSize: 26, letterSpacing: 0.5 },
-  headerSub:   { fontFamily: FONTS.body, fontSize: 12, marginTop: 2, textTransform: 'capitalize' },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  headerTextWrap: {
+    flexShrink: 1,
+  },
+  headerTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 30,
+    color: P.white,
+    letterSpacing: 0.4,
+  },
+  headerSub: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: 'rgba(214,238,247,0.92)',
+    marginTop: 2,
+    textTransform: 'capitalize',
+  },
   headerIcon: {
-    width: 42, height: 42, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center',
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: P.sun,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: P.ctaDeep,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 8,
   },
   backBtn: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: -8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(247,203,22,0.35)',
   },
 
-  // Search
+  bodySection: {
+    marginBottom: 18,
+  },
+  bodySectionHeader: {
+    width: '100%',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 12,
+  },
+  bodySectionTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 24,
+    color: P.ink,
+    letterSpacing: 0.3,
+  },
+  bodySectionSub: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: P.muted,
+    marginTop: 2,
+    maxWidth: '100%',
+    lineHeight: 18,
+  },
+  toggleTrack: {
+    flexDirection: 'row',
+    backgroundColor: P.ctaDeep,
+    borderRadius: 20,
+    padding: 3,
+    gap: 2,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  toggleBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  toggleBtnActive: {
+    backgroundColor: P.sun,
+  },
+  toggleTxt: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+    color: '#A8DFF0',
+  },
+  toggleTxtActive: {
+    color: P.ink,
+  },
+  bodyExplorerCard: {
+    paddingTop: 4,
+  },
+  bodyWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  bodyHint: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    lineHeight: 18,
+    color: P.muted,
+    textAlign: 'center',
+    opacity: 0.9,
+  },
+
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: H_PADDING,
-    marginTop: 14,
+    marginTop: -18,
     marginBottom: 4,
     paddingHorizontal: 14,
-    height: 46,
-    borderRadius: 14,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: P.white,
     borderWidth: 1,
-    gap: 8,
+    borderColor: P.border,
+    gap: 10,
+    shadowColor: P.ctaDeep,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 6,
+    zIndex: 3,
+  },
+  searchIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: P.ctaLight,
   },
   searchInput: {
     flex: 1,
     fontFamily: FONTS.body,
     fontSize: 14,
+    color: P.ink,
     height: '100%',
     paddingVertical: 0,
   },
 
-  // Grid
-  listContent: { paddingHorizontal: H_PADDING, paddingTop: 16, paddingBottom: 40 },
-  row: { justifyContent: 'space-between', marginBottom: CARD_GAP },
+  listContent: {
+    paddingHorizontal: H_PADDING,
+    paddingTop: 18,
+    paddingBottom: 40,
+  },
+  exerciseListContent: {
+    paddingHorizontal: H_PADDING,
+    paddingTop: 18,
+    paddingBottom: 40,
+  },
+  row: {
+    justifyContent: 'space-between',
+    marginBottom: CARD_GAP,
+  },
 
-  // Card shared (Uber Style: Flat with deep rounding and subtle shadows)
   card: {
     borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowColor: P.ctaDeep,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 9,
+  },
+  skeletonCard: {
+    backgroundColor: P.ctaLight,
+    borderWidth: 1,
+    borderColor: P.border,
+  },
+  skeletonGlow: {
+    position: 'absolute',
+    top: -20,
+    right: -10,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(247,203,22,0.22)',
   },
 
-  // Category Premium Internals
-  cardBgLabel: {
+  categoryCard: {
+    borderWidth: 1,
+    borderColor: P.border,
+  },
+  cardMedia: {
+    flex: 0.6,
+    position: 'relative',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaGlow: {
     position: 'absolute',
-    top: -10,
-    right: -10,
-    fontSize: 80,
-    fontFamily: FONTS.heading,
-    color: 'rgba(255,255,255,0.08)',
-    zIndex: 0,
+    top: -18,
+    right: -12,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+  },
+  cardFooter: {
+    flex: 0.4,
+    backgroundColor: P.ctaDeep,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  categoryArrow: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: P.sun,
+    shadowColor: P.ctaDeep,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
   },
   imageContainer: {
-    position: 'absolute',
-    bottom: -10,
-    right: -10,
-    width: '80%',
-    height: '70%',
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-    zIndex: 1,
-  },
-  floatingImage: {
     width: '100%',
     height: '100%',
-    transform: [{ rotate: '-5deg' }, { scale: 1.1 }],
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingTop: 14,
+    paddingBottom: 8,
   },
-  cardContent: {
-    padding: 16,
-    justifyContent: 'space-between',
-    flex: 1,
-    zIndex: 2,
+  floatingImage: {
+    width: '88%',
+    height: '88%',
+    opacity: 0.96,
   },
-  cardLabelPremium: {
+  cardLabel: {
     fontFamily: FONTS.heading,
     fontSize: 22,
-    color: '#FFF',
+    color: P.sun,
     letterSpacing: 0.5,
-    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowColor: 'rgba(0,0,0,0.18)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 4,
   },
   cardInfoRow: {
+    marginTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 'auto',
   },
-  cardCountPremium: {
-    fontFamily: FONTS.bodySemiBold,
+  cardCountText: {
+    fontFamily: FONTS.bodyBold,
     fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-  },
-  miniArrow: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    color: P.sunLight,
+    letterSpacing: 0.2,
   },
 
-  // Exercise Premium Internals
-  premiumChip: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    zIndex: 3,
+  exerciseTryCard: {
+    width: '100%',
+    backgroundColor: P.cta,
+    borderWidth: 0,
+    padding: 18,
   },
-  premiumChipText: {
+  exercisePillRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  exerciseScorePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: P.ctaDark,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    maxWidth: '72%',
+  },
+  exerciseScorePillText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 10,
-    color: '#FFF',
+    color: '#D6EEF7',
+    letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
-  exCardContent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 12,
-    zIndex: 3,
-  },
-  exNamePremium: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 14,
-    color: '#FFF',
-    lineHeight: 18,
-    textTransform: 'capitalize',
-  },
-  exTagRow: {
+  exerciseRatingPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
-  },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-    marginHorizontal: 6,
-  },
-  exTargetPremium: {
-    fontFamily: FONTS.body,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.7)',
-    textTransform: 'capitalize',
-  },
-
-  // States
-  centeredMsg: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  msgText: { fontFamily: FONTS.bodySemiBold, fontSize: 15, textAlign: 'center' },
-  retryBtn: { paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12, marginTop: 4 },
-  retryText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' },
-  ratingChip: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    paddingHorizontal: 8,
+    gap: 4,
+    backgroundColor: P.sun,
+    borderRadius: 20,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.15)',
-    zIndex: 3,
   },
-  ratingChipText: {
+  exerciseRatingPillText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    color: P.ink,
+  },
+  exerciseBodyRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  exerciseTextBlock: {
+    flex: 1,
+  },
+  exerciseThumb: {
+    width: 88,
+    height: 88,
+    borderRadius: 14,
+    resizeMode: 'cover',
+    flexShrink: 0,
+  },
+  exerciseThumbPlaceholder: {
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exerciseThumbGlow: {
+    position: 'absolute',
+    top: -14,
+    right: -12,
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+  },
+  exerciseTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  exerciseTag: {
+    backgroundColor: P.ctaDark,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  exerciseTagText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 10,
-    color: '#FFF',
+    color: '#D6EEF7',
+    letterSpacing: 0.3,
+    textTransform: 'capitalize',
+  },
+  exName: {
+    fontFamily: FONTS.heading,
+    fontSize: 20,
+    color: P.white,
+    letterSpacing: -0.4,
+    lineHeight: 24,
+    marginBottom: 2,
+  },
+  exerciseDescription: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#D6EEF7',
+    marginTop: 6,
+  },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(4,40,43,0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+  modalCard: {
+    backgroundColor: P.cta,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    width: 46,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.38)',
+    marginBottom: 14,
+  },
+  modalTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 28,
+    color: P.sun,
+    textAlign: 'center',
+  },
+  modalSub: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    color: P.sunLight,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  modalCategoryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
+  },
+  modalCategoryTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+    color: P.white,
+  },
+  modalCategoryCount: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: P.sunLight,
+    marginTop: 3,
+  },
+  modalArrow: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: P.sun,
+  },
+
+  centeredMsg: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    gap: 10,
+  },
+  messageIconWrap: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    backgroundColor: P.sunLight,
+    borderWidth: 1,
+    borderColor: 'rgba(37,150,190,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  msgTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 24,
+    color: P.ink,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  msgText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 14,
+    color: P.muted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryBtn: {
+    marginTop: 6,
+    paddingHorizontal: 26,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: P.cta,
+  },
+  retryText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 14,
+    color: P.white,
   },
 });
