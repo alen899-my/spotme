@@ -18,7 +18,6 @@ const P = {
   ctaDark: "#1a6e8a",
   white:   "#FFFFFF",
   ink:     "#04282B",
-  pageBg:  "#F5F9FC",
 };
 
 const { width: W } = Dimensions.get("window");
@@ -62,7 +61,7 @@ export default function AppHeader({
   const photoUri = user?.profile_pic_url || user?.profilePicUrl;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + scale(2) }]}>
+    <View style={[styles.container, { paddingTop: insets.top + scale(6) }]}>
       <View style={styles.row}>
         <Animated.View style={{ transform: [{ scale: profileScale }] }}>
           <TouchableOpacity
@@ -121,14 +120,14 @@ const BTN = scale(36);
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: scale(16),
-    paddingBottom: scale(4),
-    backgroundColor: P.pageBg,
+    paddingBottom: scale(10),
+    backgroundColor: P.cta,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(37,150,190,0.10)",
+    borderBottomColor: "rgba(255,255,255,0.08)",
     zIndex: 100,
   },
   row: {
-    minHeight: scale(36),
+    minHeight: scale(42),
     flexDirection: "row",
     alignItems: "center",
   },
@@ -137,7 +136,7 @@ const styles = StyleSheet.create({
     height: AVATAR,
     borderRadius: AVATAR / 2,
     borderWidth: 1.5,
-    borderColor: "rgba(37,150,190,0.25)",
+    borderColor: "rgba(255,255,255,0.45)",
     justifyContent: "center",
     alignItems: "center",
     overflow: "visible",
@@ -164,7 +163,7 @@ const styles = StyleSheet.create({
     borderRadius: scale(4.5),
     backgroundColor: P.sun,
     borderWidth: 1.5,
-    borderColor: P.pageBg,
+    borderColor: P.cta,
   },
   wordmarkWrap: {
     flex: 1,
@@ -175,7 +174,7 @@ const styles = StyleSheet.create({
   wordmarkSpot: {
     fontFamily: "Outfit_900Black",
     fontSize: scale(21),
-    color: P.ctaDark,
+    color: P.white,
     letterSpacing: -0.8,
     includeFontPadding: false,
   },
@@ -196,9 +195,7 @@ const styles = StyleSheet.create({
     borderRadius: BTN / 2,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(37,150,190,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(37,150,190,0.12)",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   badge: {
     position: "absolute",
@@ -212,7 +209,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 3,
     borderWidth: 1.5,
-    borderColor: P.pageBg,
+    borderColor: P.cta,
   },
   badgeText: {
     fontFamily: FONTS.bodyBold,
