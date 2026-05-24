@@ -30,7 +30,7 @@ export default function MealsScreen() {
   // Log Meal Form State
   const [showLogForm, setShowLogForm] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [mealDescription, setMealDescription] = useState('');
+  const [manualIngredients, setManualIngredients] = useState([{ name: '', quantity: '' }]);
 
   // Analysis Modal State
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -42,7 +42,7 @@ export default function MealsScreen() {
   // New features state
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [userData, setUserData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'tracker' | 'recommendations'>('tracker');
+  const [activeTab, setActiveTab] = useState<'tracker' | 'water' | 'recommendations'>('tracker');
   const [recommendationData, setRecommendationData] = useState<any>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
@@ -78,6 +78,7 @@ export default function MealsScreen() {
   const [savingDietForm, setSavingDietForm] = useState(false);
 
   const searchInputRef = useRef<TextInput>(null);
+  const foodSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (showFoodSearch) {
@@ -87,6 +88,14 @@ export default function MealsScreen() {
       return () => clearTimeout(timer);
     }
   }, [showFoodSearch]);
+
+  useEffect(() => {
+    return () => {
+      if (foodSearchTimerRef.current) {
+        clearTimeout(foodSearchTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     loadUser();
@@ -454,6 +463,44 @@ export default function MealsScreen() {
     }
   };
 
+  const addManualIngredient = () => {
+    setManualIngredients(prev => [...prev, { name: '', quantity: '' }]);
+  };
+
+  const updateManualIngredient = (index: number, field: 'name' | 'quantity', value: string) => {
+    setManualIngredients(prev =>
+      prev.map((ingredient, idx) =>
+        idx === index ? { ...ingredient, [field]: value } : ingredient
+      )
+    );
+  };
+
+  const removeManualIngredient = (index: number) => {
+    setManualIngredients(prev => {
+      if (prev.length === 1) return [{ name: '', quantity: '' }];
+      return prev.filter((_, idx) => idx !== index);
+    });
+  };
+
+  const buildAnalysisContext = () => {
+    const filledIngredients = manualIngredients
+      .map(ingredient => ({
+        name: ingredient.name.trim(),
+        quantity: ingredient.quantity.trim(),
+      }))
+      .filter(ingredient => ingredient.name || ingredient.quantity);
+
+    const ingredientLines = filledIngredients.map((ingredient, index) =>
+      `${index + 1}. ${ingredient.name || 'Unnamed ingredient'}${ingredient.quantity ? ` - ${ingredient.quantity}` : ''}`
+    );
+
+    if (ingredientLines.length === 0) {
+      return '';
+    }
+
+    return `Ingredients:\n${ingredientLines.join('\n')}`;
+  };
+
   const startAnalysis = async () => {
     if (!selectedImage) {
       showToast('Please select a meal image', 'error');
@@ -466,7 +513,7 @@ export default function MealsScreen() {
     try {
       const token = await AsyncStorage.getItem('userToken');
       const formData = new FormData();
-      formData.append('description', mealDescription);
+      formData.append('description', buildAnalysisContext());
       
       if (Platform.OS === 'web') {
         const response = await fetch(selectedImage);
@@ -500,7 +547,7 @@ export default function MealsScreen() {
       setShowAnalysis(true);
       // Reset form
       setSelectedImage(null);
-      setMealDescription('');
+      setManualIngredients([{ name: '', quantity: '' }]);
     } catch (err) {
       console.error('Analysis error:', err);
       showToast('Failed to analyze meal', 'error');
@@ -556,14 +603,19 @@ export default function MealsScreen() {
     const getMealIconDetails = (type: string) => {
       switch (type) {
         case 'Morning':
+          return { icon: 'sunny-outline', color: '#E7B100', bg: '#E7B10015', label: 'Morning' };
         case 'Breakfast':
           return { icon: 'sunny-outline', color: '#E7B100', bg: '#E7B10015', label: 'Breakfast' };
         case 'Afternoon':
+          return { icon: 'sunny', color: '#3B82F6', bg: '#3B82F615', label: 'Afternoon' };
         case 'Lunch':
           return { icon: 'sunny', color: '#3B82F6', bg: '#3B82F615', label: 'Lunch' };
         case 'Evening':
+          return { icon: 'partly-sunny-outline', color: '#F59E0B', bg: '#F59E0B15', label: 'Evening' };
         case 'Dinner':
-          return { icon: 'moon-outline', color: '#8B5CF6', bg: '#8B5CF615', label: 'Dinner' };
+          return { icon: 'partly-sunny-outline', color: '#F59E0B', bg: '#F59E0B15', label: 'Dinner' };
+        case 'Night':
+          return { icon: 'moon-outline', color: '#6366F1', bg: '#6366F115', label: 'Night' };
         default:
           return { icon: 'nutrition-outline', color: '#F59E0B', bg: '#F59E0B15', label: 'Snack' };
       }
@@ -589,10 +641,10 @@ export default function MealsScreen() {
     const arrowRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
     return (
-      <View style={[styles.accCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.accCard, { backgroundColor: '#2596BE', borderColor: '#2596BE' }]}>
         {/* ── Collapsed card structure (from screenshot) ── */}
         <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
-          {/* Top Section: Icon, Meta Info, Eaten status, Chevron, Image Thumbnail */}
+          {/* Top Section: Icon, Meta Info, Chevron, Image Thumbnail */}
           <View style={styles.cardHeaderRow}>
             {/* Left circular icon box */}
             <View style={[styles.mealIconBox, { backgroundColor: iconInfo.bg }]}>
@@ -601,81 +653,96 @@ export default function MealsScreen() {
 
             {/* Title & Time */}
             <View style={styles.mealMetaInfo}>
-              <Text style={[styles.mealTitleLabel, { color: colors.text }]}>{iconInfo.label}</Text>
-              <Text style={[styles.mealTimeLabel, { color: colors.textDim }]}>{timeStr}</Text>
-            </View>
-
-            {/* Eaten Badge */}
-            <View style={[styles.eatenBadgeWrap, { backgroundColor: '#10B98115' }]}>
-              <Ionicons name="checkmark" size={11} color="#10B981" style={{ marginRight: 2 }} />
-              <Text style={styles.eatenBadgeText}>Eaten</Text>
+              <Text style={[styles.mealTitleLabel, { color: '#FFF' }]}>{iconInfo.label}</Text>
+              <Text style={[styles.mealTimeLabel, { color: 'rgba(255,255,255,0.78)' }]}>{timeStr}</Text>
             </View>
 
             {/* Subtle Chevron */}
             <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
-              <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+              <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.82)" />
             </Animated.View>
 
             {/* Right Thumb Image */}
             {item.image_url ? (
               <Image source={{ uri: item.image_url }} style={styles.mealThumbImage} />
             ) : (
-              <View style={[styles.mealThumbImagePlaceholder, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                <Ionicons name="image-outline" size={16} color={colors.textMuted} />
+              <View style={[styles.mealThumbImagePlaceholder, { backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.22)' }]}>
+                <Ionicons name="image-outline" size={16} color="rgba(255,255,255,0.8)" />
               </View>
             )}
           </View>
 
-          {/* Bottom stats columns row */}
-          <View style={styles.mealStatsRow}>
-            <View style={styles.mealStatCol}>
-              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_calories)}</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>kcal</Text>
+          {!open && (
+            <View style={styles.mealStatsRow}>
+              <View style={[styles.mealStatCol, { backgroundColor: '#E7B100' }]}>
+                <Text style={[styles.mealStatNum, { color: '#3F2C00' }]}>{Math.round(item.total_calories)}</Text>
+                <Text style={[styles.mealStatUnit, { color: '#5B4300' }]}>kcal</Text>
+              </View>
+              <View style={[styles.mealStatCol, { backgroundColor: '#10B981' }]}>
+                <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(item.total_protein)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Protein</Text>
+              </View>
+              <View style={[styles.mealStatCol, { backgroundColor: '#3B82F6' }]}>
+                <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(item.total_carbs)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
+              </View>
+              <View style={[styles.mealStatCol, { backgroundColor: '#F59E0B' }]}>
+                <Text style={[styles.mealStatNum, { color: '#4A2900' }]}>{Math.round(item.total_fat)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: '#6B3A00' }]}>Fats</Text>
+              </View>
             </View>
-            <View style={styles.mealStatCol}>
-              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_protein)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Protein</Text>
-            </View>
-            <View style={styles.mealStatCol}>
-              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_carbs)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Carbs</Text>
-            </View>
-            <View style={styles.mealStatCol}>
-              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_fat)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Fats</Text>
-            </View>
-          </View>
+          )}
         </TouchableOpacity>
 
         {/* ── Expandable detail ── */}
         {open && (
-          <View style={[styles.accDetail, { borderTopColor: colors.border }]}>
-            {/* Macro grid */}
-            <View style={styles.macroGrid}>
-              {/* Full-width calories pill */}
-              <View style={[styles.macroPill, { backgroundColor: '#E7B10012', width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }]}>
-                <Text style={[styles.macroPillLabel, { color: '#E7B100' }]}>Total Calories</Text>
-                <Text style={[styles.macroPillVal, { color: '#E7B100', fontSize: 20 }]}>{Math.round(item.total_calories)} <Text style={{ fontSize: 13 }}>kcal</Text></Text>
+          <View style={[styles.accDetail, { borderTopColor: 'rgba(255,255,255,0.18)' }]}>
+            <View style={styles.openStatsRow}>
+              <View style={[styles.openStatCard, { backgroundColor: '#E7B100', borderColor: '#E7B100' }]}>
+                <Text style={[styles.openStatValue, { color: '#3F2C00' }]}>{Math.round(item.total_calories)}</Text>
+                <Text style={[styles.openStatLabel, { color: '#5B4300' }]}>kcal</Text>
               </View>
-              {macros.map((m) => (
-                <View key={m.label} style={[styles.macroPill, { backgroundColor: m.color + '12' }]}>
-                  <Text style={[styles.macroPillVal, { color: m.color }]}>{m.value}{m.unit}</Text>
-                  <Text style={[styles.macroPillLabel, { color: colors.textDim }]}>{m.label}</Text>
-                </View>
-              ))}
+              <View style={[styles.openStatCard, { backgroundColor: '#10B981', borderColor: '#10B981' }]}>
+                <Text style={[styles.openStatValue, { color: '#FFF' }]}>{Math.round(item.total_protein)}g</Text>
+                <Text style={[styles.openStatLabel, { color: 'rgba(255,255,255,0.9)' }]}>Protein</Text>
+              </View>
+              <View style={[styles.openStatCard, { backgroundColor: '#3B82F6', borderColor: '#3B82F6' }]}>
+                <Text style={[styles.openStatValue, { color: '#FFF' }]}>{Math.round(item.total_carbs)}g</Text>
+                <Text style={[styles.openStatLabel, { color: 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
+              </View>
+              <View style={[styles.openStatCard, { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}>
+                <Text style={[styles.openStatValue, { color: '#4A2900' }]}>{Math.round(item.total_fat)}g</Text>
+                <Text style={[styles.openStatLabel, { color: '#6B3A00' }]}>Fats</Text>
+              </View>
             </View>
 
             {/* Food items */}
             {item.items?.length > 0 && (
-              <View style={[styles.foodItemsWrap, { borderTopColor: colors.border }]}>
-                <Text style={[styles.foodItemsTitle, { color: colors.text }]}>Items detected</Text>
+              <View style={[styles.foodItemsWrap, { borderTopColor: 'rgba(255,255,255,0.18)' }]}>
+                <Text style={[styles.foodItemsTitle, { color: '#FFF' }]}>Items detected</Text>
                 {item.items.map((food: any, idx: number) => (
-                  <View key={idx} style={[styles.foodRow, { borderBottomColor: colors.border }]}>
+                  <View
+                    key={idx}
+                    style={[
+                      styles.savedFoodCard,
+                      {
+                        backgroundColor: idx % 2 === 0 ? '#E7B100' : '#1F7FA2',
+                        borderColor: idx % 2 === 0 ? '#E7B100' : '#1F7FA2',
+                      }
+                    ]}
+                  >
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.foodName, { color: colors.text }]}>{food.item_name}</Text>
-                      <Text style={[styles.foodQty, { color: colors.textMuted }]}>{food.quantity}</Text>
+                      <Text style={[styles.foodName, { color: idx % 2 === 0 ? '#2D2200' : '#FFF' }]}>{food.item_name}</Text>
+                      <Text style={[styles.foodQty, { color: idx % 2 === 0 ? '#5B4300' : 'rgba(255,255,255,0.82)' }]}>{food.quantity || 'Estimated serving'}</Text>
                     </View>
-                    <Text style={[styles.foodCals, { color: colors.textMuted }]}>{Math.round(food.calories)} kcal</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[styles.foodCals, { color: idx % 2 === 0 ? '#3F2C00' : '#FFF' }]}>{Math.round(food.calories || 0)} kcal</Text>
+                      <View style={styles.savedFoodMacroRow}>
+                        <Text style={[styles.savedFoodMacroText, styles.savedFoodMacroBadge, { backgroundColor: '#10B981', color: '#FFF' }]}>{Math.round(food.protein || 0)}P</Text>
+                        <Text style={[styles.savedFoodMacroText, styles.savedFoodMacroBadge, { backgroundColor: '#3B82F6', color: '#FFF' }]}>{Math.round(food.carbs || 0)}C</Text>
+                        <Text style={[styles.savedFoodMacroText, styles.savedFoodMacroBadge, { backgroundColor: '#F59E0B', color: '#4A2900' }]}>{Math.round(food.fat || 0)}F</Text>
+                      </View>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -684,11 +751,11 @@ export default function MealsScreen() {
             {/* Redesigned delete button inside expanded details */}
             <TouchableOpacity
               onPress={() => deleteMeal(item.id)}
-              style={[styles.deleteMealBtn, { borderColor: colors.border + '50', backgroundColor: colors.inputBg }]}
+              style={[styles.deleteMealBtn, { borderColor: '#DC2626', backgroundColor: '#DC2626' }]}
               activeOpacity={0.7}
             >
-              <Ionicons name="trash-outline" size={14} color="#E7B100" style={{ marginRight: 6 }} />
-              <Text style={styles.deleteMealBtnText}>Delete Meal Entry</Text>
+              <Ionicons name="trash-outline" size={14} color="#FFF" style={{ marginRight: 6 }} />
+              <Text style={[styles.deleteMealBtnText, { color: '#FFF' }]}>Delete Meal Entry</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1144,25 +1211,30 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   const proteinConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_protein || 0), 0);
   const carbsConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_carbs || 0), 0);
   const fatConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_fat || 0), 0);
+  const headerTitle = activeTab === 'water' ? 'Water Intake' : 'Nutrition';
   const headerDescription = activeTab === 'tracker'
-    ? 'Log your daily meals'
-    : 'Personalized AI diet coaching';
+    ? 'Track your meals and macros'
+    : activeTab === 'water'
+      ? 'Monitor water intake'
+      : 'Personalized AI diet coaching';
 
   const renderTopChrome = () => (
     <View>
       <View style={[styles.header, { marginTop: 6 }]}>
         <View style={styles.headerCopy}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Nutrition</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{headerTitle}</Text>
           <Text style={[styles.headerSub, { color: colors.textMuted }]}>{headerDescription}</Text>
         </View>
-        <View style={styles.headerActionWrap}>
-          <TouchableOpacity style={styles.logMealBtn} onPress={() => setShowLogForm(true)} activeOpacity={0.85}>
-            <View style={styles.logMealBtnFill}>
-              <Ionicons name="add-circle-outline" size={18} color="#FFF" />
-              <Text style={styles.logMealBtnText} numberOfLines={1}>Log Meal</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
+        {activeTab === 'tracker' && (
+          <View style={styles.headerActionWrap}>
+            <TouchableOpacity style={styles.logMealBtn} onPress={() => setShowLogForm(true)} activeOpacity={0.85}>
+              <View style={styles.logMealBtnFill}>
+                <Ionicons name="add-circle-outline" size={18} color="#FFF" />
+                <Text style={styles.logMealBtnText} numberOfLines={1}>Log Meal</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <View style={[styles.tabSelectorContainer, { backgroundColor: colors.inputBg, marginTop: 2 }]}>
@@ -1171,7 +1243,15 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           onPress={() => setActiveTab('tracker')}
         >
           <Ionicons name="nutrition-outline" size={16} color={activeTab === 'tracker' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabSelectorText, activeTab === 'tracker' ? { color: '#FFF' } : { color: colors.textMuted }]}>Daily Tracker</Text>
+          <Text style={[styles.tabSelectorText, activeTab === 'tracker' ? { color: '#FFF' } : { color: colors.textMuted }]}>Meals</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabSelectorBtn, activeTab === 'water' && [styles.tabSelectorActiveBtn, { backgroundColor: '#2596BE' }]]}
+          onPress={() => setActiveTab('water')}
+        >
+          <Ionicons name="water-outline" size={16} color={activeTab === 'water' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabSelectorText, activeTab === 'water' ? { color: '#FFF' } : { color: colors.textMuted }]}>Water</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
@@ -1179,10 +1259,20 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           onPress={() => setActiveTab('recommendations')}
         >
           <Ionicons name="sparkles-outline" size={16} color={activeTab === 'recommendations' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabSelectorText, activeTab === 'recommendations' ? { color: '#FFF' } : { color: colors.textMuted }]}>AI Diet Coach</Text>
+          <Text style={[styles.tabSelectorText, activeTab === 'recommendations' ? { color: '#FFF' } : { color: colors.textMuted }]}>AI Coach</Text>
         </TouchableOpacity>
       </View>
     </View>
+  );
+
+  const renderWaterTab = () => (
+    <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+      {renderTopChrome()}
+      <View style={styles.trackerHeaderContent}>
+        <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" />
+        <WaterTracker selectedDate={selectedDate} />
+      </View>
+    </ScrollView>
   );
 
   return (
@@ -1204,7 +1294,6 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                     carbs={{   label: 'Carbs',   icon: 'pizza-outline',   consumed: carbsConsumed,   target: targets.carbsTarget,   color: '#3B82F6', unit: 'g' }}
                     fat={{     label: 'Fat',     icon: 'water-outline',   consumed: fatConsumed,     target: targets.fatTarget,     color: '#F59E0B', unit: 'g' }}
                   />
-                  <WaterTracker selectedDate={selectedDate} />
                   {filteredMeals.length > 0 && (
                     <View style={styles.sectionDivider}>
                       <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
@@ -1255,9 +1344,11 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               )
             }
           />
-        ) : (
-          renderRecommendations()
-        )}
+      ) : activeTab === 'water' ? (
+        renderWaterTab()
+      ) : (
+        renderRecommendations()
+      )}
 
       {/* ══════════════════════════════════════════════
            INGREDIENT SELECTOR MODAL (100 items w/ images)
@@ -1400,8 +1491,8 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               onChangeText={(text) => {
                 setFoodSearchQuery(text);
                 // Inline debounce: clear previous timer, fire after 400ms
-                if ((global as any)._foodSearchTimer) clearTimeout((global as any)._foodSearchTimer);
-                (global as any)._foodSearchTimer = setTimeout(() => searchFoods(text), 400);
+                if (foodSearchTimerRef.current) clearTimeout(foodSearchTimerRef.current);
+                foodSearchTimerRef.current = setTimeout(() => searchFoods(text), 400);
               }}
               returnKeyType="search"
               onSubmitEditing={() => searchFoods(foodSearchQuery)}
@@ -1577,25 +1668,56 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                 )}
               </TouchableOpacity>
 
-              <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 20 }]}>Description / Ingredients (Optional)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, height: 100, textAlignVertical: 'top', paddingTop: 12 }]}
-                placeholder="Describe your meal to help AI be more accurate..."
-                placeholderTextColor={colors.textDim}
-                multiline
-                numberOfLines={4}
-                value={mealDescription}
-                onChangeText={setMealDescription}
-              />
+              <View style={styles.ingredientsHeaderRow}>
+                <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 20, marginBottom: 0 }]}>Ingredients (Optional)</Text>
+                <TouchableOpacity style={styles.addIngredientBtn} onPress={addManualIngredient} activeOpacity={0.85}>
+                  <Ionicons name="add" size={16} color="#2596BE" />
+                  <Text style={styles.addIngredientBtnText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+
+              {manualIngredients.map((ingredient, index) => (
+                <View key={`ingredient-${index}`} style={styles.ingredientRow}>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      styles.ingredientNameInput,
+                      { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }
+                    ]}
+                    placeholder="Ingredient"
+                    placeholderTextColor={colors.textDim}
+                    value={ingredient.name}
+                    onChangeText={(value) => updateManualIngredient(index, 'name', value)}
+                  />
+                  <TextInput
+                    style={[
+                      styles.input,
+                      styles.ingredientQtyInput,
+                      { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }
+                    ]}
+                    placeholder="Quantity"
+                    placeholderTextColor={colors.textDim}
+                    value={ingredient.quantity}
+                    onChangeText={(value) => updateManualIngredient(index, 'quantity', value)}
+                  />
+                  <TouchableOpacity
+                    style={[styles.removeIngredientBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
+                    onPress={() => removeManualIngredient(index)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="close" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              ))}
               
               <TouchableOpacity 
                 style={[styles.saveBtn, { marginTop: 30, opacity: selectedImage ? 1 : 0.5 }]} 
                 onPress={startAnalysis}
                 disabled={!selectedImage || uploading}
               >
-                <LinearGradient colors={['#2596BE', '#1a6e8a']} style={styles.saveBtnGrad}>
+                <View style={styles.saveBtnSolid}>
                   {uploading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>ANALYZE & LOG</Text>}
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
               
               <View style={{ height: 20 }} />
@@ -1619,19 +1741,42 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               <Image source={{ uri: analyzedImageUrl }} style={styles.analysisImage} />
               
               <View style={styles.typeSelector}>
-                {['Morning', 'Afternoon', 'Evening', 'Night'].map((t) => (
-                  <TouchableOpacity 
-                    key={t} 
-                    onPress={() => setMealType(t)}
-                    style={[
-                      styles.typeBtn, 
-                      { backgroundColor: colors.inputBg },
-                      mealType === t && { backgroundColor: '#2596BE' }
-                    ]}
-                  >
-                    <Text style={[styles.typeBtnText, { color: colors.textMuted }, mealType === t && { color: '#FFF' }]}>{t}</Text>
-                  </TouchableOpacity>
-                ))}
+                {['Morning', 'Afternoon', 'Evening', 'Night'].map((t) => {
+                  const meta = mealTypeMeta[t];
+                  const active = mealType === t;
+                  const inactiveTextColor = meta.darkText ? meta.inactiveColor : meta.inactiveColor;
+                  const activeTextColor = meta.activeColor;
+
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => setMealType(t)}
+                      style={[
+                        styles.typeBtn,
+                        {
+                          borderColor: active ? meta.shadowColor : `${meta.inactiveColor}20`,
+                          shadowColor: active ? meta.shadowColor : 'transparent',
+                          shadowOpacity: active ? 0.28 : 0,
+                          shadowRadius: active ? 12 : 0,
+                          shadowOffset: { width: 0, height: 5 },
+                          elevation: active ? 6 : 0,
+                        }
+                      ]}
+                    >
+                      {active && meta.activeColors ? (
+                        <LinearGradient colors={meta.activeColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.typeBtnFill}>
+                          <Ionicons name={meta.icon} size={16} color={activeTextColor} />
+                          <Text style={[styles.typeBtnText, { color: activeTextColor }]}>{t}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={[styles.typeBtnFill, { backgroundColor: active ? meta.activeBg : meta.inactiveBg }]}>
+                          <Ionicons name={meta.icon} size={16} color={active ? activeTextColor : inactiveTextColor} />
+                          <Text style={[styles.typeBtnText, { color: active ? activeTextColor : inactiveTextColor }]}>{t}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               <View style={styles.summaryGrid}>
@@ -1641,7 +1786,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                 <SummaryItem label="Fat" value={Math.round(analysisData?.total_fat || 0)} unit="g" color="#F59E0B" />
               </View>
 
-              <View style={[styles.summaryGrid, { marginTop: -12 }]}>
+              <View style={styles.summaryGrid}>
                 <SummaryItem label="Fiber" value={Math.round(analysisData?.total_fiber || 0)} unit="g" color="#10B981" />
                 <SummaryItem label="Sugar" value={Math.round(analysisData?.total_sugar || 0)} unit="g" color="#E7B100" />
                 <SummaryItem label="Sodium" value={Math.round(analysisData?.total_sodium || 0)} unit="mg" color="#F59E0B" />
@@ -1649,29 +1794,58 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               </View>
 
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Detected Items</Text>
-              {analysisData?.items?.map((item: any, idx: number) => (
-                <View key={idx} style={[styles.itemRow, { backgroundColor: colors.inputBg }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.itemName, { color: colors.text }]}>{item.item_name}</Text>
-                    <Text style={[styles.itemQty, { color: colors.textMuted }]}>{item.quantity}</Text>
+              {analysisData?.items?.map((item: any, idx: number) => {
+                const theme = detectedItemThemes[idx % detectedItemThemes.length];
+                const itemStats = [
+                  { label: 'Protein', value: `${Math.round(item.protein || 0)}g` },
+                  { label: 'Carbs', value: `${Math.round(item.carbs || 0)}g` },
+                  { label: 'Fat', value: `${Math.round(item.fat || 0)}g` },
+                  { label: 'Fiber', value: `${Math.round(item.fiber || 0)}g` },
+                  { label: 'Sugar', value: `${Math.round(item.sugar || 0)}g` },
+                  { label: 'Sodium', value: `${Math.round(item.sodium || 0)}mg` },
+                ];
+
+                return (
+                <View key={idx} style={[styles.detectedItemCard, { backgroundColor: theme.bg, borderColor: theme.bg }]}>
+                  <View style={styles.detectedItemHeader}>
+                    <View style={styles.detectedItemTitleWrap}>
+                      <View style={[styles.detectedItemIcon, { backgroundColor: theme.calorieBg }]}>
+                        <Ionicons
+                          name={idx % 2 === 0 ? 'restaurant' : 'nutrition'}
+                          size={18}
+                          color={theme.accent}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.itemName, { color: theme.text }]}>{item.item_name}</Text>
+                        <Text style={[styles.itemQty, { color: theme.subtle }]}>{item.quantity || 'Estimated serving'}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.detectedCaloriesWrap, { backgroundColor: theme.calorieBg }]}>
+                      <Text style={[styles.itemCals, { color: theme.accent }]}>{Math.round(item.calories || 0)}</Text>
+                      <Text style={[styles.detectedCaloriesLabel, { color: theme.subtle }]}>kcal</Text>
+                    </View>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[styles.itemCals, { color: colors.text }]}>{Math.round(item.calories)} kcal</Text>
-                    <Text style={[styles.itemMacros, { color: colors.textDim }]}>
-                      Sugar: {Math.round(item.sugar)}g • Sodium: {Math.round(item.sodium)}mg
-                    </Text>
+                  <View style={styles.detectedMacroGrid}>
+                    {itemStats.map((stat) => (
+                      <View key={`${item.item_name}-${stat.label}`} style={[styles.detectedMacroPill, { backgroundColor: theme.chipBg }]}>
+                        <Text style={[styles.detectedMacroLabel, { color: theme.chipLabel }]}>{stat.label}</Text>
+                        <Text style={[styles.detectedMacroValue, { color: theme.chipValue }]}>{stat.value}</Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
-              ))}
+                );
+              })}
 
               <View style={{ height: 100 }} />
             </ScrollView>
 
             <View style={[styles.modalFooter, { backgroundColor: colors.card }]}>
               <TouchableOpacity style={styles.saveBtn} onPress={handleSaveMeal} disabled={saving}>
-                <LinearGradient colors={['#2596BE', '#1a6e8a']} style={styles.saveBtnGrad}>
+                <View style={styles.saveBtnSolid}>
                   {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>SAVE MEAL</Text>}
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -1917,12 +2091,74 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   );
 }
 
-const SummaryItem = ({ label, value, unit, color }: any) => (
-  <View style={styles.summaryItem}>
-    <Text style={[styles.summaryValue, { color }]}>{value}{unit}</Text>
-    <Text style={styles.summaryLabel}>{label}</Text>
-  </View>
-);
+const SummaryItem = ({ label, value, unit, color }: any) => {
+  const usesDarkText = color === '#E7B100' || color === '#F59E0B';
+  const valueColor = usesDarkText ? '#2D2200' : '#FFF';
+  const labelColor = usesDarkText ? 'rgba(45,34,0,0.78)' : 'rgba(255,255,255,0.86)';
+
+  return (
+    <View style={[styles.summaryItem, { backgroundColor: color, borderColor: color }]}>
+      <Text style={[styles.summaryValue, { color: valueColor }]}>{value}{unit}</Text>
+      <Text style={[styles.summaryLabel, { color: labelColor }]}>{label}</Text>
+    </View>
+  );
+};
+
+const mealTypeMeta: Record<
+  string,
+  {
+    icon: keyof typeof Ionicons.glyphMap;
+    activeBg?: string;
+    activeColors?: readonly [string, string, ...string[]];
+    inactiveBg: string;
+    inactiveColor: string;
+    activeColor: string;
+    shadowColor: string;
+    darkText?: boolean;
+  }
+> = {
+  Morning: {
+    icon: 'sunny-outline',
+    activeBg: '#F7D66A',
+    inactiveBg: '#FFF3C4',
+    inactiveColor: '#A16207',
+    activeColor: '#5B4300',
+    shadowColor: '#F7CB16',
+    darkText: true,
+  },
+  Afternoon: {
+    icon: 'sunny',
+    activeBg: '#67C7F0',
+    inactiveBg: '#D7F3FF',
+    inactiveColor: '#0F6E8D',
+    activeColor: '#083344',
+    shadowColor: '#67C7F0',
+    darkText: true,
+  },
+  Evening: {
+    icon: 'partly-sunny-outline',
+    activeColors: ['#FB923C', '#DC2626'],
+    inactiveBg: '#FBD0B5',
+    inactiveColor: '#9A3412',
+    activeColor: '#FFF',
+    shadowColor: '#F97316',
+  },
+  Night: {
+    icon: 'moon',
+    activeBg: '#05070D',
+    inactiveBg: '#D4D8E3',
+    inactiveColor: '#111827',
+    activeColor: '#FFF',
+    shadowColor: '#05070D',
+  },
+};
+
+const detectedItemThemes = [
+  { bg: '#0F766E', accent: '#99F6E4', text: '#FFF', subtle: 'rgba(255,255,255,0.82)', chipBg: 'rgba(255,255,255,0.14)', chipValue: '#FFF', chipLabel: 'rgba(255,255,255,0.72)', calorieBg: 'rgba(255,255,255,0.16)' },
+  { bg: '#1D4ED8', accent: '#BFDBFE', text: '#FFF', subtle: 'rgba(255,255,255,0.82)', chipBg: 'rgba(255,255,255,0.14)', chipValue: '#FFF', chipLabel: 'rgba(255,255,255,0.72)', calorieBg: 'rgba(255,255,255,0.16)' },
+  { bg: '#B45309', accent: '#FDE68A', text: '#FFF', subtle: 'rgba(255,255,255,0.82)', chipBg: 'rgba(255,255,255,0.14)', chipValue: '#FFF', chipLabel: 'rgba(255,255,255,0.72)', calorieBg: 'rgba(255,255,255,0.16)' },
+  { bg: '#7C3AED', accent: '#DDD6FE', text: '#FFF', subtle: 'rgba(255,255,255,0.82)', chipBg: 'rgba(255,255,255,0.14)', chipValue: '#FFF', chipLabel: 'rgba(255,255,255,0.72)', calorieBg: 'rgba(255,255,255,0.16)' },
+];
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -2003,7 +2239,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   mealMetaInfo: {
-    flex: 1, marginLeft: 14, justifyContent: 'center',
+    flex: 1, marginLeft: 14, justifyContent: 'center', minWidth: 0,
   },
   mealTitleLabel: {
     fontFamily: FONTS.heading, fontSize: 18,
@@ -2028,11 +2264,16 @@ const styles = StyleSheet.create({
   },
   mealStatsRow: {
     flexDirection: 'row', justifyContent: 'space-between',
-    marginTop: 18, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.03)',
+    marginTop: 18, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.18)',
     paddingTop: 14, paddingHorizontal: 4,
   },
   mealStatCol: {
     flex: 1,
+    marginHorizontal: 4,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
   },
   mealStatNum: {
     fontFamily: FONTS.heading, fontSize: 16, letterSpacing: -0.3,
@@ -2042,6 +2283,18 @@ const styles = StyleSheet.create({
   },
   accDetail: {
     paddingHorizontal: 18, paddingBottom: 18, borderTopWidth: 1,
+  },
+  openStatsRow: {
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, paddingTop: 14,
+  },
+  openStatCard: {
+    width: '48%', borderRadius: 16, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center',
+  },
+  openStatValue: {
+    fontFamily: FONTS.heading, fontSize: 18,
+  },
+  openStatLabel: {
+    fontFamily: FONTS.bodySemiBold, fontSize: 11, marginTop: 3,
   },
   macroGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 14,
@@ -2066,6 +2319,32 @@ const styles = StyleSheet.create({
   foodRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 8, borderBottomWidth: 0.5,
+  },
+  savedFoodCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    gap: 10,
+  },
+  savedFoodMacroRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 6,
+  },
+  savedFoodMacroText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+  },
+  savedFoodMacroBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: 'hidden',
   },
   foodName: {
     fontFamily: FONTS.bodySemiBold, fontSize: 13,
@@ -2093,14 +2372,22 @@ const styles = StyleSheet.create({
   previewImage: { width: '100%', height: '100%' },
   fieldLabel: { fontFamily: FONTS.bodyBold, fontSize: 12, marginBottom: 8, letterSpacing: 0.5 },
   input: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 16, fontFamily: FONTS.bodySemiBold, fontSize: 14 },
+  ingredientsHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  ingredientRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  ingredientNameInput: { flex: 1, minHeight: 52 },
+  ingredientQtyInput: { width: 110, minHeight: 52 },
+  addIngredientBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#2596BE14' },
+  addIngredientBtnText: { color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 12 },
+  removeIngredientBtn: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   analysisImage: { width: '100%', height: 250, borderRadius: 20, marginBottom: 20 },
-  typeSelector: { flexDirection: 'row', gap: 8, marginBottom: 24 },
-  typeBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+  typeSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
+  typeBtn: { width: '48%', minHeight: 56, borderRadius: 16, overflow: 'hidden', borderWidth: 1 },
+  typeBtnFill: { minHeight: 56, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   typeBtnText: { fontFamily: FONTS.bodyBold, fontSize: 12 },
-  summaryGrid: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  summaryItem: { flex: 1, alignItems: 'center', padding: 12, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.02)' },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12 },
+  summaryItem: { width: '47%', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 10, borderRadius: 18, borderWidth: 1 },
   summaryValue: { fontFamily: FONTS.heading, fontSize: 18 },
-  summaryLabel: { fontFamily: FONTS.body, fontSize: 10, color: '#666', marginTop: 4 },
+  summaryLabel: { fontFamily: FONTS.body, fontSize: 10, marginTop: 4 },
   sectionTitle: { fontFamily: FONTS.heading, fontSize: 18, marginBottom: 12 },
   itemRow: { flexDirection: 'row', padding: 16, borderRadius: 16, marginBottom: 10, alignItems: 'center' },
   itemName: { fontFamily: FONTS.bodyBold, fontSize: 15 },
@@ -2110,7 +2397,18 @@ const styles = StyleSheet.create({
   modalFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, paddingTop: 12 },
   saveBtn: { borderRadius: 20, overflow: 'hidden' },
   saveBtnGrad: { paddingVertical: 18, alignItems: 'center' },
+  saveBtnSolid: { paddingVertical: 18, alignItems: 'center', backgroundColor: '#2596BE' },
   saveBtnText: { color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 16, letterSpacing: 1 },
+  detectedItemCard: { borderRadius: 20, borderWidth: 1, padding: 16, marginBottom: 12 },
+  detectedItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 },
+  detectedItemTitleWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  detectedItemIcon: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  detectedCaloriesWrap: { alignItems: 'center', minWidth: 72, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 10 },
+  detectedCaloriesLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 11, marginTop: 2 },
+  detectedMacroGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  detectedMacroPill: { width: '48%', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 10 },
+  detectedMacroValue: { fontFamily: FONTS.heading, fontSize: 15 },
+  detectedMacroLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 10, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
 
   // Tab Selector
   tabSelectorContainer: {
