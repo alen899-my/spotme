@@ -1144,19 +1144,23 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   const proteinConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_protein || 0), 0);
   const carbsConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_carbs || 0), 0);
   const fatConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_fat || 0), 0);
+  const headerDescription = activeTab === 'tracker'
+    ? 'Log your daily meals'
+    : 'Personalized AI diet coaching';
 
   const renderTopChrome = () => (
     <View>
       <View style={[styles.header, { marginTop: 6 }]}>
-        <View>
+        <View style={styles.headerCopy}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Nutrition</Text>
-          <Text style={[styles.headerSub, { color: colors.textMuted }]}>Track meals · hydration · macros</Text>
+          <Text style={[styles.headerSub, { color: colors.textMuted }]}>{headerDescription}</Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setShowLogForm(true)}>
-            <LinearGradient colors={['#2596BE', '#1a6e8a']} style={styles.addBtnGrad}>
-              <Ionicons name="add" size={26} color="#FFF" />
-            </LinearGradient>
+        <View style={styles.headerActionWrap}>
+          <TouchableOpacity style={styles.logMealBtn} onPress={() => setShowLogForm(true)} activeOpacity={0.85}>
+            <View style={styles.logMealBtnFill}>
+              <Ionicons name="add-circle-outline" size={18} color="#FFF" />
+              <Text style={styles.logMealBtnText} numberOfLines={1}>Log Meal</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -1191,7 +1195,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               <View>
                 {renderTopChrome()}
                 <View style={styles.trackerHeaderContent}>
-                  <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+                  <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" />
 
                   <NutritionMeter
                     caloriesConsumed={calsConsumed}
@@ -1922,11 +1926,33 @@ const SummaryItem = ({ label, value, unit, color }: any) => (
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10, gap: 12 },
+  headerCopy: { flex: 1, paddingRight: 6 },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 28 },
   headerSub: { fontFamily: FONTS.body, fontSize: 14, marginTop: 2 },
-  addBtn: { width: 56, height: 56, borderRadius: 20, overflow: 'hidden', elevation: 5, shadowColor: '#2596BE', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
-  addBtnGrad: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  headerActionWrap: { flexShrink: 1, alignItems: 'flex-end' },
+  logMealBtn: {
+    minWidth: 112,
+    maxWidth: 150,
+    borderRadius: 18,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#2596BE',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  logMealBtnFill: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#2596BE',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  logMealBtnText: { color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 14, flexShrink: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent: { paddingBottom: 32 },
   trackerHeaderContent: { paddingHorizontal: 20, paddingTop: 20 },

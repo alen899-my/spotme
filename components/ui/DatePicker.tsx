@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 interface DatePickerProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
+  variant?: 'default' | 'nutrition';
 }
 
 const DAYS_SHOWN = 7;
@@ -32,16 +33,39 @@ const today = () => {
 
 // ── Mini Calendar Modal ────────────────────────────────────────────────────────
 function CalendarModal({
-  visible, baseDate, onClose, onSelect,
+  visible, baseDate, onClose, onSelect, variant = 'default',
 }: {
   visible: boolean;
   baseDate: Date;
   onClose: () => void;
   onSelect: (d: Date) => void;
+  variant?: 'default' | 'nutrition';
 }) {
   const { colors } = useTheme();
   const [viewYear, setViewYear]   = useState(baseDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(baseDate.getMonth());
+  const isNutrition = variant === 'nutrition';
+  const palette = isNutrition
+    ? {
+        sheetBg: '#2596BE',
+        sheetBorder: 'rgba(247,203,22,0.34)',
+        text: '#FFFFFF',
+        muted: 'rgba(255,255,255,0.70)',
+        accent: '#F7CB16',
+        accentSoft: 'rgba(247,203,22,0.16)',
+        inactiveText: '#FFFFFF',
+        activeText: '#04282B',
+      }
+    : {
+        sheetBg: colors.card,
+        sheetBorder: colors.border,
+        text: colors.text,
+        muted: colors.textDim,
+        accent: '#2596BE',
+        accentSoft: colors.iconCircle,
+        inactiveText: colors.text,
+        activeText: '#FFFFFF',
+      };
 
   useEffect(() => {
     if (visible) {
@@ -87,28 +111,28 @@ function CalendarModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={cal.overlay} onPress={onClose}>
-        <Pressable onPress={() => {}} style={[cal.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Pressable onPress={() => {}} style={[cal.sheet, { backgroundColor: palette.sheetBg, borderColor: palette.sheetBorder }]}>
           {/* Header */}
           <View style={cal.header}>
-            <TouchableOpacity onPress={prevMonth} style={cal.navBtn}>
-              <Ionicons name="chevron-back" size={20} color={colors.text} />
+            <TouchableOpacity onPress={prevMonth} style={[cal.navBtn, isNutrition && { backgroundColor: palette.accentSoft }]}>
+              <Ionicons name="chevron-back" size={20} color={palette.text} />
             </TouchableOpacity>
-            <Text style={[cal.title, { color: colors.text }]}>
+            <Text style={[cal.title, { color: palette.text }]}>
               {MONTHS[viewMonth]} {viewYear}
             </Text>
             <TouchableOpacity
               onPress={nextMonth}
-              style={[cal.navBtn, atOrBeyondCurrentMonth && { opacity: 0.25 }]}
+              style={[cal.navBtn, isNutrition && { backgroundColor: palette.accentSoft }, atOrBeyondCurrentMonth && { opacity: 0.25 }]}
               disabled={atOrBeyondCurrentMonth}
             >
-              <Ionicons name="chevron-forward" size={20} color={colors.text} />
+              <Ionicons name="chevron-forward" size={20} color={palette.text} />
             </TouchableOpacity>
           </View>
 
           {/* Day-of-week row */}
           <View style={cal.weekRow}>
             {['S','M','T','W','T','F','S'].map((d, i) => (
-              <Text key={i} style={[cal.weekLabel, { color: colors.textDim }]}>{d}</Text>
+              <Text key={i} style={[cal.weekLabel, { color: palette.muted }]}>{d}</Text>
             ))}
           </View>
 
@@ -125,8 +149,8 @@ function CalendarModal({
                   key={idx}
                   style={[
                     cal.cell,
-                    selected && { backgroundColor: '#2596BE', borderRadius: 12 },
-                    !selected && todayC && { borderRadius: 12, borderWidth: 1.5, borderColor: '#2596BE' },
+                    selected && { backgroundColor: palette.accent, borderRadius: 12 },
+                    !selected && todayC && { borderRadius: 12, borderWidth: 1.5, borderColor: palette.accent },
                     future && { opacity: 0.25 },
                   ]}
                   onPress={() => {
@@ -141,7 +165,7 @@ function CalendarModal({
                 >
                   <Text style={[
                     cal.dayNum,
-                    { color: selected ? '#FFF' : todayC ? '#2596BE' : colors.text },
+                    { color: selected ? palette.activeText : todayC ? palette.accent : palette.inactiveText },
                   ]}>
                     {day}
                   </Text>
@@ -152,10 +176,10 @@ function CalendarModal({
 
           {/* Today shortcut */}
           <TouchableOpacity
-            style={[cal.todayBtn, { borderColor: colors.border }]}
+            style={[cal.todayBtn, { borderColor: palette.sheetBorder }]}
             onPress={() => { onSelect(today()); onClose(); }}
           >
-            <Text style={[cal.todayBtnText, { color: '#2596BE' }]}>Jump to Today</Text>
+            <Text style={[cal.todayBtnText, { color: palette.accent }]}>Jump to Today</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -186,10 +210,40 @@ const cal = StyleSheet.create({
 });
 
 // ── Main DatePicker ────────────────────────────────────────────────────────────
-export default function DatePicker({ selectedDate, onSelectDate }: DatePickerProps) {
+export default function DatePicker({ selectedDate, onSelectDate, variant = 'default' }: DatePickerProps) {
   const { colors } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const [showCal, setShowCal] = useState(false);
+  const isNutrition = variant === 'nutrition';
+  const palette = isNutrition
+    ? {
+        cardBg: '#2596BE',
+        cardBorder: 'rgba(247,203,22,0.34)',
+        text: '#FFFFFF',
+        muted: 'rgba(255,255,255,0.72)',
+        accent: '#F7CB16',
+        accentSoft: 'rgba(247,203,22,0.16)',
+        pillBg: '#FBE58A',
+        pillBorder: '#F7CB16',
+        pillText: '#04282B',
+        pillMuted: 'rgba(4,40,43,0.72)',
+        activeText: '#04282B',
+        shadow: '#2596BE',
+      }
+    : {
+        cardBg: 'transparent',
+        cardBorder: 'transparent',
+        text: colors.text,
+        muted: colors.textDim,
+        accent: '#2596BE',
+        accentSoft: colors.iconCircle,
+        pillBg: colors.card,
+        pillBorder: colors.border,
+        pillText: colors.text,
+        pillMuted: colors.textDim,
+        activeText: '#FFFFFF',
+        shadow: '#2596BE',
+      };
 
   const dates = React.useMemo(() => {
     const t = today();
@@ -208,31 +262,51 @@ export default function DatePicker({ selectedDate, onSelectDate }: DatePickerPro
   const selectedLabel = isToday
     ? 'Today'
     : `${DAYS[selectedDate.getDay()]}, ${selectedDate.getDate()} ${MONTHS[selectedDate.getMonth()]}`;
+  const todayLabel = `Today • ${DAYS[today().getDay()]}, ${today().getDate()} ${MONTHS[today().getMonth()]}`;
 
   // Check if selected date is in the visible 7-day strip
-  const inStrip = dates.some(d => isSameDay(d, selectedDate));
+  const inStrip = dates.some((d) => isSameDay(d, selectedDate));
 
   return (
-    <View style={styles.wrapper}>
+    <View
+      style={[
+        styles.wrapper,
+        isNutrition && [
+          styles.nutritionWrapper,
+          {
+            backgroundColor: palette.cardBg,
+            borderColor: palette.cardBorder,
+            shadowColor: palette.shadow,
+          },
+        ],
+      ]}
+    >
+      {isNutrition && <Text style={[styles.nutritionTodayLabel, { color: palette.text }]}>{todayLabel}</Text>}
       {/* Month + selected date label row */}
-      <View style={styles.labelRow}>
+      <View style={[styles.labelRow, isNutrition && styles.nutritionLabelRow]}>
         {/* Tap month label → open calendar */}
-        <TouchableOpacity onPress={() => setShowCal(true)} style={styles.monthBtn} activeOpacity={0.7}>
-          <Text style={[styles.monthLabel, { color: colors.text }]}>
-            {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}
-          </Text>
-          <Ionicons name="chevron-down" size={14} color={colors.textDim} style={{ marginLeft: 4 }} />
-        </TouchableOpacity>
-
         <TouchableOpacity
           onPress={() => setShowCal(true)}
-          style={[styles.todayPill, { backgroundColor: colors.iconCircle }]}
-          activeOpacity={0.75}
+          style={[styles.monthBtn, isNutrition && [styles.nutritionMonthBtn, { backgroundColor: palette.accentSoft, borderColor: palette.cardBorder }]]}
+          activeOpacity={0.7}
         >
-          <Ionicons name="calendar-outline" size={13} color="#2596BE" />
-          <Text style={[styles.todayPillText, { color: '#2596BE' }]}>{selectedLabel}</Text>
-          {!inStrip && <View style={[styles.dot, { backgroundColor: '#2596BE' }]} />}
+          <Text style={[styles.monthLabel, { color: palette.text }]}>
+            {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={isNutrition ? palette.accent : palette.muted} style={{ marginLeft: 4 }} />
         </TouchableOpacity>
+
+        {!isNutrition && (
+          <TouchableOpacity
+            onPress={() => setShowCal(true)}
+            style={[styles.todayPill, { backgroundColor: colors.iconCircle }]}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="calendar-outline" size={13} color="#2596BE" />
+            <Text style={[styles.todayPillText, { color: '#2596BE' }]}>{selectedLabel}</Text>
+            {!inStrip && <View style={[styles.dot, { backgroundColor: '#2596BE' }]} />}
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 7-day strip */}
@@ -240,26 +314,26 @@ export default function DatePicker({ selectedDate, onSelectDate }: DatePickerPro
         ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, isNutrition && styles.nutritionScrollContent]}
       >
         {/* If selected date is outside the strip, show it as an extra pill at the start */}
         {!inStrip && (
           <TouchableOpacity
-            style={[styles.pill, { backgroundColor: '#2596BE', borderColor: '#2596BE' }]}
+            style={[styles.pill, isNutrition && styles.nutritionPill, { backgroundColor: palette.accent, borderColor: palette.accent }]}
             activeOpacity={0.8}
             onPress={() => setShowCal(true)}
           >
-            <Text style={[styles.pillDay, { color: 'rgba(255,255,255,0.8)' }]}>
+            <Text style={[styles.pillDay, { color: isNutrition ? 'rgba(4,40,43,0.72)' : 'rgba(255,255,255,0.8)' }]}>
               {MONTHS[selectedDate.getMonth()].slice(0, 3).toUpperCase()}
             </Text>
-            <Text style={[styles.pillNum, { color: '#FFF' }]}>{selectedDate.getDate()}</Text>
-            <View style={styles.activeDot} />
+            <Text style={[styles.pillNum, { color: palette.activeText }]}>{selectedDate.getDate()}</Text>
+            <View style={[styles.activeDot, { backgroundColor: isNutrition ? 'rgba(4,40,43,0.72)' : 'rgba(255,255,255,0.7)' }]} />
           </TouchableOpacity>
         )}
 
         {dates.map((date, idx) => {
           const active = isSameDay(date, selectedDate);
-          const isT    = isSameDay(date, today());
+          const isT = isSameDay(date, today());
 
           return (
             <TouchableOpacity
@@ -268,20 +342,21 @@ export default function DatePicker({ selectedDate, onSelectDate }: DatePickerPro
               activeOpacity={0.75}
               style={[
                 styles.pill,
+                isNutrition && styles.nutritionPill,
                 {
-                  backgroundColor: active ? '#2596BE' : colors.card,
-                  borderColor: active ? '#2596BE' : colors.border,
-                  shadowColor: active ? '#2596BE' : 'transparent',
+                  backgroundColor: active ? palette.accent : palette.pillBg,
+                  borderColor: active ? palette.accent : palette.pillBorder,
+                  shadowColor: active ? palette.accent : 'transparent',
                 },
               ]}
             >
-              <Text style={[styles.pillDay, { color: active ? 'rgba(255,255,255,0.75)' : colors.textDim }]}>
+              <Text style={[styles.pillDay, { color: active ? 'rgba(4,40,43,0.72)' : palette.pillMuted }]}>
                 {isT ? 'TDY' : DAYS[date.getDay()].toUpperCase()}
               </Text>
-              <Text style={[styles.pillNum, { color: active ? '#FFF' : colors.text }]}>
+              <Text style={[styles.pillNum, { color: active ? palette.activeText : palette.pillText }]}>
                 {date.getDate()}
               </Text>
-              {active && <View style={styles.activeDot} />}
+              {active && <View style={[styles.activeDot, { backgroundColor: isNutrition ? 'rgba(4,40,43,0.72)' : 'rgba(255,255,255,0.7)' }]} />}
             </TouchableOpacity>
           );
         })}
@@ -293,6 +368,7 @@ export default function DatePicker({ selectedDate, onSelectDate }: DatePickerPro
         baseDate={selectedDate}
         onClose={() => setShowCal(false)}
         onSelect={onSelectDate}
+        variant={variant}
       />
     </View>
   );
@@ -300,12 +376,40 @@ export default function DatePicker({ selectedDate, onSelectDate }: DatePickerPro
 
 const styles = StyleSheet.create({
   wrapper: { paddingBottom: 8 },
+  nutritionWrapper: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderRadius: 22,
+    borderWidth: 1,
+    marginBottom: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 6,
+  },
   labelRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', paddingHorizontal: 20, marginBottom: 12,
   },
+  nutritionLabelRow: {
+    paddingHorizontal: 0,
+    marginBottom: 8,
+  },
+  nutritionTodayLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+    marginBottom: 8,
+    opacity: 0.9,
+  },
   monthBtn: { flexDirection: 'row', alignItems: 'center' },
-  monthLabel: { fontFamily: FONTS.bodyBold, fontSize: 16 },
+  nutritionMonthBtn: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  monthLabel: { fontFamily: FONTS.bodyBold, fontSize: 14 },
   todayPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
@@ -313,13 +417,18 @@ const styles = StyleSheet.create({
   todayPillText: { fontFamily: FONTS.bodySemiBold, fontSize: 12 },
   dot: { width: 5, height: 5, borderRadius: 2.5, marginLeft: 2 },
   scrollContent: { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
+  nutritionScrollContent: { paddingHorizontal: 0, gap: 8 },
   pill: {
     width: 54, height: 72, borderRadius: 18, borderWidth: 1.5,
     justifyContent: 'center', alignItems: 'center',
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
   },
-  pillDay: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5, marginBottom: 4 },
-  pillNum: { fontFamily: FONTS.heading, fontSize: 22 },
+  nutritionPill: {
+    width: 50,
+    height: 64,
+  },
+  pillDay: { fontFamily: FONTS.bodyBold, fontSize: 8, letterSpacing: 0.5, marginBottom: 3 },
+  pillNum: { fontFamily: FONTS.heading, fontSize: 18 },
   activeDot: {
     width: 5, height: 5, borderRadius: 2.5,
     backgroundColor: 'rgba(255,255,255,0.7)', marginTop: 4,
