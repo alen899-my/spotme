@@ -915,8 +915,17 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   };
 
   const renderRecommendations = () => {
+    const renderRecommendationState = (content: React.ReactNode) => (
+      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        {renderTopChrome()}
+        <View style={styles.recommendationStateWrap}>
+          {content}
+        </View>
+      </ScrollView>
+    );
+
     if (recommendationLoading) {
-      return (
+      return renderRecommendationState(
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#2596BE" />
           <Text style={{ marginTop: 14, fontFamily: FONTS.bodySemiBold, color: colors.textDim }}>AI Diet Coach is preparing your personalized plan...</Text>
@@ -925,7 +934,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     }
 
     if (recommendationError) {
-      return (
+      return renderRecommendationState(
         <View style={[styles.emptyContainer, { paddingHorizontal: 20 }]}>
           <View style={[styles.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="alert-circle-outline" size={40} color={colors.textDim} />
@@ -945,10 +954,30 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
       );
     }
 
-    if (!recommendationData) return null;
+    if (!recommendationData) {
+      return renderRecommendationState(
+        <View style={[styles.emptyContainer, { paddingHorizontal: 20 }]}>
+          <View style={[styles.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name="sparkles-outline" size={40} color={colors.textDim} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Diet coach unavailable</Text>
+          <Text style={[styles.emptyText, { color: colors.textMuted, maxWidth: 280, textAlign: 'center' }]}>
+            We could not load your AI nutrition plan right now. Please try again in a moment.
+          </Text>
+          <TouchableOpacity
+            style={[styles.emptyBtn, { backgroundColor: '#2596BE15', borderColor: '#2596BE30', borderWidth: 1 }]}
+            onPress={() => fetchRecommendations(true)}
+          >
+            <Ionicons name="refresh-outline" size={16} color="#2596BE" />
+            <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Reload Coach</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
 
     return (
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        {renderTopChrome()}
         {recommendationData.profileIncomplete && (
           <View style={[styles.recCard, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30', padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 14 }]}>
             <Ionicons name="warning-outline" size={20} color="#F59E0B" style={{ marginRight: 10 }} />
@@ -1116,9 +1145,8 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   const carbsConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_carbs || 0), 0);
   const fatConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_fat || 0), 0);
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {/* ── Header ── */}
+  const renderTopChrome = () => (
+    <View>
       <View style={[styles.header, { marginTop: 6 }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Nutrition</Text>
@@ -1133,7 +1161,6 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         </View>
       </View>
 
-      {/* ── Tab Selector ── */}
       <View style={[styles.tabSelectorContainer, { backgroundColor: colors.inputBg, marginTop: 2 }]}>
         <TouchableOpacity
           style={[styles.tabSelectorBtn, activeTab === 'tracker' && [styles.tabSelectorActiveBtn, { backgroundColor: '#2596BE' }]]}
@@ -1151,57 +1178,75 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           <Text style={[styles.tabSelectorText, activeTab === 'recommendations' ? { color: '#FFF' } : { color: colors.textMuted }]}>AI Diet Coach</Text>
         </TouchableOpacity>
       </View>
+    </View>
+  );
 
+  return (
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       {activeTab === 'tracker' ? (
         <FlatList
           data={loading ? [] : uploading ? [{ id: 'loading' }, ...filteredMeals] : filteredMeals}
           keyExtractor={(item) => item.id.toString()}
           ListHeaderComponent={
-              <>
-                {/* ── Date Picker ── */}
-                <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+              <View>
+                {renderTopChrome()}
+                <View style={styles.trackerHeaderContent}>
+                  <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
-                <NutritionMeter
-                  caloriesConsumed={calsConsumed}
-                  caloriesTarget={targets.caloriesTarget}
-                  protein={{ label: 'Protein', icon: 'barbell-outline', consumed: proteinConsumed, target: targets.proteinTarget, color: '#10B981', unit: 'g' }}
-                  carbs={{   label: 'Carbs',   icon: 'pizza-outline',   consumed: carbsConsumed,   target: targets.carbsTarget,   color: '#3B82F6', unit: 'g' }}
-                  fat={{     label: 'Fat',     icon: 'water-outline',   consumed: fatConsumed,     target: targets.fatTarget,     color: '#F59E0B', unit: 'g' }}
-                />
-                <WaterTracker selectedDate={selectedDate} />
-                {/* Meals section divider */}
-                {filteredMeals.length > 0 && (
-                  <View style={styles.sectionDivider}>
-                    <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
-                    <View style={[styles.sectionLabelWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      <Ionicons name="restaurant-outline" size={13} color={colors.textDim} />
-                      <Text style={[styles.sectionLabel, { color: colors.textDim }]}>
-                        {filteredMeals.length} Meal{filteredMeals.length !== 1 ? 's' : ''} · {Math.round(calsConsumed)} kcal
-                      </Text>
+                  <NutritionMeter
+                    caloriesConsumed={calsConsumed}
+                    caloriesTarget={targets.caloriesTarget}
+                    protein={{ label: 'Protein', icon: 'barbell-outline', consumed: proteinConsumed, target: targets.proteinTarget, color: '#10B981', unit: 'g' }}
+                    carbs={{   label: 'Carbs',   icon: 'pizza-outline',   consumed: carbsConsumed,   target: targets.carbsTarget,   color: '#3B82F6', unit: 'g' }}
+                    fat={{     label: 'Fat',     icon: 'water-outline',   consumed: fatConsumed,     target: targets.fatTarget,     color: '#F59E0B', unit: 'g' }}
+                  />
+                  <WaterTracker selectedDate={selectedDate} />
+                  {filteredMeals.length > 0 && (
+                    <View style={styles.sectionDivider}>
+                      <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
+                      <View style={[styles.sectionLabelWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Ionicons name="restaurant-outline" size={13} color={colors.textDim} />
+                        <Text style={[styles.sectionLabel, { color: colors.textDim }]}>
+                          {filteredMeals.length} Meal{filteredMeals.length !== 1 ? 's' : ''} · {Math.round(calsConsumed)} kcal
+                        </Text>
+                      </View>
+                      <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
                     </View>
-                    <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
-                  </View>
-                )}
-              </>
+                  )}
+                </View>
+              </View>
             }
             renderItem={({ item }) => {
-              if (item.id === 'loading') return <RenderLoadingCard />;
-              return renderMealCard({ item });
+              if (item.id === 'loading') {
+                return (
+                  <View style={styles.trackerItemWrap}>
+                    <RenderLoadingCard />
+                  </View>
+                );
+              }
+
+              return (
+                <View style={styles.trackerItemWrap}>
+                  {renderMealCard({ item })}
+                </View>
+              );
             }}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               uploading ? null : (
-                <View style={styles.emptyContainer}>
-                  <View style={[styles.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Ionicons name="restaurant-outline" size={40} color={colors.textDim} />
+                <View style={styles.trackerItemWrap}>
+                  <View style={styles.emptyContainer}>
+                    <View style={[styles.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <Ionicons name="restaurant-outline" size={40} color={colors.textDim} />
+                    </View>
+                    <Text style={[styles.emptyTitle, { color: colors.text }]}>No meals logged</Text>
+                    <Text style={[styles.emptyText, { color: colors.textMuted }]}>Tap + to log a meal and track your nutrition</Text>
+                    <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: '#2596BE15', borderColor: '#2596BE30', borderWidth: 1 }]} onPress={() => setShowLogForm(true)}>
+                      <Ionicons name="add-circle-outline" size={16} color="#2596BE" />
+                      <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Log Your First Meal</Text>
+                    </TouchableOpacity>
                   </View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No meals logged</Text>
-                  <Text style={[styles.emptyText, { color: colors.textMuted }]}>Tap + to log a meal and track your nutrition</Text>
-                  <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: '#2596BE15', borderColor: '#2596BE30', borderWidth: 1 }]} onPress={() => setShowLogForm(true)}>
-                    <Ionicons name="add-circle-outline" size={16} color="#2596BE" />
-                    <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Log Your First Meal</Text>
-                  </TouchableOpacity>
                 </View>
               )
             }
@@ -1883,7 +1928,10 @@ const styles = StyleSheet.create({
   addBtn: { width: 56, height: 56, borderRadius: 20, overflow: 'hidden', elevation: 5, shadowColor: '#2596BE', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
   addBtnGrad: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent: { padding: 20, paddingBottom: 32 },
+  listContent: { paddingBottom: 32 },
+  trackerHeaderContent: { paddingHorizontal: 20, paddingTop: 20 },
+  trackerItemWrap: { paddingHorizontal: 20 },
+  recommendationStateWrap: { paddingHorizontal: 20, paddingTop: 20 },
   mealCard: { borderRadius: 24, borderWidth: 1, marginBottom: 20, overflow: 'hidden', elevation: 2 },
   mealCardImage: { width: '100%', height: 200 },
   mealCardContent: { padding: 16 },

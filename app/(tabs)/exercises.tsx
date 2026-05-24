@@ -410,7 +410,11 @@ export default function ExercisesScreen() {
   });
 
   const renderExercise = useCallback(
-    ({ item }: any) => <ExerciseCard item={item} />,
+    ({ item }: any) => (
+      <View style={styles.exerciseItemWrap}>
+        <ExerciseCard item={item} />
+      </View>
+    ),
     []
   );
 
@@ -465,22 +469,8 @@ export default function ExercisesScreen() {
     </View>
   );
 
-  const inSearchMode = query.length > 0;
-  const title = viewMode === 'exercises' ? formatLabel(drilldownCategory) : 'Exercises';
-  const appHeaderTopPad = insets.top;
-  const appHeaderHeight = appHeaderTopPad + Math.round((SCREEN_WIDTH / 390) * 52);
-  const heroTopPadding = appHeaderHeight - appHeaderTopPad + 12;
-  const subtitle =
-    inSearchMode && !searching
-      ? `${searchTotal.toLocaleString()} results`
-      : viewMode === 'exercises' && !searching
-        ? `${searchTotal.toLocaleString()} movements`
-        : !loadingCats
-          ? `${categories.length} categories`
-          : 'Loading your library';
-
-  return (
-    <View style={styles.screen}>
+  const renderTopChrome = () => (
+    <View>
       <ImageBackground
         source={HEADER_IMAGE}
         style={[styles.hero, { paddingTop: heroTopPadding }]}
@@ -525,61 +515,98 @@ export default function ExercisesScreen() {
           </TouchableOpacity>
         )}
       </View>
+    </View>
+  );
 
-      {!inSearchMode && viewMode === 'categories' && (
-        catError ? (
-          <View style={styles.centeredMsg}>
-            <View style={styles.messageIconWrap}>
-              <Ionicons name="cloud-offline-outline" size={30} color={P.ctaDark} />
-            </View>
-            <Text style={styles.msgTitle}>Could not load categories</Text>
-            <Text style={styles.msgText}>Please try again and we will pull the exercise library back in.</Text>
-            <TouchableOpacity onPress={fetchCategories} style={styles.retryBtn}>
-              <Text style={styles.retryText}>Retry</Text>
-            </TouchableOpacity>
+  const renderCategoryState = () => (
+    <View style={styles.sectionContent}>
+      {catError ? (
+        <View style={styles.centeredMsg}>
+          <View style={styles.messageIconWrap}>
+            <Ionicons name="cloud-offline-outline" size={30} color={P.ctaDark} />
           </View>
-        ) : (
-          <FlatList
-            data={[] as number[]}
-            keyExtractor={(_, index) => String(index)}
-            renderItem={() => null}
-            ListHeaderComponent={renderBodyExplorer}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
-        )
+          <Text style={styles.msgTitle}>Could not load categories</Text>
+          <Text style={styles.msgText}>Please try again and we will pull the exercise library back in.</Text>
+          <TouchableOpacity onPress={fetchCategories} style={styles.retryBtn}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        renderBodyExplorer()
+      )}
+    </View>
+  );
+
+  const renderSearchEmptyState = () => (
+    <View style={styles.sectionContent}>
+      {searching ? (
+        <View style={styles.centeredMsg}>
+          <ActivityIndicator size="large" color={P.cta} />
+          <Text style={styles.msgText}>Loading exercises...</Text>
+        </View>
+      ) : (
+        <View style={styles.centeredMsg}>
+          <View style={styles.messageIconWrap}>
+            <Ionicons name="search-outline" size={30} color={P.ctaDark} />
+          </View>
+          <Text style={styles.msgTitle}>No exercises found</Text>
+          <Text style={styles.msgText}>Try a different keyword or browse one of the blue library cards.</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const inSearchMode = query.length > 0;
+  const title = viewMode === 'exercises' ? formatLabel(drilldownCategory) : 'Exercises';
+  const appHeaderTopPad = insets.top;
+  const appHeaderHeight = appHeaderTopPad + Math.round((SCREEN_WIDTH / 390) * 52);
+  const heroTopPadding = appHeaderHeight - appHeaderTopPad + 12;
+  const subtitle =
+    inSearchMode && !searching
+      ? `${searchTotal.toLocaleString()} results`
+      : viewMode === 'exercises' && !searching
+        ? `${searchTotal.toLocaleString()} movements`
+        : !loadingCats
+          ? `${categories.length} categories`
+          : 'Loading your library';
+
+  return (
+    <View style={styles.screen}>
+      {!inSearchMode && viewMode === 'categories' && (
+        <FlatList
+          data={[] as number[]}
+          keyExtractor={(_, index) => String(index)}
+          renderItem={() => null}
+          ListHeaderComponent={() => (
+            <View>
+              {renderTopChrome()}
+              {renderCategoryState()}
+            </View>
+          )}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
       )}
 
       {(inSearchMode || viewMode === 'exercises') && (
-        searching ? (
-          <View style={styles.centeredMsg}>
-            <ActivityIndicator size="large" color={P.cta} />
-            <Text style={styles.msgText}>Loading exercises...</Text>
-          </View>
-        ) : searchResults.length === 0 ? (
-          <View style={styles.centeredMsg}>
-            <View style={styles.messageIconWrap}>
-              <Ionicons name="search-outline" size={30} color={P.ctaDark} />
-            </View>
-            <Text style={styles.msgTitle}>No exercises found</Text>
-            <Text style={styles.msgText}>Try a different keyword or browse one of the blue library cards.</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={searchResults}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderExercise}
-            contentContainerStyle={styles.exerciseListContent}
-            showsVerticalScrollIndicator={false}
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.4}
-            ListFooterComponent={renderSearchFooter}
-            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-            removeClippedSubviews
-            maxToRenderPerBatch={10}
-            windowSize={5}
-          />
-        )
+        <FlatList
+          data={searchResults}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderExercise}
+          ListHeaderComponent={renderTopChrome}
+          ListEmptyComponent={renderSearchEmptyState}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={renderSearchFooter}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          removeClippedSubviews
+          maxToRenderPerBatch={10}
+          windowSize={5}
+        />
       )}
 
       <Modal
@@ -802,15 +829,15 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
 
-  listContent: {
-    paddingHorizontal: H_PADDING,
-    paddingTop: 18,
+  scrollContent: {
     paddingBottom: 40,
   },
-  exerciseListContent: {
+  sectionContent: {
     paddingHorizontal: H_PADDING,
     paddingTop: 18,
-    paddingBottom: 40,
+  },
+  exerciseItemWrap: {
+    paddingHorizontal: H_PADDING,
   },
   row: {
     justifyContent: 'space-between',

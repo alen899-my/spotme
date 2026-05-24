@@ -38,7 +38,7 @@ function TopTabBar() {
       : pathname.includes(tab.name)
   );
   const current = activeIndex < 0 ? 0 : activeIndex;
-  const tabWidth = Math.max(52, Math.min(66, Math.floor(barWidth / TABS.length) - 4));
+  const tabWidth = Math.max(60, Math.min(82, Math.floor(barWidth / TABS.length) - 2));
 
   return (
     <View style={[styles.topBar, { paddingBottom: Math.max(insets.bottom, 2) }]}>
@@ -60,7 +60,7 @@ function TopTabBar() {
             >
               <Ionicons
                 name={isActive ? tab.icon : tab.iconOutline}
-                size={17}
+                size={21}
                 color={isActive ? C.ink : C.text}
               />
             </TouchableOpacity>
@@ -117,18 +117,19 @@ const styles = StyleSheet.create({
   topBar: {
     backgroundColor: "transparent",
     paddingTop: 0,
+    marginBottom: 12,
   },
   tabsRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 12,
-    paddingTop: 2,
-    gap: 4,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    gap: 8,
   },
   tabPill: {
-    height: 32,
-    borderRadius: 4,
+    height: 42,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
