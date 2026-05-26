@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, ScrollView,
+  View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -9,6 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
+import { P } from '../../constants/homeTheme';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -16,6 +18,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function NewDailyWorkout() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { showToast } = useToast();
 
@@ -54,6 +57,7 @@ export default function NewDailyWorkout() {
     setLoadingSessions(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
+      const cleanTitle = selectedSession?.name || selectedSplit?.name || 'Quick Workout';
       const res = await axios.get(`${API_URL}/workouts/splits/${split.id}/sessions`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -69,12 +73,13 @@ export default function NewDailyWorkout() {
     setStarting(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
+      const cleanTitle = selectedSession?.name || selectedSplit?.name || 'Quick Workout';
       const title = selectedSession
         ? `${selectedSplit?.name} — ${selectedSession?.name}`
         : selectedSplit?.name || 'Quick Workout';
 
       const res = await axios.post(`${API_URL}/daily/workouts`, {
-        title,
+        title: cleanTitle,
         split_id: selectedSplit.id,
         session_id: selectedSession.id,
       }, {
@@ -93,7 +98,7 @@ export default function NewDailyWorkout() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="close" size={28} color={colors.text} />
           </TouchableOpacity>
@@ -102,29 +107,35 @@ export default function NewDailyWorkout() {
         </View>
 
         {/* Date/Time Hero Card */}
-        <LinearGradient colors={['#E00000', '#8B0000']} style={styles.heroCard}>
+        <View style={styles.heroCard}>
           <View style={styles.heroBadge}>
             <Ionicons name="flash" size={14} color="#FFF" />
             <Text style={styles.heroBadgeText}>TODAY'S SESSION</Text>
           </View>
           <Text style={styles.heroDate}>{dateStr}</Text>
           <Text style={styles.heroTime}>{timeStr}</Text>
-        </LinearGradient>
+        </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: 140 + Math.max(insets.bottom, 12) }
+          ]}
+        >
           {/* Step 1: Choose Split */}
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            <Text style={{ color: '#E00000' }}>1. </Text>Choose Program
+            <Text style={{ color: P.cta }}>1. </Text>Choose Program
           </Text>
 
           {loadingSplits ? (
-            <ActivityIndicator color="#E00000" style={{ marginVertical: 20 }} />
+            <ActivityIndicator color={P.cta} style={{ marginVertical: 20 }} />
           ) : splits.length === 0 ? (
             <TouchableOpacity
               style={[styles.createSplitCard, { borderColor: colors.border }]}
               onPress={() => router.push('/splits/create')}
             >
-              <Ionicons name="add-circle-outline" size={32} color="#E00000" />
+              <Ionicons name="add-circle-outline" size={32} color={P.cta} />
               <Text style={[styles.createSplitText, { color: colors.textMuted }]}>No programs yet. Create one first.</Text>
             </TouchableOpacity>
           ) : (
@@ -135,11 +146,11 @@ export default function NewDailyWorkout() {
                   style={[
                     styles.splitCard,
                     { backgroundColor: colors.card, borderColor: colors.border },
-                    selectedSplit?.id === split.id && { borderColor: '#E00000', backgroundColor: 'rgba(224,0,0,0.05)' }
+                    selectedSplit?.id === split.id && { borderColor: P.cta, backgroundColor: 'rgba(37,150,190,0.08)' }
                   ]}
                   onPress={() => handleSelectSplit(split)}
                 >
-                  <View style={[styles.splitIcon, { backgroundColor: selectedSplit?.id === split.id ? '#E00000' : colors.inputBg }]}>
+                  <View style={[styles.splitIcon, { backgroundColor: selectedSplit?.id === split.id ? P.cta : colors.inputBg }]}>
                     <MaterialCommunityIcons
                       name="dumbbell"
                       size={20}
@@ -151,7 +162,7 @@ export default function NewDailyWorkout() {
                     <Text style={[styles.splitMeta, { color: colors.textMuted }]}>{split.session_count} sessions</Text>
                   </View>
                   {selectedSplit?.id === split.id && (
-                    <Ionicons name="checkmark-circle" size={22} color="#E00000" />
+                    <Ionicons name="checkmark-circle" size={22} color={P.cta} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -162,11 +173,11 @@ export default function NewDailyWorkout() {
           {selectedSplit && (
             <>
               <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>
-                <Text style={{ color: '#E00000' }}>2. </Text>Choose Day
+                <Text style={{ color: P.cta }}>2. </Text>Choose Day
               </Text>
 
               {loadingSessions ? (
-                <ActivityIndicator color="#E00000" style={{ marginVertical: 20 }} />
+                <ActivityIndicator color={P.cta} style={{ marginVertical: 20 }} />
               ) : sessions.length === 0 ? (
                 <Text style={[styles.noSessions, { color: colors.textMuted }]}>No sessions in this program yet.</Text>
               ) : (
@@ -177,11 +188,11 @@ export default function NewDailyWorkout() {
                       style={[
                         styles.splitCard,
                         { backgroundColor: colors.card, borderColor: colors.border },
-                        selectedSession?.id === session.id && { borderColor: '#E00000', backgroundColor: 'rgba(224,0,0,0.05)' }
+                        selectedSession?.id === session.id && { borderColor: P.cta, backgroundColor: 'rgba(37,150,190,0.08)' }
                       ]}
                       onPress={() => setSelectedSession(session)}
                     >
-                      <View style={[styles.splitIcon, { backgroundColor: selectedSession?.id === session.id ? '#E00000' : colors.inputBg }]}>
+                      <View style={[styles.splitIcon, { backgroundColor: selectedSession?.id === session.id ? P.cta : colors.inputBg }]}>
                         <Ionicons
                           name="calendar"
                           size={18}
@@ -193,7 +204,7 @@ export default function NewDailyWorkout() {
                         <Text style={[styles.splitMeta, { color: colors.textMuted }]}>{session.exercise_count} exercises</Text>
                       </View>
                       {selectedSession?.id === session.id && (
-                        <Ionicons name="checkmark-circle" size={22} color="#E00000" />
+                        <Ionicons name="checkmark-circle" size={22} color={P.cta} />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -201,24 +212,30 @@ export default function NewDailyWorkout() {
               )}
             </>
           )}
-
-          <View style={{ height: 120 }} />
         </ScrollView>
 
-        <View style={[styles.bottomBar, { backgroundColor: colors.bg }]}>
+        <View
+          style={[
+            styles.bottomBar,
+            {
+              backgroundColor: colors.bg,
+              paddingBottom: Math.max(insets.bottom, 12) + 12,
+            }
+          ]}
+        >
           <TouchableOpacity
             style={[styles.startBtn, (!selectedSplit || !selectedSession) && { opacity: 0.5 }]}
             onPress={handleStart}
             disabled={!selectedSplit || !selectedSession || starting}
           >
-            <LinearGradient colors={['#E00000', '#B00000']} style={styles.startBtnGradient}>
+            <View style={styles.startBtnGradient}>
               {starting ? <ActivityIndicator color="#FFF" /> : (
                 <>
                   <Ionicons name="play" size={20} color="#FFF" />
                   <Text style={styles.startBtnText}>START WORKOUT</Text>
                 </>
               )}
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -228,14 +245,15 @@ export default function NewDailyWorkout() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingTop: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8, marginBottom: 12 },
   backBtn: { marginLeft: -8 },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 24 },
-  heroCard: { marginHorizontal: 20, borderRadius: 24, padding: 24, marginBottom: 28 },
+  heroCard: { marginHorizontal: 20, borderRadius: 24, padding: 24, marginBottom: 28, backgroundColor: P.cta },
   heroBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
   heroBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 11, color: 'rgba(255,255,255,0.8)', letterSpacing: 1 },
   heroDate: { fontFamily: FONTS.heading, fontSize: 26, color: '#FFF', marginBottom: 4 },
   heroTime: { fontFamily: FONTS.body, fontSize: 16, color: 'rgba(255,255,255,0.7)' },
+  scrollContent: { paddingBottom: 120 },
   sectionTitle: { fontFamily: FONTS.bodyBold, fontSize: 16, paddingHorizontal: 20, marginBottom: 14 },
   splitList: { paddingHorizontal: 20, gap: 12 },
   splitCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 18, padding: 16, borderWidth: 1.5 },
@@ -245,8 +263,8 @@ const styles = StyleSheet.create({
   createSplitCard: { marginHorizontal: 20, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', padding: 24, alignItems: 'center', gap: 10 },
   createSplitText: { fontFamily: FONTS.body, fontSize: 14, textAlign: 'center' },
   noSessions: { fontFamily: FONTS.body, fontSize: 14, paddingHorizontal: 20, marginTop: 8 },
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: Platform.OS === 'ios' ? 34 : 20 },
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingTop: 12 },
   startBtn: { borderRadius: 18, overflow: 'hidden' },
-  startBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, height: 60 },
+  startBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, height: 60, backgroundColor: P.cta },
   startBtnText: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF', letterSpacing: 1 },
 });

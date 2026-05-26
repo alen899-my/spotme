@@ -46,6 +46,8 @@ export default function MealsScreen() {
   const [recommendationData, setRecommendationData] = useState<any>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
+  const [featuredFoods, setFeaturedFoods] = useState<any[]>([]);
+  const [featuredFoodsLoading, setFeaturedFoodsLoading] = useState(false);
 
   // Food Search State
   const [showFoodSearch, setShowFoodSearch] = useState(false);
@@ -108,6 +110,12 @@ export default function MealsScreen() {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab === 'recommendations') {
+      loadFeaturedFoods();
+    }
+  }, [activeTab, recommendationData?.targets?.protein, recommendationData?.targets?.carbs, recommendationData?.targets?.fat]);
+
   const fetchRecommendations = async (forceRefresh = false) => {
     setRecommendationLoading(true);
     setRecommendationError(null);
@@ -151,6 +159,110 @@ export default function MealsScreen() {
       console.error('Food search error:', err);
     } finally {
       setFoodSearchLoading(false);
+    }
+  };
+
+  const normalizeMealKey = (value?: string) => (value || '').toLowerCase();
+
+  const getMealVisual = (mealType?: string, title?: string, fallbackName?: string) => {
+    const key = `${normalizeMealKey(mealType)} ${normalizeMealKey(title)} ${normalizeMealKey(fallbackName)}`;
+
+    if (key.includes('breakfast') || key.includes('morning') || key.includes('egg') || key.includes('oat')) {
+      return {
+        image: 'https://images.unsplash.com/photo-1494859802809-d069c3b71a8a?w=900&auto=format&fit=crop',
+        icon: 'sunny-outline',
+      };
+    }
+    if (key.includes('lunch') || key.includes('rice') || key.includes('bowl') || key.includes('quinoa')) {
+      return {
+        image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=900&auto=format&fit=crop',
+        icon: 'restaurant-outline',
+      };
+    }
+    if (key.includes('dinner') || key.includes('beef') || key.includes('fish') || key.includes('salmon')) {
+      return {
+        image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=900&auto=format&fit=crop',
+        icon: 'moon-outline',
+      };
+    }
+    if (key.includes('snack') || key.includes('yogurt') || key.includes('berries') || key.includes('hummus')) {
+      return {
+        image: 'https://images.unsplash.com/photo-1505253716362-afaea1d3d1af?w=900&auto=format&fit=crop',
+        icon: 'cafe-outline',
+      };
+    }
+
+    return {
+      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=900&auto=format&fit=crop',
+      icon: 'sparkles-outline',
+    };
+  };
+
+  const loadFeaturedFoods = async () => {
+    setFeaturedFoodsLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(`${API_URL}/meals/food-search`, {
+        params: { q: '', limit: 80 },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const foods = Array.isArray(res.data?.results) ? res.data.results : [];
+      const availableFoods = foods.filter((food: any) => (food.image_url || food.image_small_url) && food.food_name);
+      const seenIds = new Set<number | string>();
+
+      const nutrientThemes = [
+        { key: 'protein_g', label: 'Protein boost', nutrient: 'Protein', unit: 'g', icon: 'barbell-outline' as const },
+        { key: 'carbohydrates_g', label: 'Carb energy', nutrient: 'Carbs', unit: 'g', icon: 'flash-outline' as const },
+        { key: 'fat_g', label: 'Healthy fats', nutrient: 'Fat', unit: 'g', icon: 'water-outline' as const },
+        { key: 'fiber_g', label: 'Fiber support', nutrient: 'Fiber', unit: 'g', icon: 'leaf-outline' as const },
+      ];
+
+      const picks = nutrientThemes.map((theme) => {
+        const candidate = [...availableFoods]
+          .filter((food: any) => !seenIds.has(food.id) && Number(food[theme.key]) > 0)
+          .sort((a: any, b: any) => {
+            const macroDiff = Number(b[theme.key] || 0) - Number(a[theme.key] || 0);
+            if (macroDiff !== 0) return macroDiff;
+            return Number(b.nutrition_density || 0) - Number(a.nutrition_density || 0);
+          })[0];
+
+        if (!candidate) return null;
+        seenIds.add(candidate.id);
+        return {
+          ...candidate,
+          themeLabel: theme.label,
+          nutrientLabel: theme.nutrient,
+          nutrientUnit: theme.unit,
+          icon: theme.icon,
+          displayValue: Math.round(Number(candidate[theme.key] || 0)),
+          image: candidate.image_url || candidate.image_small_url,
+        };
+      }).filter(Boolean);
+
+      const balancedPick = [...availableFoods]
+        .filter((food: any) => !seenIds.has(food.id))
+        .sort((a: any, b: any) => Number(b.nutrition_density || 0) - Number(a.nutrition_density || 0))[0];
+
+      const finalPicks = balancedPick ? [
+        ...picks,
+        {
+          ...balancedPick,
+          themeLabel: 'Balanced choice',
+          nutrientLabel: 'Density',
+          nutrientUnit: '',
+          icon: 'sparkles-outline',
+          displayValue: Math.round(Number(balancedPick.nutrition_density || 0)),
+          image: balancedPick.image_url || balancedPick.image_small_url,
+        }
+      ] : picks;
+
+      setFeaturedFoods(finalPicks.slice(0, 5));
+    } catch (err) {
+      console.error('Featured foods load error:', err);
+      setFeaturedFoods([]);
+    } finally {
+      setFeaturedFoodsLoading(false);
     }
   };
 
@@ -370,18 +482,7 @@ export default function MealsScreen() {
   const handleLogRecommendedMeal = async (meal: any) => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      
-      // Choose high-fidelity food category image for the log
-      let imageUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop'; // fallback
-      if (meal.meal_type === 'Breakfast') {
-        imageUrl = 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=500&auto=format&fit=crop';
-      } else if (meal.meal_type === 'Lunch') {
-        imageUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop';
-      } else if (meal.meal_type === 'Dinner') {
-        imageUrl = 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=500&auto=format&fit=crop';
-      } else if (meal.meal_type === 'Snack') {
-        imageUrl = 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=500&auto=format&fit=crop';
-      }
+      const imageUrl = getMealVisual(meal.meal_type, meal.title).image;
 
       const items = meal.ingredients.map((ing: any) => ({
         item_name: ing.name,
@@ -870,6 +971,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   const RecommendedMealCard = ({ meal, mealIndex }: { meal: any, mealIndex: number }) => {
     const [open, setOpen] = useState(false);
     const anim = React.useRef(new Animated.Value(0)).current;
+    const visual = getMealVisual(meal.meal_type, meal.title);
     
     const toggle = () => {
       const toVal = open ? 0 : 1;
@@ -880,56 +982,58 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     const arrowRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
     return (
-      <View style={[styles.accCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.accCard, styles.recMealCardShell]}>
         <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
+          <Image source={{ uri: visual.image }} style={styles.recommendedMealHero} />
+          <LinearGradient colors={['rgba(6,78,120,0.06)', 'rgba(37,150,190,0.24)']} style={styles.recommendedMealHeroOverlay} />
           <View style={styles.cardHeaderRow}>
-            <View style={[styles.mealIconBox, { backgroundColor: '#2596BE10' }]}>
-              <Ionicons name="sparkles" size={20} color="#2596BE" />
+            <View style={[styles.mealIconBox, { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
+              <Ionicons name={visual.icon as any} size={20} color="#D9F3FF" />
             </View>
             <View style={styles.mealMetaInfo}>
-              <Text style={[styles.mealTitleLabel, { color: colors.text, fontSize: 16 }]}>{meal.meal_type}</Text>
-              <Text style={[styles.mealTimeLabel, { color: colors.textDim, fontSize: 12, marginTop: 2 }]} numberOfLines={1}>{meal.title}</Text>
+              <Text style={[styles.mealTitleLabel, { color: '#FFF', fontSize: 16 }]}>{meal.meal_type}</Text>
+              <Text style={[styles.mealTimeLabel, { color: 'rgba(255,255,255,0.82)', fontSize: 12, marginTop: 2 }]} numberOfLines={1}>{meal.title}</Text>
             </View>
             <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
-              <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+              <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.82)" />
             </Animated.View>
           </View>
 
           <View style={styles.mealStatsRow}>
-            <View style={styles.mealStatCol}>
-              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.calories)}</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>kcal</Text>
+            <View style={[styles.mealStatCol, { backgroundColor: '#E7B100' }]}>
+              <Text style={[styles.mealStatNum, { color: '#3F2C00' }]}>{Math.round(meal.calories)}</Text>
+              <Text style={[styles.mealStatUnit, { color: '#5B4300' }]}>kcal</Text>
             </View>
-            <View style={styles.mealStatCol}>
-              <Text style={[styles.mealStatNum, { color: '#10B981' }]}>{Math.round(meal.protein)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Protein</Text>
+            <View style={[styles.mealStatCol, { backgroundColor: '#10B981' }]}>
+              <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(meal.protein)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Protein</Text>
             </View>
-            <View style={styles.mealStatCol}>
-              <Text style={[styles.mealStatNum, { color: '#3B82F6' }]}>{Math.round(meal.carbs)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Carbs</Text>
+            <View style={[styles.mealStatCol, { backgroundColor: '#3B82F6' }]}>
+              <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(meal.carbs)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
             </View>
-            <View style={styles.mealStatCol}>
-              <Text style={[styles.mealStatNum, { color: '#F59E0B' }]}>{Math.round(meal.fat)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Fats</Text>
+            <View style={[styles.mealStatCol, { backgroundColor: '#F59E0B' }]}>
+              <Text style={[styles.mealStatNum, { color: '#4A2900' }]}>{Math.round(meal.fat)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: '#6B3A00' }]}>Fats</Text>
             </View>
           </View>
         </TouchableOpacity>
 
         {open && (
-          <View style={[styles.accDetail, { borderTopColor: colors.border }]}>
-            <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: colors.textDim, lineHeight: 18, marginTop: 10 }}>
+          <View style={[styles.accDetail, { borderTopColor: 'rgba(255,255,255,0.18)' }]}>
+            <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: 'rgba(255,255,255,0.82)', lineHeight: 18, marginTop: 10 }}>
               {meal.description}
             </Text>
 
             <View style={{ marginTop: 12 }}>
-              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: colors.text, marginBottom: 6 }}>Ingredients</Text>
+              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: '#FFF', marginBottom: 6 }}>Ingredients</Text>
               {meal.ingredients?.map((ing: any, i: number) => (
-                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.16)' }}>
                   <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.text }}>{ing.name}</Text>
-                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: colors.textDim, marginTop: 1 }}>{ing.quantity}</Text>
+                    <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: '#FFF' }}>{ing.name}</Text>
+                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: 'rgba(255,255,255,0.78)', marginTop: 1 }}>{ing.quantity}</Text>
                     {ing.calories !== undefined && (
-                      <Text style={{ fontFamily: FONTS.body, fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
+                      <Text style={{ fontFamily: FONTS.body, fontSize: 10, color: 'rgba(255,255,255,0.62)', marginTop: 2 }}>
                         {ing.calories} kcal · P: {ing.protein}g · C: {ing.carbs}g · F: {ing.fat}g
                       </Text>
                     )}
@@ -944,18 +1048,18 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                         setShowItemSelector(true);
                         loadAlternativeFoods(ing);
                       }}
-                      style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.inputBg }}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.12)' }}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="create-outline" size={14} color={colors.text} style={{ marginRight: 2 }} />
-                      <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: colors.text }}>Change</Text>
+                      <Ionicons name="create-outline" size={14} color="#FFF" style={{ marginRight: 2 }} />
+                      <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: '#FFF' }}>Change</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDeleteIngredient(mealIndex, i)}
-                      style={{ padding: 6, borderRadius: 8, backgroundColor: '#E7B10015' }}
+                      style={{ padding: 6, borderRadius: 8, backgroundColor: 'rgba(231,177,0,0.2)' }}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="trash-outline" size={14} color="#E7B100" />
+                      <Ionicons name="trash-outline" size={14} color="#FDE68A" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -963,17 +1067,17 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
             </View>
 
             <View style={{ marginTop: 12 }}>
-              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: colors.text, marginBottom: 4 }}>Preparation Instructions</Text>
-              <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim, lineHeight: 18 }}>{meal.instructions}</Text>
+              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: '#FFF', marginBottom: 4 }}>Preparation Instructions</Text>
+              <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: 'rgba(255,255,255,0.82)', lineHeight: 18 }}>{meal.instructions}</Text>
             </View>
 
             <TouchableOpacity
               onPress={() => handleLogRecommendedMeal(meal)}
-              style={[styles.deleteMealBtn, { borderColor: '#2596BE30', backgroundColor: '#2596BE10' }]}
+              style={[styles.deleteMealBtn, { borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.12)' }]}
               activeOpacity={0.7}
             >
-              <Ionicons name="checkmark-circle-outline" size={16} color="#2596BE" style={{ marginRight: 6 }} />
-              <Text style={[styles.deleteMealBtnText, { color: '#2596BE' }]}>Quick Log Meal</Text>
+              <Ionicons name="checkmark-circle-outline" size={16} color="#FFF" style={{ marginRight: 6 }} />
+              <Text style={[styles.deleteMealBtnText, { color: '#FFF' }]}>Quick Log Meal</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -995,7 +1099,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
       return renderRecommendationState(
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#2596BE" />
-          <Text style={{ marginTop: 14, fontFamily: FONTS.bodySemiBold, color: colors.textDim }}>AI Diet Coach is preparing your personalized plan...</Text>
+          <Text style={{ marginTop: 14, fontFamily: FONTS.bodySemiBold, color: colors.textDim }}>Diet recommendations are being prepared...</Text>
         </View>
       );
     }
@@ -1015,7 +1119,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
             onPress={() => fetchRecommendations(true)}
           >
             <Ionicons name="refresh-outline" size={16} color="#2596BE" />
-            <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Retry Loading Coach</Text>
+            <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Retry Recommendations</Text>
           </TouchableOpacity>
         </View>
       );
@@ -1027,7 +1131,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           <View style={[styles.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="sparkles-outline" size={40} color={colors.textDim} />
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>Diet coach unavailable</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Diet recommendations unavailable</Text>
           <Text style={[styles.emptyText, { color: colors.textMuted, maxWidth: 280, textAlign: 'center' }]}>
             We could not load your AI nutrition plan right now. Please try again in a moment.
           </Text>
@@ -1036,11 +1140,154 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
             onPress={() => fetchRecommendations(true)}
           >
             <Ionicons name="refresh-outline" size={16} color="#2596BE" />
-            <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Reload Coach</Text>
+            <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Reload Recommendations</Text>
           </TouchableOpacity>
         </View>
       );
     }
+
+    return (
+      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        {renderTopChrome()}
+
+        {recommendationData.profileIncomplete && (
+          <View style={[styles.recCard, styles.recAlertCard, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30' }]}>
+            <Ionicons name="warning-outline" size={20} color="#F59E0B" style={{ marginRight: 10 }} />
+            <Text style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 12, color: colors.text, lineHeight: 18 }}>
+              Profile incomplete. We are using standard values (70kg, 170cm). Complete your height and weight in Profile for more precise meal recommendations.
+            </Text>
+          </View>
+        )}
+
+        <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: colors.border, overflow: 'hidden', paddingHorizontal: 0 }]}>
+          <View style={styles.recSectionHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.recSectionTitle, { color: colors.text }]}>Nutrient-smart picks</Text>
+              <Text style={[styles.recSectionSub, { color: colors.textMuted }]}>Food cards pulled from your database and surfaced by useful nutrient strengths.</Text>
+            </View>
+            <View style={styles.recSourceBadge}>
+              <Ionicons name="sparkles-outline" size={12} color="#2596BE" style={{ marginRight: 4 }} />
+              <Text style={styles.recSourceBadgeText}>Live picks</Text>
+            </View>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.databaseMealsScroller}>
+            {featuredFoodsLoading ? (
+              <View style={[styles.databaseMealCard, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0B7EA4' }]}>
+                <ActivityIndicator color="#FFF" />
+                <Text style={[styles.databaseMealCardCopy, { marginTop: 12 }]}>Loading food cards...</Text>
+              </View>
+            ) : featuredFoods.length > 0 ? (
+              featuredFoods.map((food: any, idx: number) => {
+                const visual = getMealVisual(food.meal_type, food.food_name, food.category);
+                const imageUri = food.image || visual.image;
+                const macroBadges = [
+                  { label: 'Protein', value: Math.round(Number(food.protein_g || 0)), color: '#10B981' },
+                  { label: 'Carbs', value: Math.round(Number(food.carbohydrates_g || 0)), color: '#3B82F6' },
+                  { label: 'Fat', value: Math.round(Number(food.fat_g || 0)), color: '#F59E0B' },
+                ];
+
+                return (
+                  <View key={`${food.id}-${idx}`} style={[styles.databaseMealCard, { backgroundColor: '#0B7EA4' }]}>
+                    {imageUri ? <Image source={{ uri: imageUri }} style={styles.recommendedMealHero} /> : null}
+                    <View style={[styles.databaseMealIconWrap, { backgroundColor: 'rgba(255,255,255,0.14)' }]}>
+                      <Ionicons name={(food.icon || visual.icon) as any} size={20} color="#D9F3FF" />
+                    </View>
+                    <Text style={styles.databaseMealCardEyebrow}>{food.themeLabel}</Text>
+                    <Text style={styles.databaseMealCardTitle} numberOfLines={2}>{food.food_name}</Text>
+                    <Text style={styles.databaseMealCardCopy} numberOfLines={2}>
+                      {food.category || food.meal_type || 'Available in your food database'}
+                    </Text>
+                    <View style={[styles.databaseMealCardChip, { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
+                      <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 10 }}>
+                        {food.displayValue}{food.nutrientUnit} {food.nutrientLabel}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 10 }}>
+                      {macroBadges.map((badge) => (
+                        <View key={badge.label} style={{ flex: 1, borderRadius: 10, paddingVertical: 7, alignItems: 'center', backgroundColor: badge.color }}>
+                          <Text style={{ color: '#FFF', fontFamily: FONTS.heading, fontSize: 11 }}>{badge.value}g</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontFamily: FONTS.bodyBold, fontSize: 8 }}>{badge.label}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={[styles.databaseMealCard, { justifyContent: 'center', backgroundColor: '#0B7EA4' }]}>
+                <Text style={styles.databaseMealCardTitle}>No database picks yet</Text>
+                <Text style={styles.databaseMealCardCopy}>Your food database cards will appear here once searchable items are available.</Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+
+        <View style={styles.recSectionRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.recSectionTitle, { color: colors.text }]}>Meals built for you</Text>
+            <Text style={[styles.recSectionSub, { color: colors.textMuted }]}>
+              {recommendationData.recommendedMeals?.length || 0} personalized meals generated from your profile, goals, and meal frequency
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.recConfigBtn} onPress={openDietForm} activeOpacity={0.85}>
+            <Ionicons name="options-outline" size={14} color="#2596BE" style={{ marginRight: 5 }} />
+            <Text style={styles.recConfigBtnText}>Adjust</Text>
+          </TouchableOpacity>
+        </View>
+
+        {recommendationData.recommendedMeals?.length > 0 ? (
+          recommendationData.recommendedMeals.map((meal: any, idx: number) => (
+            <RecommendedMealCard key={idx} meal={meal} mealIndex={idx} />
+          ))
+        ) : (
+          <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.emptyTitle, { color: colors.text, fontSize: 18 }]}>No Recommended Meals Yet</Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted, marginBottom: 0, maxWidth: '100%' }]}>
+              Configure your profile to generate a tailored meal list under this section.
+            </Text>
+          </View>
+        )}
+
+        <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.recSectionTitle, { color: colors.text }]}>Daily target snapshot</Text>
+          <Text style={[styles.recGuideLead, { color: colors.textMuted }]}>These numbers guide the foods above and the meals built specifically for your profile.</Text>
+
+          <View style={styles.recGuideBlock}>
+            <Text style={styles.recGuideLabel}>Diet Setup</Text>
+            <Text style={[styles.recGuideValue, { color: colors.text }]}>
+              {(recommendationData.user?.diet_type || 'Standard')}{recommendationData.user?.food_preference ? ` · ${recommendationData.user.food_preference}` : ''} · {recommendationData.user?.meals_per_day || 4} meals per day
+            </Text>
+          </View>
+
+          <View style={styles.recGuideBlock}>
+            <Text style={styles.recGuideLabel}>Profile Goal</Text>
+            <Text style={[styles.recGuideValue, { color: colors.text }]}>
+              {recommendationData.user?.fitness_goal || 'Maintain'} · {recommendationData.bmiCategory}
+            </Text>
+          </View>
+
+          <View style={styles.recMacroFocusRow}>
+            <View style={[styles.recMacroFocusChip, { backgroundColor: '#E7B100' }]}>
+              <Text style={styles.recMacroFocusValue}>{recommendationData.targets.calories}</Text>
+              <Text style={styles.recMacroFocusLabel}>kcal</Text>
+            </View>
+            <View style={[styles.recMacroFocusChip, { backgroundColor: '#10B981' }]}>
+              <Text style={styles.recMacroFocusValueLight}>{recommendationData.targets.protein}g</Text>
+              <Text style={styles.recMacroFocusLabelLight}>Protein</Text>
+            </View>
+            <View style={[styles.recMacroFocusChip, { backgroundColor: '#3B82F6' }]}>
+              <Text style={styles.recMacroFocusValueLight}>{recommendationData.targets.carbs}g</Text>
+              <Text style={styles.recMacroFocusLabelLight}>Carbs</Text>
+            </View>
+            <View style={[styles.recMacroFocusChip, { backgroundColor: '#F59E0B' }]}>
+              <Text style={styles.recMacroFocusValue}>{recommendationData.targets.fat}g</Text>
+              <Text style={styles.recMacroFocusLabel}>Fat</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    );
 
     return (
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
@@ -1211,12 +1458,16 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   const proteinConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_protein || 0), 0);
   const carbsConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_carbs || 0), 0);
   const fatConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_fat || 0), 0);
-  const headerTitle = activeTab === 'water' ? 'Water Intake' : 'Nutrition';
+  const headerTitle = activeTab === 'water'
+    ? 'Water Intake'
+    : activeTab === 'recommendations'
+      ? 'Diet Recommendations'
+      : 'Nutrition';
   const headerDescription = activeTab === 'tracker'
     ? 'Track your meals and macros'
     : activeTab === 'water'
       ? 'Monitor water intake'
-      : 'Personalized AI diet coaching';
+      : 'Database meals and tailored guidance';
 
   const renderTopChrome = () => (
     <View>
@@ -1259,7 +1510,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           onPress={() => setActiveTab('recommendations')}
         >
           <Ionicons name="sparkles-outline" size={16} color={activeTab === 'recommendations' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabSelectorText, activeTab === 'recommendations' ? { color: '#FFF' } : { color: colors.textMuted }]}>AI Coach</Text>
+          <Text style={[styles.tabSelectorText, activeTab === 'recommendations' ? { color: '#FFF' } : { color: colors.textMuted }]}>Diet Recs</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -2228,8 +2479,26 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.05, shadowRadius: 16, elevation: 3,
   },
+  recMealCardShell: {
+    backgroundColor: '#0B7EA4',
+    borderColor: '#0B7EA4',
+  },
   cardContentWrap: {
     padding: 18,
+  },
+  recommendedMealHero: {
+    height: 138,
+    width: '100%',
+    borderRadius: 18,
+    marginBottom: 14,
+  },
+  recommendedMealHeroOverlay: {
+    position: 'absolute',
+    top: 18,
+    left: 18,
+    right: 18,
+    height: 138,
+    borderRadius: 18,
   },
   cardHeaderRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -2449,6 +2718,175 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 16,
     elevation: 3,
+  },
+  recAlertCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  recSectionHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 12,
+  },
+  recSectionTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 18,
+  },
+  recSectionSub: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  recSourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#2596BE12',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  recSourceBadgeText: {
+    color: '#2596BE',
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+  },
+  databaseMealsScroller: {
+    paddingHorizontal: 18,
+    paddingBottom: 18,
+  },
+  databaseMealCard: {
+    width: 210,
+    minHeight: 210,
+    borderRadius: 22,
+    padding: 16,
+    marginRight: 12,
+  },
+  databaseMealIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  databaseMealCardEyebrow: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.72)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  databaseMealCardTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 18,
+    color: '#FFF',
+    lineHeight: 24,
+    marginTop: 4,
+  },
+  databaseMealCardCopy: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.86)',
+    marginTop: 10,
+  },
+  databaseMealCardChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginTop: 12,
+  },
+  recSectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 20,
+    marginBottom: 12,
+  },
+  recConfigBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2596BE15',
+    borderColor: '#2596BE30',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  recConfigBtnText: {
+    color: '#2596BE',
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+  },
+  recGuideLead: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  recGuideBlock: {
+    marginBottom: 14,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+  },
+  recGuideLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: '#2596BE',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  recGuideValue: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  recMacroFocusRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  recMacroFocusChip: {
+    width: '48%',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  recMacroFocusValue: {
+    fontFamily: FONTS.heading,
+    fontSize: 16,
+    color: '#3F2C00',
+  },
+  recMacroFocusLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: '#5B4300',
+    marginTop: 2,
+    textTransform: 'uppercase',
+  },
+  recMacroFocusValueLight: {
+    fontFamily: FONTS.heading,
+    fontSize: 16,
+    color: '#FFF',
+  },
+  recMacroFocusLabelLight: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 2,
+    textTransform: 'uppercase',
   },
   groundingCard: {
     borderRadius: 20,

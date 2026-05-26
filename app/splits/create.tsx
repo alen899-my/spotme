@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -16,7 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS } from '../../constants/theme';
+import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -24,6 +25,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function CreateSplitGroupScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { showToast } = useToast();
   const [name, setName] = useState('');
@@ -73,7 +75,7 @@ export default function CreateSplitGroupScreen() {
       >
         <View style={styles.container}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
               <Ionicons name="close" size={28} color={colors.text} />
             </TouchableOpacity>
@@ -81,7 +83,14 @@ export default function CreateSplitGroupScreen() {
             <View style={{ width: 28 }} />
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: 140 + Math.max(insets.bottom, 12) }
+            ]}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.form}>
               <Text style={[styles.label, { color: colors.text }]}>Program Name</Text>
               <TextInput
@@ -103,7 +112,7 @@ export default function CreateSplitGroupScreen() {
               />
 
               <View style={styles.tipCard}>
-                <Ionicons name="information-circle-outline" size={20} color="#E00000" />
+                <Ionicons name="information-circle-outline" size={20} color={P.cta} />
                 <Text style={[styles.tipText, { color: colors.textMuted }]}>
                   After creating the program, you'll add specific "Sessions" (like Push Day, Pull Day) inside it.
                 </Text>
@@ -111,25 +120,32 @@ export default function CreateSplitGroupScreen() {
             </View>
           </ScrollView>
 
-          <TouchableOpacity 
-            style={styles.saveBtn}
-            onPress={handleSave}
-            disabled={loading}
+          <View
+            style={[
+              styles.bottomBar,
+              {
+                backgroundColor: colors.bg,
+                paddingBottom: Math.max(insets.bottom, 12) + 12,
+              }
+            ]}
           >
-            <LinearGradient
-              colors={['#E00000', '#B00000']}
-              style={styles.saveBtnGradient}
+            <TouchableOpacity 
+              style={styles.saveBtn}
+              onPress={handleSave}
+              disabled={loading}
             >
-              {loading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <>
-                  <Text style={styles.saveBtnText}>CREATE PROGRAM</Text>
-                  <Ionicons name="arrow-forward" size={18} color="#FFF" />
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+              <View style={styles.saveBtnGradient}>
+                {loading ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <>
+                    <Text style={styles.saveBtnText}>CREATE PROGRAM</Text>
+                    <Ionicons name="arrow-forward" size={18} color="#FFF" />
+                  </>
+                )}
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -137,18 +153,20 @@ export default function CreateSplitGroupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 32,
-    marginTop: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    marginBottom: 12,
   },
   backBtn: { marginLeft: -8 },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 24 },
   
-  form: { marginTop: 10 },
+  scrollContent: { paddingHorizontal: 20 },
+  form: { paddingTop: 10 },
   label: { fontFamily: FONTS.bodyBold, fontSize: 16, marginBottom: 10 },
   input: {
     borderRadius: 14,
@@ -160,11 +178,13 @@ const styles = StyleSheet.create({
   
   tipCard: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(224,0,0,0.05)',
+    backgroundColor: 'rgba(37,150,190,0.08)',
     padding: 16,
     borderRadius: 16,
-    marginTop: 32,
+    marginTop: 28,
     gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(37,150,190,0.14)',
   },
   tipText: {
     flex: 1,
@@ -173,9 +193,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
   saveBtn: {
-    marginTop: 'auto',
-    marginBottom: 20,
     borderRadius: 16,
     overflow: 'hidden',
   },
@@ -183,8 +209,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
+    minHeight: 58,
     gap: 10,
+    backgroundColor: P.cta,
   },
   saveBtnText: {
     fontFamily: FONTS.bodyBold,

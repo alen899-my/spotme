@@ -3,6 +3,88 @@ const router = express.Router();
 const { pool } = require('../db');
 const authenticateToken = require('../middleware/auth');
 
+const SPLIT_THEME_RULES = [
+  {
+    patterns: ['push', 'chest', 'tricep', 'shoulder', 'upper'],
+    categories: ['chest', 'shoulders', 'upper arms'],
+    targets: ['pectorals', 'pecs', 'delts', 'triceps'],
+  },
+  {
+    patterns: ['pull', 'back', 'bicep', 'lat', 'rear'],
+    categories: ['back', 'upper arms', 'lower arms'],
+    targets: ['lats', 'upper back', 'traps', 'biceps', 'forearms'],
+  },
+  {
+    patterns: ['leg', 'lower', 'glute', 'quad', 'hamstring', 'calf'],
+    categories: ['upper legs', 'lower legs'],
+    targets: ['quads', 'hamstrings', 'glutes', 'calves'],
+  },
+  {
+    patterns: ['core', 'ab', 'waist'],
+    categories: ['waist'],
+    targets: ['abs', 'obliques'],
+  },
+  {
+    patterns: ['cardio', 'conditioning', 'hiit'],
+    categories: ['cardio'],
+    targets: ['cardio'],
+  },
+];
+
+function normalizePreviewText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getSplitThemePreference(split) {
+  const text = `${split?.name || ''} ${split?.description || ''}`.toLowerCase();
+  const categories = new Set();
+  const targets = new Set();
+
+  for (const rule of SPLIT_THEME_RULES) {
+    if (rule.patterns.some((pattern) => text.includes(pattern))) {
+      rule.categories.forEach((category) => categories.add(category));
+      rule.targets.forEach((target) => targets.add(target));
+    }
+  }
+
+  return { categories, targets };
+}
+
+function pickSplitCoverImage(split, usedImages, usedCategories) {
+  const candidates = Array.isArray(split?.preview_candidates)
+    ? split.preview_candidates.filter((candidate) => candidate?.image_url)
+    : [];
+
+  if (candidates.length === 0) {
+    return split?.cover_image_url || null;
+  }
+
+  const preferences = getSplitThemePreference(split);
+
+  const ranked = candidates
+    .map((candidate, index) => {
+      const category = normalizePreviewText(candidate.category);
+      const target = normalizePreviewText(candidate.target);
+      let score = 0;
+
+      if (!usedImages.has(candidate.image_url)) score += 6;
+      if (preferences.categories.has(category)) score += 5;
+      if (preferences.targets.has(target)) score += 4;
+      if (category && !usedCategories.has(category)) score += 1.5;
+      score += Math.max(0, 8 - index) * 0.1;
+
+      return { candidate, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const selected = ranked[0]?.candidate || candidates[0];
+
+  if (selected?.image_url) usedImages.add(selected.image_url);
+  if (selected?.category) usedCategories.add(normalizePreviewText(selected.category));
+
+  return selected?.image_url || split?.cover_image_url || null;
+}
+
 // ─── TEMPLATE SPLITS (pre-seeded, read-only) ─────────────────────────────────
 
 // GET /workouts/templates — list all expert splits with randomized images
@@ -145,6 +227,31 @@ router.get('/splits', authenticateToken, async (req, res) => {
       `SELECT s.*, 
         (SELECT COUNT(*) FROM workout_sessions WHERE split_id = s.id) as session_count,
         (
+          SELECT e.image_url
+          FROM workout_sessions ws
+          JOIN workout_session_exercises wse ON ws.id = wse.session_id
+          JOIN exercises e ON wse.exercise_id = e.id
+          WHERE ws.split_id = s.id AND e.image_url IS NOT NULL
+          ORDER BY COALESCE(ws.sort_order, 0) ASC, COALESCE(wse.sort_order, 0) ASC, wse.id ASC
+          LIMIT 1
+        ) as cover_image_url,
+        (
+          SELECT json_agg(candidate_rows)
+          FROM (
+            SELECT DISTINCT ON (e.image_url)
+              e.image_url,
+              COALESCE(NULLIF(e.category, ''), 'general') AS category,
+              COALESCE(NULLIF(e.target, ''), 'general') AS target,
+              e.name
+            FROM workout_sessions ws
+            JOIN workout_session_exercises wse ON ws.id = wse.session_id
+            JOIN exercises e ON wse.exercise_id = e.id
+            WHERE ws.split_id = s.id AND e.image_url IS NOT NULL
+            ORDER BY e.image_url, COALESCE(ws.sort_order, 0) ASC, COALESCE(wse.sort_order, 0) ASC, wse.id ASC
+            LIMIT 8
+          ) candidate_rows
+        ) as preview_candidates,
+        (
           SELECT json_agg(image_url) FROM (
             SELECT DISTINCT e.image_url 
             FROM workout_sessions ws
@@ -159,7 +266,15 @@ router.get('/splits', authenticateToken, async (req, res) => {
        ORDER BY created_at DESC`,
       [req.user.id]
     );
-    res.json(result.rows);
+    const usedImages = new Set();
+    const usedCategories = new Set();
+
+    const rows = result.rows.map((split) => ({
+      ...split,
+      cover_image_url: pickSplitCoverImage(split, usedImages, usedCategories),
+    }));
+
+    res.json(rows);
   } catch (error) {
     console.error('Fetch user splits error:', error);
     res.status(500).json({ error: error.message });

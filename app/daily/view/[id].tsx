@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, FlatList,
+  View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Image, Modal,
   ScrollView, Platform, Dimensions, TextInput,
 } from 'react-native';
@@ -12,6 +12,8 @@ import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { FONTS } from '../../../constants/theme';
+import { P } from '../../../constants/homeTheme';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import Slider from '@react-native-community/slider';
@@ -44,6 +46,7 @@ function formatLocalDate(dateStr: string) {
 export default function WorkoutViewScreen() {
   const router = useRouter();
   const { id: workoutId } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { showToast } = useToast();
 
@@ -170,7 +173,7 @@ export default function WorkoutViewScreen() {
   const WorkoutPerformanceSummary = ({ data }: { data: any }) => {
     if (!data) return null;
     const stats = [
-      { label: 'DURATION', val: formatTime(data.total_duration_seconds || 0), icon: 'time', color: '#EF4444', sub: 'Total active time' },
+      { label: 'DURATION', val: formatTime(data.total_duration_seconds || 0), icon: 'time', color: P.cta, sub: 'Total active time' },
       { label: 'VOLUME', val: `${Math.round(data.total_volume || 0)}kg`, icon: 'barbell', color: '#10B981', sub: 'Total weight lifted' },
       { label: 'REST TIME', val: formatTime(data.total_rest_seconds || 0), icon: 'hourglass', color: '#F59E0B', sub: 'Recovery between sets' },
       { label: 'SETS', val: `${data.total_sets || calculatedTotalSets || 0}`, icon: 'layers', color: '#8B5CF6', sub: 'Total sets completed' },
@@ -228,22 +231,21 @@ export default function WorkoutViewScreen() {
     return (
       <View style={[
         styles.summaryCard,
-        { backgroundColor: colors.card, borderColor: isSkipped ? colors.border : (item.is_completed ? '#10B981' : colors.border) },
-        isSkipped && { opacity: 0.6 }
+        isSkipped ? styles.summaryCardSkipped : styles.summaryCardBlue,
       ]}>
         <View style={styles.summaryHeader}>
           <Image source={{ uri: item.image_url }} style={styles.summaryImage} />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <Text style={[styles.summaryName, { color: colors.text }]}>{item.name}</Text>
+              <Text style={[styles.summaryName, isSkipped ? { color: colors.text } : styles.summaryNameBlue]}>{item.name}</Text>
               {item.avg_rating !== undefined && item.avg_rating !== null && (
-                <View style={[styles.avgRatingBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                <View style={[styles.avgRatingBadge, isSkipped ? { backgroundColor: colors.inputBg, borderColor: colors.border } : styles.avgRatingBadgeBlue]}>
                   <Ionicons name="star" size={10} color="#F59E0B" />
-                  <Text style={[styles.avgRatingText, { color: colors.text }]}>{item.avg_rating} </Text>
+                  <Text style={[styles.avgRatingText, isSkipped ? { color: colors.text } : styles.avgRatingTextBlue]}>{item.avg_rating} </Text>
                 </View>
               )}
             </View>
-            <Text style={[styles.summarySub, { color: colors.textMuted }]}>
+            <Text style={[styles.summarySub, isSkipped ? { color: colors.textMuted } : styles.summarySubBlue]}>
               {isSkipped ? 'Movement skipped' : `${completedSets.length} sets completed`}
             </Text>
             {item.rating !== undefined && item.rating !== null && (
@@ -262,20 +264,20 @@ export default function WorkoutViewScreen() {
         {!isSkipped && completedSets.length > 0 && (
           <View style={styles.metricsGrid}>
             <View style={styles.metricItem}>
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>TOTAL WEIGHT</Text>
-              <Text style={[styles.metricValue, { color: colors.text }]}>{Math.round(totalWeight)}kg</Text>
+              <Text style={styles.metricLabelBlue}>TOTAL WEIGHT</Text>
+              <Text style={styles.metricValueBlue}>{Math.round(totalWeight)}kg</Text>
             </View>
             <View style={styles.metricItem}>
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>AVG WEIGHT/SET</Text>
-              <Text style={[styles.metricValue, { color: colors.text }]}>{avgWeight}kg</Text>
+              <Text style={styles.metricLabelBlue}>AVG WEIGHT/SET</Text>
+              <Text style={styles.metricValueBlue}>{avgWeight}kg</Text>
             </View>
             <View style={styles.metricItem}>
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>TOTAL REPS</Text>
-              <Text style={[styles.metricValue, { color: colors.text }]}>{totalReps}</Text>
+              <Text style={styles.metricLabelBlue}>TOTAL REPS</Text>
+              <Text style={styles.metricValueBlue}>{totalReps}</Text>
             </View>
             <View style={styles.metricItem}>
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>AVG TIME/SET</Text>
-              <Text style={[styles.metricValue, { color: colors.text }]}>{formatTime(avgTime)}</Text>
+              <Text style={styles.metricLabelBlue}>AVG TIME/SET</Text>
+              <Text style={styles.metricValueBlue}>{formatTime(avgTime)}</Text>
             </View>
           </View>
         )}
@@ -284,14 +286,14 @@ export default function WorkoutViewScreen() {
   };
 
   if (loading) {
-    return <View style={[styles.centered, { backgroundColor: colors.bg }]}><ActivityIndicator size="large" color="#E00000" /></View>;
+    return <View style={[styles.centered, { backgroundColor: colors.bg }]}><ActivityIndicator size="large" color={P.cta} /></View>;
   }
   if (!workout) return null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={28} color={colors.text} />
           </TouchableOpacity>
@@ -303,12 +305,15 @@ export default function WorkoutViewScreen() {
           data={workout.exercises || []}
           keyExtractor={item => String(item.id)}
           renderItem={renderExercise}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: 32 + Math.max(insets.bottom, 12) }
+          ]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={(
-            <View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
+            <View style={styles.listHeader}>
               {/* Photo Gallery */}
-              <View style={{ marginBottom: 20 }}>
+              <View style={styles.photoSection}>
                 {(workout.photos && workout.photos.length > 0) || uploadingPhotos.length > 0 ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                     {workout.photos?.map((p: any) => (
@@ -361,7 +366,7 @@ export default function WorkoutViewScreen() {
           </TouchableOpacity>
           <Image source={{ uri: viewerUri || '' }} style={styles.viewerImage} resizeMode="contain" />
           <TouchableOpacity style={styles.downloadBtn} onPress={() => handleDownload(viewerUri || '')}>
-            <LinearGradient colors={['#E00000', '#B00000']} style={styles.downloadBtnGrad}>
+            <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.downloadBtnGrad}>
               <Ionicons name="download-outline" size={20} color="#FFF" />
               <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold, marginLeft: 8 }}>SAVE / SHARE</Text>
             </LinearGradient>
@@ -385,14 +390,14 @@ export default function WorkoutViewScreen() {
             <View style={styles.editField}>
               <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Hydration ({finishWater.toFixed(1)}L)</Text>
               <Slider style={{ width: '100%', height: 40 }} minimumValue={0} maximumValue={5} step={0.1}
-                value={finishWater} onValueChange={setFinishWater} minimumTrackTintColor="#E00000" thumbTintColor="#E00000" />
+                value={finishWater} onValueChange={setFinishWater} minimumTrackTintColor={P.cta} thumbTintColor={P.cta} />
             </View>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditMetricsModal(false)}>
                 <Text style={{ color: colors.textMuted, fontFamily: FONTS.bodyBold }}>CANCEL</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateMetrics}>
-                <LinearGradient colors={['#E00000', '#B00000']} style={styles.saveBtnGrad}>
+                <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.saveBtnGrad}>
                   {updatingMetrics ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold }}>SAVE CHANGES</Text>}
                 </LinearGradient>
               </TouchableOpacity>
@@ -407,10 +412,12 @@ export default function WorkoutViewScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingTop: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8 },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 20 },
   listContent: { paddingBottom: 40 },
+  listHeader: { marginBottom: 20, paddingHorizontal: 20 },
+  photoSection: { marginBottom: 20 },
   divider: { height: 1, backgroundColor: 'rgba(0,0,0,0.06)', marginVertical: 20 },
   sectionTitle: { fontFamily: FONTS.heading, fontSize: 18, marginBottom: 4 },
 
@@ -419,7 +426,7 @@ const styles = StyleSheet.create({
   perfHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   perfTitle: { fontFamily: FONTS.heading, fontSize: 24 },
   perfSub: { fontFamily: FONTS.body, fontSize: 13 },
-  perfEditBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#E00000', justifyContent: 'center', alignItems: 'center', elevation: 4 },
+  perfEditBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: P.cta, justifyContent: 'center', alignItems: 'center', elevation: 4 },
   perfGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   perfCard: { width: (SCREEN_WIDTH - 52) / 2, padding: 16, borderRadius: 24, overflow: 'hidden', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 },
   perfIconBox: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
@@ -444,14 +451,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   summaryCard: { marginHorizontal: 20, marginBottom: 12, borderRadius: 20, padding: 16, borderWidth: 1 },
+  summaryCardBlue: { backgroundColor: P.cta, borderColor: P.ctaDark },
+  summaryCardSkipped: { opacity: 0.6 },
   summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  summaryImage: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#FFF' },
+  summaryImage: { width: 44, height: 44, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' },
   summaryName: { fontFamily: FONTS.bodyBold, fontSize: 16 },
+  summaryNameBlue: { color: P.sun },
   summarySub: { fontFamily: FONTS.body, fontSize: 12, marginTop: 2 },
+  summarySubBlue: { color: 'rgba(255,255,255,0.78)' },
+  avgRatingBadgeBlue: { backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.18)' },
+  avgRatingTextBlue: { color: '#FFF' },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   metricItem: { width: '47%', gap: 2 },
   metricLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5 },
   metricValue: { fontFamily: FONTS.heading, fontSize: 18 },
+  metricLabelBlue: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5, color: 'rgba(255,255,255,0.72)' },
+  metricValueBlue: { fontFamily: FONTS.heading, fontSize: 18, color: '#FFF' },
   skippedBadge: { backgroundColor: 'rgba(0,0,0,0.06)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   skippedBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 10, color: 'rgba(0,0,0,0.4)' },
 
@@ -460,7 +475,7 @@ const styles = StyleSheet.create({
   photoThumb: { width: '100%', height: '100%' },
   photoAdd: { backgroundColor: 'rgba(0,0,0,0.03)', borderStyle: 'dashed', borderWidth: 2, borderColor: 'rgba(0,0,0,0.1)', justifyContent: 'center', alignItems: 'center' },
   photoPlaceholder: { height: 120, borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-  removePhotoBtn: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(224,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
+  removePhotoBtn: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(37,150,190,0.9)', justifyContent: 'center', alignItems: 'center' },
 
   // Viewer
   viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
@@ -471,13 +486,13 @@ const styles = StyleSheet.create({
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 30 },
-  modalTitle: { fontFamily: FONTS.heading, fontSize: 24, marginBottom: 25 },
+  modalContent: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 30, backgroundColor: P.cta },
+  modalTitle: { fontFamily: FONTS.heading, fontSize: 24, marginBottom: 25, color: '#FFF' },
   editField: { marginBottom: 20 },
-  fieldLabel: { fontFamily: FONTS.bodyBold, fontSize: 12, marginBottom: 8, letterSpacing: 0.5 },
-  input: { height: 56, borderRadius: 16, borderWidth: 1, paddingHorizontal: 16, fontFamily: FONTS.bodyBold, fontSize: 16 },
+  fieldLabel: { fontFamily: FONTS.bodyBold, fontSize: 12, marginBottom: 8, letterSpacing: 0.5, color: 'rgba(255,255,255,0.82)' },
+  input: { height: 56, borderRadius: 16, borderWidth: 1, paddingHorizontal: 16, fontFamily: FONTS.bodyBold, fontSize: 16, backgroundColor: '#FFF', color: P.ink, borderColor: 'rgba(255,255,255,0.22)' },
   modalActions: { flexDirection: 'row', alignItems: 'center', gap: 15, marginTop: 10 },
-  cancelBtn: { flex: 1, height: 56, justifyContent: 'center', alignItems: 'center' },
+  cancelBtn: { flex: 1, height: 56, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 16 },
   saveBtn: { flex: 2, borderRadius: 16, overflow: 'hidden' },
   saveBtnGrad: { height: 56, justifyContent: 'center', alignItems: 'center' },
 });

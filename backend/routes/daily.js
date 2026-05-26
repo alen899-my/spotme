@@ -5,6 +5,263 @@ const authenticateToken = require('../middleware/auth');
 const { validate, schemas } = require('../middleware/validate');
 const upload = require('../uploadConfig');
 const { awardXP } = require('../utils/xp');
+const {
+  parseWeightKg,
+  calculateEstimatedOneRepMax,
+  estimateWorkoutCalories,
+  formatRecordValue,
+} = require('../utils/workoutAnalytics');
+
+async function syncWorkoutCompletionAnalytics(client, workoutId, userId) {
+  const userRes = await client.query(
+    'SELECT weight FROM users WHERE id = $1',
+    [userId]
+  );
+
+  const workoutStatsRes = await client.query(
+    `SELECT dw.total_duration_seconds, dw.total_rest_seconds, dw.total_volume, dw.post_workout_weight,
+            COUNT(dws.id) FILTER (WHERE COALESCE(dws.is_skipped, false) = false) AS total_sets,
+            COALESCE(SUM(dws.reps) FILTER (WHERE COALESCE(dws.is_skipped, false) = false), 0) AS total_reps
+     FROM daily_workouts dw
+     LEFT JOIN daily_workout_exercises dwe ON dw.id = dwe.daily_workout_id
+     LEFT JOIN daily_workout_sets dws ON dwe.id = dws.daily_exercise_id
+     WHERE dw.id = $1
+     GROUP BY dw.id`,
+    [workoutId]
+  );
+
+  const workoutStats = workoutStatsRes.rows[0] || {};
+  const weightKg =
+    parseWeightKg(workoutStats.post_workout_weight) ||
+    parseWeightKg(userRes.rows[0]?.weight) ||
+    70;
+
+  const calorieSummary = estimateWorkoutCalories({
+    weightKg,
+    totalDurationSeconds: workoutStats.total_duration_seconds,
+    totalRestSeconds: workoutStats.total_rest_seconds,
+    totalVolume: workoutStats.total_volume,
+    totalSets: workoutStats.total_sets,
+    totalReps: workoutStats.total_reps,
+  });
+
+  await client.query(
+    `UPDATE daily_workouts
+     SET calories_burned = $1,
+         workout_met = $2,
+         calories_burned_method = $3
+     WHERE id = $4`,
+    [
+      calorieSummary.caloriesBurned,
+      calorieSummary.workoutMet,
+      calorieSummary.method,
+      workoutId,
+    ]
+  );
+
+  const setRowsRes = await client.query(
+    `SELECT dwe.id AS daily_exercise_id,
+            dwe.exercise_id,
+            e.name AS exercise_name,
+            COALESCE(dws.weight, 0) AS weight,
+            COALESCE(dws.reps, 0) AS reps,
+            COALESCE(dws.is_skipped, false) AS is_skipped
+     FROM daily_workout_exercises dwe
+     JOIN exercises e ON e.id = dwe.exercise_id
+     LEFT JOIN daily_workout_sets dws ON dws.daily_exercise_id = dwe.id
+     WHERE dwe.daily_workout_id = $1
+     ORDER BY dwe.id ASC, dws.set_number ASC`,
+    [workoutId]
+  );
+
+  const grouped = new Map();
+  for (const row of setRowsRes.rows) {
+    if (!grouped.has(row.daily_exercise_id)) {
+      grouped.set(row.daily_exercise_id, {
+        dailyExerciseId: row.daily_exercise_id,
+        exerciseId: row.exercise_id,
+        exerciseName: row.exercise_name,
+        sets: [],
+      });
+    }
+    grouped.get(row.daily_exercise_id).sets.push(row);
+  }
+
+  const exerciseIds = Array.from(new Set(setRowsRes.rows.map((row) => row.exercise_id)));
+  if (exerciseIds.length === 0) {
+    return { calorieSummary, exercisePrs: [] };
+  }
+
+  const userPrRes = await client.query(
+    `SELECT * FROM user_exercise_prs
+     WHERE user_id = $1
+       AND exercise_id = ANY($2::varchar[])`,
+    [userId, exerciseIds]
+  );
+
+  const globalPrRes = await client.query(
+    `SELECT * FROM global_exercise_prs
+     WHERE exercise_id = ANY($1::varchar[])`,
+    [exerciseIds]
+  );
+
+  const userPrMap = new Map(
+    userPrRes.rows.map((row) => [`${row.exercise_id}:${row.metric_type}`, row])
+  );
+  const globalPrMap = new Map(
+    globalPrRes.rows.map((row) => [`${row.exercise_id}:${row.metric_type}`, row])
+  );
+
+  const exercisePrs = [];
+
+  for (const exercise of grouped.values()) {
+    const validSets = exercise.sets.filter((setRow) => !setRow.is_skipped && ((Number(setRow.weight) || 0) > 0 || (Number(setRow.reps) || 0) > 0));
+
+    if (validSets.length === 0) {
+      await client.query(
+        `UPDATE daily_workout_exercises
+         SET best_set_weight = 0,
+             best_set_reps = 0,
+             estimated_1rm = 0,
+             total_set_volume = 0,
+             record_metric_type = 'estimated_1rm',
+             is_personal_record = false,
+             is_world_record = false,
+             personal_record_value = 0,
+             world_record_value = 0
+         WHERE id = $1`,
+        [exercise.dailyExerciseId]
+      );
+      continue;
+    }
+
+    const bestSet = validSets.reduce((best, current) => {
+      const currentWeight = Number(current.weight) || 0;
+      const currentReps = Number(current.reps) || 0;
+      const currentOneRep = calculateEstimatedOneRepMax(currentWeight, currentReps);
+      const bestWeight = Number(best.weight) || 0;
+      const bestReps = Number(best.reps) || 0;
+      const bestOneRep = calculateEstimatedOneRepMax(bestWeight, bestReps);
+
+      const currentMetric = currentWeight > 0 ? currentOneRep : currentReps;
+      const bestMetric = bestWeight > 0 ? bestOneRep : bestReps;
+
+      if (currentMetric > bestMetric) return current;
+      if (currentMetric === bestMetric && currentWeight > bestWeight) return current;
+      if (currentMetric === bestMetric && currentWeight === bestWeight && currentReps > bestReps) return current;
+      return best;
+    }, validSets[0]);
+
+    const bestSetWeight = Number(bestSet.weight) || 0;
+    const bestSetReps = Number(bestSet.reps) || 0;
+    const estimatedOneRepMax = calculateEstimatedOneRepMax(bestSetWeight, bestSetReps);
+    const totalSetVolume = validSets.reduce((sum, row) => sum + ((Number(row.weight) || 0) * (Number(row.reps) || 0)), 0);
+    const metricType = bestSetWeight > 0 ? 'estimated_1rm' : 'max_reps';
+    const metricValue = metricType === 'estimated_1rm' ? estimatedOneRepMax : bestSetReps;
+    const metricKey = `${exercise.exerciseId}:${metricType}`;
+
+    const existingUserPr = userPrMap.get(metricKey);
+    const existingWorldPr = globalPrMap.get(metricKey);
+    const previousUserValue = Number(existingUserPr?.metric_value) || 0;
+    const previousWorldValue = Number(existingWorldPr?.metric_value) || 0;
+    const sameWorkoutOwnPr =
+      existingUserPr &&
+      Number(existingUserPr.daily_workout_id) === workoutId &&
+      metricValue >= previousUserValue;
+    const sameWorkoutWorldPr =
+      existingWorldPr &&
+      Number(existingWorldPr.daily_workout_id) === workoutId &&
+      metricValue >= previousWorldValue;
+    const isPersonalRecord = metricValue > previousUserValue || sameWorkoutOwnPr;
+    const isWorldRecord = metricValue > previousWorldValue || sameWorkoutWorldPr;
+    const personalRecordValue = Math.max(metricValue, previousUserValue);
+    const worldRecordValue = Math.max(metricValue, previousWorldValue);
+
+    if (isPersonalRecord) {
+      await client.query(
+        `INSERT INTO user_exercise_prs
+           (user_id, exercise_id, metric_type, metric_value, source_weight, source_reps, source_volume, daily_workout_id, daily_exercise_id, achieved_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+         ON CONFLICT (user_id, exercise_id, metric_type)
+         DO UPDATE SET
+           metric_value = EXCLUDED.metric_value,
+           source_weight = EXCLUDED.source_weight,
+           source_reps = EXCLUDED.source_reps,
+           source_volume = EXCLUDED.source_volume,
+           daily_workout_id = EXCLUDED.daily_workout_id,
+           daily_exercise_id = EXCLUDED.daily_exercise_id,
+           achieved_at = NOW(),
+           updated_at = NOW()`,
+        [userId, exercise.exerciseId, metricType, metricValue, bestSetWeight, bestSetReps, totalSetVolume, workoutId, exercise.dailyExerciseId]
+      );
+    }
+
+    if (isWorldRecord) {
+      await client.query(
+        `INSERT INTO global_exercise_prs
+           (exercise_id, metric_type, metric_value, source_weight, source_reps, source_volume, user_id, daily_workout_id, daily_exercise_id, achieved_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+         ON CONFLICT (exercise_id, metric_type)
+         DO UPDATE SET
+           metric_value = EXCLUDED.metric_value,
+           source_weight = EXCLUDED.source_weight,
+           source_reps = EXCLUDED.source_reps,
+           source_volume = EXCLUDED.source_volume,
+           user_id = EXCLUDED.user_id,
+           daily_workout_id = EXCLUDED.daily_workout_id,
+           daily_exercise_id = EXCLUDED.daily_exercise_id,
+           achieved_at = NOW(),
+           updated_at = NOW()`,
+        [exercise.exerciseId, metricType, metricValue, bestSetWeight, bestSetReps, totalSetVolume, userId, workoutId, exercise.dailyExerciseId]
+      );
+    }
+
+    await client.query(
+      `UPDATE daily_workout_exercises
+       SET best_set_weight = $1,
+           best_set_reps = $2,
+           estimated_1rm = $3,
+           total_set_volume = $4,
+           record_metric_type = $5,
+           is_personal_record = $6,
+           is_world_record = $7,
+           personal_record_value = $8,
+           world_record_value = $9
+       WHERE id = $10`,
+      [
+        bestSetWeight,
+        bestSetReps,
+        estimatedOneRepMax,
+        totalSetVolume,
+        metricType,
+        isPersonalRecord,
+        isWorldRecord,
+        personalRecordValue,
+        worldRecordValue,
+        exercise.dailyExerciseId,
+      ]
+    );
+
+    exercisePrs.push({
+      dailyExerciseId: exercise.dailyExerciseId,
+      exerciseId: exercise.exerciseId,
+      exerciseName: exercise.exerciseName,
+      metricType,
+      metricValue,
+      bestSetWeight,
+      bestSetReps,
+      totalSetVolume,
+      isPersonalRecord,
+      isWorldRecord,
+      personalRecordValue,
+      worldRecordValue,
+      personalRecordLabel: formatRecordValue(metricType, personalRecordValue),
+      worldRecordLabel: formatRecordValue(metricType, worldRecordValue),
+    });
+  }
+
+  return { calorieSummary, exercisePrs };
+}
 
 // ── GET /daily/workouts — list past workouts for user ─────────────────────────
 router.get('/workouts', authenticateToken, async (req, res) => {
@@ -261,6 +518,7 @@ router.patch(
   async (req, res) => {
     const { total_duration_seconds, total_volume, notes, completion_photo_url } = req.body;
     const { id } = req.params;
+    const workoutId = parseInt(id);
     const userId = req.user.id;
 
     console.log(`[Daily] Finishing workout ${id} for user ${userId}`);
@@ -268,6 +526,16 @@ router.patch(
 
     try {
       const { water_intake_liters, post_workout_weight, photos, total_rest_seconds } = req.body;
+      const existingWorkoutRes = await pool.query(
+        'SELECT status FROM daily_workouts WHERE id = $1 AND user_id = $2',
+        [workoutId, userId]
+      );
+
+      if (existingWorkoutRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Workout not found or unauthorized' });
+      }
+
+      const wasAlreadyCompleted = existingWorkoutRes.rows[0].status === 'completed';
       
       console.log(`[Daily] Processing metrics for workout ${id}:`, {
         water: water_intake_liters,
@@ -278,7 +546,7 @@ router.patch(
       // Check if all exercises are done or skipped
       const exercisesCheck = await pool.query(
         'SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = $1 AND is_completed = false',
-        [parseInt(id)]
+        [workoutId]
       );
       const remainingCount = parseInt(exercisesCheck.rows[0].count);
       console.log(`[Daily] Remaining exercises for workout ${id}: ${remainingCount}`);
@@ -313,7 +581,7 @@ router.patch(
         return res.status(400).json({ error: 'No fields to update' });
       }
 
-      queryParams.push(parseInt(id), userId);
+      queryParams.push(workoutId, userId);
       const query = `UPDATE daily_workouts SET ${updateFields.join(', ')} WHERE id = $${paramIdx} AND user_id = $${paramIdx + 1} RETURNING *`;
       
       console.log(`[Daily] Executing update query for workout ${id}`);
@@ -328,26 +596,33 @@ router.patch(
       if (Array.isArray(photos)) {
         console.log(`[Daily] Updating ${photos.length} photos for workout ${id}`);
         // Clear old ones first (if any)
-        await pool.query('DELETE FROM daily_workout_photos WHERE daily_workout_id = $1', [parseInt(id)]);
+        await pool.query('DELETE FROM daily_workout_photos WHERE daily_workout_id = $1', [workoutId]);
         for (const photoUrl of photos) {
           await pool.query(
             'INSERT INTO daily_workout_photos (daily_workout_id, photo_url) VALUES ($1, $2)',
-            [parseInt(id), photoUrl]
+            [workoutId, photoUrl]
           );
         }
       }
+
+      const analytics = await syncWorkoutCompletionAnalytics(pool, workoutId, userId);
+      result.rows[0].calories_burned = analytics.calorieSummary.caloriesBurned;
+      result.rows[0].workout_met = analytics.calorieSummary.workoutMet;
+      result.rows[0].calories_burned_method = analytics.calorieSummary.method;
+      result.rows[0].exercise_prs = analytics.exercisePrs;
 
       console.log(`[Daily] Workout ${id} successfully finalized. Status: ${result.rows[0].status}`);
 
       // ─── STREAK CALCULATION ───
       try {
+        if (!wasAlreadyCompleted) {
         const today = new Date().toISOString().split('T')[0];
         const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
         // 1. Check for any skips in this workout
         const skippedCheck = await pool.query(
           'SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = $1 AND is_skipped = true',
-          [parseInt(id)]
+          [workoutId]
         );
         const hasSkips = parseInt(skippedCheck.rows[0].count) > 0;
 
@@ -391,9 +666,9 @@ router.patch(
           FROM daily_workouts dw
           LEFT JOIN daily_workout_exercises dwe ON dw.id = dwe.daily_workout_id
           LEFT JOIN daily_workout_sets dws ON dwe.id = dws.daily_exercise_id
-          WHERE dw.id = $1 AND dws.is_skipped = false
+          WHERE dw.id = $1 AND COALESCE(dws.is_skipped, false) = false
           GROUP BY dw.id
-        `, [parseInt(id)]);
+        `, [workoutId]);
 
         if (workoutStats.rows.length > 0) {
           const stats = workoutStats.rows[0];
@@ -420,6 +695,10 @@ router.patch(
         }
 
         result.rows[0].new_streak = newStreak;
+        } else {
+          const streakRes = await pool.query('SELECT current_streak FROM users WHERE id = $1', [userId]);
+          result.rows[0].new_streak = parseInt(streakRes.rows[0]?.current_streak) || 0;
+        }
       } catch (streakErr) {
         console.error('[XP/Streak] Failed to update metrics:', streakErr);
       }
@@ -826,7 +1105,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 
     // ── 2. Today's completed workouts ─────────────────────────────────────────
     const todayWorkoutsRes = await pool.query(
-      `SELECT id, title, total_duration_seconds, total_volume, status, completed_at, post_workout_weight
+      `SELECT id, title, total_duration_seconds, total_volume, status, completed_at, post_workout_weight, calories_burned
        FROM daily_workouts
        WHERE user_id = $1 AND status = 'completed'
          AND completed_at BETWEEN $2 AND $3
@@ -840,8 +1119,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     let totalDurationToday = 0;
     let totalVolumeToday = 0;
     todayWorkoutsRes.rows.forEach(w => {
-      const durationHours = (parseInt(w.total_duration_seconds) || 0) / 3600;
-      const kcal = Math.round(5 * weightKg * durationHours);
+      const kcal = parseInt(w.calories_burned) || 0;
       totalCaloriesBurned += kcal;
       totalDurationToday += parseInt(w.total_duration_seconds) || 0;
       totalVolumeToday += parseFloat(w.total_volume) || 0;

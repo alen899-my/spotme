@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from '../../constants/theme';
+import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -50,35 +51,42 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, ex
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.guideOverlay}>
-        <View style={[styles.guideContent, { backgroundColor: colors.card }]}>
+        <View style={[styles.guideContent, { backgroundColor: colors.card, borderColor: P.border }]}>
           <TouchableOpacity style={styles.closeGuide} onPress={onClose}>
-            <Ionicons name="close-circle" size={32} color="rgba(0,0,0,0.5)" />
+            <Ionicons name="close-circle" size={32} color="rgba(255,255,255,0.85)" />
           </TouchableOpacity>
           
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Image 
-              source={{ uri: exercise.gif_url || exercise.image_url }} 
-              style={styles.guideGif} 
-              resizeMode="contain" 
-            />
+            <View style={styles.heroWrap}>
+              <Image 
+                source={{ uri: exercise.gif_url || exercise.image_url }} 
+                style={styles.guideGif} 
+                resizeMode="contain" 
+              />
+            </View>
             <View style={styles.guideBody}>
               <Text style={[styles.guideName, { color: colors.text }]}>{exercise.name}</Text>
               
               <View style={styles.guideMetaRow}>
-                <View style={[styles.guideBadge, { backgroundColor: colors.inputBg }]}>
-                  <Text style={[styles.guideBadgeText, { color: colors.textMuted }]}>{exercise.equipment}</Text>
+                <View style={styles.guideBadge}>
+                  <Text style={styles.guideBadgeText}>{exercise.equipment}</Text>
                 </View>
-                <View style={[styles.guideBadge, { backgroundColor: colors.inputBg }]}>
-                  <Text style={[styles.guideBadgeText, { color: colors.textMuted }]}>{exercise.target}</Text>
+                <View style={styles.guideBadge}>
+                  <Text style={styles.guideBadgeText}>{exercise.target}</Text>
                 </View>
               </View>
               
-              <Text style={[styles.guideSectionTitle, { color: colors.text }]}>Instructions</Text>
+              <Text style={styles.guideSectionTitle}>Instructions</Text>
               {steps.length > 0 ? (
                 steps.map((step, index) => (
-                  <Text key={index} style={[styles.guideText, { color: colors.textMuted, marginBottom: 8 }]}>
-                    {steps.length > 1 ? `${index + 1}. ` : ''}{step.trim()}
-                  </Text>
+                  <View key={index} style={styles.stepRow}>
+                    <View style={styles.stepDot}>
+                      <Text style={styles.stepDotText}>{steps.length > 1 ? index + 1 : '•'}</Text>
+                    </View>
+                    <Text style={[styles.guideText, { color: colors.textMuted }]}>
+                      {step.trim()}
+                    </Text>
+                  </View>
                 ))
               ) : (
                 <Text style={[styles.guideText, { color: colors.textMuted, fontStyle: 'italic' }]}>
@@ -89,9 +97,9 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, ex
           </ScrollView>
 
           <TouchableOpacity style={styles.gotItBtn} onPress={onClose}>
-            <LinearGradient colors={['#E00000', '#B00000']} style={styles.gotItBtnGrad}>
+            <View style={styles.gotItBtnGrad}>
               <Text style={styles.gotItBtnText}>GOT IT, LET'S GO!</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -102,14 +110,15 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, ex
 const styles = StyleSheet.create({
   guideOverlay: { 
     flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.85)', 
+    backgroundColor: 'rgba(4,40,43,0.78)', 
     justifyContent: 'center', 
     padding: 20 
   },
   guideContent: { 
     borderRadius: 32, 
     overflow: 'hidden', 
-    maxHeight: '85%' 
+    maxHeight: '85%',
+    borderWidth: 1.5,
   },
   closeGuide: { 
     position: 'absolute', 
@@ -117,10 +126,13 @@ const styles = StyleSheet.create({
     right: 16, 
     zIndex: 10 
   },
+  heroWrap: {
+    backgroundColor: 'transparent',
+  },
   guideGif: { 
     width: '100%', 
     height: 250, 
-    backgroundColor: '#FFF' 
+    backgroundColor: 'transparent' 
   },
   guideBody: { 
     padding: 24 
@@ -133,27 +145,55 @@ const styles = StyleSheet.create({
   guideMetaRow: { 
     flexDirection: 'row', 
     gap: 10, 
-    marginBottom: 20 
+    marginBottom: 20,
+    flexWrap: 'wrap',
   },
   guideBadge: { 
     paddingHorizontal: 12, 
     paddingVertical: 6, 
-    borderRadius: 8 
+    borderRadius: 999,
+    backgroundColor: 'rgba(37,150,190,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(37,150,190,0.18)',
   },
   guideBadgeText: { 
     fontFamily: FONTS.bodyBold, 
     fontSize: 11, 
-    textTransform: 'uppercase' 
+    textTransform: 'uppercase',
+    color: P.ctaDeep,
   },
   guideSectionTitle: { 
     fontFamily: FONTS.bodyBold, 
     fontSize: 18, 
-    marginBottom: 10 
+    marginBottom: 12,
+    color: P.cta,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 10,
+  },
+  stepDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: P.sun,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+    flexShrink: 0,
+  },
+  stepDotText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    color: P.ink,
   },
   guideText: { 
     fontFamily: FONTS.body, 
     fontSize: 15, 
-    lineHeight: 24 
+    lineHeight: 24,
+    flex: 1,
   },
   gotItBtn: { 
     margin: 24, 
@@ -164,7 +204,8 @@ const styles = StyleSheet.create({
   gotItBtnGrad: { 
     height: 56, 
     justifyContent: 'center', 
-    alignItems: 'center' 
+    alignItems: 'center',
+    backgroundColor: P.cta,
   },
   gotItBtnText: { 
     fontFamily: FONTS.bodyBold, 

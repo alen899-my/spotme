@@ -147,6 +147,72 @@ const initDB = async () => {
       );
     `);
 
+    await pool.query(`
+      ALTER TABLE daily_workouts
+      ADD COLUMN IF NOT EXISTS water_intake_liters NUMERIC(5,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS post_workout_weight NUMERIC(6,2),
+      ADD COLUMN IF NOT EXISTS rating INT,
+      ADD COLUMN IF NOT EXISTS calories_burned INT DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS calories_burned_method VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS workout_met NUMERIC(4,2) DEFAULT 0;
+
+      ALTER TABLE daily_workout_exercises
+      ADD COLUMN IF NOT EXISTS is_skipped BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS rating INT,
+      ADD COLUMN IF NOT EXISTS best_set_weight NUMERIC(8,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS best_set_reps INT DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS estimated_1rm NUMERIC(10,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS total_set_volume NUMERIC(10,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS record_metric_type VARCHAR(50) DEFAULT 'estimated_1rm',
+      ADD COLUMN IF NOT EXISTS is_personal_record BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS is_world_record BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS personal_record_value NUMERIC(10,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS world_record_value NUMERIC(10,2) DEFAULT 0;
+
+      ALTER TABLE daily_workout_sets
+      ADD COLUMN IF NOT EXISTS is_skipped BOOLEAN DEFAULT FALSE;
+
+      CREATE TABLE IF NOT EXISTS user_exercise_prs (
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        exercise_id VARCHAR(10) REFERENCES exercises(id) ON DELETE CASCADE,
+        metric_type VARCHAR(50) NOT NULL DEFAULT 'estimated_1rm',
+        metric_value NUMERIC(10,2) NOT NULL DEFAULT 0,
+        source_weight NUMERIC(8,2) DEFAULT 0,
+        source_reps INT DEFAULT 0,
+        source_volume NUMERIC(10,2) DEFAULT 0,
+        daily_workout_id INT REFERENCES daily_workouts(id) ON DELETE SET NULL,
+        daily_exercise_id INT REFERENCES daily_workout_exercises(id) ON DELETE SET NULL,
+        achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, exercise_id, metric_type)
+      );
+
+      CREATE TABLE IF NOT EXISTS global_exercise_prs (
+        exercise_id VARCHAR(10) REFERENCES exercises(id) ON DELETE CASCADE,
+        metric_type VARCHAR(50) NOT NULL DEFAULT 'estimated_1rm',
+        metric_value NUMERIC(10,2) NOT NULL DEFAULT 0,
+        source_weight NUMERIC(8,2) DEFAULT 0,
+        source_reps INT DEFAULT 0,
+        source_volume NUMERIC(10,2) DEFAULT 0,
+        user_id INT REFERENCES users(id) ON DELETE SET NULL,
+        daily_workout_id INT REFERENCES daily_workouts(id) ON DELETE SET NULL,
+        daily_exercise_id INT REFERENCES daily_workout_exercises(id) ON DELETE SET NULL,
+        achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (exercise_id, metric_type)
+      );
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_exercise_prs_user_exercise
+      ON user_exercise_prs (user_id, exercise_id);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_global_exercise_prs_exercise
+      ON global_exercise_prs (exercise_id);
+    `);
+
     // ── Water Intake Logging ─────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS water_logs (

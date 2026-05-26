@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   Image,
@@ -17,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../../../constants/theme';
+import { P } from '../../../../constants/homeTheme';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../../contexts/ThemeContext';
 import { useToast } from '../../../../contexts/ToastContext';
 import ExercisePreviewModal from '../../../../components/modals/ExercisePreviewModal';
@@ -27,6 +28,7 @@ const LIMIT = 20;
 export default function AddSessionExercisesScreen() {
   const router = useRouter();
   const { id: sessionId } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { showToast } = useToast();
 
@@ -163,7 +165,7 @@ export default function AddSessionExercisesScreen() {
 
   const renderExercise = ({ item }: { item: any }) => (
     <TouchableOpacity 
-      style={[styles.exCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      style={styles.exCard}
       activeOpacity={0.7}
       onPress={() => setPreviewEx(item)}
     >
@@ -176,22 +178,22 @@ export default function AddSessionExercisesScreen() {
       )}
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <Text style={[styles.exName, { color: colors.text }]} numberOfLines={1}>
+          <Text style={styles.exName}>
             {item.name}
           </Text>
           {item.avg_rating !== undefined && item.avg_rating !== null && (
-            <View style={[styles.avgRatingBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+            <View style={styles.avgRatingBadge}>
               <Ionicons name="star" size={10} color="#F59E0B" />
-              <Text style={[styles.avgRatingText, { color: colors.text }]}>{item.avg_rating}</Text>
+              <Text style={styles.avgRatingText}>{item.avg_rating}</Text>
             </View>
           )}
         </View>
-        <Text style={[styles.exMeta, { color: colors.textMuted }]}>
+        <Text style={styles.exMeta}>
           {[item.target, item.equipment].filter(Boolean).join(' • ')}
         </Text>
       </View>
       <TouchableOpacity
-        style={[styles.addBtn, { backgroundColor: '#E00000' }]}
+        style={styles.addBtn}
         onPress={() => handleAdd(item.id)}
         disabled={addingId === item.id}
       >
@@ -218,7 +220,7 @@ export default function AddSessionExercisesScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="close" size={28} color={colors.text} />
           </TouchableOpacity>
@@ -259,7 +261,7 @@ export default function AddSessionExercisesScreen() {
                   style={[
                     styles.filterChip,
                     { backgroundColor: colors.inputBg, borderColor: colors.border },
-                    selectedCategory === cat && { backgroundColor: '#E00000', borderColor: '#E00000' },
+                    selectedCategory === cat && { backgroundColor: P.cta, borderColor: P.cta },
                   ]}
                   onPress={() => handleCategoryPress(cat)}
                 >
@@ -281,7 +283,7 @@ export default function AddSessionExercisesScreen() {
         {/* List */}
         {loading && exercises.length === 0 ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#E00000" />
+            <ActivityIndicator size="large" color={P.cta} />
           </View>
         ) : (
           <FlatList
@@ -290,6 +292,7 @@ export default function AddSessionExercisesScreen() {
             renderItem={renderExercise}
             contentContainerStyle={[
               styles.listContent,
+              { paddingBottom: 24 + Math.max(insets.bottom, 12) },
               exercises.length === 0 && styles.listContentEmpty,
             ]}
             showsVerticalScrollIndicator={false}
@@ -299,7 +302,7 @@ export default function AddSessionExercisesScreen() {
             ListEmptyComponent={renderEmpty}
             ListFooterComponent={
               loadingMore ? (
-                <ActivityIndicator color="#E00000" style={{ marginVertical: 20 }} />
+                <ActivityIndicator color={P.cta} style={{ marginVertical: 20 }} />
               ) : null
             }
           />
@@ -321,8 +324,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
-    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
   },
   backBtn: { marginLeft: -8 },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 24 },
@@ -363,20 +366,21 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 16,
     marginBottom: 12,
-    borderWidth: 1,
+    borderWidth: 0,
+    backgroundColor: P.cta,
   },
   exImage: {
     width: 50,
     height: 50,
     borderRadius: 10,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     marginRight: 12,
   },
   exImageFallback: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  exName: { fontFamily: FONTS.bodyBold, fontSize: 15, marginBottom: 2 },
+  exName: { fontFamily: FONTS.bodyBold, fontSize: 15, marginBottom: 2, color: '#FFF', lineHeight: 19, flexShrink: 1 },
   avgRatingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -386,18 +390,24 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     marginLeft: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255,255,255,0.18)',
   },
   avgRatingText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 10,
+    color: '#FFF',
   },
-  exMeta: { fontFamily: FONTS.body, fontSize: 12, textTransform: 'capitalize' },
+  exMeta: { fontFamily: FONTS.body, fontSize: 12, textTransform: 'capitalize', color: 'rgba(255,255,255,0.78)' },
   addBtn: {
     width: 40,
     height: 40,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#34D399',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.28)',
   },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   emptyText: { fontFamily: FONTS.body, fontSize: 15 },

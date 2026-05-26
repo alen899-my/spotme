@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from "react-native";
 import { Tabs, usePathname, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppHeader from "../../components/ui/AppHeader";
 import ProfileSidebar from "../../components/ui/ProfileSidebar";
@@ -29,7 +28,6 @@ const TABS = [
 function TopTabBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [barWidth, setBarWidth] = useState(W - 16);
 
   const activeIndex = TABS.findIndex((tab) =>
@@ -41,7 +39,7 @@ function TopTabBar() {
   const tabWidth = Math.max(60, Math.min(82, Math.floor(barWidth / TABS.length) - 2));
 
   return (
-    <View style={[styles.topBar, { paddingBottom: Math.max(insets.bottom, 2) }]}>
+    <View style={styles.topBar}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -117,7 +115,7 @@ const styles = StyleSheet.create({
   topBar: {
     backgroundColor: "transparent",
     paddingTop: 0,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   tabsRow: {
     flexDirection: "row",

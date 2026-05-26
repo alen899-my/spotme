@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, ScrollView,
+  View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Image, Platform, ActivityIndicator,
   TextInput, Dimensions, Animated,
 } from 'react-native';
@@ -11,6 +11,8 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
+import { P } from '../../constants/homeTheme';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import Slider from '@react-native-community/slider';
@@ -19,10 +21,18 @@ import StreakIcon from '../../components/ui/StreakIcon';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-const EMOJIS = ['😢', '😣', '😕', '😐', '🙂', '😊', '💪', '😎', '🔥', '🏆'];
-const LABELS = [
-  'Terrible', 'Very Bad', 'Okayish', 'Decent', 'Good',
-  'Very Good', 'Strong Lift', 'Amazing', 'Beast Mode', 'Legendary!'
+// ─── Palette ──────────────────────────────────────────────────────────────────
+// Hero gradient: deep green → teal-green
+const HERO_GRADIENT: [string, string] = ['#1DB954', '#0A8F4C'];
+
+// Six stat cards — distinct shades that all live in a blue-teal family
+const STAT_COLORS = [
+  '#2563EB', // duration   — royal blue
+  '#0891B2', // calories   — cyan-ish
+  '#1D4ED8', // volume     — indigo-blue
+  '#0E7490', // rest       — dark cyan
+  '#3B82F6', // sets       — lighter blue
+  '#0284C7', // hydration  — sky blue
 ];
 
 function formatDuration(sec: number) {
@@ -40,8 +50,16 @@ function formatTime(sec: number) {
   return `${m}:${s}`;
 }
 
+function formatRecord(metricType?: string, value?: number | string) {
+  const numeric = Number(value) || 0;
+  if (!numeric) return '0';
+  if (metricType === 'max_reps') return `${Math.round(numeric)} reps`;
+  return `${numeric.toFixed(1)} kg est. 1RM`;
+}
+
 export default function WorkoutCompleteScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { showToast } = useToast();
   const params = useLocalSearchParams();
@@ -60,7 +78,6 @@ export default function WorkoutCompleteScreen() {
   const [loading, setLoading] = useState(true);
   const [newStreak, setNewStreak] = useState<number | null>(null);
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
-  const [workoutRating, setWorkoutRating] = useState<number | null>(null);
 
   useEffect(() => {
     fetchWorkout();
@@ -75,27 +92,10 @@ export default function WorkoutCompleteScreen() {
       setWorkout(response.data);
       if (response.data.post_workout_weight) setWeight(String(response.data.post_workout_weight));
       if (response.data.water_intake_liters) setWaterIntake(Number(response.data.water_intake_liters));
-      if (response.data.rating) setWorkoutRating(Number(response.data.rating));
     } catch (err) {
       console.error('Error fetching workout summary:', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleRateWorkout = async (rating: number) => {
-    setWorkoutRating(rating);
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      await axios.patch(`${API_URL}/daily/workouts/${workoutId}/rating`, {
-        rating
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      showToast('Workout rating updated! 🌟');
-    } catch (err) {
-      console.error('Error rating workout:', err);
-      showToast('Failed to save workout rating', 'error');
     }
   };
 
@@ -107,7 +107,7 @@ export default function WorkoutCompleteScreen() {
     });
 
     if (!result.canceled) {
-      const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+      const MAX_SIZE = 10 * 1024 * 1024;
       const newPhotos: string[] = [];
       for (const asset of result.assets) {
         if (asset.fileSize && asset.fileSize > MAX_SIZE) {
@@ -130,18 +130,16 @@ export default function WorkoutCompleteScreen() {
     try {
       const token = await AsyncStorage.getItem('userToken');
 
-      // Step 1: Upload photos if any
       if (photos.length > 0) {
         showToast(`Uploading ${photos.length} photos...`, 'info');
-        
+
         const uploadPhotoWithRetry = async (uri: string, index: number, retries = 2): Promise<any> => {
           try {
             const formData = new FormData();
             if (Platform.OS === 'web') {
               const response = await fetch(uri);
               const blob = await response.blob();
-              const filename = `photo_${Date.now()}_${index}.jpg`;
-              formData.append('photos', blob, filename);
+              formData.append('photos', blob, `photo_${Date.now()}_${index}.jpg`);
             } else {
               const name = uri.split('/').pop() || `photo_${index}.jpg`;
               const match = /\.(\w+)$/.exec(name);
@@ -152,40 +150,25 @@ export default function WorkoutCompleteScreen() {
                 type,
               } as any);
             }
-
             return await axios.post(`${API_URL}/daily/workouts/${workoutId}/photos`, formData, {
-              headers: { 
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'multipart/form-data',
-              },
-              timeout: 30000, // 30s timeout per photo is plenty
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+              timeout: 30000,
             });
           } catch (err) {
-            if (retries > 0) {
-              console.warn(`Retry upload for photo ${index + 1}. Retries left: ${retries}`);
-              return await uploadPhotoWithRetry(uri, index, retries - 1);
-            }
+            if (retries > 0) return await uploadPhotoWithRetry(uri, index, retries - 1);
             throw err;
           }
         };
 
-        // Upload all photos concurrently
-        const uploadPromises = photos.map((uri, index) => uploadPhotoWithRetry(uri, index));
-        const results = await Promise.allSettled(uploadPromises);
-
+        const results = await Promise.allSettled(photos.map((uri, i) => uploadPhotoWithRetry(uri, i)));
         const succeeded = results.filter(r => r.status === 'fulfilled').length;
         const failed = results.filter(r => r.status === 'rejected').length;
 
-        if (failed === 0) {
-          showToast('All photos uploaded successfully!');
-        } else if (succeeded > 0) {
-          showToast(`Uploaded ${succeeded}/${photos.length} photos. ${failed} failed.`, 'warning');
-        } else {
-          showToast('Failed to upload photos, saving workout metrics...', 'error');
-        }
+        if (failed === 0) showToast('All photos uploaded successfully!');
+        else if (succeeded > 0) showToast(`Uploaded ${succeeded}/${photos.length} photos. ${failed} failed.`, 'warning');
+        else showToast('Failed to upload photos, saving workout metrics...', 'error');
       }
 
-      // Step 2: Save metrics
       const payload: any = {
         water_intake_liters: waterIntake,
         total_duration_seconds: duration,
@@ -199,24 +182,20 @@ export default function WorkoutCompleteScreen() {
       const completeRes = await axios.patch(`${API_URL}/daily/workouts/${workoutId}/complete`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      setWorkout(completeRes.data);
 
       if (completeRes.data.new_streak !== undefined) {
         setNewStreak(completeRes.data.new_streak);
-        if (completeRes.data.new_streak > 0) {
-          setShowStreakOverlay(true);
-        }
+        if (completeRes.data.new_streak > 0) setShowStreakOverlay(true);
       }
 
       showToast('Workout finalized! Great job! 🏆');
-      
-      // Redirect after showing the streak for a bit
       setTimeout(() => {
         router.replace('/(tabs)/daily');
       }, completeRes.data.new_streak > 0 ? 3500 : 1500);
     } catch (err: any) {
       console.error('Error saving final metrics:', err);
-      const msg = err.response?.data?.error || 'Failed to update metrics';
-      showToast(msg, 'error');
+      showToast(err.response?.data?.error || 'Failed to update metrics', 'error');
     } finally {
       setSaving(false);
     }
@@ -225,24 +204,28 @@ export default function WorkoutCompleteScreen() {
   const displayDuration = workout?.total_duration_seconds || duration;
   const displayVolume = workout?.total_volume || volume;
   const displayRest = workout?.total_rest_seconds || rest;
+  const caloriesBurned = Number(workout?.calories_burned) || 0;
 
-  const calculatedTotalSets = workout?.exercises?.reduce((acc: number, ex: any) => {
-    return acc + (ex.sets?.filter((s: any) => !s.is_skipped).length || 0);
-  }, 0) || 0;
-  
+  const calculatedTotalSets = workout?.exercises?.reduce((acc: number, ex: any) =>
+    acc + (ex.sets?.filter((s: any) => !s.is_skipped).length || 0), 0) || 0;
+
   const stats = [
-    { icon: 'time', label: 'DURATION', value: formatDuration(displayDuration), color: '#EF4444', sub: 'Total active time' },
-    { icon: 'barbell', label: 'VOLUME', value: `${Math.round(displayVolume)}kg`, color: '#10B981', sub: 'Total weight lifted' },
-    { icon: 'hourglass', label: 'REST TIME', value: formatDuration(displayRest), color: '#F59E0B', sub: 'Recovery between sets' },
-    { icon: 'layers', label: 'SETS', value: `${workout?.total_sets || calculatedTotalSets || 0}`, color: '#8B5CF6', sub: 'Total sets completed' },
-    { icon: 'water', label: 'HYDRATION', value: `${waterIntake.toFixed(1)}L`, color: '#3B82F6', sub: 'Water intake' },
+    { icon: 'time', label: 'DURATION', value: formatDuration(displayDuration), sub: 'Active time' },
+    { icon: 'flame', label: 'CALORIES', value: `${caloriesBurned} kcal`, sub: 'Est. burn' },
+    { icon: 'barbell', label: 'VOLUME', value: `${Math.round(displayVolume)}kg`, sub: 'Weight lifted' },
+    { icon: 'hourglass', label: 'REST TIME', value: formatDuration(displayRest), sub: 'Recovery' },
+    { icon: 'layers', label: 'SETS', value: `${workout?.total_sets || calculatedTotalSets || 0}`, sub: 'Completed sets' },
+    { icon: 'water', label: 'HYDRATION', value: `${waterIntake.toFixed(1)}L`, sub: 'Water intake' },
   ];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Celebration Hero */}
-        <LinearGradient colors={['#10B981', '#059669']} style={styles.hero}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 150 + Math.max(insets.bottom, 12) }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── 1. Hero — green completion gradient ── */}
+        <LinearGradient colors={HERO_GRADIENT} style={styles.hero}>
           {newStreak !== null && newStreak > 0 ? (
             <View style={{ marginBottom: 20 }}>
               <StreakIcon streak={newStreak} size={100} />
@@ -252,104 +235,134 @@ export default function WorkoutCompleteScreen() {
               <Ionicons name="trophy" size={48} color="#FFF" />
             </View>
           )}
-          <Text style={styles.heroTitle}>{newStreak !== null && newStreak > 0 ? 'Perfect Workout!' : 'Workout Complete!'}</Text>
+          <Text style={styles.heroTitle}>
+            {newStreak !== null && newStreak > 0 ? 'Perfect Workout!' : 'Workout Complete!'}
+          </Text>
           <Text style={styles.heroSub}>
-            {newStreak !== null && newStreak > 0 
-              ? `You kept your ${newStreak} day streak alive! 🔥` 
+            {newStreak !== null && newStreak > 0
+              ? `You kept your ${newStreak} day streak alive! 🔥`
               : 'You crushed it today 💪'}
           </Text>
         </LinearGradient>
 
-        {/* Stats Grid */}
+        {/* ── 2. Stats grid — different blue-family shades ── */}
         <View style={styles.statsGrid}>
           {stats.map((s, i) => (
-            <View key={i} style={[
-              styles.perfCard, 
-              { 
-                backgroundColor: s.color, 
-                borderRightColor: 'rgba(255,255,255,0.3)',
-                borderRightWidth: 4,
-                borderWidth: 0
-              }
-            ]}>
-              <View style={[styles.perfIconBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+            <View
+              key={i}
+              style={[styles.perfCard, { backgroundColor: STAT_COLORS[i] }]}
+            >
+              <View style={styles.perfIconBox}>
                 <Ionicons name={s.icon as any} size={18} color="#FFF" />
               </View>
-              <View style={styles.perfContent}>
-                <Text style={[styles.perfLabel, { color: 'rgba(255,255,255,0.7)' }]}>{s.label}</Text>
-                <Text style={[styles.perfValue, { color: '#FFF' }]}>{s.value}</Text>
-                <Text style={[styles.perfSubLabel, { color: 'rgba(255,255,255,0.6)' }]} numberOfLines={1}>{s.sub}</Text>
-              </View>
+              <Text style={styles.perfLabel}>{s.label}</Text>
+              <Text style={styles.perfValue}>{s.value}</Text>
+              <Text style={styles.perfSub}>{s.sub}</Text>
             </View>
           ))}
         </View>
 
         <View style={styles.formContainer}>
-          {/* Movement Summary Section */}
+
+          {/* ── 3. Movement Summary — responsive exercise cards ── */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: '#8B5CF620' }]}>
-                <Ionicons name="list" size={20} color="#8B5CF6" />
+              <View style={[styles.sectionIcon, { backgroundColor: 'rgba(37,150,190,0.12)' }]}>
+                <Ionicons name="list" size={20} color={P.cta} />
               </View>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Movement Summary</Text>
             </View>
+
             {loading ? (
-              <ActivityIndicator color="#8B5CF6" style={{ marginVertical: 20 }} />
+              <ActivityIndicator color={P.cta} style={{ marginVertical: 20 }} />
             ) : !workout ? (
-              <Text style={{ color: colors.textMuted, textAlign: 'center', marginVertical: 20 }}>Failed to load session details</Text>
+              <Text style={{ color: colors.textMuted, textAlign: 'center', marginVertical: 20 }}>
+                Failed to load session details
+              </Text>
             ) : (
               <View style={styles.summaryList}>
                 {workout?.exercises?.map((ex: any) => {
                   const isSkipped = ex.is_skipped;
                   const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
-                  
                   const totalReps = completedSets.reduce((acc: number, s: any) => acc + (parseInt(s.reps) || 0), 0);
                   const totalWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0);
                   const totalSetWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0), 0);
                   const totalTime = completedSets.reduce((acc: number, s: any) => acc + (s.duration_seconds || 0), 0);
-                  
                   const avgWeight = completedSets.length > 0 ? (totalSetWeight / completedSets.length).toFixed(1) : '0';
                   const avgTime = completedSets.length > 0 ? Math.round(totalTime / completedSets.length) : 0;
 
                   return (
-                    <View key={ex.id} style={[
-                      styles.summaryFullCard, 
-                      { backgroundColor: colors.inputBg, borderColor: colors.border },
-                      isSkipped && { opacity: 0.6 }
-                    ]}>
-                      <View style={styles.summaryFullHeader}>
-                        <Image source={{ uri: ex.image_url }} style={styles.summaryFullImage} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.summaryFullName, { color: colors.text }]}>{ex.name}</Text>
-                          <Text style={[styles.summaryFullSub, { color: colors.textMuted }]}>
-                            {isSkipped ? 'Movement skipped' : `${completedSets.length} sets completed`}
+                    <View
+                      key={ex.id}
+                      style={[styles.exCard, isSkipped && { opacity: 0.55 }]}
+                    >
+                      {/* Card header row */}
+                      <View style={styles.exHeader}>
+                        <Image source={{ uri: ex.image_url }} style={styles.exImage} />
+                        <View style={styles.exMeta}>
+                          <Text style={styles.exName} numberOfLines={2}>{ex.name}</Text>
+                          <Text style={styles.exSetsSub}>
+                            {isSkipped ? 'Movement skipped' : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
                           </Text>
                         </View>
+                        {/* PR / skipped badge */}
                         {isSkipped && (
-                          <View style={styles.skippedBadge}>
-                            <Text style={styles.skippedBadgeText}>SKIPPED</Text>
+                          <View style={styles.badgeSkipped}>
+                            <Text style={styles.badgeText}>SKIPPED</Text>
+                          </View>
+                        )}
+                        {!isSkipped && ex.is_world_record && (
+                          <View style={styles.badgeWorld}>
+                            <Ionicons name="earth" size={10} color="#FFF" style={{ marginRight: 3 }} />
+                            <Text style={styles.badgeText}>WORLD PR</Text>
+                          </View>
+                        )}
+                        {!isSkipped && !ex.is_world_record && ex.is_personal_record && (
+                          <View style={styles.badgePR}>
+                            <Ionicons name="ribbon" size={10} color="#1a1a1a" style={{ marginRight: 3 }} />
+                            <Text style={[styles.badgeText, { color: '#1a1a1a' }]}>NEW PR</Text>
                           </View>
                         )}
                       </View>
 
+                      {/* Record row */}
+                      {!isSkipped && (
+                        <View style={styles.recordRow}>
+                          <View style={styles.recordPill}>
+                            <Text style={styles.recordPillLabel}>BEST SET</Text>
+                            <Text style={styles.recordPillVal}>
+                              {Number(ex.best_set_weight || 0).toFixed(1)}kg × {ex.best_set_reps || 0}
+                            </Text>
+                          </View>
+                          <View style={styles.recordPill}>
+                            <Text style={styles.recordPillLabel}>MY PR</Text>
+                            <Text style={styles.recordPillVal}>
+                              {formatRecord(ex.record_metric_type, ex.personal_record_value)}
+                            </Text>
+                          </View>
+                          <View style={styles.recordPill}>
+                            <Text style={styles.recordPillLabel}>WORLD PR</Text>
+                            <Text style={styles.recordPillVal}>
+                              {formatRecord(ex.record_metric_type, ex.world_record_value)}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Stats 2×2 grid */}
                       {!isSkipped && completedSets.length > 0 && (
-                        <View style={styles.summaryFullGrid}>
-                          <View style={styles.summaryFullItem}>
-                            <Text style={styles.summaryFullLabel}>TOTAL WEIGHT</Text>
-                            <Text style={[styles.summaryFullValue, { color: colors.text }]}>{totalWeight}kg</Text>
-                          </View>
-                          <View style={styles.summaryFullItem}>
-                            <Text style={styles.summaryFullLabel}>AVG WEIGHT/SET</Text>
-                            <Text style={[styles.summaryFullValue, { color: colors.text }]}>{avgWeight}kg</Text>
-                          </View>
-                          <View style={styles.summaryFullItem}>
-                            <Text style={styles.summaryFullLabel}>TOTAL REPS</Text>
-                            <Text style={[styles.summaryFullValue, { color: colors.text }]}>{totalReps}</Text>
-                          </View>
-                          <View style={styles.summaryFullItem}>
-                            <Text style={styles.summaryFullLabel}>AVG TIME/SET</Text>
-                            <Text style={[styles.summaryFullValue, { color: colors.text }]}>{formatTime(avgTime)}</Text>
-                          </View>
+                        <View style={styles.exStatsGrid}>
+                          {[
+                            { label: 'TOTAL WEIGHT', value: `${totalWeight}kg` },
+                            { label: 'AVG / SET', value: `${avgWeight}kg` },
+                            { label: 'TOTAL REPS', value: `${totalReps}` },
+                            { label: 'AVG TIME / SET', value: formatTime(avgTime) },
+                          ].map((item, idx) => (
+                            <View key={idx} style={styles.exStatCell}>
+                              <Text style={styles.exStatLabel}>{item.label}</Text>
+                              <Text style={styles.exStatValue}>{item.value}</Text>
+                            </View>
+                          ))}
                         </View>
                       )}
                     </View>
@@ -359,92 +372,97 @@ export default function WorkoutCompleteScreen() {
             )}
           </View>
 
-          {/* Weight Input */}
-          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: '#10B98120' }]}>
-                <Ionicons name="scale" size={20} color="#10B981" />
+          {/* ── 4. Body Weight — warm yellow card ── */}
+          <LinearGradient
+            colors={['#F59E0B', '#D97706']}
+            style={styles.weightCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.weightCardTop}>
+              <View style={styles.weightIconBox}>
+                <Ionicons name="scale-outline" size={22} color="#78350F" />
               </View>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Body Weight</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.weightCardTitle}>Post-Workout Weight</Text>
+                <Text style={styles.weightCardSub}>Log your body weight to track progress over time</Text>
+              </View>
             </View>
-            <TextInput
-              style={[styles.weightInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
-              placeholder="e.g. 75.5 kg"
-              placeholderTextColor={colors.textDim}
-              keyboardType="decimal-pad"
-              value={weight}
-              onChangeText={setWeight}
-            />
-          </View>
-          
-          {/* Hydration Section */}
-          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.weightInputWrap}>
+              <TextInput
+                style={styles.weightInput}
+                placeholder="e.g. 75.5"
+                placeholderTextColor="rgba(120,53,15,0.45)"
+                keyboardType="decimal-pad"
+                value={weight}
+                onChangeText={setWeight}
+              />
+              <View style={styles.weightUnit}>
+                <Text style={styles.weightUnitText}>kg</Text>
+              </View>
+            </View>
+            {!!weight && (
+              <Text style={styles.weightHint}>
+                Logged: <Text style={{ fontFamily: FONTS.bodyBold }}>{weight} kg</Text> ✓
+              </Text>
+            )}
+          </LinearGradient>
+
+          {/* ── 5. Hydration — blue-tinted card, slider inside ── */}
+          <View style={[styles.section, styles.hydrationCard, { borderColor: '#BFDBFE' }]}>
             <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: '#3B82F620' }]}>
+              <View style={[styles.sectionIcon, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
                 <Ionicons name="water" size={20} color="#3B82F6" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Hydration Tracker</Text>
-                <Text style={[styles.sectionSub, { color: colors.textMuted }]}>How much water did you drink? ({waterIntake.toFixed(1)}L)</Text>
+                <Text style={[styles.sectionTitle, { color: '#1E40AF' }]}>Hydration Tracker</Text>
+                <Text style={[styles.sectionSub, { color: '#3B82F6' }]}>
+                  How much water did you drink?
+                </Text>
+              </View>
+              <View style={styles.hydrationBadge}>
+                <Text style={styles.hydrationBadgeText}>{waterIntake.toFixed(1)}L</Text>
               </View>
             </View>
+
+            {/* Water level visualiser */}
+            <View style={styles.waterBar}>
+              <View
+                style={[
+                  styles.waterFill,
+                  { width: `${Math.min((waterIntake / 5) * 100, 100)}%` },
+                ]}
+              />
+              {[1, 2, 3, 4].map(tick => (
+                <View
+                  key={tick}
+                  style={[styles.waterTick, { left: `${(tick / 5) * 100}%` as any }]}
+                />
+              ))}
+            </View>
+
             <Slider
-              style={{ width: '100%', height: 40 }}
+              style={{ width: '100%', height: 40, marginTop: 4 }}
               minimumValue={0}
               maximumValue={5}
               step={0.1}
               value={waterIntake}
               onValueChange={setWaterIntake}
               minimumTrackTintColor="#3B82F6"
-              maximumTrackTintColor={colors.border}
-              thumbTintColor="#3B82F6"
+              maximumTrackTintColor="#BFDBFE"
+              thumbTintColor="#1D4ED8"
             />
-          </View>
-
-          {/* Workout Satisfaction Section */}
-          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: '#F59E0B20' }]}>
-                <Ionicons name="star" size={20} color="#F59E0B" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Workout Satisfaction</Text>
-                <Text style={[styles.sectionSub, { color: colors.textMuted }]}>
-                  How satisfied are you with this workout? ({workoutRating || 'Not rated'}/10)
-                </Text>
-              </View>
-            </View>
-            
-            <View style={{ alignItems: 'center', marginVertical: 10 }}>
-              <Text style={{ fontSize: 44, marginBottom: 8 }}>
-                {workoutRating ? EMOJIS[workoutRating - 1] : '🤔'}
-              </Text>
-              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 16, color: colors.text, marginBottom: 12 }}>
-                {workoutRating ? LABELS[workoutRating - 1] : 'Slide to Rate Workout'}
-              </Text>
-              <Slider
-                style={{ width: '100%', height: 40 }}
-                minimumValue={1}
-                maximumValue={10}
-                step={1}
-                value={workoutRating || 5}
-                onValueChange={(val) => handleRateWorkout(Math.round(val))}
-                minimumTrackTintColor="#F59E0B"
-                maximumTrackTintColor={colors.border}
-                thumbTintColor="#F59E0B"
-              />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 10 }}>
-                <Text style={{ color: colors.textMuted, fontSize: 11 }}>1 (Terrible)</Text>
-                <Text style={{ color: colors.textMuted, fontSize: 11 }}>10 (Legendary)</Text>
-              </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 }}>
+              <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: FONTS.body }}>0L</Text>
+              <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: FONTS.body }}>5L</Text>
             </View>
           </View>
 
-          {/* Photo Section */}
+          {/* ── Photo Section ── */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: '#E0000020' }]}>
-                <Ionicons name="camera" size={20} color="#E00000" />
+              <View style={[styles.sectionIcon, { backgroundColor: 'rgba(37,150,190,0.12)' }]}>
+                <Ionicons name="camera" size={20} color={P.cta} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Session Photos</Text>
@@ -462,7 +480,7 @@ export default function WorkoutCompleteScreen() {
                 </View>
               ))}
               {photos.length < 10 && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.addPhotoBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
                   onPress={pickPhotos}
                 >
@@ -472,18 +490,23 @@ export default function WorkoutCompleteScreen() {
               )}
             </ScrollView>
           </View>
-        </View>
 
+        </View>
       </ScrollView>
 
-      {/* Sticky Bottom Buttons */}
-      <View style={[styles.footer, { backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }]}>
-        <TouchableOpacity
-          style={styles.saveBtn}
-          onPress={handleFinalSave}
-          disabled={saving}
-        >
-          <LinearGradient colors={['#E00000', '#B00000']} style={styles.saveBtnGradient}>
+      {/* Sticky footer */}
+      <View style={[
+        styles.footer,
+        {
+          backgroundColor: colors.bg,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          paddingTop: 16,
+          paddingBottom: Math.max(insets.bottom, 12) + 16,
+        },
+      ]}>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleFinalSave} disabled={saving}>
+          <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.saveBtnGradient}>
             {saving ? <ActivityIndicator color="#FFF" /> : (
               <>
                 <Ionicons name="checkmark-done" size={22} color="#FFF" />
@@ -493,21 +516,19 @@ export default function WorkoutCompleteScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.skipLink} 
+        <TouchableOpacity
+          style={styles.skipLink}
           onPress={() => router.replace('/(tabs)/daily')}
           disabled={saving}
         >
           <Text style={[styles.skipLinkText, { color: colors.textMuted }]}>I'll do this later</Text>
         </TouchableOpacity>
       </View>
-      {/* Streak Celebration Overlay */}
+
+      {/* Streak overlay */}
       {showStreakOverlay && (
         <View style={styles.streakOverlay}>
-          <LinearGradient 
-            colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.95)']} 
-            style={StyleSheet.absoluteFill} 
-          />
+          <LinearGradient colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.95)']} style={StyleSheet.absoluteFill} />
           <Animated.View style={styles.streakPopup}>
             <StreakIcon streak={newStreak || 0} size={120} />
             <Text style={styles.streakPopupTitle}>STREAK UP!</Text>
@@ -521,49 +542,308 @@ export default function WorkoutCompleteScreen() {
 
 const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
-  hero: { padding: 40, alignItems: 'center', borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
-  heroIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+
+  // ── Hero ──────────────────────────────────────────────────────────────────
+  hero: {
+    padding: 40,
+    alignItems: 'center',
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  heroIcon: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 16,
+  },
   heroTitle: { fontFamily: FONTS.heading, fontSize: 32, color: '#FFF', marginBottom: 6 },
   heroSub: { fontFamily: FONTS.body, fontSize: 16, color: 'rgba(255,255,255,0.9)' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 20, gap: 12 },
-  perfCard: { width: (SCREEN_WIDTH - 52) / 2, padding: 16, borderRadius: 24, overflow: 'hidden', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 },
-  perfIconBox: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  perfContent: { gap: 2 },
-  perfLabel: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 1 },
-  perfValue: { fontFamily: FONTS.heading, fontSize: 18 },
-  perfSubLabel: { fontFamily: FONTS.body, fontSize: 10 },
-  formContainer: { padding: 20, paddingTop: 0, gap: 20 },
-  section: { borderRadius: 28, padding: 20, borderWidth: 1 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
-  sectionIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  sectionTitle: { fontFamily: FONTS.heading, fontSize: 18 },
-  sectionSub: { fontFamily: FONTS.body, fontSize: 13, marginTop: 2 },
-  summaryList: { gap: 12 },
-  summaryFullCard: { borderRadius: 20, padding: 16, borderWidth: 1 },
-  summaryFullHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  summaryFullImage: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#FFF' },
-  summaryFullName: { fontFamily: FONTS.bodyBold, fontSize: 16 },
-  summaryFullSub: { fontFamily: FONTS.body, fontSize: 12 },
-  summaryFullGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  summaryFullItem: { width: '47%', gap: 2 },
-  summaryFullLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(0,0,0,0.4)', letterSpacing: 0.5 },
-  summaryFullValue: { fontFamily: FONTS.heading, fontSize: 18 },
-  skippedBadge: { backgroundColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  skippedBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 10, color: 'rgba(0,0,0,0.4)' },
-  weightInput: { height: 64, borderRadius: 18, borderWidth: 1, paddingHorizontal: 20, fontFamily: FONTS.heading, fontSize: 24 },
+
+  // ── Stats grid ────────────────────────────────────────────────────────────
+  statsGrid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    paddingHorizontal: 16, paddingTop: 20, gap: 10,
+  },
+  perfCard: {
+    width: (SCREEN_WIDTH - 52) / 2,
+    padding: 16, borderRadius: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+  },
+  perfIconBox: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: 10,
+  },
+  perfLabel: {
+    fontFamily: FONTS.bodyBold, fontSize: 9,
+    color: 'rgba(255,255,255,0.65)', letterSpacing: 1.2,
+    marginBottom: 2,
+  },
+  perfValue: { fontFamily: FONTS.heading, fontSize: 20, color: '#FFF' },
+  perfSub: { fontFamily: FONTS.body, fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
+
+  // ── Form sections ─────────────────────────────────────────────────────────
+  formContainer: { padding: 16, paddingTop: 12, gap: 16 },
+  section: { borderRadius: 24, padding: 18, borderWidth: 1 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  sectionIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  sectionTitle: { fontFamily: FONTS.heading, fontSize: 17 },
+  sectionSub: { fontFamily: FONTS.body, fontSize: 12, marginTop: 2 },
+
+  // ── Movement summary — exercise cards ─────────────────────────────────────
+  summaryList: { gap: 14 },
+
+  exCard: {
+    backgroundColor: '#0F172A',       // deep navy base
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1E3A5F',
+    overflow: 'hidden',
+  },
+
+  exHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+  },
+  exImage: {
+    width: 52, height: 52, borderRadius: 12,
+    backgroundColor: '#1E293B',
+  },
+  exMeta: { flex: 1, paddingTop: 2 },
+  exName: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+    color: '#E2E8F0',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  exSetsSub: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: '#64748B',
+  },
+
+  // PR badges
+  badgeSkipped: {
+    backgroundColor: '#374151',
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  badgeWorld: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  badgePR: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FBBF24',
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  badgeText: {
+    fontFamily: FONTS.bodyBold, fontSize: 9,
+    color: '#FFF', letterSpacing: 0.5,
+  },
+
+  // Record pills row
+  recordRow: {
+    flexDirection: 'row', gap: 8,
+    marginBottom: 12, flexWrap: 'wrap',
+  },
+  recordPill: {
+    flex: 1, minWidth: 90,
+    backgroundColor: '#1E293B',
+    borderRadius: 10,
+    paddingVertical: 8, paddingHorizontal: 10,
+  },
+  recordPillLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 9,
+    color: '#475569',
+    letterSpacing: 0.8,
+    marginBottom: 3,
+  },
+  recordPillVal: {
+    fontFamily: FONTS.heading,
+    fontSize: 13,
+    color: '#94A3B8',
+  },
+
+  // 2×2 stat grid inside exercise card
+  exStatsGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+  },
+  exStatCell: {
+    width: '47%',
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  exStatLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 8,
+    color: '#475569',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  exStatValue: {
+    fontFamily: FONTS.heading,
+    fontSize: 18,
+    color: '#E2E8F0',
+  },
+
+  // ── Body weight — yellow card ─────────────────────────────────────────────
+  weightCard: {
+    borderRadius: 24,
+    padding: 20,
+  },
+  weightCardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 16,
+  },
+  weightIconBox: {
+    width: 42, height: 42, borderRadius: 12,
+    backgroundColor: 'rgba(120,53,15,0.15)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  weightCardTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 17,
+    color: '#78350F',
+    marginBottom: 3,
+  },
+  weightCardSub: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    color: 'rgba(120,53,15,0.75)',
+    lineHeight: 17,
+  },
+  weightInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.45)',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.7)',
+    overflow: 'hidden',
+  },
+  weightInput: {
+    flex: 1,
+    height: 58,
+    paddingHorizontal: 18,
+    fontFamily: FONTS.heading,
+    fontSize: 26,
+    color: '#78350F',
+  },
+  weightUnit: {
+    width: 52,
+    height: 58,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(120,53,15,0.12)',
+  },
+  weightUnitText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 16,
+    color: '#92400E',
+  },
+  weightHint: {
+    marginTop: 10,
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    color: '#92400E',
+    textAlign: 'center',
+  },
+
+  // ── Hydration card ────────────────────────────────────────────────────────
+  hydrationCard: {
+    backgroundColor: '#EFF6FF',   // very light blue, not full-blue
+  },
+  hydrationBadge: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 12,
+  },
+  hydrationBadgeText: {
+    fontFamily: FONTS.heading,
+    fontSize: 16,
+    color: '#FFF',
+  },
+  waterBar: {
+    height: 10,
+    backgroundColor: '#BFDBFE',
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginBottom: 2,
+    position: 'relative',
+  },
+  waterFill: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+    borderRadius: 6,
+  },
+  waterTick: {
+    position: 'absolute',
+    width: 1,
+    height: '100%',
+    backgroundColor: '#EFF6FF',
+    top: 0,
+  },
+
+  // ── Photos ────────────────────────────────────────────────────────────────
   photoList: { gap: 12 },
   photoWrap: { width: 100, height: 130, borderRadius: 16, overflow: 'hidden' },
   photo: { width: '100%', height: '100%' },
-  removeBtn: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(224,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
-  addPhotoBtn: { width: 100, height: 130, borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-  footer: { paddingHorizontal: 20, paddingBottom: 30, gap: 12 },
+  removeBtn: {
+    position: 'absolute', top: 6, right: 6,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(224,0,0,0.8)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  addPhotoBtn: {
+    width: 100, height: 130, borderRadius: 16,
+    borderStyle: 'dashed', borderWidth: 2,
+    justifyContent: 'center', alignItems: 'center',
+  },
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  footer: { paddingHorizontal: 20, gap: 12 },
   saveBtn: { borderRadius: 20, overflow: 'hidden' },
-  saveBtnGradient: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  saveBtnGradient: {
+    height: 64, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center', gap: 12,
+  },
   saveBtnText: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF', letterSpacing: 1 },
   skipLink: { alignItems: 'center', paddingVertical: 10 },
   skipLinkText: { fontFamily: FONTS.body, fontSize: 14, textDecorationLine: 'underline' },
-  streakOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 100, justifyContent: 'center', alignItems: 'center' },
+
+  // ── Streak overlay ────────────────────────────────────────────────────────
+  streakOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    justifyContent: 'center', alignItems: 'center',
+  },
   streakPopup: { alignItems: 'center', gap: 10 },
-  streakPopupTitle: { fontFamily: FONTS.heading, fontSize: 36, color: '#FFF', letterSpacing: 2, marginTop: 20 },
-  streakPopupSub: { fontFamily: FONTS.body, fontSize: 16, color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
+  streakPopupTitle: {
+    fontFamily: FONTS.heading, fontSize: 36,
+    color: '#FFF', letterSpacing: 2, marginTop: 20,
+  },
+  streakPopupSub: {
+    fontFamily: FONTS.body, fontSize: 16,
+    color: 'rgba(255,255,255,0.7)', textAlign: 'center',
+  },
 });

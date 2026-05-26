@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -22,6 +21,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
+import { P } from '../../../constants/homeTheme';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmationModal from '../../../components/ui/ConfirmationModal';
@@ -34,6 +35,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 export default function SessionDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { showToast } = useToast();
   
@@ -124,54 +126,63 @@ export default function SessionDetailScreen() {
 
   const renderExercise = ({ item }: { item: any }) => (
     <TouchableOpacity 
-      style={[styles.exerciseCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      style={styles.exerciseCard}
       activeOpacity={0.8}
       onPress={() => setPreviewEx(item)}
     >
       <View style={styles.exInfo}>
         <Image source={{ uri: item.image_url }} style={styles.exImage} />
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <Text style={[styles.exName, { color: colors.text }]}>{item.name}</Text>
+        <View style={styles.exTextBlock}>
+          <View style={styles.exTopRow}>
+            <Text style={styles.exName}>{item.name}</Text>
             {item.avg_rating !== undefined && item.avg_rating !== null && (
-              <View style={[styles.avgRatingBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+              <View style={styles.avgRatingBadge}>
                 <Ionicons name="star" size={10} color="#F59E0B" />
-                <Text style={[styles.avgRatingText, { color: colors.text }]}>{item.avg_rating}</Text>
+                <Text style={styles.avgRatingText}>{item.avg_rating}</Text>
               </View>
             )}
           </View>
           <Text style={[styles.exMeta, { color: colors.textMuted }]}>{item.target} • {item.equipment}</Text>
         </View>
-        <TouchableOpacity style={styles.removeIcon} onPress={() => handleRemoveExercise(item.id)}>
-          <Ionicons name="close-circle-outline" size={24} color={colors.textDim} />
-        </TouchableOpacity>
       </View>
 
-      <View style={[styles.exControls, { backgroundColor: colors.inputBg }]}>
+      <View style={styles.exControls}>
         <View style={styles.controlItem}>
-          <Text style={[styles.controlLabel, { color: colors.textMuted }]}>SETS</Text>
-          <Text style={[styles.controlValue, { color: colors.text }]}>{item.sets}</Text>
+          <Text style={styles.controlLabel}>SETS</Text>
+          <Text style={styles.controlValue}>{item.sets}</Text>
         </View>
         <View style={styles.vDivider} />
         <View style={styles.controlItem}>
-          <Text style={[styles.controlLabel, { color: colors.textMuted }]}>REPS</Text>
-          <Text style={[styles.controlValue, { color: colors.text }]}>{item.reps}</Text>
+          <Text style={styles.controlLabel}>REPS</Text>
+          <Text style={styles.controlValue}>{item.reps}</Text>
         </View>
         <View style={styles.vDivider} />
         <View style={styles.controlItem}>
-          <Text style={[styles.controlLabel, { color: colors.textMuted }]}>WEIGHT</Text>
-          <Text style={[styles.controlValue, { color: colors.text }]}>{item.weight || 0}kg</Text>
+          <Text style={styles.controlLabel}>WEIGHT</Text>
+          <Text style={styles.controlValue}>{item.weight || 0}kg</Text>
         </View>
         <View style={styles.vDivider} />
         <View style={styles.controlItem}>
-          <Text style={[styles.controlLabel, { color: colors.textMuted }]}>REST</Text>
-          <Text style={[styles.controlValue, { color: colors.text }]}>{item.rest_time}</Text>
+          <Text style={styles.controlLabel}>REST</Text>
+          <Text style={styles.controlValue}>{item.rest_time}</Text>
         </View>
+      </View>
+
+      <View style={styles.actionRow}>
         <TouchableOpacity 
           style={styles.editStatsBtn}
           onPress={() => openEditModal(item)}
         >
-          <Ionicons name="create-outline" size={18} color="#E00000" />
+          <Ionicons name="create-outline" size={18} color={P.ink} />
+          <Text style={styles.editStatsText}>Edit</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.deleteActionBtn}
+          onPress={() => handleRemoveExercise(item.id)}
+        >
+          <Ionicons name="trash-outline" size={18} color="#FFF" />
+          <Text style={styles.deleteActionText}>Delete</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -180,7 +191,7 @@ export default function SessionDetailScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={28} color={colors.text} />
           </TouchableOpacity>
@@ -197,7 +208,10 @@ export default function SessionDetailScreen() {
             data={exercises}
             keyExtractor={(item) => String(item.id)}
             renderItem={renderExercise}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: 112 + Math.max(insets.bottom, 12) }
+            ]}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyState}>
@@ -209,18 +223,23 @@ export default function SessionDetailScreen() {
           />
         )}
 
-        <View style={[styles.bottomBar, { backgroundColor: colors.bg }]}>
+        <View
+          style={[
+            styles.bottomBar,
+            {
+              backgroundColor: colors.bg,
+              paddingBottom: Math.max(insets.bottom, 12) + 12,
+            }
+          ]}
+        >
           <TouchableOpacity 
             style={[styles.addExBtn]}
             onPress={() => router.push({ pathname: `/splits/session/${id}/add-exercises`, params: { sessionId: id } })}
           >
-            <LinearGradient
-              colors={['#E00000', '#B00000']}
-              style={styles.addBtnGradient}
-            >
+            <View style={styles.addBtnGradient}>
               <Ionicons name="add" size={24} color="#FFF" />
               <Text style={styles.addExText}>ADD EXERCISE</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -236,11 +255,11 @@ export default function SessionDetailScreen() {
               behavior={Platform.OS === 'ios' ? 'padding' : undefined}
               style={styles.modalContentWrap}
             >
-              <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Performance</Text>
+                  <Text style={styles.modalTitle}>Edit Performance</Text>
                   <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
-                    <Ionicons name="close" size={24} color={colors.text} />
+                    <Ionicons name="close" size={24} color="#FFF" />
                   </TouchableOpacity>
                 </View>
 
@@ -250,12 +269,14 @@ export default function SessionDetailScreen() {
                     keyboardType="numeric"
                     value={editSets}
                     onChangeText={setEditSets}
+                    tone="light"
                   />
 
                   <Input
                     label="REPS (e.g. 8-12)"
                     value={editReps}
                     onChangeText={setEditReps}
+                    tone="light"
                   />
 
                   <Input
@@ -263,12 +284,14 @@ export default function SessionDetailScreen() {
                     keyboardType="numeric"
                     value={editWeight}
                     onChangeText={setEditWeight}
+                    tone="light"
                   />
 
                   <Input
                     label="REST (e.g. 60s)"
                     value={editRest}
                     onChangeText={setEditRest}
+                    tone="light"
                   />
 
                   <TouchableOpacity 
@@ -276,9 +299,9 @@ export default function SessionDetailScreen() {
                     onPress={handleUpdateStats}
                     disabled={isUpdating}
                   >
-                    <LinearGradient colors={['#E00000', '#B00000']} style={styles.updateBtnGradient}>
+                    <View style={styles.updateBtnGradient}>
                       {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.updateBtnText}>UPDATE STATS</Text>}
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                 </ScrollView>
               </View>
@@ -307,15 +330,28 @@ export default function SessionDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 8 },
   backBtn: { marginLeft: -8 },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 24 },
   headerSub: { fontFamily: FONTS.body, fontSize: 13, marginTop: 2 },
   listContent: { padding: 20, paddingBottom: 100 },
-  exerciseCard: { borderRadius: 20, marginBottom: 16, borderWidth: 1, overflow: 'hidden', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5 },
-  exInfo: { flexDirection: 'row', alignItems: 'center', padding: 16 },
-  exImage: { width: 54, height: 54, borderRadius: 12, backgroundColor: '#F5F5F5', marginRight: 16 },
-  exName: { fontFamily: FONTS.bodyBold, fontSize: 16, marginBottom: 4 },
+  exerciseCard: {
+    borderRadius: 20,
+    marginBottom: 16,
+    borderWidth: 0,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: P.ctaDeep,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    backgroundColor: P.cta,
+  },
+  exInfo: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingBottom: 14 },
+  exImage: { width: 56, height: 56, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)', marginRight: 14 },
+  exTextBlock: { flex: 1, justifyContent: 'center' },
+  exTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap', marginBottom: 4 },
+  exName: { fontFamily: FONTS.bodyBold, fontSize: 16, lineHeight: 20, color: P.sun, flexShrink: 1 },
   avgRatingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -325,22 +361,122 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     marginLeft: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255,255,255,0.18)',
   },
   avgRatingText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 10,
+    color: '#FFF',
   },
-  exMeta: { fontFamily: FONTS.body, fontSize: 12, textTransform: 'capitalize' },
-  removeIcon: { padding: 4 },
-  exControls: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 },
+  exMeta: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    textTransform: 'capitalize',
+    color: P.ink,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  metaPillsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 2 },
+  metaPill: {
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  metaPillText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    color: P.ink,
+    textTransform: 'capitalize',
+  },
+  removeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  exControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
   controlItem: { flex: 1, alignItems: 'center' },
-  controlLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, marginBottom: 2 },
-  controlValue: { fontFamily: FONTS.bodyBold, fontSize: 13 },
-  vDivider: { width: 1, height: 20, backgroundColor: 'rgba(0,0,0,0.08)' },
-  editStatsBtn: { paddingLeft: 12 },
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: Platform.OS === 'ios' ? 34 : 20, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+  controlLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, marginBottom: 3, color: 'rgba(255,255,255,0.68)', letterSpacing: 0.6 },
+  controlValue: { fontFamily: FONTS.bodyBold, fontSize: 13, color: '#FFF' },
+  vDivider: { width: 1, height: 22, backgroundColor: 'rgba(255,255,255,0.14)' },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  editStatsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: P.sun,
+    paddingHorizontal: 14,
+  },
+  editStatsText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+    color: P.ink,
+    letterSpacing: 0.4,
+  },
+  deleteActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 14,
+  },
+  deleteActionText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+    color: '#FFF',
+    letterSpacing: 0.4,
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
   addExBtn: { height: 60, borderRadius: 18, overflow: 'hidden' },
-  addBtnGradient: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  addBtnGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: P.cta,
+  },
   addExText: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF', letterSpacing: 1.2 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 80, paddingHorizontal: 40 },
@@ -351,10 +487,15 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
   modalContentWrap: { width: '100%' },
-  modalContent: { borderRadius: 28, padding: 24, maxHeight: SCREEN_WIDTH * 1.5 },
+  modalContent: {
+    borderRadius: 28,
+    padding: 24,
+    maxHeight: SCREEN_WIDTH * 1.5,
+    backgroundColor: P.cta,
+  },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  modalTitle: { fontFamily: FONTS.heading, fontSize: 24 },
+  modalTitle: { fontFamily: FONTS.heading, fontSize: 24, color: '#FFF' },
   updateBtn: { marginTop: 12, borderRadius: 16, overflow: 'hidden' },
-  updateBtnGradient: { height: 54, justifyContent: 'center', alignItems: 'center' },
-  updateBtnText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: '#FFF', letterSpacing: 1 },
+  updateBtnGradient: { height: 54, justifyContent: 'center', alignItems: 'center', backgroundColor: P.sun },
+  updateBtnText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: P.ink, letterSpacing: 1 },
 });

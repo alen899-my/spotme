@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -17,6 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
+import { P } from '../../../constants/homeTheme';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -25,6 +26,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 export default function SplitSessionsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +74,7 @@ export default function SplitSessionsScreen() {
 
   const renderSession = ({ item }: { item: any }) => (
     <TouchableOpacity 
-      style={[styles.sessionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      style={styles.sessionCard}
       activeOpacity={0.8}
       onPress={() => router.push(`/splits/session/${item.id}`)}
     >
@@ -85,19 +87,19 @@ export default function SplitSessionsScreen() {
           <View style={styles.sessionOverlay} />
         </View>
         <View style={styles.titleArea}>
-          <Text style={[styles.sessionName, { color: colors.text }]}>{item.name}</Text>
-          <Text style={[styles.sessionMeta, { color: colors.textMuted }]}>
-            <Ionicons name="barbell-outline" size={12} color={colors.textDim} /> {item.exercise_count} Exercises
+          <Text style={styles.sessionName}>{item.name}</Text>
+          <Text style={styles.sessionMeta}>
+            <Ionicons name="barbell-outline" size={12} color="#FFF" /> {item.exercise_count} Exercises
           </Text>
         </View>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)}>
-          <Ionicons name="trash-outline" size={18} color={colors.textDim} />
+          <Ionicons name="trash-outline" size={18} color="#FFF" />
         </TouchableOpacity>
       </View>
       
-      <View style={[styles.cardFooter, { backgroundColor: colors.inputBg }]}>
-        <Text style={[styles.actionText, { color: colors.primary || '#E00000' }]}>Manage Routine</Text>
-        <Ionicons name="chevron-forward" size={14} color={colors.primary || '#E00000' } />
+      <View style={styles.cardFooter}>
+        <Text style={styles.actionText}>Manage Routine</Text>
+        <Ionicons name="chevron-forward" size={14} color={P.sun} />
       </View>
     </TouchableOpacity>
   );
@@ -106,7 +108,7 @@ export default function SplitSessionsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={28} color={colors.text} />
           </TouchableOpacity>
@@ -118,9 +120,9 @@ export default function SplitSessionsScreen() {
             style={styles.addBtn}
             onPress={() => router.push({ pathname: `/splits/${id}/create-session` })}
           >
-            <LinearGradient colors={['#E00000', '#B00000']} style={styles.addBtnGradient}>
+            <View style={styles.addBtnGradient}>
               <Ionicons name="add" size={24} color="#FFF" />
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -138,7 +140,7 @@ export default function SplitSessionsScreen() {
               Create your first session (e.g. Push Day, Upper Body) within this program.
             </Text>
             <TouchableOpacity 
-              style={[styles.createNowBtn, { backgroundColor: '#E00000' }]}
+              style={styles.createNowBtn}
               onPress={() => router.push({ pathname: `/splits/${id}/create-session` })}
             >
               <Text style={styles.createNowText}>ADD NEW SESSION</Text>
@@ -149,7 +151,10 @@ export default function SplitSessionsScreen() {
             data={sessions}
             keyExtractor={(item) => String(item.id)}
             renderItem={renderSession}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: 32 + Math.max(insets.bottom, 12) }
+            ]}
             showsVerticalScrollIndicator={false}
           />
         )}
@@ -159,12 +164,12 @@ export default function SplitSessionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
+  container: { flex: 1, paddingHorizontal: 20 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
-    marginTop: 10,
+    marginBottom: 24,
+    paddingBottom: 8,
   },
   backBtn: { marginLeft: -8 },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 26 },
@@ -178,6 +183,7 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: P.cta,
   },
   listContent: { paddingBottom: 40 },
 
@@ -186,11 +192,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 1,
-    elevation: 2,
-    shadowColor: '#000',
+    borderWidth: 0,
+    backgroundColor: P.cta,
+    elevation: 4,
+    shadowColor: P.ctaDeep,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.14,
     shadowRadius: 10,
   },
   cardMain: {
@@ -216,9 +223,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
   titleArea: { flex: 1 },
-  sessionName: { fontFamily: FONTS.bodyBold, fontSize: 17, marginBottom: 4 },
-  sessionMeta: { fontFamily: FONTS.body, fontSize: 12, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  deleteBtn: { padding: 8 },
+  sessionName: { fontFamily: FONTS.bodyBold, fontSize: 17, marginBottom: 4, color: P.sun },
+  sessionMeta: { fontFamily: FONTS.body, fontSize: 12, flexDirection: 'row', alignItems: 'center', gap: 4, color: '#FFF' },
+  deleteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
   
   cardFooter: {
     flexDirection: 'row',
@@ -228,8 +243,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 8,
     marginTop: 4,
+    backgroundColor: P.sun,
   },
-  actionText: { fontFamily: FONTS.bodyBold, fontSize: 12 },
+  actionText: { fontFamily: FONTS.bodyBold, fontSize: 12, color: P.ink },
 
   // States
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
@@ -240,6 +256,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 14,
+    backgroundColor: P.cta,
   },
   createNowText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' },
 });
