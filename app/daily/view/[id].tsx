@@ -174,6 +174,7 @@ export default function WorkoutViewScreen() {
     if (!data) return null;
     const stats = [
       { label: 'DURATION', val: formatTime(data.total_duration_seconds || 0), icon: 'time', color: P.cta, sub: 'Total active time' },
+      { label: 'CALORIES', val: `${Number(data.calories_burned || 0)} kcal`, icon: 'flame', color: '#EF4444', sub: 'Est. calories burned' },
       { label: 'VOLUME', val: `${Math.round(data.total_volume || 0)}kg`, icon: 'barbell', color: '#10B981', sub: 'Total weight lifted' },
       { label: 'REST TIME', val: formatTime(data.total_rest_seconds || 0), icon: 'hourglass', color: '#F59E0B', sub: 'Recovery between sets' },
       { label: 'SETS', val: `${data.total_sets || calculatedTotalSets || 0}`, icon: 'layers', color: '#8B5CF6', sub: 'Total sets completed' },

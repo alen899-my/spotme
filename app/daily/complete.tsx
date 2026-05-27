@@ -22,8 +22,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
-// Hero gradient: deep green → teal-green
-const HERO_GRADIENT: [string, string] = ['#1DB954', '#0A8F4C'];
+// Hero gradient: vibrant blue → deep blue
+const HERO_GRADIENT: [string, string] = ['#2596BE', '#1a6e8a'];
 
 // Six stat cards — distinct shades that all live in a blue-teal family
 const STAT_COLORS = [
@@ -601,11 +601,11 @@ const styles = StyleSheet.create({
   summaryList: { gap: 14 },
 
   exCard: {
-    backgroundColor: '#0F172A',       // deep navy base
+    backgroundColor: P.cta,           // vibrant blue base
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#1E3A5F',
+    borderColor: P.ctaDark,
     overflow: 'hidden',
   },
 
@@ -617,20 +617,20 @@ const styles = StyleSheet.create({
   },
   exImage: {
     width: 52, height: 52, borderRadius: 12,
-    backgroundColor: '#1E293B',
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   exMeta: { flex: 1, paddingTop: 2 },
   exName: {
     fontFamily: FONTS.bodyBold,
     fontSize: 15,
-    color: '#E2E8F0',
+    color: P.sun,
     lineHeight: 20,
     marginBottom: 4,
   },
   exSetsSub: {
     fontFamily: FONTS.body,
     fontSize: 12,
-    color: '#64748B',
+    color: 'rgba(255,255,255,0.78)',
   },
 
   // PR badges
@@ -663,21 +663,21 @@ const styles = StyleSheet.create({
   },
   recordPill: {
     flex: 1, minWidth: 90,
-    backgroundColor: '#1E293B',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 10,
     paddingVertical: 8, paddingHorizontal: 10,
   },
   recordPillLabel: {
     fontFamily: FONTS.bodyBold,
     fontSize: 9,
-    color: '#475569',
+    color: 'rgba(255,255,255,0.72)',
     letterSpacing: 0.8,
     marginBottom: 3,
   },
   recordPillVal: {
     fontFamily: FONTS.heading,
     fontSize: 13,
-    color: '#94A3B8',
+    color: '#FFF',
   },
 
   // 2×2 stat grid inside exercise card
@@ -686,7 +686,7 @@ const styles = StyleSheet.create({
   },
   exStatCell: {
     width: '47%',
-    backgroundColor: '#1E293B',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -694,14 +694,14 @@ const styles = StyleSheet.create({
   exStatLabel: {
     fontFamily: FONTS.bodyBold,
     fontSize: 8,
-    color: '#475569',
+    color: 'rgba(255,255,255,0.72)',
     letterSpacing: 0.8,
     marginBottom: 4,
   },
   exStatValue: {
     fontFamily: FONTS.heading,
     fontSize: 18,
-    color: '#E2E8F0',
+    color: '#FFF',
   },
 
   // ── Body weight — yellow card ─────────────────────────────────────────────
