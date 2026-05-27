@@ -104,4 +104,55 @@ router.put('/update', authenticateToken, upload.fields([
   }
 });
 
+// GET PUBLIC PROFILE BY ID (with recent workouts)
+router.get('/:id', authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id);
+    if (isNaN(targetId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const userQuery = await pool.query(`
+      SELECT id, full_name, profile_pic_url, gender, age, height, weight, 
+             total_xp AS xp, league_tier, current_streak, last_workout_date, 
+             fitness_goal, experience_level
+      FROM users 
+      WHERE id = $1
+    `, [targetId]);
+
+    if (userQuery.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const user = userQuery.rows[0];
+
+    // Fetch user's recent workouts
+    const workoutsQuery = await pool.query(`
+      SELECT dw.*,
+        ws.name AS split_name,
+        wsess.name AS session_name,
+        (SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = dw.id) AS exercise_count,
+        (SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = dw.id AND is_completed = true) AS completed_count,
+        (SELECT COUNT(*) FROM daily_workout_sets dws 
+         JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id 
+         WHERE dwe.daily_workout_id = dw.id AND dws.is_skipped = false) AS total_sets,
+        (SELECT photo_url FROM daily_workout_photos WHERE daily_workout_id = dw.id ORDER BY created_at ASC LIMIT 1) AS cover_photo_url
+      FROM daily_workouts dw
+      LEFT JOIN workout_splits ws ON dw.split_id = ws.id
+      LEFT JOIN workout_sessions wsess ON dw.session_id = wsess.id
+      WHERE dw.user_id = $1 AND dw.status = 'completed'
+      ORDER BY dw.started_at DESC
+      LIMIT 10
+    `, [targetId]);
+
+    res.json({
+      user,
+      workouts: workoutsQuery.rows
+    });
+  } catch (error) {
+    console.error("GET /profile/:id error:", error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
