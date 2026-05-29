@@ -27,7 +27,7 @@ export default function SplitSessionsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -74,7 +74,14 @@ export default function SplitSessionsScreen() {
 
   const renderSession = ({ item }: { item: any }) => (
     <TouchableOpacity 
-      style={styles.sessionCard}
+      style={[
+        styles.sessionCard, 
+        { 
+          backgroundColor: isDark ? colors.card : P.cta, 
+          borderColor: isDark ? colors.border : P.cta, 
+          borderWidth: isDark ? 1 : 0 
+        }
+      ]}
       activeOpacity={0.8}
       onPress={() => router.push(`/splits/session/${item.id}`)}
     >
@@ -88,8 +95,8 @@ export default function SplitSessionsScreen() {
         </View>
         <View style={styles.titleArea}>
           <Text style={styles.sessionName}>{item.name}</Text>
-          <Text style={styles.sessionMeta}>
-            <Ionicons name="barbell-outline" size={12} color="#FFF" /> {item.exercise_count} Exercises
+          <Text style={[styles.sessionMeta, { color: isDark ? colors.textMuted : '#FFF' }]}>
+            <Ionicons name="barbell-outline" size={12} color={isDark ? colors.textMuted : '#FFF'} /> {item.exercise_count} Exercises
           </Text>
         </View>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)}>
@@ -128,7 +135,7 @@ export default function SplitSessionsScreen() {
 
         {loading ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#E00000" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : sessions.length === 0 ? (
           <View style={styles.centered}>

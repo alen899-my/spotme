@@ -23,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PADDING = 16;
@@ -109,6 +110,7 @@ const SkeletonCard = ({ tall = true }: { tall?: boolean }) => (
 );
 
 const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => void }) => {
+  const { colors, isDark } = useTheme();
   const [imgError, setImgError] = useState(false);
   const theme = accentFor(item.category);
   const label = formatLabel(item.category);
@@ -117,11 +119,20 @@ const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => 
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={onPress}
-      style={[styles.card, styles.categoryCard, { width: CARD_WIDTH, height: CARD_HEIGHT }]}
+      style={[
+        styles.card,
+        styles.categoryCard,
+        {
+          width: CARD_WIDTH,
+          height: CARD_HEIGHT,
+          borderWidth: isDark ? 1 : 0,
+          borderColor: isDark ? colors.border : 'transparent',
+        },
+      ]}
     >
       <View style={styles.cardMedia}>
         <LinearGradient
-          colors={[P.offWhite, P.ctaLight]}
+          colors={isDark ? ['#0D0D0D', '#050505'] : [P.offWhite, P.ctaLight]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
@@ -137,15 +148,15 @@ const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => 
               onError={() => setImgError(true)}
             />
           ) : (
-            <Ionicons name="fitness-outline" size={64} color={P.cta} />
+            <Ionicons name="fitness-outline" size={64} color={isDark ? colors.primary : P.cta} />
           )}
         </View>
       </View>
 
-      <View style={styles.cardFooter}>
+      <View style={[styles.cardFooter, { backgroundColor: isDark ? colors.card : P.ctaDeep }]}>
         <Text style={styles.cardLabel}>{label}</Text>
         <View style={styles.cardInfoRow}>
-          <Text style={styles.cardCountText}>{item.exercise_count || 0} exercises</Text>
+          <Text style={[styles.cardCountText, { color: isDark ? colors.textMuted : P.sunLight }]}>{item.exercise_count || 0} exercises</Text>
           <View style={styles.categoryArrow}>
             <Ionicons name="arrow-forward" size={14} color={P.ink} />
           </View>
@@ -156,6 +167,7 @@ const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => 
 });
 
 const ExerciseCard = React.memo(({ item }: { item: any }) => {
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [imgError, setImgError] = useState(false);
   const theme = accentFor(item.category);
@@ -169,34 +181,42 @@ const ExerciseCard = React.memo(({ item }: { item: any }) => {
     <TouchableOpacity
       activeOpacity={0.86}
       onPress={() => router.push(`/exercises/${item.id}`)}
-      style={[styles.card, styles.exerciseTryCard]}
+      style={[
+        styles.card,
+        styles.exerciseTryCard,
+        {
+          backgroundColor: isDark ? colors.card : P.cta,
+          borderWidth: isDark ? 1 : 0,
+          borderColor: isDark ? colors.border : 'transparent',
+        },
+      ]}
     >
       <View style={styles.exercisePillRow}>
         {item.category ? (
-          <View style={styles.exerciseScorePill}>
+          <View style={[styles.exerciseScorePill, { backgroundColor: isDark ? colors.inputBg : P.ctaDark, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}>
             <Ionicons name="fitness-outline" size={11} color={P.sun} />
-            <Text style={styles.exerciseScorePillText}>{formatLabel(item.category)}</Text>
+            <Text style={[styles.exerciseScorePillText, { color: isDark ? colors.primary : '#D6EEF7' }]}>{formatLabel(item.category)}</Text>
           </View>
         ) : (
           <View />
         )}
 
         {item.avg_rating !== undefined && item.avg_rating !== null && (
-          <View style={styles.exerciseRatingPill}>
+          <View style={[styles.exerciseRatingPill, { backgroundColor: isDark ? colors.inputBg : P.sun, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}>
             <Ionicons name="star" size={11} color={P.ink} />
-            <Text style={styles.exerciseRatingPillText}>{item.avg_rating}</Text>
+            <Text style={[styles.exerciseRatingPillText, { color: isDark ? colors.text : P.ink }]}>{item.avg_rating}</Text>
           </View>
         )}
       </View>
 
       <View style={styles.exerciseBodyRow}>
         <View style={styles.exerciseTextBlock}>
-          <Text style={styles.exName} numberOfLines={2}>
+          <Text style={[styles.exName, { color: isDark ? colors.text : P.white }]} numberOfLines={2}>
             {item.name}
           </Text>
 
           {description ? (
-            <Text style={styles.exerciseDescription} numberOfLines={2}>
+            <Text style={[styles.exerciseDescription, { color: isDark ? colors.textMuted : '#D6EEF7' }]} numberOfLines={2}>
               {description}
             </Text>
           ) : null}
@@ -204,8 +224,8 @@ const ExerciseCard = React.memo(({ item }: { item: any }) => {
           {tagItems.length > 0 ? (
             <View style={styles.exerciseTagsRow}>
               {tagItems.map((tag) => (
-                <View key={`${item.id}-${tag}`} style={styles.exerciseTag}>
-                  <Text style={styles.exerciseTagText}>{tag}</Text>
+                <View key={`${item.id}-${tag}`} style={[styles.exerciseTag, { backgroundColor: isDark ? colors.inputBg : P.ctaDark, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}>
+                  <Text style={[styles.exerciseTagText, { color: isDark ? colors.primary : '#D6EEF7' }]}>{tag}</Text>
                 </View>
               ))}
             </View>
@@ -222,7 +242,7 @@ const ExerciseCard = React.memo(({ item }: { item: any }) => {
         {!imageUri || imgError ? (
           <View style={[styles.exerciseThumb, styles.exerciseThumbPlaceholder]}>
             <LinearGradient
-              colors={[P.ctaDark, P.ctaDeep]}
+              colors={isDark ? [colors.card, '#050505'] : [P.ctaDark, P.ctaDeep]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFillObject}
@@ -238,6 +258,7 @@ const ExerciseCard = React.memo(({ item }: { item: any }) => {
 
 export default function ExercisesScreen() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const [viewMode, setViewMode] = useState<'categories' | 'exercises'>('categories');
   const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
 
@@ -427,19 +448,28 @@ export default function ExercisesScreen() {
     <View style={styles.bodySection}>
       <View style={styles.bodySectionHeader}>
         <View>
-          <Text style={styles.bodySectionTitle}>Browse by body area</Text>
-          <Text style={styles.bodySectionSub}>Tap a muscle, see the mapped category, then jump into exercises.</Text>
+          <Text style={[styles.bodySectionTitle, { color: colors.text }]}>Browse by body area</Text>
+          <Text style={[styles.bodySectionSub, { color: colors.textMuted }]}>Tap a muscle, see the mapped category, then jump into exercises.</Text>
         </View>
 
-        <View style={styles.toggleTrack}>
+        <View style={[styles.toggleTrack, { backgroundColor: isDark ? '#1A1A1A' : P.ctaDeep }]}>
           {(['front', 'back'] as const).map((side) => (
             <TouchableOpacity
               key={side}
               onPress={() => setBodySide(side)}
-              style={[styles.toggleBtn, bodySide === side && styles.toggleBtnActive]}
+              style={[
+                styles.toggleBtn,
+                bodySide === side && { backgroundColor: isDark ? colors.primary : P.sun },
+              ]}
               activeOpacity={0.85}
             >
-              <Text style={[styles.toggleTxt, bodySide === side && styles.toggleTxtActive]}>
+              <Text
+                style={[
+                  styles.toggleTxt,
+                  { color: isDark ? colors.textMuted : '#A8DFF0' },
+                  bodySide === side && { color: isDark ? '#FFFFFF' : P.ink },
+                ]}
+              >
                 {side.charAt(0).toUpperCase() + side.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -455,14 +485,14 @@ export default function ExercisesScreen() {
             side={bodySide}
             scale={1.15}
             colors={['#F7CB1644', '#F7CB16AA', '#F7CB16']}
-            defaultFill={'#1a3a45'}
-            defaultStroke={'rgba(255,255,255,0.2)'}
+            defaultFill={isDark ? '#222222' : '#1a3a45'}
+            defaultStroke={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.2)'}
             defaultStrokeWidth={0.5}
             onBodyPartPress={handleBodyPartPress}
           />
         </View>
 
-        <Text style={styles.bodyHint}>
+        <Text style={[styles.bodyHint, { color: colors.textMuted }]}>
           Selected muscles glow yellow. Tap again on another area to open the linked exercise category.
         </Text>
       </View>
@@ -496,14 +526,14 @@ export default function ExercisesScreen() {
         </View>
       </ImageBackground>
 
-      <View style={styles.searchWrap}>
-        <View style={styles.searchIconWrap}>
+      <View style={[styles.searchWrap, { backgroundColor: isDark ? '#1A1A1A' : P.white, borderColor: isDark ? 'rgba(255,255,255,0.08)' : P.border }]}>
+        <View style={[styles.searchIconWrap, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : P.ctaLight }]}>
           <Ionicons name="search-outline" size={16} color={P.ctaDark} />
         </View>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: isDark ? '#F1F5F9' : P.ink }]}
           placeholder="Search exercises..."
-          placeholderTextColor={P.muted}
+          placeholderTextColor={isDark ? 'rgba(241,245,249,0.4)' : P.muted}
           value={query}
           onChangeText={handleQueryChange}
           returnKeyType="search"
@@ -522,12 +552,12 @@ export default function ExercisesScreen() {
     <View style={styles.sectionContent}>
       {catError ? (
         <View style={styles.centeredMsg}>
-          <View style={styles.messageIconWrap}>
-            <Ionicons name="cloud-offline-outline" size={30} color={P.ctaDark} />
+          <View style={[styles.messageIconWrap, { backgroundColor: isDark ? colors.inputBg : P.sunLight, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.16)' }]}>
+            <Ionicons name="cloud-offline-outline" size={30} color={isDark ? colors.primary : P.ctaDark} />
           </View>
-          <Text style={styles.msgTitle}>Could not load categories</Text>
-          <Text style={styles.msgText}>Please try again and we will pull the exercise library back in.</Text>
-          <TouchableOpacity onPress={fetchCategories} style={styles.retryBtn}>
+          <Text style={[styles.msgTitle, { color: isDark ? colors.text : P.ink }]}>Could not load categories</Text>
+          <Text style={[styles.msgText, { color: isDark ? colors.textMuted : P.muted }]}>Please try again and we will pull the exercise library back in.</Text>
+          <TouchableOpacity onPress={fetchCategories} style={[styles.retryBtn, { backgroundColor: isDark ? colors.primary : P.cta }]}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -541,16 +571,16 @@ export default function ExercisesScreen() {
     <View style={styles.sectionContent}>
       {searching ? (
         <View style={styles.centeredMsg}>
-          <ActivityIndicator size="large" color={P.cta} />
-          <Text style={styles.msgText}>Loading exercises...</Text>
+          <ActivityIndicator size="large" color={isDark ? colors.primary : P.cta} />
+          <Text style={[styles.msgText, { color: isDark ? colors.textMuted : P.muted }]}>Loading exercises...</Text>
         </View>
       ) : (
         <View style={styles.centeredMsg}>
-          <View style={styles.messageIconWrap}>
-            <Ionicons name="search-outline" size={30} color={P.ctaDark} />
+          <View style={[styles.messageIconWrap, { backgroundColor: isDark ? colors.inputBg : P.sunLight, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.16)' }]}>
+            <Ionicons name="search-outline" size={30} color={isDark ? colors.primary : P.ctaDark} />
           </View>
-          <Text style={styles.msgTitle}>No exercises found</Text>
-          <Text style={styles.msgText}>Try a different keyword or browse one of the blue library cards.</Text>
+          <Text style={[styles.msgTitle, { color: isDark ? colors.text : P.ink }]}>No exercises found</Text>
+          <Text style={[styles.msgText, { color: isDark ? colors.textMuted : P.muted }]}>Try a different keyword or browse one of the blue library cards.</Text>
         </View>
       )}
     </View>
@@ -571,7 +601,7 @@ export default function ExercisesScreen() {
           : 'Loading your library';
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       {!inSearchMode && viewMode === 'categories' && (
         <FlatList
           data={[] as number[]}
@@ -622,21 +652,36 @@ export default function ExercisesScreen() {
             style={StyleSheet.absoluteFillObject}
           />
 
-          <View style={styles.modalCard}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>{selectedRegion?.label || 'Muscle Group'}</Text>
-            <Text style={styles.modalSub}>Choose a mapped category to open its exercises.</Text>
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: isDark ? colors.card : P.white,
+                borderWidth: isDark ? 1 : 0,
+                borderColor: isDark ? colors.border : 'transparent',
+              },
+            ]}
+          >
+            <View style={[styles.modalHandle, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)' }]} />
+            <Text style={[styles.modalTitle, { color: isDark ? colors.text : P.ink }]}>{selectedRegion?.label || 'Muscle Group'}</Text>
+            <Text style={[styles.modalSub, { color: isDark ? colors.textMuted : P.muted }]}>Choose a mapped category to open its exercises.</Text>
 
             {modalCategories.map((item) => (
               <TouchableOpacity
                 key={item.key}
-                style={styles.modalCategoryBtn}
+                style={[
+                  styles.modalCategoryBtn,
+                  {
+                    backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)',
+                    borderColor: isDark ? colors.border : 'rgba(255,255,255,0.16)',
+                  },
+                ]}
                 activeOpacity={0.86}
                 onPress={() => handleCategoryPress(item.key)}
               >
                 <View>
-                  <Text style={styles.modalCategoryTitle}>{item.label}</Text>
-                  <Text style={styles.modalCategoryCount}>
+                  <Text style={[styles.modalCategoryTitle, { color: isDark ? colors.text : P.white }]}>{item.label}</Text>
+                  <Text style={[styles.modalCategoryCount, { color: isDark ? colors.textMuted : P.sunLight }]}>
                     {item.count !== null ? `${item.count} exercises` : 'Open category'}
                   </Text>
                 </View>
@@ -655,7 +700,6 @@ export default function ExercisesScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: P.offWhite,
   },
 
   hero: {
@@ -801,9 +845,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 52,
     borderRadius: 18,
-    backgroundColor: P.white,
     borderWidth: 1,
-    borderColor: P.border,
     gap: 10,
     shadowColor: P.ctaDeep,
     shadowOffset: { width: 0, height: 8 },

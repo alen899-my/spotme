@@ -319,7 +319,7 @@ export default function LeaderboardScreen() {
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
       {/* Background */}
       <LinearGradient
-        colors={isDark ? ['#060D14', '#0A1624', '#060D14'] : ['#EBF3FB', '#F5F9FC', '#EBF3FB']}
+        colors={isDark ? ['#000000', '#000000'] : ['#EBF3FB', '#F5F9FC', '#EBF3FB']}
         style={StyleSheet.absoluteFill}
       />
 
@@ -348,8 +348,8 @@ export default function LeaderboardScreen() {
               <Animated.View style={[
                 styles.heroCard,
                 {
-                  backgroundColor: isDark ? 'rgba(37,150,190,0.1)' : '#FFF',
-                  borderColor: isDark ? 'rgba(37,150,190,0.35)' : 'rgba(37,150,190,0.2)',
+                  backgroundColor: isDark ? colors.card : '#FFF',
+                  borderColor: isDark ? colors.border : 'rgba(37,150,190,0.2)',
                   opacity: headerAnim,
                   transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
                 }

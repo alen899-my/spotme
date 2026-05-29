@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -33,6 +34,7 @@ const formatLabel = (value?: string | null) =>
     : 'N/A';
 
 export default function ExerciseDetailScreen() {
+  const { colors, isDark } = useTheme();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -85,18 +87,18 @@ export default function ExerciseDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={P.cta} />
+      <View style={[styles.centered, { backgroundColor: isDark ? colors.bg : P.offWhite }]}>
+        <ActivityIndicator size="large" color={isDark ? colors.primary : P.cta} />
       </View>
     );
   }
 
   if (error || !exercise) {
     return (
-      <View style={styles.centered}>
-        <Ionicons name="alert-circle-outline" size={48} color={P.muted} />
-        <Text style={styles.errorText}>Exercise not found</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backActionBtn} activeOpacity={0.88}>
+      <View style={[styles.centered, { backgroundColor: isDark ? colors.bg : P.offWhite }]}>
+        <Ionicons name="alert-circle-outline" size={48} color={isDark ? colors.textMuted : P.muted} />
+        <Text style={[styles.errorText, { color: isDark ? colors.text : P.ink }]}>Exercise not found</Text>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backActionBtn, { backgroundColor: isDark ? colors.primary : P.cta }]} activeOpacity={0.88}>
           <Text style={styles.backActionBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -104,14 +106,14 @@ export default function ExerciseDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: isDark ? colors.bg : P.offWhite }]}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 28 }}
       >
-        <View style={[styles.hero, { height: headerHeight, paddingTop: topOffset }]}>
+        <View style={[styles.hero, { height: headerHeight, paddingTop: topOffset, backgroundColor: isDark ? colors.card : P.cta, borderBottomWidth: isDark ? 1 : 0, borderBottomColor: isDark ? colors.border : 'transparent' }]}>
           <View style={[styles.heroInner, { width: shellWidth }]}>
             <TouchableOpacity
               style={styles.backLink}
@@ -163,7 +165,7 @@ export default function ExerciseDetailScreen() {
 
         <View style={[styles.contentWrap, { width: shellWidth }]}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Muscle Groups</Text>
+            <Text style={[styles.sectionTitle, { color: isDark ? colors.text : P.ink }]}>Muscle Groups</Text>
             <View style={styles.grid}>
               {muscleRows.map((row, rowIndex) => (
                 <View key={`row-${rowIndex}`} style={styles.gridRow}>
@@ -172,14 +174,18 @@ export default function ExerciseDetailScreen() {
                       key={card.key}
                       style={[
                         styles.gridCard,
-                        card.tone === 'blue' ? styles.gridCardBlue : styles.gridCardYellow,
-                        { width: row.length === 1 ? shellWidth : gridCardWidth },
+                        {
+                          width: row.length === 1 ? shellWidth : gridCardWidth,
+                          backgroundColor: isDark ? colors.card : (card.tone === 'blue' ? P.cta : P.sun),
+                          borderWidth: isDark ? 1 : 0,
+                          borderColor: isDark ? (card.tone === 'blue' ? 'rgba(37,150,190,0.18)' : 'rgba(231,177,0,0.22)') : 'transparent',
+                        },
                       ]}
                     >
-                      <Text style={[styles.gridLabel, card.tone === 'blue' ? styles.gridLabelBlue : styles.gridLabelYellow]}>
+                      <Text style={[styles.gridLabel, { color: isDark ? (card.tone === 'blue' ? colors.primary : '#F7CB16') : (card.tone === 'blue' ? '#D6EEF7' : '#7A5B00') }]}>
                         {card.label}
                       </Text>
-                      <Text style={[styles.gridValue, card.tone === 'blue' ? styles.gridValueBlue : styles.gridValueYellow]}>
+                      <Text style={[styles.gridValue, { color: isDark ? colors.text : (card.tone === 'blue' ? P.white : P.ink) }]}>
                         {card.value}
                       </Text>
                     </View>
@@ -191,22 +197,22 @@ export default function ExerciseDetailScreen() {
 
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Instructions</Text>
-              <Text style={styles.stepCount}>{steps.length || 1} steps</Text>
+              <Text style={[styles.sectionTitle, { color: isDark ? colors.text : P.ink, marginBottom: 0 }]}>Instructions</Text>
+              <Text style={[styles.stepCount, { color: isDark ? colors.primary : P.ctaDeep }]}>{steps.length || 1} steps</Text>
             </View>
 
-            <View style={styles.instructionsCard}>
+            <View style={[styles.instructionsCard, { backgroundColor: isDark ? colors.card : P.cta, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}>
               {steps.length > 0 ? (
                 steps.map((step: string, index: number) => (
                   <View key={`${step}-${index}`} style={[styles.stepRow, index === steps.length - 1 && styles.lastStepRow]}>
                     <View style={styles.stepNumber}>
-                      <Text style={styles.stepNumberText}>{index + 1}</Text>
+                      <Text style={[styles.stepNumberText, { color: isDark ? P.ink : P.ctaDeep }]}>{index + 1}</Text>
                     </View>
-                    <Text style={styles.stepText}>{step}</Text>
+                    <Text style={[styles.stepText, { color: isDark ? colors.textMuted : P.white }]}>{step}</Text>
                   </View>
                 ))
               ) : (
-                <Text style={styles.stepText}>
+                <Text style={[styles.stepText, { color: isDark ? colors.textMuted : P.white }]}>
                   {exercise.instructions_en || 'Position yourself correctly and perform the movement with controlled form.'}
                 </Text>
               )}

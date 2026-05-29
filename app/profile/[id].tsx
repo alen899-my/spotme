@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Image, ActivityIndicator,
-  Dimensions, SafeAreaView,
+  Dimensions,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -68,6 +69,7 @@ export default function PublicProfileScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [workouts, setWorkouts] = useState<any[]>([]);
@@ -93,7 +95,7 @@ export default function PublicProfileScreen() {
   if (loading) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.bg }]}>
-        <ActivityIndicator size="large" color={P.cta} />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[styles.loadingText, { color: P.muted }]}>Loading athlete…</Text>
       </View>
     );
@@ -104,7 +106,7 @@ export default function PublicProfileScreen() {
       <View style={[styles.centered, { backgroundColor: colors.bg }]}>
         <MaterialCommunityIcons name="account-off-outline" size={72} color={P.border} />
         <Text style={[styles.emptyTitle, { color: colors.text }]}>Athlete not found</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backPill}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backPill, isDark && { backgroundColor: colors.primary }]}>
           <Ionicons name="chevron-back" size={16} color="#FFF" />
           <Text style={styles.backPillText}>Go Back</Text>
         </TouchableOpacity>
@@ -117,26 +119,38 @@ export default function PublicProfileScreen() {
   const isDarkText = ['Silver','Gold','Diamond','Legend'].includes(user.league_tier ?? '');
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.bg }]}>
+    <View style={[styles.root, { backgroundColor: colors.bg }]}>
+      <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── HEADER ── */}
-      <LinearGradient colors={[P.ctaDeep, P.ctaDark]} style={styles.header}>
+      <View style={[
+        styles.header, 
+        { 
+          backgroundColor: isDark ? colors.bg : colors.primary, 
+          paddingTop: Math.max(insets.top, 12),
+          borderBottomWidth: isDark ? 1 : 0,
+          borderBottomColor: colors.border,
+        }
+      ]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
-          <Ionicons name="chevron-back" size={22} color={P.sun} />
-          <Text style={styles.headerBackText}>Back</Text>
+          <Ionicons name="chevron-back" size={24} color={isDark ? colors.primary : '#FFF'} />
+          <Text style={[styles.headerBackText, { color: isDark ? colors.primary : '#FFF' }]}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>ATHLETE PROFILE</Text>
-        <View style={{ width: 72 }} />
-      </LinearGradient>
-      <View style={styles.headerAccentLine} />
+        <Text style={[styles.headerTitle, { color: isDark ? colors.text : '#FFF' }]}>ATHLETE PROFILE</Text>
+        <View style={styles.headerRightPlaceholder} />
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── HERO CARD (matches daily card style) ── */}
-        <TouchableOpacity activeOpacity={1} style={styles.heroCardWrap}>
-          <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.heroCard}>
+        {/* ── HERO CARD ── */}
+        <TouchableOpacity activeOpacity={1} style={[styles.heroCardWrap, { borderColor: isDark ? colors.border : 'rgba(37,150,190,0.2)' }]}>
+          <LinearGradient
+            colors={isDark ? ['#0D0D0D', '#050505'] : ['#2596BE', '#0d4d65']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.heroCard}
+          >
             <View style={styles.heroRow}>
               {/* Avatar */}
               <View style={styles.heroAvatarWrap}>
@@ -144,9 +158,9 @@ export default function PublicProfileScreen() {
                   {user.profile_pic_url ? (
                     <Image source={{ uri: user.profile_pic_url }} style={styles.avatarImg} />
                   ) : (
-                    <LinearGradient colors={[P.ctaDark, P.ctaDeep]} style={styles.avatarPlaceholder}>
-                      <Ionicons name="person" size={36} color={P.sun} />
-                    </LinearGradient>
+                    <View style={[styles.avatarPlaceholder, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                      <Ionicons name="person" size={36} color="#FFF" />
+                    </View>
                   )}
                 </View>
                 {/* Tier badge */}
@@ -163,41 +177,41 @@ export default function PublicProfileScreen() {
 
               {/* Name + tier */}
               <View style={styles.heroInfo}>
-                <Text style={styles.heroName} numberOfLines={1}>{user.full_name ?? 'Athlete'}</Text>
+                <Text style={[styles.heroName, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1}>{user.full_name ?? 'Athlete'}</Text>
                 <Text style={[styles.heroTier, { color: tier.color }]}>
                   {(user.league_tier ?? 'Bronze').toUpperCase()} LEAGUE
                 </Text>
                 {user.fitness_goal ? (
-                  <View style={styles.goalBadge}>
-                    <Ionicons name="flag-outline" size={10} color={P.sun} />
-                    <Text style={styles.goalText} numberOfLines={1}>{user.fitness_goal}</Text>
+                  <View style={[styles.goalBadge, { backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(255, 255, 255, 0.15)' }]}>
+                    <Ionicons name="flag-outline" size={10} color={isDark ? colors.primary : '#FFF'} />
+                    <Text style={[styles.goalText, { color: isDark ? colors.primary : '#FFF' }]} numberOfLines={1}>{user.fitness_goal}</Text>
                   </View>
                 ) : null}
               </View>
 
               {/* XP block */}
               <View style={styles.heroXPBlock}>
-                <Text style={[styles.heroXPVal, { color: P.sun }]}>
+                <Text style={[styles.heroXPVal, { color: isDark ? colors.text : '#FFF' }]}>
                   {(user.xp ?? 0) >= 1000
                     ? `${((user.xp ?? 0) / 1000).toFixed(1)}k`
                     : String(user.xp ?? 0)}
                 </Text>
-                <Text style={styles.heroXPLabel}>XP</Text>
+                <Text style={[styles.heroXPLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.7)' }]}>XP</Text>
               </View>
             </View>
 
             {/* XP Progress bar */}
             <View style={styles.xpBarArea}>
               <View style={styles.xpBarLabels}>
-                <Text style={styles.xpBarTierText}>{user.league_tier}</Text>
-                <Text style={styles.xpBarNextText}>
+                <Text style={[styles.xpBarTierText, { color: tier.color }]}>{user.league_tier}</Text>
+                <Text style={[styles.xpBarNextText, { color: isDark ? colors.textMuted : 'rgba(255, 255, 255, 0.8)' }]}>
                   {xpInfo.xpToNext.toLocaleString()} XP to {xpInfo.nextTier}
                 </Text>
-                <Text style={styles.xpBarTierText}>{xpInfo.nextTier}</Text>
+                <Text style={[styles.xpBarTierText, { color: isDark ? colors.textMuted : 'rgba(255, 255, 255, 0.7)' }]}>{xpInfo.nextTier}</Text>
               </View>
-              <View style={styles.xpBarTrack}>
+              <View style={[styles.xpBarTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255, 255, 255, 0.2)' }]}>
                 <LinearGradient
-                  colors={[P.sun, P.sunDeep]}
+                  colors={tier.gradient}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={[styles.xpBarFill, { width: `${Math.round(xpInfo.progress * 100)}%` }]}
                 />
@@ -209,42 +223,42 @@ export default function PublicProfileScreen() {
         {/* ── STATS ROW ── */}
         <View style={styles.statsRow}>
           {/* Streak */}
-          <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
             <View style={styles.statIconRow}>
-              <Ionicons name="flame" size={18} color={P.sun} />
-              <Text style={styles.statCardLabel}>STREAK</Text>
+              <Ionicons name="flame" size={18} color="#FF9F43" />
+              <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>STREAK</Text>
             </View>
-            <Text style={[styles.statCardValue, { color: P.sun }]}>
+            <Text style={[styles.statCardValue, { color: colors.text }]}>
               {user.current_streak || 0}
             </Text>
-            <Text style={styles.statCardUnit}>days</Text>
-            <View style={styles.statCardDivider} />
-            <Text style={styles.statCardFooter}>
+            <Text style={[styles.statCardUnit, { color: colors.textDim }]}>days</Text>
+            <View style={[styles.statCardDivider, { backgroundColor: colors.border }]} />
+            <Text style={[styles.statCardFooter, { color: colors.textMuted }]}>
               Last active: {formatDate(user.last_workout_date)}
             </Text>
-          </LinearGradient>
+          </View>
 
           {/* Workouts logged */}
-          <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
             <View style={styles.statIconRow}>
-              <MaterialCommunityIcons name="dumbbell" size={18} color={P.sun} />
-              <Text style={styles.statCardLabel}>WORKOUTS</Text>
+              <MaterialCommunityIcons name="dumbbell" size={18} color={colors.primary} />
+              <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>WORKOUTS</Text>
             </View>
-            <Text style={[styles.statCardValue, { color: '#FFF' }]}>
+            <Text style={[styles.statCardValue, { color: colors.text }]}>
               {workouts.length}
             </Text>
-            <Text style={styles.statCardUnit}>logged</Text>
-            <View style={styles.statCardDivider} />
-            <Text style={styles.statCardFooter}>
+            <Text style={[styles.statCardUnit, { color: colors.textDim }]}>logged</Text>
+            <View style={[styles.statCardDivider, { backgroundColor: colors.border }]} />
+            <Text style={[styles.statCardFooter, { color: colors.textMuted }]}>
               {user.experience_level?.split('(')[0]?.trim() || 'Intermediate'}
             </Text>
-          </LinearGradient>
+          </View>
         </View>
 
         {/* ── PHYSICAL METRICS GRID ── */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Physical Metrics</Text>
-          <View style={[styles.sectionLine, { backgroundColor: P.border }]} />
+          <View style={[styles.sectionLine, { backgroundColor: colors.primary }]} />
         </View>
 
         <View style={styles.metricsGrid}>
@@ -254,30 +268,36 @@ export default function PublicProfileScreen() {
             { label: 'Age',    value: user.age    ? `${user.age} yrs`  : '—', icon: 'calendar-account' },
             { label: 'Gender', value: user.gender || '—',                      icon: 'gender-male-female' },
           ].map((m) => (
-            <LinearGradient
+            <View
               key={m.label}
-              colors={[P.ctaDark, P.ctaDeep]}
-              style={styles.metricTile}
+              style={[
+                styles.metricTile, 
+                { 
+                  backgroundColor: colors.card, 
+                  borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)',
+                  shadowColor: isDark ? '#000000' : P.ctaDeep,
+                }
+              ]}
             >
-              <MaterialCommunityIcons name={m.icon as any} size={20} color={P.sun} />
-              <Text style={styles.metricValue}>{m.value}</Text>
-              <Text style={styles.metricLabel}>{m.label}</Text>
-            </LinearGradient>
+              <MaterialCommunityIcons name={m.icon as any} size={20} color={colors.primary} />
+              <Text style={[styles.metricValue, { color: colors.text }]}>{m.value}</Text>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{m.label}</Text>
+            </View>
           ))}
         </View>
 
         {/* ── RECENT WORKOUTS ── */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Workouts</Text>
-          <View style={[styles.sectionLine, { backgroundColor: P.border }]} />
+          <View style={[styles.sectionLine, { backgroundColor: colors.primary }]} />
         </View>
 
         {workouts.length === 0 ? (
-          <LinearGradient colors={[P.ctaDark, P.ctaDeep]} style={styles.emptyCard}>
-            <MaterialCommunityIcons name="calendar-plus" size={52} color={`${P.sun}55`} />
-            <Text style={styles.emptyCardTitle}>No Workouts Yet</Text>
-            <Text style={styles.emptyCardSub}>This athlete hasn't logged any workouts.</Text>
-          </LinearGradient>
+          <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
+            <MaterialCommunityIcons name="calendar-plus" size={52} color={colors.primary} />
+            <Text style={[styles.emptyCardTitle, { color: colors.text }]}>No Workouts Yet</Text>
+            <Text style={[styles.emptyCardSub, { color: colors.textMuted }]}>This athlete hasn't logged any workouts.</Text>
+          </View>
         ) : (
           workouts.map((w) => {
             const totalExs  = parseInt(w.exercise_count   || 0);
@@ -289,20 +309,30 @@ export default function PublicProfileScreen() {
             const split     = w.split_name && w.split_name !== title ? w.split_name : '';
 
             return (
-              <View key={w.id} style={styles.wCard}>
-                <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.wCardGradient}>
+              <View 
+                key={w.id} 
+                style={[
+                  styles.wCard, 
+                  { 
+                    borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)', 
+                    backgroundColor: colors.card,
+                    shadowColor: isDark ? '#000000' : P.ctaDeep,
+                  }
+                ]}
+              >
+                <View style={styles.wCardGradient}>
                   <View style={styles.wCardRow}>
                     {/* Photo / Placeholder */}
-                    <View style={styles.wImgWrap}>
+                    <View style={[styles.wImgWrap, { borderColor: colors.border }]}>
                       {hasPhoto ? (
                         <Image
                           source={{ uri: w.cover_photo_url || w.completion_photo_url }}
                           style={styles.wImg}
                         />
                       ) : (
-                        <LinearGradient colors={[P.ctaDark, P.ctaDeep]} style={styles.wImgPlaceholder}>
-                          <MaterialCommunityIcons name="arm-flex" size={28} color={`${P.sun}80`} />
-                        </LinearGradient>
+                        <View style={[styles.wImgPlaceholder, { backgroundColor: colors.inputBg }]}>
+                          <MaterialCommunityIcons name="arm-flex" size={28} color={colors.primary} />
+                        </View>
                       )}
                       <View style={styles.doneBadge}>
                         <Text style={styles.doneBadgeText}>DONE</Text>
@@ -311,40 +341,40 @@ export default function PublicProfileScreen() {
 
                     {/* Info */}
                     <View style={styles.wInfo}>
-                      <Text style={styles.wDate}>{formatShortDate(w.completed_at || w.started_at)}</Text>
-                      <Text style={styles.wTitle} numberOfLines={1}>{title}</Text>
-                      {!!split && <Text style={styles.wSplit}>{split}</Text>}
+                      <Text style={[styles.wDate, { color: colors.textMuted }]}>{formatShortDate(w.completed_at || w.started_at)}</Text>
+                      <Text style={[styles.wTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+                      {!!split && <Text style={[styles.wSplit, { color: colors.primary }]}>{split}</Text>}
 
                       <View style={styles.wStatsRow}>
                         <View style={styles.wStatItem}>
-                          <Text style={styles.wStatVal}>{totalExs}</Text>
-                          <Text style={styles.wStatLbl}>Exs</Text>
+                          <Text style={[styles.wStatVal, { color: colors.text }]}>{totalExs}</Text>
+                          <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Exs</Text>
                         </View>
-                        <View style={styles.wStatLine} />
+                        <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
                         <View style={styles.wStatItem}>
-                          <Text style={styles.wStatVal}>{totalSets}</Text>
-                          <Text style={styles.wStatLbl}>Sets</Text>
+                          <Text style={[styles.wStatVal, { color: colors.text }]}>{totalSets}</Text>
+                          <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Sets</Text>
                         </View>
-                        <View style={styles.wStatLine} />
+                        <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
                         <View style={styles.wStatItem}>
-                          <Text style={styles.wStatVal}>{vol}</Text>
-                          <Text style={styles.wStatLbl}>kg</Text>
+                          <Text style={[styles.wStatVal, { color: colors.text }]}>{vol}</Text>
+                          <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>kg</Text>
                         </View>
-                        <View style={styles.wStatLine} />
+                        <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
                         <View style={styles.wStatItem}>
-                          <Text style={styles.wStatVal}>{dur}</Text>
-                          <Text style={styles.wStatLbl}>Time</Text>
+                          <Text style={[styles.wStatVal, { color: colors.text }]}>{dur}</Text>
+                          <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Time</Text>
                         </View>
                       </View>
                     </View>
                   </View>
-                </LinearGradient>
+                </View>
               </View>
             );
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -362,15 +392,35 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 14,
   },
-  headerAccentLine: { height: 2.5, backgroundColor: P.sun },
-  headerBack: { flexDirection: 'row', alignItems: 'center', gap: 4, width: 72 },
-  headerBackText: { fontFamily: FONTS.bodyBold, color: '#FFF', fontSize: 14 },
-  headerTitle: { fontFamily: FONTS.heading, color: '#FFF', fontSize: 15, letterSpacing: 1.2 },
+  headerBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 72,
+  },
+  headerBackText: {
+    fontFamily: FONTS.bodyBold,
+    color: '#FFF',
+    fontSize: 15,
+  },
+  headerTitle: {
+    fontFamily: FONTS.heading,
+    color: '#FFF',
+    fontSize: 18,
+    letterSpacing: 1.2,
+    textAlign: 'center',
+  },
+  headerRightPlaceholder: {
+    minWidth: 72,
+  },
 
-  scroll: { paddingHorizontal: 16, paddingBottom: 100 },
+  scroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40 },
 
   // Hero Card (matches daily card exactly)
   heroCardWrap: {

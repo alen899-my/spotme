@@ -742,102 +742,96 @@ export default function MealsScreen() {
     const arrowRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
     return (
-      <View style={[styles.accCard, { backgroundColor: '#2596BE', borderColor: '#2596BE' }]}>
-        {/* ── Collapsed card structure (from screenshot) ── */}
+      <View style={[styles.accCard, isDark ? { backgroundColor: colors.card, borderColor: colors.border } : { backgroundColor: '#2596BE', borderColor: '#2596BE' }, isDark && { borderWidth: 1 }]}>
         <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
-          {/* Top Section: Icon, Meta Info, Chevron, Image Thumbnail */}
           <View style={styles.cardHeaderRow}>
-            {/* Left circular icon box */}
-            <View style={[styles.mealIconBox, { backgroundColor: iconInfo.bg }]}>
+            <View style={[styles.mealIconBox, { backgroundColor: isDark ? colors.inputBg : iconInfo.bg }, isDark && { borderWidth: 1, borderColor: iconInfo.color + '30' }]}>
               <Ionicons name={iconInfo.icon as any} size={23} color={iconInfo.color} />
             </View>
 
-            {/* Title & Time */}
             <View style={styles.mealMetaInfo}>
-              <Text style={[styles.mealTitleLabel, { color: '#FFF' }]}>{iconInfo.label}</Text>
-              <Text style={[styles.mealTimeLabel, { color: 'rgba(255,255,255,0.78)' }]}>{timeStr}</Text>
+              <Text style={[styles.mealTitleLabel, { color: isDark ? colors.text : '#FFF' }]}>{iconInfo.label}</Text>
+              <Text style={[styles.mealTimeLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.78)' }]}>{timeStr}</Text>
             </View>
 
-            {/* Subtle Chevron */}
             <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
-              <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.82)" />
+              <Ionicons name="chevron-down" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.82)'} />
             </Animated.View>
 
-            {/* Right Thumb Image */}
             {item.image_url ? (
               <Image source={{ uri: item.image_url }} style={styles.mealThumbImage} />
             ) : (
-              <View style={[styles.mealThumbImagePlaceholder, { backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.22)' }]}>
-                <Ionicons name="image-outline" size={16} color="rgba(255,255,255,0.8)" />
+              <View style={[styles.mealThumbImagePlaceholder, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)', borderColor: isDark ? colors.border : 'rgba(255,255,255,0.22)' }]}>
+                <Ionicons name="image-outline" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.8)'} />
               </View>
             )}
           </View>
 
           {!open && (
             <View style={styles.mealStatsRow}>
-              <View style={[styles.mealStatCol, { backgroundColor: '#E7B100' }]}>
-                <Text style={[styles.mealStatNum, { color: '#3F2C00' }]}>{Math.round(item.total_calories)}</Text>
-                <Text style={[styles.mealStatUnit, { color: '#5B4300' }]}>kcal</Text>
+              <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#E7B100' } : { backgroundColor: '#E7B100' }]}>
+                <Text style={[styles.mealStatNum, { color: isDark ? '#E7B100' : '#3F2C00' }]}>{Math.round(item.total_calories)}</Text>
+                <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : '#5B4300' }]}>kcal</Text>
               </View>
-              <View style={[styles.mealStatCol, { backgroundColor: '#10B981' }]}>
-                <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(item.total_protein)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Protein</Text>
+              <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#10B981' } : { backgroundColor: '#10B981' }]}>
+                <Text style={[styles.mealStatNum, { color: isDark ? '#10B981' : '#FFF' }]}>{Math.round(item.total_protein)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Protein</Text>
               </View>
-              <View style={[styles.mealStatCol, { backgroundColor: '#3B82F6' }]}>
-                <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(item.total_carbs)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
+              <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#3B82F6' } : { backgroundColor: '#3B82F6' }]}>
+                <Text style={[styles.mealStatNum, { color: isDark ? '#3B82F6' : '#FFF' }]}>{Math.round(item.total_carbs)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
               </View>
-              <View style={[styles.mealStatCol, { backgroundColor: '#F59E0B' }]}>
-                <Text style={[styles.mealStatNum, { color: '#4A2900' }]}>{Math.round(item.total_fat)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: '#6B3A00' }]}>Fats</Text>
+              <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#F59E0B' } : { backgroundColor: '#F59E0B' }]}>
+                <Text style={[styles.mealStatNum, { color: isDark ? '#F59E0B' : '#4A2900' }]}>{Math.round(item.total_fat)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : '#6B3A00' }]}>Fats</Text>
               </View>
             </View>
           )}
         </TouchableOpacity>
 
-        {/* ── Expandable detail ── */}
         {open && (
-          <View style={[styles.accDetail, { borderTopColor: 'rgba(255,255,255,0.18)' }]}>
+          <View style={[styles.accDetail, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
             <View style={styles.openStatsRow}>
-              <View style={[styles.openStatCard, { backgroundColor: '#E7B100', borderColor: '#E7B100' }]}>
-                <Text style={[styles.openStatValue, { color: '#3F2C00' }]}>{Math.round(item.total_calories)}</Text>
-                <Text style={[styles.openStatLabel, { color: '#5B4300' }]}>kcal</Text>
+              <View style={[styles.openStatCard, isDark ? { backgroundColor: colors.inputBg, borderColor: '#E7B100', borderWidth: 1 } : { backgroundColor: '#E7B100', borderColor: '#E7B100' }]}>
+                <Text style={[styles.openStatValue, { color: isDark ? '#E7B100' : '#3F2C00' }]}>{Math.round(item.total_calories)}</Text>
+                <Text style={[styles.openStatLabel, { color: isDark ? colors.textMuted : '#5B4300' }]}>kcal</Text>
               </View>
-              <View style={[styles.openStatCard, { backgroundColor: '#10B981', borderColor: '#10B981' }]}>
-                <Text style={[styles.openStatValue, { color: '#FFF' }]}>{Math.round(item.total_protein)}g</Text>
-                <Text style={[styles.openStatLabel, { color: 'rgba(255,255,255,0.9)' }]}>Protein</Text>
+              <View style={[styles.openStatCard, isDark ? { backgroundColor: colors.inputBg, borderColor: '#10B981', borderWidth: 1 } : { backgroundColor: '#10B981', borderColor: '#10B981' }]}>
+                <Text style={[styles.openStatValue, { color: isDark ? '#10B981' : '#FFF' }]}>{Math.round(item.total_protein)}g</Text>
+                <Text style={[styles.openStatLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Protein</Text>
               </View>
-              <View style={[styles.openStatCard, { backgroundColor: '#3B82F6', borderColor: '#3B82F6' }]}>
-                <Text style={[styles.openStatValue, { color: '#FFF' }]}>{Math.round(item.total_carbs)}g</Text>
-                <Text style={[styles.openStatLabel, { color: 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
+              <View style={[styles.openStatCard, isDark ? { backgroundColor: colors.inputBg, borderColor: '#3B82F6', borderWidth: 1 } : { backgroundColor: '#3B82F6', borderColor: '#3B82F6' }]}>
+                <Text style={[styles.openStatValue, { color: isDark ? '#3B82F6' : '#FFF' }]}>{Math.round(item.total_carbs)}g</Text>
+                <Text style={[styles.openStatLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
               </View>
-              <View style={[styles.openStatCard, { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}>
-                <Text style={[styles.openStatValue, { color: '#4A2900' }]}>{Math.round(item.total_fat)}g</Text>
-                <Text style={[styles.openStatLabel, { color: '#6B3A00' }]}>Fats</Text>
+              <View style={[styles.openStatCard, isDark ? { backgroundColor: colors.inputBg, borderColor: '#F59E0B', borderWidth: 1 } : { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}>
+                <Text style={[styles.openStatValue, { color: isDark ? '#F59E0B' : '#4A2900' }]}>{Math.round(item.total_fat)}g</Text>
+                <Text style={[styles.openStatLabel, { color: isDark ? colors.textMuted : '#6B3A00' }]}>Fats</Text>
               </View>
             </View>
 
-            {/* Food items */}
             {item.items?.length > 0 && (
-              <View style={[styles.foodItemsWrap, { borderTopColor: 'rgba(255,255,255,0.18)' }]}>
-                <Text style={[styles.foodItemsTitle, { color: '#FFF' }]}>Items detected</Text>
+              <View style={[styles.foodItemsWrap, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
+                <Text style={[styles.foodItemsTitle, { color: isDark ? colors.text : '#FFF' }]}>Items detected</Text>
                 {item.items.map((food: any, idx: number) => (
                   <View
                     key={idx}
                     style={[
                       styles.savedFoodCard,
-                      {
-                        backgroundColor: idx % 2 === 0 ? '#E7B100' : '#1F7FA2',
-                        borderColor: idx % 2 === 0 ? '#E7B100' : '#1F7FA2',
-                      }
+                      isDark
+                        ? { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }
+                        : {
+                            backgroundColor: idx % 2 === 0 ? '#E7B100' : '#1F7FA2',
+                            borderColor: idx % 2 === 0 ? '#E7B100' : '#1F7FA2',
+                          }
                     ]}
                   >
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.foodName, { color: idx % 2 === 0 ? '#2D2200' : '#FFF' }]}>{food.item_name}</Text>
-                      <Text style={[styles.foodQty, { color: idx % 2 === 0 ? '#5B4300' : 'rgba(255,255,255,0.82)' }]}>{food.quantity || 'Estimated serving'}</Text>
+                      <Text style={[styles.foodName, { color: isDark ? colors.text : (idx % 2 === 0 ? '#2D2200' : '#FFF') }]}>{food.item_name}</Text>
+                      <Text style={[styles.foodQty, { color: isDark ? colors.textMuted : (idx % 2 === 0 ? '#5B4300' : 'rgba(255,255,255,0.82)') }]}>{food.quantity || 'Estimated serving'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[styles.foodCals, { color: idx % 2 === 0 ? '#3F2C00' : '#FFF' }]}>{Math.round(food.calories || 0)} kcal</Text>
+                      <Text style={[styles.foodCals, { color: isDark ? colors.text : (idx % 2 === 0 ? '#3F2C00' : '#FFF') }]}>{Math.round(food.calories || 0)} kcal</Text>
                       <View style={styles.savedFoodMacroRow}>
                         <Text style={[styles.savedFoodMacroText, styles.savedFoodMacroBadge, { backgroundColor: '#10B981', color: '#FFF' }]}>{Math.round(food.protein || 0)}P</Text>
                         <Text style={[styles.savedFoodMacroText, styles.savedFoodMacroBadge, { backgroundColor: '#3B82F6', color: '#FFF' }]}>{Math.round(food.carbs || 0)}C</Text>
@@ -849,14 +843,13 @@ export default function MealsScreen() {
               </View>
             )}
 
-            {/* Redesigned delete button inside expanded details */}
             <TouchableOpacity
               onPress={() => deleteMeal(item.id)}
-              style={[styles.deleteMealBtn, { borderColor: '#DC2626', backgroundColor: '#DC2626' }]}
+              style={[styles.deleteMealBtn, isDark ? { borderColor: colors.error || '#DC2626', backgroundColor: 'transparent' } : { borderColor: '#DC2626', backgroundColor: '#DC2626' }]}
               activeOpacity={0.7}
             >
-              <Ionicons name="trash-outline" size={14} color="#FFF" style={{ marginRight: 6 }} />
-              <Text style={[styles.deleteMealBtnText, { color: '#FFF' }]}>Delete Meal Entry</Text>
+              <Ionicons name="trash-outline" size={14} color={isDark ? (colors.error || '#DC2626') : '#FFF'} style={{ marginRight: 6 }} />
+              <Text style={[styles.deleteMealBtnText, { color: isDark ? (colors.error || '#DC2626') : '#FFF' }]}>Delete Meal Entry</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -982,58 +975,58 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     const arrowRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
 
     return (
-      <View style={[styles.accCard, styles.recMealCardShell]}>
+      <View style={[styles.accCard, styles.recMealCardShell, isDark && { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
         <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
           <Image source={{ uri: visual.image }} style={styles.recommendedMealHero} />
-          <LinearGradient colors={['rgba(6,78,120,0.06)', 'rgba(37,150,190,0.24)']} style={styles.recommendedMealHeroOverlay} />
+          <LinearGradient colors={isDark ? ['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)'] : ['rgba(6,78,120,0.06)', 'rgba(37,150,190,0.24)']} style={styles.recommendedMealHeroOverlay} />
           <View style={styles.cardHeaderRow}>
-            <View style={[styles.mealIconBox, { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
-              <Ionicons name={visual.icon as any} size={20} color="#D9F3FF" />
+            <View style={[styles.mealIconBox, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.16)' }, isDark && { borderWidth: 1, borderColor: colors.border }]}>
+              <Ionicons name={visual.icon as any} size={20} color={isDark ? colors.primary : '#D9F3FF'} />
             </View>
             <View style={styles.mealMetaInfo}>
-              <Text style={[styles.mealTitleLabel, { color: '#FFF', fontSize: 16 }]}>{meal.meal_type}</Text>
-              <Text style={[styles.mealTimeLabel, { color: 'rgba(255,255,255,0.82)', fontSize: 12, marginTop: 2 }]} numberOfLines={1}>{meal.title}</Text>
+              <Text style={[styles.mealTitleLabel, { color: isDark ? colors.text : '#FFF', fontSize: 16 }]}>{meal.meal_type}</Text>
+              <Text style={[styles.mealTimeLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.82)', fontSize: 12, marginTop: 2 }]} numberOfLines={1}>{meal.title}</Text>
             </View>
             <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
-              <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.82)" />
+              <Ionicons name="chevron-down" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.82)'} />
             </Animated.View>
           </View>
 
           <View style={styles.mealStatsRow}>
-            <View style={[styles.mealStatCol, { backgroundColor: '#E7B100' }]}>
-              <Text style={[styles.mealStatNum, { color: '#3F2C00' }]}>{Math.round(meal.calories)}</Text>
-              <Text style={[styles.mealStatUnit, { color: '#5B4300' }]}>kcal</Text>
+            <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#E7B100' } : { backgroundColor: '#E7B100' }]}>
+              <Text style={[styles.mealStatNum, { color: isDark ? '#E7B100' : '#3F2C00' }]}>{Math.round(meal.calories)}</Text>
+              <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : '#5B4300' }]}>kcal</Text>
             </View>
-            <View style={[styles.mealStatCol, { backgroundColor: '#10B981' }]}>
-              <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(meal.protein)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Protein</Text>
+            <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#10B981' } : { backgroundColor: '#10B981' }]}>
+              <Text style={[styles.mealStatNum, { color: isDark ? '#10B981' : '#FFF' }]}>{Math.round(meal.protein)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Protein</Text>
             </View>
-            <View style={[styles.mealStatCol, { backgroundColor: '#3B82F6' }]}>
-              <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(meal.carbs)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
+            <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#3B82F6' } : { backgroundColor: '#3B82F6' }]}>
+              <Text style={[styles.mealStatNum, { color: isDark ? '#3B82F6' : '#FFF' }]}>{Math.round(meal.carbs)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
             </View>
-            <View style={[styles.mealStatCol, { backgroundColor: '#F59E0B' }]}>
-              <Text style={[styles.mealStatNum, { color: '#4A2900' }]}>{Math.round(meal.fat)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: '#6B3A00' }]}>Fats</Text>
+            <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#F59E0B' } : { backgroundColor: '#F59E0B' }]}>
+              <Text style={[styles.mealStatNum, { color: isDark ? '#F59E0B' : '#4A2900' }]}>{Math.round(meal.fat)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : '#6B3A00' }]}>Fats</Text>
             </View>
           </View>
         </TouchableOpacity>
 
         {open && (
-          <View style={[styles.accDetail, { borderTopColor: 'rgba(255,255,255,0.18)' }]}>
-            <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: 'rgba(255,255,255,0.82)', lineHeight: 18, marginTop: 10 }}>
+          <View style={[styles.accDetail, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
+            <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: isDark ? colors.text : 'rgba(255,255,255,0.82)', lineHeight: 18, marginTop: 10 }}>
               {meal.description}
             </Text>
 
             <View style={{ marginTop: 12 }}>
-              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: '#FFF', marginBottom: 6 }}>Ingredients</Text>
+              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: isDark ? colors.text : '#FFF', marginBottom: 6 }}>Ingredients</Text>
               {meal.ingredients?.map((ing: any, i: number) => (
-                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.16)' }}>
+                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: isDark ? colors.border : 'rgba(255,255,255,0.16)' }}>
                   <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: '#FFF' }}>{ing.name}</Text>
-                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: 'rgba(255,255,255,0.78)', marginTop: 1 }}>{ing.quantity}</Text>
+                    <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: isDark ? colors.text : '#FFF' }}>{ing.name}</Text>
+                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: isDark ? colors.textMuted : 'rgba(255,255,255,0.78)', marginTop: 1 }}>{ing.quantity}</Text>
                     {ing.calories !== undefined && (
-                      <Text style={{ fontFamily: FONTS.body, fontSize: 10, color: 'rgba(255,255,255,0.62)', marginTop: 2 }}>
+                      <Text style={{ fontFamily: FONTS.body, fontSize: 10, color: isDark ? colors.textMuted : 'rgba(255,255,255,0.62)', marginTop: 2 }}>
                         {ing.calories} kcal · P: {ing.protein}g · C: {ing.carbs}g · F: {ing.fat}g
                       </Text>
                     )}
@@ -1048,18 +1041,18 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                         setShowItemSelector(true);
                         loadAlternativeFoods(ing);
                       }}
-                      style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.12)' }}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)', borderWidth: isDark ? 1 : 0, borderColor: colors.border }}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="create-outline" size={14} color="#FFF" style={{ marginRight: 2 }} />
-                      <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: '#FFF' }}>Change</Text>
+                      <Ionicons name="create-outline" size={14} color={isDark ? colors.text : '#FFF'} style={{ marginRight: 2 }} />
+                      <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: isDark ? colors.text : '#FFF' }}>Change</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDeleteIngredient(mealIndex, i)}
-                      style={{ padding: 6, borderRadius: 8, backgroundColor: 'rgba(231,177,0,0.2)' }}
+                      style={{ padding: 6, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(231,177,0,0.2)' }}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="trash-outline" size={14} color="#FDE68A" />
+                      <Ionicons name="trash-outline" size={14} color={isDark ? '#E14B4B' : '#FDE68A'} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1067,17 +1060,17 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
             </View>
 
             <View style={{ marginTop: 12 }}>
-              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: '#FFF', marginBottom: 4 }}>Preparation Instructions</Text>
-              <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: 'rgba(255,255,255,0.82)', lineHeight: 18 }}>{meal.instructions}</Text>
+              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: isDark ? colors.text : '#FFF', marginBottom: 4 }}>Preparation Instructions</Text>
+              <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: isDark ? colors.textMuted : 'rgba(255,255,255,0.82)', lineHeight: 18 }}>{meal.instructions}</Text>
             </View>
 
             <TouchableOpacity
               onPress={() => handleLogRecommendedMeal(meal)}
-              style={[styles.deleteMealBtn, { borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.12)' }]}
+              style={[styles.deleteMealBtn, isDark ? { borderColor: colors.primary, backgroundColor: 'transparent' } : { borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.12)' }]}
               activeOpacity={0.7}
             >
-              <Ionicons name="checkmark-circle-outline" size={16} color="#FFF" style={{ marginRight: 6 }} />
-              <Text style={[styles.deleteMealBtnText, { color: '#FFF' }]}>Quick Log Meal</Text>
+              <Ionicons name="checkmark-circle-outline" size={16} color={isDark ? colors.primary : '#FFF'} style={{ marginRight: 6 }} />
+              <Text style={[styles.deleteMealBtnText, { color: isDark ? colors.primary : '#FFF' }]}>Quick Log Meal</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1188,26 +1181,26 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                 ];
 
                 return (
-                  <View key={`${food.id}-${idx}`} style={[styles.databaseMealCard, { backgroundColor: '#0B7EA4' }]}>
+                  <View key={`${food.id}-${idx}`} style={[styles.databaseMealCard, isDark ? { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border } : { backgroundColor: '#0B7EA4' }]}>
                     {imageUri ? <Image source={{ uri: imageUri }} style={styles.recommendedMealHero} /> : null}
-                    <View style={[styles.databaseMealIconWrap, { backgroundColor: 'rgba(255,255,255,0.14)' }]}>
-                      <Ionicons name={(food.icon || visual.icon) as any} size={20} color="#D9F3FF" />
+                    <View style={[styles.databaseMealIconWrap, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.14)', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]}>
+                      <Ionicons name={(food.icon || visual.icon) as any} size={20} color={isDark ? colors.primary : '#D9F3FF'} />
                     </View>
-                    <Text style={styles.databaseMealCardEyebrow}>{food.themeLabel}</Text>
-                    <Text style={styles.databaseMealCardTitle} numberOfLines={2}>{food.food_name}</Text>
-                    <Text style={styles.databaseMealCardCopy} numberOfLines={2}>
+                    <Text style={[styles.databaseMealCardEyebrow, isDark && { color: colors.primary }]}>{food.themeLabel}</Text>
+                    <Text style={[styles.databaseMealCardTitle, isDark && { color: colors.text }]} numberOfLines={2}>{food.food_name}</Text>
+                    <Text style={[styles.databaseMealCardCopy, isDark && { color: colors.textMuted }]} numberOfLines={2}>
                       {food.category || food.meal_type || 'Available in your food database'}
                     </Text>
-                    <View style={[styles.databaseMealCardChip, { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
-                      <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 10 }}>
+                    <View style={[styles.databaseMealCardChip, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.16)', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]}>
+                      <Text style={{ color: isDark ? colors.primary : '#FFF', fontFamily: FONTS.bodyBold, fontSize: 10 }}>
                         {food.displayValue}{food.nutrientUnit} {food.nutrientLabel}
                       </Text>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 6, marginTop: 10 }}>
                       {macroBadges.map((badge) => (
-                        <View key={badge.label} style={{ flex: 1, borderRadius: 10, paddingVertical: 7, alignItems: 'center', backgroundColor: badge.color }}>
-                          <Text style={{ color: '#FFF', fontFamily: FONTS.heading, fontSize: 11 }}>{badge.value}g</Text>
-                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontFamily: FONTS.bodyBold, fontSize: 8 }}>{badge.label}</Text>
+                        <View key={badge.label} style={[{ flex: 1, borderRadius: 10, paddingVertical: 7, alignItems: 'center', backgroundColor: badge.color }, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: badge.color }]}>
+                          <Text style={{ color: isDark ? badge.color : '#FFF', fontFamily: FONTS.heading, fontSize: 11 }}>{badge.value}g</Text>
+                          <Text style={{ color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)', fontFamily: FONTS.bodyBold, fontSize: 8 }}>{badge.label}</Text>
                         </View>
                       ))}
                     </View>
@@ -1268,21 +1261,21 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           </View>
 
           <View style={styles.recMacroFocusRow}>
-            <View style={[styles.recMacroFocusChip, { backgroundColor: '#E7B100' }]}>
-              <Text style={styles.recMacroFocusValue}>{recommendationData.targets.calories}</Text>
-              <Text style={styles.recMacroFocusLabel}>kcal</Text>
+            <View style={[styles.recMacroFocusChip, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#E7B100' } : { backgroundColor: '#E7B100' }]}>
+              <Text style={[styles.recMacroFocusValue, isDark && { color: '#E7B100' }]}>{recommendationData.targets.calories}</Text>
+              <Text style={[styles.recMacroFocusLabel, isDark && { color: colors.textMuted }]}>kcal</Text>
             </View>
-            <View style={[styles.recMacroFocusChip, { backgroundColor: '#10B981' }]}>
-              <Text style={styles.recMacroFocusValueLight}>{recommendationData.targets.protein}g</Text>
-              <Text style={styles.recMacroFocusLabelLight}>Protein</Text>
+            <View style={[styles.recMacroFocusChip, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#10B981' } : { backgroundColor: '#10B981' }]}>
+              <Text style={[styles.recMacroFocusValueLight, isDark && { color: '#10B981' }]}>{recommendationData.targets.protein}g</Text>
+              <Text style={[styles.recMacroFocusLabelLight, isDark && { color: colors.textMuted }]}>Protein</Text>
             </View>
-            <View style={[styles.recMacroFocusChip, { backgroundColor: '#3B82F6' }]}>
-              <Text style={styles.recMacroFocusValueLight}>{recommendationData.targets.carbs}g</Text>
-              <Text style={styles.recMacroFocusLabelLight}>Carbs</Text>
+            <View style={[styles.recMacroFocusChip, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#3B82F6' } : { backgroundColor: '#3B82F6' }]}>
+              <Text style={[styles.recMacroFocusValueLight, isDark && { color: '#3B82F6' }]}>{recommendationData.targets.carbs}g</Text>
+              <Text style={[styles.recMacroFocusLabelLight, isDark && { color: colors.textMuted }]}>Carbs</Text>
             </View>
-            <View style={[styles.recMacroFocusChip, { backgroundColor: '#F59E0B' }]}>
-              <Text style={styles.recMacroFocusValue}>{recommendationData.targets.fat}g</Text>
-              <Text style={styles.recMacroFocusLabel}>Fat</Text>
+            <View style={[styles.recMacroFocusChip, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#F59E0B' } : { backgroundColor: '#F59E0B' }]}>
+              <Text style={[styles.recMacroFocusValue, isDark && { color: '#F59E0B' }]}>{recommendationData.targets.fat}g</Text>
+              <Text style={[styles.recMacroFocusLabel, isDark && { color: colors.textMuted }]}>Fat</Text>
             </View>
           </View>
         </View>
@@ -1490,27 +1483,27 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
 
       <View style={[styles.tabSelectorContainer, { backgroundColor: colors.inputBg, marginTop: 2 }]}>
         <TouchableOpacity
-          style={[styles.tabSelectorBtn, activeTab === 'tracker' && [styles.tabSelectorActiveBtn, { backgroundColor: '#2596BE' }]]}
+          style={[styles.tabSelectorBtn, activeTab === 'tracker' && [styles.tabSelectorActiveBtn, { backgroundColor: isDark ? colors.inputBg : '#2596BE', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]]}
           onPress={() => setActiveTab('tracker')}
         >
-          <Ionicons name="nutrition-outline" size={16} color={activeTab === 'tracker' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabSelectorText, activeTab === 'tracker' ? { color: '#FFF' } : { color: colors.textMuted }]}>Meals</Text>
+          <Ionicons name="nutrition-outline" size={16} color={activeTab === 'tracker' ? (isDark ? colors.primary : '#FFF') : colors.textMuted} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabSelectorText, activeTab === 'tracker' ? { color: isDark ? colors.primary : '#FFF' } : { color: colors.textMuted }]}>Meals</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tabSelectorBtn, activeTab === 'water' && [styles.tabSelectorActiveBtn, { backgroundColor: '#2596BE' }]]}
+          style={[styles.tabSelectorBtn, activeTab === 'water' && [styles.tabSelectorActiveBtn, { backgroundColor: isDark ? colors.inputBg : '#2596BE', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]]}
           onPress={() => setActiveTab('water')}
         >
-          <Ionicons name="water-outline" size={16} color={activeTab === 'water' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabSelectorText, activeTab === 'water' ? { color: '#FFF' } : { color: colors.textMuted }]}>Water</Text>
+          <Ionicons name="water-outline" size={16} color={activeTab === 'water' ? (isDark ? colors.primary : '#FFF') : colors.textMuted} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabSelectorText, activeTab === 'water' ? { color: isDark ? colors.primary : '#FFF' } : { color: colors.textMuted }]}>Water</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.tabSelectorBtn, activeTab === 'recommendations' && [styles.tabSelectorActiveBtn, { backgroundColor: '#2596BE' }]]}
+          style={[styles.tabSelectorBtn, activeTab === 'recommendations' && [styles.tabSelectorActiveBtn, { backgroundColor: isDark ? colors.inputBg : '#2596BE', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]]}
           onPress={() => setActiveTab('recommendations')}
         >
-          <Ionicons name="sparkles-outline" size={16} color={activeTab === 'recommendations' ? '#FFF' : colors.textMuted} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabSelectorText, activeTab === 'recommendations' ? { color: '#FFF' } : { color: colors.textMuted }]}>Diet Recs</Text>
+          <Ionicons name="sparkles-outline" size={16} color={activeTab === 'recommendations' ? (isDark ? colors.primary : '#FFF') : colors.textMuted} style={{ marginRight: 6 }} />
+          <Text style={[styles.tabSelectorText, activeTab === 'recommendations' ? { color: isDark ? colors.primary : '#FFF' } : { color: colors.textMuted }]}>Diet Recs</Text>
         </TouchableOpacity>
       </View>
     </View>

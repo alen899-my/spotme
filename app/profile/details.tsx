@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
@@ -12,9 +11,11 @@ import {
   Image,
   KeyboardAvoidingView,
   Modal,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -23,6 +24,8 @@ import { useTheme } from "../../contexts/ThemeContext";
 import Input from "../../components/ui/Input";
 import axios from "axios";
 import { LinearGradient } from 'expo-linear-gradient';
+
+const { width: SW } = Dimensions.get("window");
 
 const SectionHeader = ({ title, colors }: { title: string; colors: any }) => (
   <View style={styles.sectionHeader}>
@@ -33,7 +36,8 @@ const SectionHeader = ({ title, colors }: { title: string; colors: any }) => (
 
 export default function MyDetailsScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -219,7 +223,7 @@ export default function MyDetailsScreen() {
   const StatTile = ({ label, value, icon }: { label: string; value: any; icon: any }) => (
     <View style={[vStyles.statTile, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={vStyles.statIconWrap}>
-        <Ionicons name={icon} size={18} color="#E00000" />
+        <Ionicons name={icon} size={18} color={colors.primary} />
       </View>
       <Text style={[vStyles.statValue, { color: colors.text }]}>{value || '—'}</Text>
       <Text style={[vStyles.statLabel, { color: colors.textMuted }]}>{label}</Text>
@@ -230,7 +234,7 @@ export default function MyDetailsScreen() {
     <View style={[vStyles.badgeRow, { borderBottomColor: colors.border }]}>
       <Text style={[vStyles.badgeLabel, { color: colors.textMuted }]}>{label}</Text>
       {value ? (
-        <View style={vStyles.badge}>
+        <View style={[vStyles.badge, { backgroundColor: colors.primary }]}>
           <Text style={vStyles.badgeText}>{value}</Text>
         </View>
       ) : <Text style={[vStyles.fieldValue, { color: colors.text }]}>—</Text>}
@@ -246,7 +250,7 @@ export default function MyDetailsScreen() {
 
   const HealthRow = ({ label, value, dot }: { label: string; value: any; dot?: string }) => (
     <View style={[vStyles.healthRow, { borderBottomColor: colors.border }]}>
-      <View style={[vStyles.dot, { backgroundColor: dot || '#E00000' }]} />
+      <View style={[vStyles.dot, { backgroundColor: (dot === '#E00000' || !dot) ? colors.primary : dot }]} />
       <View style={{ flex: 1 }}>
         <Text style={[vStyles.fieldLabel, { color: colors.textMuted }]}>{label}</Text>
         <Text style={[vStyles.fieldValue, { color: colors.text }]}>{value || '—'}</Text>
@@ -273,7 +277,7 @@ export default function MyDetailsScreen() {
                 label={label}
                 value={formData[key]?.toString() || ""}
                 placeholder={`Select ${label.toLowerCase()}`}
-                icon={iconType === 'Ionicons' ? <Ionicons name={icon} size={20} color="#E00000" /> : <MaterialCommunityIcons name={icon} size={20} color="#E00000" />}
+                icon={iconType === 'Ionicons' ? <Ionicons name={icon} size={20} color={colors.primary} /> : <MaterialCommunityIcons name={icon} size={20} color={colors.primary} />}
                 containerStyle={styles.inputContainer}
                 editable={false}
                 rightIcon={<Ionicons name="chevron-down" size={16} color="#A0A0A0" />}
@@ -289,7 +293,7 @@ export default function MyDetailsScreen() {
           value={formData[key]?.toString() || ""}
           onChangeText={(text) => setFormData({ ...formData, [key]: text })}
           placeholder={`Enter ${label.toLowerCase()}`}
-          icon={iconType === 'Ionicons' ? <Ionicons name={icon} size={20} color="#E00000" /> : <MaterialCommunityIcons name={icon} size={20} color="#E00000" />}
+          icon={iconType === 'Ionicons' ? <Ionicons name={icon} size={20} color={colors.primary} /> : <MaterialCommunityIcons name={icon} size={20} color={colors.primary} />}
           containerStyle={styles.inputContainer}
           editable={key !== 'age'} // Age is not directly editable
         />
@@ -302,27 +306,49 @@ export default function MyDetailsScreen() {
   if (loading) {
     return (
       <View style={[styles.centered, { flex: 1, backgroundColor: colors.bg }]}>
-        <ActivityIndicator size="large" color="#E00000" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={[styles.headerBtn, { backgroundColor: colors.inputBg }]}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={[
+        styles.header,
+        {
+          backgroundColor: isDark ? colors.bg : colors.primary,
+          paddingTop: Math.max(insets.top, 12),
+          borderBottomWidth: isDark ? 1 : 0,
+          borderBottomColor: colors.border,
+        }
+      ]}>
+        <TouchableOpacity 
+          onPress={() => router.back()} 
+          style={[styles.headerBtn, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.15)' }]}
+        >
+          <Ionicons name="chevron-back" size={24} color={isDark ? colors.text : '#FFF'} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>My Details</Text>
+        <Text style={[styles.headerTitle, { color: isDark ? colors.text : '#FFF' }]}>My Details</Text>
         <TouchableOpacity 
           onPress={() => isEditing ? handleSave() : setIsEditing(true)} 
-          style={[styles.headerBtn, { backgroundColor: isEditing ? '#E00000' : colors.inputBg }]}
+          style={[
+            styles.headerBtn, 
+            { 
+              backgroundColor: isEditing 
+                ? (isDark ? colors.primary : '#FFF') 
+                : (isDark ? colors.inputBg : 'rgba(255,255,255,0.15)') 
+            }
+          ]}
           disabled={saving}
         >
           {saving ? (
-            <ActivityIndicator size="small" color={isEditing ? "#FFF" : "#E00000"} />
+            <ActivityIndicator size="small" color={isEditing ? (isDark ? "#FFF" : colors.primary) : (isDark ? colors.primary : "#FFF")} />
           ) : (
-            <Text style={[styles.headerBtnText, isEditing && { color: "#FFF" }]}>
+            <Text style={[
+              styles.headerBtnText, 
+              { color: isDark ? colors.primary : '#FFF' }, 
+              isEditing && { color: isDark ? '#FFF' : colors.primary }
+            ]}>
               {isEditing ? "SAVE" : "EDIT"}
             </Text>
           )}
@@ -354,7 +380,7 @@ export default function MyDetailsScreen() {
                     } else { setShowDatePicker(true); }
                   }}>
                     <View pointerEvents="none">
-                      <Input label="Date of Birth" placeholder="DD / MM / YYYY" value={formData.dob ? formatDate(formData.dob) : ""} editable={false} icon={<Ionicons name="calendar-outline" size={20} color="#E00000" />} containerStyle={styles.inputContainer} />
+                      <Input label="Date of Birth" placeholder="DD / MM / YYYY" value={formData.dob ? formatDate(formData.dob) : ""} editable={false} icon={<Ionicons name="calendar-outline" size={20} color={colors.primary} />} containerStyle={styles.inputContainer} />
                     </View>
                   </TouchableOpacity>
                   {Platform.OS === "web" && (<input id="profile-web-date-picker" type="date" style={{ position: "absolute", opacity: 0, width: 0, height: 0, pointerEvents: "none" }} onChange={(e) => { const v = e.target.value; if (v) setFormData({ ...formData, dob: v, age: calculateAge(v) }); }} />)}
@@ -459,7 +485,7 @@ export default function MyDetailsScreen() {
             <View style={styles.section}>
               <SectionHeader title="Nutrition & Health" colors={colors} />
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <HealthRow label="Diet Type" value={formData.diet_type} dot="#E00000" />
+                <HealthRow label="Diet Type" value={formData.diet_type} dot={colors.primary} />
                 <HealthRow label="Food Preference" value={formData.food_preference} dot="#FF9800" />
                 <HealthRow label="Water Intake" value={formData.water_intake} dot="#2196F3" />
                 <HealthRow label="Medical Issues" value={formData.medical_conditions} dot="#9C27B0" />
@@ -507,7 +533,7 @@ export default function MyDetailsScreen() {
                     <Text style={styles.photoLabel}>{img.label}</Text>
                     
                     {isEditing && (
-                      <View style={[styles.editPhotoBadge, { borderColor: colors.card }]}>
+                      <View style={[styles.editPhotoBadge, { backgroundColor: colors.primary, borderColor: colors.card }]}>
                         <Ionicons name="camera" size={16} color="#FFF" />
                       </View>
                     )}
@@ -558,7 +584,7 @@ export default function MyDetailsScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -596,10 +622,10 @@ const styles = StyleSheet.create({
   headerBtnText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 12,
-    color: "#E00000",
+    color: "#2596BE",
   },
   saveBtnHeader: {
-    backgroundColor: "#E00000",
+    backgroundColor: "#2596BE",
   },
   scrollContent: {
     padding: 16,
@@ -654,7 +680,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(224, 0, 0, 0.05)',
+    backgroundColor: 'rgba(37, 150, 190, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -724,7 +750,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
-    backgroundColor: "#E00000",
+    backgroundColor: "#2596BE",
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -738,11 +764,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   saveBtnBottom: {
-    backgroundColor: "#E00000",
+    backgroundColor: "#2596BE",
     borderRadius: 16,
     padding: 18,
     alignItems: 'center',
-    shadowColor: "#E00000",
+    shadowColor: "#2596BE",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
@@ -828,7 +854,7 @@ const vStyles = StyleSheet.create({
     gap: 12,
   },
   statTile: {
-    width: '48%',
+    width: (SW - 32 - 12) / 2,
     padding: 16,
     borderRadius: 20,
     borderWidth: 1,
@@ -859,7 +885,7 @@ const vStyles = StyleSheet.create({
     fontSize: 14,
   },
   badge: {
-    backgroundColor: '#E00000',
+    backgroundColor: '#2596BE',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -875,7 +901,7 @@ const vStyles = StyleSheet.create({
     gap: 8,
   },
   measureChip: {
-    width: '31.5%',
+    width: (SW - 32 - 16) / 3,
     paddingVertical: 12,
     alignItems: 'center',
     borderRadius: 16,

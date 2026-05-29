@@ -3,30 +3,42 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Switch,
   ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors, isDark, toggleTheme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const s = makeStyles(colors);
 
   return (
-    <SafeAreaView style={s.container}>
+    <View style={s.container}>
       {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
+      <View style={[
+        s.header,
+        {
+          backgroundColor: isDark ? colors.bg : colors.primary,
+          paddingTop: Math.max(insets.top, 12),
+          borderBottomWidth: isDark ? 1 : 0,
+          borderBottomColor: colors.border,
+        }
+      ]}>
+        <TouchableOpacity 
+          onPress={() => router.back()} 
+          style={[s.backBtn, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.15)' }]}
+        >
+          <Ionicons name="chevron-back" size={24} color={isDark ? colors.text : '#FFF'} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Settings</Text>
+        <Text style={[s.headerTitle, { color: isDark ? colors.text : '#FFF' }]}>Settings</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -36,8 +48,8 @@ export default function SettingsScreen() {
         <View style={s.card}>
           <View style={s.settingRow}>
             <View style={s.settingLeft}>
-              <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(224,0,0,0.15)' : '#FFF5F5' }]}>
-                <Ionicons name={isDark ? "moon" : "sunny"} size={20} color="#E00000" />
+              <View style={[s.iconCircle, { backgroundColor: isDark ? colors.iconCircle : 'rgba(37,150,190,0.1)' }]}>
+                <Ionicons name={isDark ? "moon" : "sunny"} size={20} color={colors.primary} />
               </View>
               <View>
                 <Text style={s.settingTitle}>Dark Mode</Text>
@@ -47,7 +59,7 @@ export default function SettingsScreen() {
             <Switch
               value={isDark}
               onValueChange={toggleTheme}
-              trackColor={{ false: "#E0E0E0", true: "#E00000" }}
+              trackColor={{ false: "#E0E0E0", true: colors.primary }}
               thumbColor="#FFFFFF"
               ios_backgroundColor="#E0E0E0"
             />
@@ -69,7 +81,7 @@ export default function SettingsScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -83,7 +95,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },

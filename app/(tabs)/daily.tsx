@@ -17,6 +17,18 @@ import ConfirmationModal from '../../components/ui/ConfirmationModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
+// Profile gate colors
+const G = {
+  bg:      '#04282B',
+  bgDeep:  '#021518',
+  primary: '#2596BE',
+  gold:    '#F7CB16',
+  text:    '#FFFFFF',
+  muted:   'rgba(255,255,255,0.62)',
+  soft:    'rgba(255,255,255,0.28)',
+  border:  'rgba(37,150,190,0.28)',
+};
+
 function formatDuration(seconds: number) {
   if (!seconds) return '0m';
   const m = Math.floor(seconds / 60);
@@ -86,16 +98,42 @@ function getWorkoutDisplay(item: any) {
 
 export default function DailyTab() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [splits, setSplits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSplits, setLoadingSplits] = useState(true);
+  const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
   
   // Deletion
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const checkProfileCompletion = useCallback(async () => {
+    try {
+      const userStr = await AsyncStorage.getItem('userData');
+      const cached = userStr ? JSON.parse(userStr) : null;
+      // Fast-path: trust cache if already completed
+      if (cached?.onboarding_completed) {
+        setProfileComplete(true);
+        return;
+      }
+      // Otherwise hit the API for fresh data
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) { setProfileComplete(false); return; }
+      const res = await axios.get(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const completed = !!res.data.onboarding_completed;
+      setProfileComplete(completed);
+      // Update local cache
+      await AsyncStorage.setItem('userData', JSON.stringify(res.data));
+    } catch {
+      setProfileComplete(false);
+    }
+  }, []);
+
   const fetchSplits = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -124,10 +162,11 @@ export default function DailyTab() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { 
-    fetchWorkouts(); 
+  useFocusEffect(useCallback(() => {
+    checkProfileCompletion();
+    fetchWorkouts();
     fetchSplits();
-  }, [fetchWorkouts, fetchSplits]));
+  }, [checkProfileCompletion, fetchWorkouts, fetchSplits]));
 
   const handleDeleteWorkout = async () => {
     if (!deletingId) return;
@@ -157,7 +196,7 @@ export default function DailyTab() {
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[styles.card, isDark && { borderColor: colors.border, borderWidth: 1 }]}
         onPress={() => {
           if (item.status === 'completed') {
             router.push(`/daily/view/${item.id}`);
@@ -167,14 +206,20 @@ export default function DailyTab() {
         }}
         activeOpacity={0.85}
       >
-        <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.cardGradient}>
+        <LinearGradient 
+          colors={isDark ? ['#0D0D0D', '#050505'] : [P.cta, P.ctaDark]} 
+          style={styles.cardGradient}
+        >
           <View style={styles.cardRow}>
             <View style={styles.imageContainer}>
               {hasPhoto ? (
                 <Image source={{ uri: item.cover_photo_url || item.completion_photo_url }} style={styles.workoutImg} />
               ) : (
-                <LinearGradient colors={[P.ctaDark, P.ctaDeep]} style={styles.workoutImgPlaceholder}>
-                  <MaterialCommunityIcons name="arm-flex" size={32} color="rgba(247,203,22,0.55)" />
+                <LinearGradient 
+                  colors={isDark ? [colors.inputBg, '#000000'] : [P.ctaDark, P.ctaDeep]} 
+                  style={styles.workoutImgPlaceholder}
+                >
+                  <MaterialCommunityIcons name="arm-flex" size={32} color={isDark ? colors.primary : "rgba(247,203,22,0.55)"} />
                 </LinearGradient>
               )}
               <View style={[styles.statusBadge, { backgroundColor: isCompleted ? '#10B981' : '#E00000' }]}>
@@ -184,7 +229,7 @@ export default function DailyTab() {
 
             <View style={styles.cardInfo}>
               <View style={styles.cardHeader}>
-                <Text style={styles.dateText}>{formatDate(item.started_at)}</Text>
+                <Text style={[styles.dateText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>{formatDate(item.started_at)}</Text>
                 <View style={styles.cardHeaderActions}>
                   {item.rating !== null && item.rating !== undefined && (
                     <View style={styles.ratingWrap}>
@@ -196,34 +241,34 @@ export default function DailyTab() {
                     style={styles.deleteBtn} 
                     onPress={() => setDeletingId(item.id)}
                   >
-                    <Ionicons name="trash-outline" size={18} color="rgba(255,255,255,0.85)" />
+                    <Ionicons name="trash-outline" size={18} color={isDark ? colors.textMuted : "rgba(255,255,255,0.85)"} />
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={styles.cardTitle}>
+              <Text style={[styles.cardTitle, { color: isDark ? colors.text : '#FFF' }]}>
                 {title}
               </Text>
-              {!!splitLabel && <Text style={styles.splitNameText}>{splitLabel}</Text>}
+              {!!splitLabel && <Text style={[styles.splitNameText, { color: isDark ? colors.primary : P.sun }]}>{splitLabel}</Text>}
 
               <View style={styles.statsGrid}>
                 <View style={styles.statItem}>
-                  <Text style={styles.statVal}>{totalExs}</Text>
-                  <Text style={styles.statLbl}>Exs</Text>
+                  <Text style={[styles.statVal, { color: isDark ? colors.text : '#FFF' }]}>{totalExs}</Text>
+                  <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>Exs</Text>
                 </View>
-                <View style={styles.statLine} />
+                <View style={[styles.statLine, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]} />
                 <View style={styles.statItem}>
-                  <Text style={styles.statVal}>{totalSets}</Text>
-                  <Text style={styles.statLbl}>Sets</Text>
+                  <Text style={[styles.statVal, { color: isDark ? colors.text : '#FFF' }]}>{totalSets}</Text>
+                  <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>Sets</Text>
                 </View>
-                <View style={styles.statLine} />
+                <View style={[styles.statLine, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]} />
                 <View style={styles.statItem}>
-                  <Text style={styles.statVal}>{Math.round(item.total_volume)}</Text>
-                  <Text style={styles.statLbl}>kg</Text>
+                  <Text style={[styles.statVal, { color: isDark ? colors.text : '#FFF' }]}>{Math.round(item.total_volume)}</Text>
+                  <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>kg</Text>
                 </View>
-                <View style={styles.statLine} />
+                <View style={[styles.statLine, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]} />
                 <View style={styles.statItem}>
-                  <Text style={styles.statVal}>{formatDuration(item.total_duration_seconds)}</Text>
-                  <Text style={styles.statLbl}>Time</Text>
+                  <Text style={[styles.statVal, { color: isDark ? colors.text : '#FFF' }]}>{formatDuration(item.total_duration_seconds)}</Text>
+                  <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>Time</Text>
                 </View>
               </View>
             </View>
@@ -232,6 +277,77 @@ export default function DailyTab() {
       </TouchableOpacity>
     );
   };
+
+  // ── Profile incomplete gate ───────────────────────────────────────────────
+  if (profileComplete === null) {
+    return (
+      <View style={{ flex: 1, backgroundColor: G.bgDeep, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color={G.primary} size="large" />
+      </View>
+    );
+  }
+
+  if (profileComplete === false) {
+    return (
+      <View style={{ flex: 1 }}>
+        <LinearGradient colors={[G.bgDeep, G.bg]} style={StyleSheet.absoluteFillObject} />
+        <View style={gateStyles.root}>
+          {/* Decorative rings */}
+          <View style={gateStyles.ring1} />
+          <View style={gateStyles.ring2} />
+
+          {/* Wordmark */}
+          <View style={gateStyles.wordmark}>
+            <View style={gateStyles.dot} />
+            <Text style={gateStyles.wordSpot}>spot</Text>
+            <Text style={gateStyles.wordMe}>ME</Text>
+          </View>
+
+          {/* Icon */}
+          <View style={gateStyles.iconCircle}>
+            <Ionicons name="person-outline" size={42} color={G.gold} />
+          </View>
+
+          {/* Copy */}
+          <Text style={gateStyles.title}>Complete Your Profile</Text>
+          <Text style={gateStyles.sub}>
+            Set up your profile to unlock your personalised workout plan, nutrition guidance, and progress tracking.
+          </Text>
+
+          {/* Steps preview */}
+          <View style={gateStyles.stepsRow}>
+            {[
+              { icon: 'body-outline',       label: 'Body Stats' },
+              { icon: 'flag-outline',       label: 'Goals' },
+              { icon: 'restaurant-outline', label: 'Nutrition' },
+              { icon: 'camera-outline',     label: 'Photos' },
+            ].map((s, i) => (
+              <View key={i} style={gateStyles.stepItem}>
+                <View style={gateStyles.stepIcon}>
+                  <Ionicons name={s.icon as any} size={16} color={G.gold} />
+                </View>
+                <Text style={gateStyles.stepLabel}>{s.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* CTA */}
+          <TouchableOpacity
+            style={gateStyles.cta}
+            onPress={() => router.push('/onboarding')}
+            activeOpacity={0.87}
+          >
+            <LinearGradient colors={[G.gold, '#E7B100']} style={gateStyles.ctaGrad}>
+              <Text style={gateStyles.ctaText}>Set Up Profile</Text>
+              <Ionicons name="arrow-forward" size={18} color={G.bgDeep} />
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <Text style={gateStyles.time}>Takes about 3 minutes</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -249,7 +365,10 @@ export default function DailyTab() {
                 <Text style={[styles.headerSub, { color: colors.textMuted }]}>Your workout history</Text>
               </View>
               <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/daily/new')}>
-                <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.newBtnGradient}>
+                <LinearGradient 
+                  colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} 
+                  style={styles.newBtnGradient}
+                >
                   <Ionicons name="add" size={24} color="#FFF" />
                 </LinearGradient>
               </TouchableOpacity>
@@ -260,58 +379,76 @@ export default function DailyTab() {
                 <ActivityIndicator color={P.sun} style={{ marginVertical: 20 }} />
               ) : splits.length === 0 ? (
                 <TouchableOpacity 
-                  style={styles.emptySplitsBtn}
+                  style={[
+                    styles.emptySplitsBtn,
+                    isDark && {
+                      borderColor: colors.border,
+                      backgroundColor: colors.inputBg,
+                    }
+                  ]}
                   onPress={() => router.push('/splits/create')}
                 >
-                  <Ionicons name="layers-outline" size={20} color="#FFF" />
-                  <Text style={styles.emptySplitsText}>Setup your workout split</Text>
+                  <Ionicons name="layers-outline" size={20} color={isDark ? colors.primary : "#FFF"} />
+                  <Text style={[styles.emptySplitsText, isDark && { color: colors.primary }]}>Setup your workout split</Text>
                 </TouchableOpacity>
               ) : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.splitsScroll}>
                   {splits.map(split => (
                     <TouchableOpacity 
                       key={split.id} 
-                      style={styles.splitMenuCard}
+                      style={[
+                        styles.splitMenuCard,
+                        isDark && { borderColor: colors.border, shadowColor: '#000000' }
+                      ]}
                       onPress={() => router.push(`/splits/${split.id}`)}
                     >
-                      <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.splitMenuCardBg}>
+                      <LinearGradient 
+                        colors={isDark ? ['#0D0D0D', '#050505'] : [P.cta, P.ctaDark]} 
+                        style={styles.splitMenuCardBg}
+                      >
                         <View style={styles.splitMenuImageWrap}>
-                        <View style={styles.splitMenuImageFrame}>
-                          {getSplitPreviewImage(split) ? (
-                            <Image
-                              source={{ uri: getSplitPreviewImage(split) as string }}
-                              style={styles.splitMenuImage}
-                              resizeMode="contain"
-                            />
-                          ) : (
-                            <LinearGradient colors={[P.ctaDark, P.ctaDeep]} style={styles.splitMenuImagePlaceholder}>
-                              <MaterialCommunityIcons name="dumbbell" size={28} color={P.sun} />
-                            </LinearGradient>
-                          )}
-                        </View>
+                          <View style={styles.splitMenuImageFrame}>
+                            {getSplitPreviewImage(split) ? (
+                              <Image
+                                source={{ uri: getSplitPreviewImage(split) as string }}
+                                style={styles.splitMenuImage}
+                                resizeMode="contain"
+                              />
+                            ) : (
+                              <LinearGradient 
+                                colors={isDark ? [colors.inputBg, '#000000'] : [P.ctaDark, P.ctaDeep]} 
+                                style={styles.splitMenuImagePlaceholder}
+                              >
+                                <MaterialCommunityIcons name="dumbbell" size={28} color={isDark ? colors.primary : P.sun} />
+                              </LinearGradient>
+                            )}
+                          </View>
                         </View>
                         <View style={styles.splitMenuContent}>
-                          <Text style={styles.splitMenuName} numberOfLines={2}>{split.name}</Text>
+                          <Text style={[styles.splitMenuName, isDark && { color: colors.text }]} numberOfLines={2}>{split.name}</Text>
                           <View style={styles.splitMenuMetaRow}>
-                            <Ionicons name="calendar-outline" size={14} color="rgba(255,255,255,0.82)" />
-                            <Text style={styles.splitMenuMeta}>{split.session_count} Sessions</Text>
+                            <Ionicons name="calendar-outline" size={14} color={isDark ? colors.textMuted : "rgba(255,255,255,0.82)"} />
+                            <Text style={[styles.splitMenuMeta, isDark && { color: colors.textMuted }]}>{split.session_count} Sessions</Text>
                           </View>
                         </View>
                       </LinearGradient>
                     </TouchableOpacity>
                   ))}
                   <TouchableOpacity
-                    style={styles.addSplitCard}
+                    style={[
+                      styles.addSplitCard,
+                      isDark && { borderColor: colors.border, shadowColor: '#000000' }
+                    ]}
                     onPress={() => router.push('/splits/create')}
                     activeOpacity={0.86}
                   >
-                    <LinearGradient colors={[P.ctaLight, '#FFFFFF']} style={styles.addSplitCardInner}>
-                      <View style={styles.addSplitIconWrap}>
-                        <Ionicons name="add" size={26} color={P.cta} />
+                    <LinearGradient colors={isDark ? ['#0D0D0D', '#050505'] : [P.ctaLight, '#FFFFFF']} style={styles.addSplitCardInner}>
+                      <View style={[styles.addSplitIconWrap, isDark && { backgroundColor: 'rgba(247,203,22,0.12)' }]}>
+                        <Ionicons name="add" size={26} color={isDark ? colors.primary : P.cta} />
                       </View>
                       <View style={styles.addSplitCopy}>
-                        <Text style={styles.addSplitTitle}>Add Program</Text>
-                        <Text style={styles.addSplitMeta}>Create a new split</Text>
+                        <Text style={[styles.addSplitTitle, { color: isDark ? '#F1F5F9' : P.ctaDeep }]}>Add Program</Text>
+                        <Text style={[styles.addSplitMeta, { color: isDark ? 'rgba(241,245,249,0.5)' : P.muted }]}>Create a new split</Text>
                       </View>
                     </LinearGradient>
                   </TouchableOpacity>
@@ -330,7 +467,7 @@ export default function DailyTab() {
         ListEmptyComponent={(
           loading ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color="#E00000" />
+              <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : (
             <View style={styles.centered}>
@@ -340,7 +477,7 @@ export default function DailyTab() {
                 Start your first workout session and track your progress daily.
               </Text>
               <TouchableOpacity style={styles.startBtn} onPress={() => router.push('/daily/new')}>
-                <LinearGradient colors={['#E00000', '#B00000']} style={styles.startBtnGradient}>
+                <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.startBtnGradient}>
                   <Ionicons name="play" size={18} color="#FFF" />
                   <Text style={styles.startBtnText}>START TODAY'S WORKOUT</Text>
                 </LinearGradient>
@@ -557,5 +694,136 @@ const styles = StyleSheet.create({
   historyHeader: {
     marginBottom: 16,
     marginTop: 8,
+  },
+});
+
+// ── Gate styles ──────────────────────────────────────────────────
+const gateStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  // Decorative background rings
+  ring1: {
+    position: 'absolute',
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    borderWidth: 1,
+    borderColor: 'rgba(37,150,190,0.12)',
+    top: '15%',
+  },
+  ring2: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    borderWidth: 1,
+    borderColor: 'rgba(247,203,22,0.10)',
+    top: '22%',
+  },
+  // Wordmark
+  wordmark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'absolute',
+    top: 60,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: G.gold,
+    marginRight: 6,
+  },
+  wordSpot: {
+    fontFamily: FONTS.heading,
+    fontSize: 22,
+    color: G.text,
+  },
+  wordMe: {
+    fontFamily: FONTS.heading,
+    fontSize: 22,
+    color: G.gold,
+  },
+  // Icon
+  iconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(247,203,22,0.10)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(247,203,22,0.30)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  // Copy
+  title: {
+    fontFamily: FONTS.heading,
+    fontSize: 34,
+    color: G.text,
+    textAlign: 'center',
+    marginBottom: 14,
+    letterSpacing: 0.5,
+  },
+  sub: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+    color: G.muted,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  // Steps row
+  stepsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 36,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(37,150,190,0.22)',
+  },
+  stepIcon: {},
+  stepLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+    color: G.muted,
+  },
+  // CTA
+  cta: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  ctaGrad: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 17,
+    gap: 10,
+  },
+  ctaText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 16,
+    color: G.bgDeep,
+  },
+  time: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    color: G.soft,
   },
 });

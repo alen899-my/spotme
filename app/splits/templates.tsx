@@ -213,7 +213,7 @@ export default function TemplatesScreen() {
             {filters.map(f => (
               <TouchableOpacity
                 key={f.key}
-                style={[styles.filterChip, activeFilter === f.key && styles.filterChipActive]}
+                style={[styles.filterChip, activeFilter === f.key && { backgroundColor: colors.primary }]}
                 onPress={() => setActiveFilter(f.key)}
               >
                 <Text style={[styles.filterChipText, activeFilter === f.key && styles.filterChipTextActive]}>
@@ -226,7 +226,7 @@ export default function TemplatesScreen() {
 
         {loading ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#E00000" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <FlatList
@@ -303,7 +303,7 @@ export default function TemplatesScreen() {
                   <Text style={[styles.sessionsTitle, { color: colors.text }]}>Sessions Included</Text>
 
                   {detailLoading ? (
-                    <ActivityIndicator color="#E00000" style={{ marginTop: 20 }} />
+                    <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
                   ) : (
                     selected.sessions?.map((sess: any, idx: number) => (
                       <View key={sess.id} style={[styles.sessCard, { backgroundColor: colors.bg, borderColor: colors.border }]}>

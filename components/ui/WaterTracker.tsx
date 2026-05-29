@@ -187,6 +187,7 @@ function WaterBar({
   goalRatio: number;
   fillColor: string;
 }) {
+  const { colors, isDark } = useTheme();
   const fillAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -203,7 +204,7 @@ function WaterBar({
 
   return (
     <View style={wb.wrap}>
-      <View style={wb.track}>
+      <View style={[wb.track, isDark && { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
         <View style={wb.trackGlow} />
         <Animated.View style={[wb.fill, { width: fillW, backgroundColor: fillColor }]}>
           <View style={wb.fillShine} />
@@ -220,16 +221,16 @@ function WaterBar({
       </View>
 
       <View style={wb.legendRow}>
-        <Text style={wb.zeroLabel}>0 ml</Text>
+        <Text style={[wb.zeroLabel, isDark && { color: colors.textMuted }]}>0 ml</Text>
 
-        <View style={[wb.legendChip, { backgroundColor: HYDRATION.deepBlue }]}>
-          <Ionicons name="water-outline" size={12} color={HYDRATION.white} style={{ marginRight: 5 }} />
-          <Text style={[wb.legendText, { color: HYDRATION.white }]}>Goal</Text>
+        <View style={[wb.legendChip, { backgroundColor: isDark ? colors.inputBg : HYDRATION.deepBlue, borderWidth: isDark ? 1 : 0, borderColor: HYDRATION.deepBlue }]}>
+          <Ionicons name="water-outline" size={12} color={isDark ? HYDRATION.sky : HYDRATION.white} style={{ marginRight: 5 }} />
+          <Text style={[wb.legendText, { color: isDark ? HYDRATION.sky : HYDRATION.white }]}>Goal</Text>
         </View>
 
-        <View style={[wb.legendChip, { backgroundColor: HYDRATION.lightGreen }]}>
-          <Ionicons name="shield-checkmark-outline" size={12} color={HYDRATION.ink} style={{ marginRight: 5 }} />
-          <Text style={[wb.legendText, { color: HYDRATION.ink }]}>Max Safe</Text>
+        <View style={[wb.legendChip, { backgroundColor: isDark ? colors.inputBg : HYDRATION.lightGreen, borderWidth: isDark ? 1 : 0, borderColor: HYDRATION.lightGreen }]}>
+          <Ionicons name="shield-checkmark-outline" size={12} color={isDark ? HYDRATION.green : HYDRATION.ink} style={{ marginRight: 5 }} />
+          <Text style={[wb.legendText, { color: isDark ? HYDRATION.green : HYDRATION.ink }]}>Max Safe</Text>
         </View>
       </View>
     </View>
@@ -324,6 +325,7 @@ const wb = StyleSheet.create({
 });
 
 function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
+  const { colors, isDark } = useTheme();
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -335,9 +337,9 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   if (!lastLog) {
     return (
-      <View style={[rb.banner, { backgroundColor: HYDRATION.yellow }]}>
-        <Ionicons name="information-circle-outline" size={18} color={HYDRATION.ink} />
-        <Text style={[rb.text, { color: HYDRATION.ink }]}>
+      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.yellow, borderWidth: isDark ? 1 : 0, borderColor: HYDRATION.yellow }]}>
+        <Ionicons name="information-circle-outline" size={18} color={isDark ? HYDRATION.yellow : HYDRATION.ink} />
+        <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
           Start your hydration journey and log your first drink.
         </Text>
       </View>
@@ -346,9 +348,9 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   if (totalWater >= waterTarget) {
     return (
-      <View style={[rb.banner, { backgroundColor: HYDRATION.lightGreen }]}>
-        <Ionicons name="checkmark-circle" size={18} color={HYDRATION.ink} />
-        <Text style={[rb.text, { color: HYDRATION.ink }]}>
+      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.lightGreen, borderWidth: isDark ? 1 : 0, borderColor: HYDRATION.green }]}>
+        <Ionicons name="checkmark-circle" size={18} color={isDark ? HYDRATION.green : HYDRATION.ink} />
+        <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
           Amazing. Daily hydration goal achieved.
         </Text>
       </View>
@@ -360,20 +362,21 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   if (elapsedMin < interval) {
     return (
-      <View style={[rb.banner, { backgroundColor: HYDRATION.yellow }]}>
-        <Ionicons name="time-outline" size={18} color={HYDRATION.ink} />
-        <Text style={[rb.text, { color: HYDRATION.ink }]}>
-          Next drink in <Text style={rb.emphasis}>{nextIn} min</Text>. Stay consistent.
+      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.yellow, borderWidth: isDark ? 1 : 0, borderColor: HYDRATION.yellow }]}>
+        <Ionicons name="time-outline" size={18} color={isDark ? HYDRATION.yellow : HYDRATION.ink} />
+        <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
+          Next drink in <Text style={[rb.emphasis, isDark && { color: HYDRATION.sky }]}>{nextIn} min</Text>. Stay consistent.
         </Text>
       </View>
     );
   }
 
   const urgency = elapsedMin > interval * 1.5;
+  const stateColor = urgency ? HYDRATION.orange : HYDRATION.amber;
   return (
-    <View style={[rb.banner, { backgroundColor: urgency ? HYDRATION.orange : HYDRATION.amber }]}>
-      <Ionicons name={urgency ? 'warning-outline' : 'notifications-outline'} size={18} color={HYDRATION.ink} />
-      <Text style={[rb.text, { color: HYDRATION.ink }]}>
+    <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : stateColor, borderWidth: isDark ? 1 : 0, borderColor: stateColor }]}>
+      <Ionicons name={urgency ? 'warning-outline' : 'notifications-outline'} size={18} color={isDark ? stateColor : HYDRATION.ink} />
+      <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
         {urgency ? `${elapsedMin} min since your last drink. Hydrate now.` : `Time to hydrate. It has been ${elapsedMin} min.`}
       </Text>
     </View>
@@ -394,7 +397,7 @@ const rb = StyleSheet.create({
 });
 
 export default function WaterTracker({ selectedDate }: Props) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
 
   const [expanded, setExpanded] = useState(true);
@@ -539,49 +542,49 @@ export default function WaterTracker({ selectedDate }: Props) {
 
   if (loading) {
     return (
-      <View style={s.loadingCard}>
+      <View style={[s.loadingCard, isDark && { backgroundColor: colors.card, borderColor: colors.border }]}>
         <ActivityIndicator size="large" color={HYDRATION.yellow} />
       </View>
     );
   }
 
   return (
-    <View style={s.card}>
+    <View style={[s.card, isDark && { backgroundColor: colors.card, borderColor: colors.border, shadowColor: '#000', shadowOpacity: 0.28 }]}>
       <TouchableOpacity style={s.header} activeOpacity={0.88} onPress={() => setExpanded((prev) => !prev)}>
         <View style={s.headerLeft}>
-          <View style={[s.headerIcon, { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
-            <Ionicons name="water" size={20} color={HYDRATION.white} />
+          <View style={[s.headerIcon, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.16)' }]}>
+            <Ionicons name="water" size={20} color={isDark ? HYDRATION.sky : HYDRATION.white} />
           </View>
           <View>
-            <Text style={s.title}>Hydration</Text>
-            <Text style={s.subtitle}>Track your water intake</Text>
+            <Text style={[s.title, isDark && { color: colors.text }]}>Hydration</Text>
+            <Text style={[s.subtitle, isDark && { color: colors.textMuted }]}>Track your water intake</Text>
           </View>
         </View>
 
-        <View style={[s.chip, { backgroundColor: 'rgba(255,255,255,0.14)' }]}>
+        <View style={[s.chip, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.14)', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]}>
           <View style={[s.chipDot, { backgroundColor: hydrationState.primary }]} />
-          <Text style={[s.chipText, { color: HYDRATION.white }]} numberOfLines={1}>
+          <Text style={[s.chipText, { color: isDark ? colors.text : HYDRATION.white }]} numberOfLines={1}>
             {isGoal ? 'Goal Met' : isOver ? 'Over Limit' : hydrationState.chipLabel}
           </Text>
         </View>
-        <View style={s.accordionIconWrap}>
-          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="#FFF" />
+        <View style={[s.accordionIconWrap, isDark && { backgroundColor: colors.inputBg }]}>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={isDark ? colors.text : '#FFF'} />
         </View>
       </TouchableOpacity>
 
       {!expanded && (
         <View style={s.collapsedSummaryRow}>
-          <View style={[s.summaryChip, s.summaryChipLight]}>
-            <Text style={s.summaryLabelLight}>Consumed</Text>
-            <Text style={s.summaryValueLight}>{totalWater.toLocaleString()} ml</Text>
+          <View style={[s.summaryChip, s.summaryChipLight, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: HYDRATION.yellow }]}>
+            <Text style={[s.summaryLabelLight, isDark && { color: colors.textMuted }]}>Consumed</Text>
+            <Text style={[s.summaryValueLight, isDark && { color: colors.text }]}>{totalWater.toLocaleString()} ml</Text>
           </View>
-          <View style={[s.summaryChip, s.summaryChipBlue]}>
-            <Text style={s.summaryLabelLight}>Goal</Text>
-            <Text style={s.summaryValueLight}>{target.toLocaleString()} ml</Text>
+          <View style={[s.summaryChip, s.summaryChipBlue, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: HYDRATION.deepBlue }]}>
+            <Text style={[s.summaryLabelLight, isDark && { color: colors.textMuted }]}>Goal</Text>
+            <Text style={[s.summaryValueLight, isDark && { color: colors.text }]}>{target.toLocaleString()} ml</Text>
           </View>
-          <View style={[s.summaryChip, isOver ? s.summaryChipAlert : s.summaryChipGreen]}>
-            <Text style={isOver ? s.summaryLabelDark : s.summaryLabelLight}>{isOver ? 'Over' : 'Remaining'}</Text>
-            <Text style={isOver ? s.summaryValueDark : s.summaryValueLight}>{Math.abs(target - totalWater).toLocaleString()} ml</Text>
+          <View style={[s.summaryChip, isOver ? s.summaryChipAlert : s.summaryChipGreen, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: isOver ? HYDRATION.amber : HYDRATION.green }]}>
+            <Text style={[isOver ? s.summaryLabelDark : s.summaryLabelLight, isDark ? { color: colors.textMuted } : null]}>{isOver ? 'Over' : 'Remaining'}</Text>
+            <Text style={[isOver ? s.summaryValueDark : s.summaryValueLight, isDark ? { color: colors.text } : null]}>{Math.abs(target - totalWater).toLocaleString()} ml</Text>
           </View>
         </View>
       )}
@@ -618,51 +621,51 @@ export default function WaterTracker({ selectedDate }: Props) {
 
                 <View style={[s.goalLine, { bottom: '62.5%', borderColor: HYDRATION.deepBlue }]} />
                 <View style={s.cupLabel}>
-                  <Text style={s.cupNum}>{totalWater.toLocaleString()}</Text>
-                  <Text style={s.cupUnit}>ml</Text>
+                  <Text style={[s.cupNum, isDark && { color: colors.text }]}>{totalWater.toLocaleString()}</Text>
+                  <Text style={[s.cupUnit, isDark && { color: colors.textMuted }]}>ml</Text>
                 </View>
               </View>
             </View>
 
             <View style={{ flex: 1, gap: 7 }}>
-              <View style={[s.statCard, s.consumedCard]}>
+              <View style={[s.statCard, s.consumedCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: HYDRATION.yellow }]}>
                 <View style={s.statHeader}>
-                  <View style={s.statIconDark}>
-                    <Ionicons name="analytics-outline" size={15} color={HYDRATION.ink} />
+                  <View style={[s.statIconDark, isDark && { backgroundColor: 'rgba(247,203,22,0.15)' }]}>
+                    <Ionicons name="analytics-outline" size={15} color={isDark ? HYDRATION.yellow : HYDRATION.ink} />
                   </View>
-                  <Text style={s.statLabelDark}>Consumed</Text>
+                  <Text style={[s.statLabelDark, isDark && { color: colors.textMuted }]}>Consumed</Text>
                 </View>
-                <Text style={s.statValueDark}>{totalWater.toLocaleString()} ml</Text>
+                <Text style={[s.statValueDark, isDark && { color: colors.text }]}>{totalWater.toLocaleString()} ml</Text>
               </View>
 
-              <View style={[s.statCard, s.goalCard]}>
+              <View style={[s.statCard, s.goalCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: HYDRATION.deepBlue }]}>
                 <View style={s.statHeader}>
-                  <View style={s.statIconWhite}>
-                    <Ionicons name="water-outline" size={15} color={HYDRATION.deepBlue} />
+                  <View style={[s.statIconWhite, isDark && { backgroundColor: 'rgba(26,110,138,0.15)' }]}>
+                    <Ionicons name="water-outline" size={15} color={isDark ? HYDRATION.deepBlue : HYDRATION.deepBlue} />
                   </View>
-                  <Text style={s.statLabelLight}>Goal</Text>
+                  <Text style={[s.statLabelLight, isDark && { color: colors.textMuted }]}>Goal</Text>
                 </View>
-                <Text style={s.statValueLight}>{target.toLocaleString()} ml</Text>
+                <Text style={[s.statValueLight, isDark && { color: colors.text }]}>{target.toLocaleString()} ml</Text>
               </View>
 
-              <View style={[s.statCard, s.maxCard]}>
+              <View style={[s.statCard, s.maxCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: HYDRATION.lightGreen }]}>
                 <View style={s.statHeader}>
-                  <View style={s.statIconSoft}>
-                    <Ionicons name="shield-checkmark-outline" size={15} color={HYDRATION.ink} />
+                  <View style={[s.statIconSoft, isDark && { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
+                    <Ionicons name="shield-checkmark-outline" size={15} color={isDark ? HYDRATION.green : HYDRATION.ink} />
                   </View>
-                  <Text style={s.statLabelDark}>Max Safe</Text>
+                  <Text style={[s.statLabelDark, isDark && { color: colors.textMuted }]}>Max Safe</Text>
                 </View>
-                <Text style={s.statValueDark}>{maxSafe.toLocaleString()} ml</Text>
+                <Text style={[s.statValueDark, isDark && { color: colors.text }]}>{maxSafe.toLocaleString()} ml</Text>
               </View>
 
-              <View style={[s.statCard, isOver ? s.overCard : s.remainingCard]}>
+              <View style={[s.statCard, isOver ? s.overCard : s.remainingCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: isOver ? HYDRATION.amber : HYDRATION.sky }]}>
                 <View style={s.statHeader}>
-                  <View style={s.statIconWhite}>
-                    <Ionicons name={isOver ? 'warning-outline' : 'hourglass-outline'} size={15} color={isOver ? HYDRATION.ink : HYDRATION.white} />
+                  <View style={[s.statIconWhite, isDark && { backgroundColor: isOver ? 'rgba(217,164,4,0.15)' : 'rgba(103,199,240,0.15)' }]}>
+                    <Ionicons name={isOver ? 'warning-outline' : 'hourglass-outline'} size={15} color={isDark ? (isOver ? HYDRATION.amber : HYDRATION.sky) : (isOver ? HYDRATION.ink : HYDRATION.white)} />
                   </View>
-                  <Text style={isOver ? s.statLabelDark : s.statLabelLight}>{isOver ? 'Over by' : 'Remaining'}</Text>
+                  <Text style={[isOver ? s.statLabelDark : s.statLabelLight, isDark && { color: colors.textMuted }]}>{isOver ? 'Over by' : 'Remaining'}</Text>
                 </View>
-                <Text style={isOver ? s.statValueDark : s.statValueLight}>
+                <Text style={[isOver ? s.statValueDark : s.statValueLight, isDark && { color: colors.text }]}>
                   {Math.abs(target - totalWater).toLocaleString()} ml
                 </Text>
               </View>
@@ -675,24 +678,28 @@ export default function WaterTracker({ selectedDate }: Props) {
             {PRESETS.map((item) => (
               <TouchableOpacity
                 key={item.label}
-                style={[s.presetBtn, { backgroundColor: item.bg }]}
+                style={[
+                  s.presetBtn,
+                  { backgroundColor: isDark ? colors.inputBg : item.bg },
+                  isDark && { borderWidth: 1, borderColor: item.bg }
+                ]}
                 onPress={() => handleLog(item.amount)}
                 activeOpacity={0.78}
               >
-                <Ionicons name={item.icon as any} size={18} color={item.text} />
-                <Text style={[s.presetAmt, { color: item.text }]}>+{item.amount}</Text>
-                <Text style={[s.presetLbl, { color: item.text }]}>{item.label}</Text>
+                <Ionicons name={item.icon as any} size={18} color={isDark ? item.bg : item.text} />
+                <Text style={[s.presetAmt, { color: isDark ? colors.text : item.text }]}>+{item.amount}</Text>
+                <Text style={[s.presetLbl, { color: isDark ? colors.textMuted : item.text }]}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <View style={s.sliderSection}>
-            <Text style={s.sliderTitle}>
+          <View style={[s.sliderSection, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+            <Text style={[s.sliderTitle, isDark && { color: colors.text }]}>
               Custom: <Text style={[s.sliderHighlight, { color: hydrationState.primary }]}>{sliderVal} ml</Text>
             </Text>
 
             <View style={{ height: 36, justifyContent: 'center', marginBottom: 4 }}>
-              <View style={[s.sliderTrack, { width: SLIDER_W }]}>
+              <View style={[s.sliderTrack, { width: SLIDER_W }, isDark && { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
                 <View style={s.sliderTrackGlow} />
                 <View style={[s.sliderFill, { width: ((sliderVal - 50) / 700) * SLIDER_W, backgroundColor: hydrationState.primary }]} />
                 <View
@@ -712,8 +719,8 @@ export default function WaterTracker({ selectedDate }: Props) {
             </View>
 
             <View style={[s.sliderLabels, { width: SLIDER_W }]}>
-              <Text style={s.sliderEdge}>50 ml</Text>
-              <Text style={s.sliderEdge}>750 ml</Text>
+              <Text style={[s.sliderEdge, isDark && { color: colors.textMuted }]}>50 ml</Text>
+              <Text style={[s.sliderEdge, isDark && { color: colors.textMuted }]}>750 ml</Text>
             </View>
 
             <TouchableOpacity
@@ -728,7 +735,7 @@ export default function WaterTracker({ selectedDate }: Props) {
 
           {waterLogs.length > 0 && (
             <View style={s.logList}>
-              <Text style={s.logListTitle}>Today's Log</Text>
+              <Text style={[s.logListTitle, isDark && { color: colors.text }]}>Today's Log</Text>
               {waterLogs.map((log) => {
                 const t = new Date(log.logged_at).toLocaleTimeString([], {
                   hour: '2-digit',
@@ -737,21 +744,28 @@ export default function WaterTracker({ selectedDate }: Props) {
                 const tone = getLogTone(log.amount_ml);
 
                 return (
-                  <View key={log.id} style={[s.logRow, { backgroundColor: tone.bg }]}>
-                    <View style={[s.logIcon, { backgroundColor: tone.iconBg }]}>
-                      <Ionicons name="water" size={14} color={tone.icon} />
+                  <View
+                    key={log.id}
+                    style={[
+                      s.logRow,
+                      { backgroundColor: isDark ? colors.inputBg : tone.bg },
+                      isDark && { borderWidth: 1, borderColor: tone.bg }
+                    ]}
+                  >
+                    <View style={[s.logIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : tone.iconBg }]}>
+                      <Ionicons name="water" size={14} color={isDark ? tone.bg : tone.icon} />
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.logAmt, { color: tone.text }]}>{log.amount_ml} ml</Text>
-                      <Text style={[s.logTime, { color: tone.subText }]}>{t}</Text>
+                      <Text style={[s.logAmt, { color: isDark ? colors.text : tone.text }]}>{log.amount_ml} ml</Text>
+                      <Text style={[s.logTime, { color: isDark ? colors.textMuted : tone.subText }]}>{t}</Text>
                     </View>
 
                     <TouchableOpacity
                       onPress={() => handleDelete(log.id, log.amount_ml)}
-                      style={[s.deleteBtn, { backgroundColor: tone.deleteBg }]}
+                      style={[s.deleteBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : tone.deleteBg }]}
                     >
-                      <Ionicons name="trash-outline" size={15} color={tone.deleteIcon} />
+                      <Ionicons name="trash-outline" size={15} color={isDark ? '#E14B4B' : tone.deleteIcon} />
                     </TouchableOpacity>
                   </View>
                 );

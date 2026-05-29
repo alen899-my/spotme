@@ -3,6 +3,7 @@ import { View, Text, Dimensions } from "react-native";
 import Svg, { Path, Circle, Text as SvgText } from "react-native-svg";
 import { FONTS } from "../../constants/theme";
 import { P, scale, vs } from "../../constants/homeTheme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -15,12 +16,13 @@ interface Props {
 }
 
 export default function WeightSparkline({ data }: Props) {
+  const { colors, isDark } = useTheme();
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   if (data.length < 2) {
     return (
       <View style={{ alignItems: "center", paddingVertical: vs(16) }}>
-        <Text style={{ fontFamily: FONTS.body, fontSize: scale(13), color: P.muted }}>
+        <Text style={{ fontFamily: FONTS.body, fontSize: scale(13), color: isDark ? colors.textMuted : P.muted }}>
           Log workouts with weight to see your trend
         </Text>
       </View>
@@ -45,10 +47,10 @@ export default function WeightSparkline({ data }: Props) {
   return (
     <View style={{ height: H + vs(30) }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: vs(8) }}>
-        <Text style={{ fontFamily: FONTS.body, fontSize: scale(12), color: P.muted }}>
+        <Text style={{ fontFamily: FONTS.body, fontSize: scale(12), color: isDark ? colors.textMuted : P.muted }}>
           {vals[0]}kg
         </Text>
-        <Text style={{ fontFamily: FONTS.bodyBold, fontSize: scale(13), color: P.cta }}>
+        <Text style={{ fontFamily: FONTS.bodyBold, fontSize: scale(13), color: isDark ? colors.primary : P.cta }}>
           {vals[vals.length - 1]}kg
         </Text>
       </View>
@@ -57,7 +59,7 @@ export default function WeightSparkline({ data }: Props) {
           <Path
             d={pathD}
             fill="none"
-            stroke={P.cta}
+            stroke={isDark ? colors.primary : P.cta}
             strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -72,7 +74,7 @@ export default function WeightSparkline({ data }: Props) {
                   cx={x} cy={y}
                   r={isSel ? "6" : "4"}
                   fill={P.sun}
-                  stroke={P.white}
+                  stroke={isDark ? colors.card : P.white}
                   strokeWidth="2"
                 />
                 <Circle
@@ -84,7 +86,7 @@ export default function WeightSparkline({ data }: Props) {
                 {isSel && (
                   <SvgText
                     x={x} y={y - 12}
-                    fill={P.ink}
+                    fill={isDark ? "#FFFFFF" : P.ink}
                     fontSize={scale(12)}
                     fontFamily={FONTS.bodyBold}
                     textAnchor={i === 0 ? "start" : i === vals.length - 1 ? "end" : "middle"}

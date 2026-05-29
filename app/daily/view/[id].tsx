@@ -47,7 +47,7 @@ export default function WorkoutViewScreen() {
   const router = useRouter();
   const { id: workoutId } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
 
   const [workout, setWorkout] = useState<any>(null);
@@ -197,20 +197,40 @@ export default function WorkoutViewScreen() {
               )}
             </View>
           </View>
-          <TouchableOpacity onPress={openEditMetrics} style={styles.perfEditBtn}>
-            <Ionicons name="options-outline" size={20} color="#FFF" />
+          <TouchableOpacity 
+            onPress={openEditMetrics} 
+            style={[
+              styles.perfEditBtn,
+              isDark && { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }
+            ]}
+          >
+            <Ionicons name="options-outline" size={20} color={isDark ? colors.primary : "#FFF"} />
           </TouchableOpacity>
         </View>
         <View style={styles.perfGrid}>
           {stats.map((item, idx) => (
-            <View key={idx} style={[styles.perfCard, { backgroundColor: item.color, borderRightColor: 'rgba(255,255,255,0.3)', borderRightWidth: 4, borderWidth: 0 }]}>
-              <View style={[styles.perfIconBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <Ionicons name={item.icon as any} size={18} color="#FFF" />
+            <View 
+              key={idx} 
+              style={[
+                styles.perfCard, 
+                { backgroundColor: item.color, borderRightColor: 'rgba(255,255,255,0.3)', borderRightWidth: 4, borderWidth: 0 },
+                isDark && {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRightColor: item.color,
+                  borderRightWidth: 4,
+                  shadowColor: '#000000',
+                }
+              ]}
+            >
+              <View style={[styles.perfIconBox, { backgroundColor: 'rgba(255,255,255,0.2)' }, isDark && { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
+                <Ionicons name={item.icon as any} size={18} color={isDark ? item.color : "#FFF"} />
               </View>
               <View style={styles.perfContent}>
-                <Text style={[styles.perfLabel, { color: 'rgba(255,255,255,0.7)' }]}>{item.label}</Text>
-                <Text style={[styles.perfValue, { color: '#FFF' }]}>{item.val}</Text>
-                <Text style={[styles.perfSubLabel, { color: 'rgba(255,255,255,0.6)' }]} numberOfLines={1}>{item.sub}</Text>
+                <Text style={[styles.perfLabel, { color: 'rgba(255,255,255,0.7)' }, isDark && { color: colors.textMuted }]}>{item.label}</Text>
+                <Text style={[styles.perfValue, { color: '#FFF' }, isDark && { color: colors.text }]}>{item.val}</Text>
+                <Text style={[styles.perfSubLabel, { color: 'rgba(255,255,255,0.6)' }, isDark && { color: colors.textDim }]} numberOfLines={1}>{item.sub}</Text>
               </View>
             </View>
           ))}
@@ -233,20 +253,25 @@ export default function WorkoutViewScreen() {
       <View style={[
         styles.summaryCard,
         isSkipped ? styles.summaryCardSkipped : styles.summaryCardBlue,
+        isDark && {
+          backgroundColor: colors.pill,
+          borderColor: colors.border,
+          borderWidth: 1,
+        }
       ]}>
         <View style={styles.summaryHeader}>
           <Image source={{ uri: item.image_url }} style={styles.summaryImage} />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <Text style={[styles.summaryName, isSkipped ? { color: colors.text } : styles.summaryNameBlue]}>{item.name}</Text>
+              <Text style={[styles.summaryName, isSkipped ? { color: colors.text } : (isDark ? { color: colors.text } : styles.summaryNameBlue)]}>{item.name}</Text>
               {item.avg_rating !== undefined && item.avg_rating !== null && (
-                <View style={[styles.avgRatingBadge, isSkipped ? { backgroundColor: colors.inputBg, borderColor: colors.border } : styles.avgRatingBadgeBlue]}>
+                <View style={[styles.avgRatingBadge, isSkipped ? { backgroundColor: colors.inputBg, borderColor: colors.border } : (isDark ? { backgroundColor: colors.inputBg, borderColor: colors.border } : styles.avgRatingBadgeBlue)]}>
                   <Ionicons name="star" size={10} color="#F59E0B" />
-                  <Text style={[styles.avgRatingText, isSkipped ? { color: colors.text } : styles.avgRatingTextBlue]}>{item.avg_rating} </Text>
+                  <Text style={[styles.avgRatingText, isSkipped ? { color: colors.text } : (isDark ? { color: colors.text } : styles.avgRatingTextBlue)]}>{item.avg_rating} </Text>
                 </View>
               )}
             </View>
-            <Text style={[styles.summarySub, isSkipped ? { color: colors.textMuted } : styles.summarySubBlue]}>
+            <Text style={[styles.summarySub, isSkipped ? { color: colors.textMuted } : styles.summarySubBlue, isDark && { color: colors.textMuted }]}>
               {isSkipped ? 'Movement skipped' : `${completedSets.length} sets completed`}
             </Text>
             {item.rating !== undefined && item.rating !== null && (
@@ -256,7 +281,7 @@ export default function WorkoutViewScreen() {
             )}
           </View>
           {isSkipped ? (
-            <View style={styles.skippedBadge}><Text style={styles.skippedBadgeText}>SKIPPED</Text></View>
+            <View style={[styles.skippedBadge, isDark && { backgroundColor: colors.inputBg }]}><Text style={[styles.skippedBadgeText, isDark && { color: colors.textDim }]}>SKIPPED</Text></View>
           ) : item.is_completed ? (
             <Ionicons name="checkmark-circle" size={22} color="#10B981" />
           ) : null}
@@ -265,20 +290,20 @@ export default function WorkoutViewScreen() {
         {!isSkipped && completedSets.length > 0 && (
           <View style={styles.metricsGrid}>
             <View style={styles.metricItem}>
-              <Text style={styles.metricLabelBlue}>TOTAL WEIGHT</Text>
-              <Text style={styles.metricValueBlue}>{Math.round(totalWeight)}kg</Text>
+              <Text style={[styles.metricLabelBlue, isDark && { color: colors.textMuted }]}>TOTAL WEIGHT</Text>
+              <Text style={[styles.metricValueBlue, isDark && { color: colors.text }]}>{Math.round(totalWeight)}kg</Text>
             </View>
             <View style={styles.metricItem}>
-              <Text style={styles.metricLabelBlue}>AVG WEIGHT/SET</Text>
-              <Text style={styles.metricValueBlue}>{avgWeight}kg</Text>
+              <Text style={[styles.metricLabelBlue, isDark && { color: colors.textMuted }]}>AVG WEIGHT/SET</Text>
+              <Text style={[styles.metricValueBlue, isDark && { color: colors.text }]}>{avgWeight}kg</Text>
             </View>
             <View style={styles.metricItem}>
-              <Text style={styles.metricLabelBlue}>TOTAL REPS</Text>
-              <Text style={styles.metricValueBlue}>{totalReps}</Text>
+              <Text style={[styles.metricLabelBlue, isDark && { color: colors.textMuted }]}>TOTAL REPS</Text>
+              <Text style={[styles.metricValueBlue, isDark && { color: colors.text }]}>{totalReps}</Text>
             </View>
             <View style={styles.metricItem}>
-              <Text style={styles.metricLabelBlue}>AVG TIME/SET</Text>
-              <Text style={styles.metricValueBlue}>{formatTime(avgTime)}</Text>
+              <Text style={[styles.metricLabelBlue, isDark && { color: colors.textMuted }]}>AVG TIME/SET</Text>
+              <Text style={[styles.metricValueBlue, isDark && { color: colors.text }]}>{formatTime(avgTime)}</Text>
             </View>
           </View>
         )}
@@ -335,7 +360,12 @@ export default function WorkoutViewScreen() {
                       </View>
                     ))}
                     <TouchableOpacity 
-                      style={[styles.photoThumbWrap, styles.photoAdd, loadingPhotos && { opacity: 0.5 }]} 
+                      style={[
+                        styles.photoThumbWrap, 
+                        styles.photoAdd, 
+                        isDark && { backgroundColor: colors.inputBg, borderColor: colors.border },
+                        loadingPhotos && { opacity: 0.5 }
+                      ]} 
                       onPress={handleUpdatePhotos}
                       disabled={loadingPhotos}
                     >
@@ -343,7 +373,7 @@ export default function WorkoutViewScreen() {
                     </TouchableOpacity>
                   </ScrollView>
                 ) : (
-                  <TouchableOpacity style={[styles.photoPlaceholder, { borderColor: colors.border }]} onPress={handleUpdatePhotos}>
+                  <TouchableOpacity style={[styles.photoPlaceholder, { borderColor: colors.border }, isDark && { backgroundColor: colors.inputBg }]} onPress={handleUpdatePhotos}>
                     <Ionicons name="camera" size={32} color={colors.textDim} />
                     <Text style={{ color: colors.textDim, fontFamily: FONTS.bodyBold, marginTop: 8 }}>ADD PHOTOS</Text>
                   </TouchableOpacity>
@@ -390,15 +420,24 @@ export default function WorkoutViewScreen() {
             </View>
             <View style={styles.editField}>
               <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Hydration ({finishWater.toFixed(1)}L)</Text>
-              <Slider style={{ width: '100%', height: 40 }} minimumValue={0} maximumValue={5} step={0.1}
-                value={finishWater} onValueChange={setFinishWater} minimumTrackTintColor={P.cta} thumbTintColor={P.cta} />
+              <Slider 
+                style={{ width: '100%', height: 40 }} 
+                minimumValue={0} 
+                maximumValue={5} 
+                step={0.1}
+                value={finishWater} 
+                onValueChange={setFinishWater} 
+                minimumTrackTintColor={isDark ? colors.primary : P.cta} 
+                maximumTrackTintColor={isDark ? colors.border : '#BFDBFE'} 
+                thumbTintColor={isDark ? colors.primary : P.cta} 
+              />
             </View>
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditMetricsModal(false)}>
+              <TouchableOpacity style={[styles.cancelBtn, isDark && { backgroundColor: colors.inputBg }]} onPress={() => setShowEditMetricsModal(false)}>
                 <Text style={{ color: colors.textMuted, fontFamily: FONTS.bodyBold }}>CANCEL</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateMetrics}>
-                <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.saveBtnGrad}>
+                <LinearGradient colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} style={styles.saveBtnGrad}>
                   {updatingMetrics ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold }}>SAVE CHANGES</Text>}
                 </LinearGradient>
               </TouchableOpacity>

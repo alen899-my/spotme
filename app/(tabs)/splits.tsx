@@ -26,7 +26,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function SplitsTab() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const [splits, setSplits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,8 +79,9 @@ export default function SplitsTab() {
   };
 
   const renderSplit = ({ item, index }: { item: any, index: number }) => {
-    // Determine card color: split color or theme primary
-    const cardColor = item.template_color || colors.primary || '#E00000';
+    // Determine card colors based on theme
+    const cardBg = isDark ? colors.card : (item.template_color || colors.primary || '#E00000');
+    const cardBorderColor = isDark ? colors.border : (item.template_color || colors.primary || '#E00000');
     
     // Image stack logic
     const rawImages = item.exercise_images || [];
@@ -97,38 +98,40 @@ export default function SplitsTab() {
         style={[
           styles.splitCard, 
           { 
-            backgroundColor: cardColor, 
-            shadowColor: cardColor,
-            elevation: 4
+            backgroundColor: cardBg, 
+            borderColor: cardBorderColor,
+            borderWidth: isDark ? 1 : 0,
+            shadowColor: isDark ? 'transparent' : cardBg,
+            elevation: isDark ? 0 : 4
           }
         ]}
         activeOpacity={0.9}
         onPress={() => router.push(`/splits/${item.id}`)}
       >
         <View style={styles.cardHeader}>
-          <View style={[styles.iconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-            <MaterialCommunityIcons name={item.template_icon || "folder-outline"} size={22} color="#FFF" />
+          <View style={[styles.iconWrap, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.2)' }]}>
+            <MaterialCommunityIcons name={item.template_icon || "folder-outline"} size={22} color={isDark ? colors.primary : "#FFF"} />
           </View>
           <TouchableOpacity 
             style={styles.deleteBtn} 
             onPress={() => handleDelete(item.id)}
             hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           >
-            <Ionicons name="trash-outline" size={16} color="rgba(255,255,255,0.6)" />
+            <Ionicons name="trash-outline" size={16} color={isDark ? colors.textMuted : "rgba(255,255,255,0.6)"} />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.splitName} numberOfLines={1}>{item.name}</Text>
+        <Text style={[styles.splitName, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1}>{item.name}</Text>
         
         <View style={styles.cardFooterArea}>
           <View style={styles.cardStatsArea}>
             <View style={styles.miniStat}>
-              <Ionicons name="flash" size={12} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.miniStatText}>{item.session_count} Sessions</Text>
+              <Ionicons name="flash" size={12} color={isDark ? colors.primary : "rgba(255,255,255,0.8)"} />
+              <Text style={[styles.miniStatText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}>{item.session_count} Sessions</Text>
             </View>
             <View style={styles.miniStat}>
-              <Ionicons name="calendar" size={12} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.miniStatText}>Program</Text>
+              <Ionicons name="calendar" size={12} color={isDark ? colors.primary : "rgba(255,255,255,0.8)"} />
+              <Text style={[styles.miniStatText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}>Program</Text>
             </View>
           </View>
 
@@ -138,10 +141,10 @@ export default function SplitsTab() {
               style={[styles.miniThumbnailBack, { opacity: 0.3, transform: [{ rotate: '12deg' }, { translateX: 6 }] }]} 
             />
             {images.length > 0 ? (
-              <Image source={{ uri: images[0] }} style={styles.miniThumbnailFront} />
+              <Image source={{ uri: images[0] }} style={[styles.miniThumbnailFront, { borderColor: isDark ? colors.border : '#FFF' }]} />
             ) : (
-              <View style={[styles.miniThumbnailFront, { backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }]}>
-                <Ionicons name="barbell-outline" size={12} color="rgba(255,255,255,0.5)" />
+              <View style={[styles.miniThumbnailFront, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.1)', borderColor: isDark ? colors.border : '#FFF', justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="barbell-outline" size={12} color={isDark ? colors.textMuted : "rgba(255,255,255,0.5)"} />
               </View>
             )}
           </View>
@@ -171,7 +174,7 @@ export default function SplitsTab() {
               onPress={() => router.push('/splits/create')}
             >
               <LinearGradient
-                colors={['#E00000', '#B00000']}
+                colors={[colors.primary, colors.primaryDark]}
                 style={styles.addBtnGradient}
               >
                 <Ionicons name="add" size={24} color="#FFF" />
@@ -182,7 +185,7 @@ export default function SplitsTab() {
 
         {loading ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#E00000" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : splits.length === 0 ? (
           <View style={styles.centered}>
@@ -201,7 +204,7 @@ export default function SplitsTab() {
               <Text style={styles.createNowText}>BROWSE EXPERT SPLITS</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.createNowBtn, { backgroundColor: '#E00000' }]}
+              style={[styles.createNowBtn, { backgroundColor: colors.primary }]}
               onPress={() => router.push('/splits/create')}
             >
               <Text style={styles.createNowText}>CREATE FROM SCRATCH</Text>
@@ -274,7 +277,7 @@ const styles = StyleSheet.create({
   },
   addBtn: {
     borderRadius: 12, overflow: 'hidden', elevation: 4,
-    shadowColor: '#E00000', shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#2596BE', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 8,
   },
   addBtnGradient: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },

@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const P = {
   sun:     "#F7CB16",
@@ -38,6 +39,7 @@ export default function AppHeader({
   actionIcon = "notifications-outline",
   actionBadge,
 }: AppHeaderProps) {
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const profileScale = useRef(new Animated.Value(1)).current;
 
@@ -61,7 +63,14 @@ export default function AppHeader({
   const photoUri = user?.profile_pic_url || user?.profilePicUrl;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + scale(6) }]}>
+    <View style={[
+      styles.container, 
+      { paddingTop: insets.top + scale(6) },
+      isDark && {
+        backgroundColor: "#000000",
+        borderBottomColor: colors.border,
+      }
+    ]}>
       <View style={styles.row}>
         <Animated.View style={{ transform: [{ scale: profileScale }] }}>
           <TouchableOpacity
@@ -75,11 +84,11 @@ export default function AppHeader({
             {hasPhoto ? (
               <Image source={{ uri: photoUri }} style={styles.avatarImg} />
             ) : (
-              <View style={styles.avatarFallback}>
-                <Ionicons name="person" size={scale(16)} color={P.cta} />
+              <View style={[styles.avatarFallback, isDark && { backgroundColor: colors.inputBg }]}>
+                <Ionicons name="person" size={scale(16)} color={isDark ? colors.textMuted : P.cta} />
               </View>
             )}
-            <View style={styles.activeDot} />
+            <View style={[styles.activeDot, isDark && { borderColor: "#000000" }]} />
           </TouchableOpacity>
         </Animated.View>
 
@@ -92,13 +101,13 @@ export default function AppHeader({
           {onActionPress ? (
             <TouchableOpacity
               onPress={onActionPress}
-              style={styles.iconBtn}
+              style={[styles.iconBtn, isDark && { backgroundColor: colors.inputBg }]}
               activeOpacity={0.82}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons name={actionIcon as any} size={scale(18)} color={P.white} />
               {!!actionBadge && actionBadge > 0 && (
-                <View style={styles.badge}>
+                <View style={[styles.badge, isDark && { borderColor: "#000000" }]}>
                   <Text style={styles.badgeText} allowFontScaling={false}>
                     {actionBadge > 9 ? "9+" : String(actionBadge)}
                   </Text>
@@ -106,7 +115,7 @@ export default function AppHeader({
               )}
             </TouchableOpacity>
           ) : (
-            <View style={styles.iconBtn} />
+            <View style={[styles.iconBtn, isDark && { backgroundColor: colors.inputBg }]} />
           )}
         </View>
       </View>

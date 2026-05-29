@@ -95,7 +95,7 @@ export default function SplitDetailScreen() {
           style={styles.editStatsBtn}
           onPress={() => alert('Edit sets/reps coming soon!')}
         >
-          <Ionicons name="create-outline" size={18} color="#E00000" />
+          <Ionicons name="create-outline" size={18} color={colors.primary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -104,7 +104,7 @@ export default function SplitDetailScreen() {
   if (loading) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.bg }]}>
-        <ActivityIndicator size="large" color="#E00000" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -150,16 +150,16 @@ export default function SplitDetailScreen() {
         {/* Bottom Actions */}
         <View style={[styles.bottomBar, { backgroundColor: colors.bg }]}>
           <TouchableOpacity 
-            style={[styles.addExBtn, { borderColor: '#E00000' }]}
+            style={[styles.addExBtn, { borderColor: colors.primary }]}
             onPress={() => router.push({ pathname: '/workout/split/add-exercises', params: { splitId: id } })}
           >
-            <Ionicons name="add" size={20} color="#E00000" />
-            <Text style={styles.addExText}>ADD EXERCISE</Text>
+            <Ionicons name="add" size={20} color={colors.primary} />
+            <Text style={[styles.addExText, { color: colors.primary }]}>ADD EXERCISE</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.startBtn}>
             <LinearGradient
-              colors={['#E00000', '#B00000']}
+              colors={['#2596BE', '#0d4d65']}
               style={styles.startBtnGradient}
             >
               <Text style={styles.startBtnText}>START WORKOUT</Text>

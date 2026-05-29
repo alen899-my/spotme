@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
 import { P, scale, vs, TIER_COLORS, getXPProgress } from "../../constants/homeTheme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface Props {
   tier: string;
@@ -10,8 +11,23 @@ interface Props {
   totalXP: number;
 }
 
+const DARK_TIER_COLORS: Record<string, [string, string]> = {
+  Bronze:      ["#4A2B0E", "#2A1807"],
+  Silver:      ["#2E2F33", "#1A1B1D"],
+  Gold:        ["#4D3F00", "#292100"],
+  Platinum:    ["#003C3C", "#002042"],
+  Diamond:     ["#193740", "#002533"],
+  Master:      ["#3C1B4A", "#1D0A26"],
+  Grandmaster: ["#540922", "#2B020E"],
+  Elite:       ["#541A08", "#2E0D03"],
+  Champion:    ["#4A0000", "#240000"],
+  Legend:      ["#543200", "#330000"],
+};
+
 export default function XPCard({ tier, level, totalXP }: Props) {
-  const tierColors = TIER_COLORS[tier] || TIER_COLORS.Bronze;
+  const { isDark } = useTheme();
+  const baseTierColors = TIER_COLORS[tier] || TIER_COLORS.Bronze;
+  const tierColors = isDark ? (DARK_TIER_COLORS[tier] || baseTierColors) : baseTierColors;
   const { progress, nextTier, xpToNext } = getXPProgress(tier, totalXP);
 
   return (

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface StatCardProps {
   icon: any;
@@ -13,6 +14,8 @@ interface StatCardProps {
   labelColor: string;
   value: string;
   label: string;
+  darkIconBg: string;
+  darkIconColor: string;
 }
 
 function StatCard({
@@ -24,14 +27,44 @@ function StatCard({
   labelColor,
   value,
   label,
+  darkIconBg,
+  darkIconColor,
 }: StatCardProps) {
+  const { colors, isDark } = useTheme();
   return (
-    <View style={[styles.statCard, { backgroundColor: cardBg }]}>
-      <View style={[styles.statIconWrap, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon} size={scale(18)} color={iconColor} />
+    <View
+      style={[
+        styles.statCard,
+        {
+          backgroundColor: isDark ? colors.card : cardBg,
+          borderWidth: isDark ? 1 : 0,
+          borderColor: isDark ? colors.border : "transparent",
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.statIconWrap,
+          { backgroundColor: isDark ? darkIconBg : iconBg },
+        ]}
+      >
+        <Ionicons
+          name={icon}
+          size={scale(18)}
+          color={isDark ? darkIconColor : iconColor}
+        />
       </View>
-      <Text style={[styles.statVal, { color: valueColor }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: labelColor }]}>{label}</Text>
+      <Text style={[styles.statVal, { color: isDark ? colors.text : valueColor }]}>
+        {value}
+      </Text>
+      <Text
+        style={[
+          styles.statLabel,
+          { color: isDark ? colors.textMuted : labelColor },
+        ]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -51,6 +84,8 @@ const CARD_CONFIGS = [
     iconColor:  "#04282B", // ink
     valueColor: "#04282B",
     labelColor: "#5a4200",
+    darkIconBg: "rgba(255, 69, 58, 0.18)",
+    darkIconColor: "#FF453A",
   },
   {
     cardBg:     "#2596BE", // cta blue
@@ -58,6 +93,8 @@ const CARD_CONFIGS = [
     iconColor:  "#D6EEF7", // ctaLight
     valueColor: "#FFFFFF",
     labelColor: "#a8dff0",
+    darkIconBg: "rgba(255, 214, 10, 0.18)",
+    darkIconColor: "#FFD60A",
   },
   {
     cardBg:     "#0d4d65", // ctaDeep
@@ -65,6 +102,8 @@ const CARD_CONFIGS = [
     iconColor:  "#F7CB16", // sun (accent pop)
     valueColor: "#FFFFFF",
     labelColor: "#7ec6db",
+    darkIconBg: "rgba(10, 132, 255, 0.18)",
+    darkIconColor: "#0A84FF",
   },
   {
     cardBg:     "#E7B100", // sunDeep
@@ -72,6 +111,8 @@ const CARD_CONFIGS = [
     iconColor:  "#04282B",
     valueColor: "#04282B",
     labelColor: "#5a4200",
+    darkIconBg: "rgba(48, 209, 88, 0.18)",
+    darkIconColor: "#30D158",
   },
 ];
 

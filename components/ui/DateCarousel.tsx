@@ -58,7 +58,7 @@ export default function DateCarousel({ selectedDate, onSelectDate, daysBack = 14
               key={idx}
               style={[
                 styles.dateCard,
-                { backgroundColor: selected ? '#E00000' : colors.card, borderColor: selected ? '#E00000' : colors.border }
+                { backgroundColor: selected ? colors.primary : colors.card, borderColor: selected ? colors.primary : colors.border }
               ]}
               onPress={() => onSelectDate(date)}
               activeOpacity={0.7}

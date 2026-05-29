@@ -19,7 +19,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function WorkoutScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -39,27 +39,27 @@ export default function WorkoutScreen() {
         </View>
 
         {/* ── Active Workout Hero ────────────────────────────────────── */}
-        <TouchableOpacity activeOpacity={0.9} style={styles.heroCard}>
+        <TouchableOpacity activeOpacity={0.9} style={[styles.heroCard, isDark && { borderColor: colors.border, borderWidth: 1 }]}>
           <LinearGradient
-            colors={['#E00000', '#8B0000']}
+            colors={isDark ? ['#0D0D0D', '#050505'] : ['#2596BE', '#0d4d65']}
             style={StyleSheet.absoluteFillObject}
           />
           <View style={styles.heroContent}>
             <View style={styles.heroBadge}>
               <Text style={styles.heroBadgeText}>RECOMMENDED</Text>
             </View>
-            <Text style={styles.heroTitle}>Morning Push Session</Text>
-            <Text style={styles.heroSub}>45-60 mins • High Intensity</Text>
+            <Text style={[styles.heroTitle, { color: colors.text }]}>Morning Push Session</Text>
+            <Text style={[styles.heroSub, { color: colors.textMuted }]}>45-60 mins • High Intensity</Text>
             
             <View style={styles.heroFooter}>
-              <View style={styles.startBtn}>
-                <Text style={styles.startBtnText}>START WORKOUT</Text>
-                <Ionicons name="play" size={16} color="#E00000" />
+              <View style={[styles.startBtn, { backgroundColor: isDark ? colors.primary : '#FFF' }]}>
+                <Text style={[styles.startBtnText, { color: isDark ? '#FFF' : colors.primary }]}>START WORKOUT</Text>
+                <Ionicons name="play" size={16} color={isDark ? '#FFF' : colors.primary} />
               </View>
             </View>
           </View>
           <View style={styles.heroIconPlaceholder}>
-            <MaterialCommunityIcons name="weight-lifter" size={140} color="rgba(255,255,255,0.15)" />
+            <MaterialCommunityIcons name="weight-lifter" size={140} color={isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.15)'} />
           </View>
         </TouchableOpacity>
 
@@ -70,8 +70,8 @@ export default function WorkoutScreen() {
             style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => router.push('/splits/create')}
           >
-            <View style={[styles.tileIconWrap, { backgroundColor: 'rgba(224,0,0,0.1)' }]}>
-              <Ionicons name="add-circle" size={30} color="#E00000" />
+            <View style={[styles.tileIconWrap, { backgroundColor: isDark ? 'rgba(37,150,190,0.18)' : 'rgba(37,150,190,0.12)' }]}>
+              <Ionicons name="add-circle" size={30} color={colors.primary} />
             </View>
             <Text style={[styles.tileLabel, { color: colors.text }]}>New{"\n"}Program</Text>
           </TouchableOpacity>
@@ -130,7 +130,7 @@ export default function WorkoutScreen() {
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>My Routines</Text>
           <TouchableOpacity>
-            <Text style={{ color: '#E00000', fontFamily: FONTS.bodyBold }}>See All</Text>
+            <Text style={{ color: colors.primary, fontFamily: FONTS.bodyBold }}>See All</Text>
           </TouchableOpacity>
         </View>
 

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
 import { P, scale, vs } from "../../constants/homeTheme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const WATER_GOAL_ML = 2500;
 
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function HydrationCard({ waterMl, onLogWaterPress }: Props) {
+  const { colors, isDark } = useTheme();
   const waterPct     = Math.min((waterMl || 0) / WATER_GOAL_ML, 1);
   const pctLabel     = Math.round(waterPct * 100);
   const waterDisplay = waterMl >= 1000
@@ -36,35 +38,44 @@ export default function HydrationCard({ waterMl, onLogWaterPress }: Props) {
   const filledCups  = Math.round(waterPct * CUPS);
 
   return (
-    <View style={styles.card}>
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: isDark ? colors.card : C.cardBg,
+          borderWidth: isDark ? 1 : 0,
+          borderColor: isDark ? colors.border : "transparent",
+        },
+      ]}
+    >
 
       {/* ── Header ─────────────────────────────────────────── */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <View style={styles.iconWrap}>
+          <View style={[styles.iconWrap, { backgroundColor: isDark ? "#1A1A1A" : C.iconBg }]}>
             <Ionicons name="water" size={scale(18)} color={C.sun} />
           </View>
           <View>
-            <Text style={styles.title}>Hydration</Text>
-            <Text style={styles.subtitle}>Daily water intake</Text>
+            <Text style={[styles.title, { color: isDark ? colors.text : C.white }]}>Hydration</Text>
+            <Text style={[styles.subtitle, { color: isDark ? colors.textMuted : C.lightText }]}>Daily water intake</Text>
           </View>
         </View>
 
         {/* Percentage badge */}
-        <View style={styles.pctBadge}>
+        <View style={[styles.pctBadge, { backgroundColor: isDark ? "#1A1A1A" : C.iconBg }]}>
           <Text style={styles.pctText}>{pctLabel}%</Text>
         </View>
       </View>
 
       {/* ── Big water amount ───────────────────────────────── */}
       <View style={styles.amountRow}>
-        <Text style={styles.amountVal}>{waterDisplay}</Text>
-        <Text style={styles.amountGoal}> / 2.5L</Text>
+        <Text style={[styles.amountVal, { color: isDark ? colors.text : C.white }]}>{waterDisplay}</Text>
+        <Text style={[styles.amountGoal, { color: isDark ? colors.textMuted : C.lightText }]}> / 2.5L</Text>
       </View>
 
       {/* ── Progress bar ───────────────────────────────────── */}
-      <View style={styles.barBg}>
-        <View style={[styles.barFill, { width: `${waterPct * 100}%` }]}>
+      <View style={[styles.barBg, { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : C.fillBg }]}>
+        <View style={[styles.barFill, { width: `${waterPct * 100}%`, backgroundColor: isDark ? colors.primary : C.white }]}>
           {/* Shimmer stripe */}
           <View style={styles.barShimmer} />
         </View>
@@ -77,18 +88,18 @@ export default function HydrationCard({ waterMl, onLogWaterPress }: Props) {
             key={i}
             name={i < filledCups ? "water" : "water-outline"}
             size={scale(16)}
-            color={i < filledCups ? C.sun : C.lightBorder}
+            color={i < filledCups ? C.sun : (isDark ? "rgba(255,255,255,0.15)" : C.lightBorder)}
           />
         ))}
-        <Text style={styles.cupsLabel}>{filledCups}/{CUPS} cups</Text>
+        <Text style={[styles.cupsLabel, { color: isDark ? colors.textMuted : C.lightText }]}>{filledCups}/{CUPS} cups</Text>
       </View>
 
       {/* ── Divider ────────────────────────────────────────── */}
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : C.lightBorder }]} />
 
       {/* ── Footer ─────────────────────────────────────────── */}
       <View style={styles.footer}>
-        <Text style={styles.footerHint}>
+        <Text style={[styles.footerHint, { color: isDark ? colors.textMuted : C.lightText }]}>
           {waterPct >= 1
             ? "🎉 Goal reached! Great job!"
             : `${Math.round((WATER_GOAL_ML - (waterMl || 0)) / 1000 * 10) / 10}L left to reach your goal`}

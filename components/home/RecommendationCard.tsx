@@ -5,6 +5,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // ── Palette (mirrors homeTheme P, kept local for portability) ────────────────
 const C = {
@@ -46,6 +47,7 @@ interface Props {
 
 // ── Stars helper ─────────────────────────────────────────────────────────────
 function StarRating({ rating }: { rating: number }) {
+  const { colors, isDark } = useTheme();
   const full    = Math.floor(rating);
   const hasHalf = rating - full >= 0.5;
   return (
@@ -61,36 +63,41 @@ function StarRating({ rating }: { rating: number }) {
               : "star-outline"
           }
           size={scale(11)}
-          color={C.sun}
+          color={isDark ? colors.primary : C.sun}
         />
       ))}
-      <Text style={sr.label}>{rating.toFixed(1)}</Text>
+      <Text style={[sr.label, { color: isDark ? colors.textMuted : C.ink }]}>{rating.toFixed(1)}</Text>
     </View>
   );
 }
 
 const sr = StyleSheet.create({
   row:   { flexDirection: "row", alignItems: "center", gap: scale(2) },
-  label: { fontFamily: FONTS.bodyBold, fontSize: scale(11), color: C.ink, marginLeft: scale(4) },
+  label: { fontFamily: FONTS.bodyBold, fontSize: scale(11), marginLeft: scale(4) },
 });
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function RecommendationCard({ rec, onBrowsePress }: Props) {
+  const { colors, isDark } = useTheme();
+
   if (!rec) {
     return (
       <TouchableOpacity
-        style={styles.emptyCard}
+        style={[
+          styles.emptyCard, 
+          isDark ? { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 } : { backgroundColor: C.emptyBg }
+        ]}
         onPress={onBrowsePress}
         activeOpacity={0.88}
       >
-        <View style={styles.emptyIconWrap}>
-          <Ionicons name="fitness-outline" size={scale(28)} color={C.emptyInk} />
+        <View style={[styles.emptyIconWrap, { backgroundColor: isDark ? colors.inputBg : C.emptyIconBg }]}>
+          <Ionicons name="fitness-outline" size={scale(28)} color={isDark ? colors.primary : C.emptyInk} />
         </View>
-        <Text style={styles.emptyTitle}>Browse exercises</Text>
-        <Text style={styles.emptySub}>Find exercises to build your routine</Text>
-        <View style={styles.emptyBtn}>
-          <Ionicons name="search-outline" size={scale(14)} color={C.sun} />
-          <Text style={styles.emptyBtnText}>Explore library</Text>
+        <Text style={[styles.emptyTitle, { color: isDark ? colors.text : C.emptyInk }]}>Browse exercises</Text>
+        <Text style={[styles.emptySub, { color: isDark ? colors.textMuted : C.emptyMuted }]}>Find exercises to build your routine</Text>
+        <View style={[styles.emptyBtn, { backgroundColor: isDark ? colors.primary : C.ink }]}>
+          <Ionicons name="search-outline" size={scale(14)} color={isDark ? "#FFF" : C.sun} />
+          <Text style={[styles.emptyBtnText, { color: isDark ? "#FFF" : C.white }]}>Explore library</Text>
         </View>
       </TouchableOpacity>
     );
@@ -99,25 +106,28 @@ export default function RecommendationCard({ rec, onBrowsePress }: Props) {
   const rating = rec.rating ?? 4.8;
 
   return (
-    <View style={styles.card}>
+    <View style={[
+      styles.card, 
+      isDark ? { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 } : { backgroundColor: C.cardBg }
+    ]}>
 
       {/* ── Top pill row ─────────────────────────────────────────── */}
       <View style={styles.pillRow}>
-        <View style={styles.scorePill}>
-          <Ionicons name="sparkles" size={scale(11)} color={C.sun} />
-          <Text style={styles.scorePillText}>{rec.scoreTag || "Top pick"}</Text>
+        <View style={[styles.scorePill, { backgroundColor: isDark ? colors.inputBg : C.iconBg, borderColor: isDark ? colors.border : "transparent", borderWidth: isDark ? 1 : 0 }]}>
+          <Ionicons name="sparkles" size={scale(11)} color={isDark ? colors.primary : C.sun} />
+          <Text style={[styles.scorePillText, { color: isDark ? colors.text : "#D6EEF7" }]}>{rec.scoreTag || "Top pick"}</Text>
         </View>
-        <View style={styles.ratingPill}>
-          <Ionicons name="star" size={scale(11)} color={C.ink} />
-          <Text style={styles.ratingPillText}>{rating.toFixed(1)}</Text>
+        <View style={[styles.ratingPill, { backgroundColor: isDark ? colors.inputBg : C.sun, borderColor: isDark ? colors.border : "transparent", borderWidth: isDark ? 1 : 0 }]}>
+          <Ionicons name="star" size={scale(11)} color={isDark ? colors.primary : C.ink} />
+          <Text style={[styles.ratingPillText, { color: isDark ? colors.text : C.ink }]}>{rating.toFixed(1)}</Text>
         </View>
       </View>
 
       {/* ── Body row ─────────────────────────────────────────────── */}
       <View style={styles.body}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.name} numberOfLines={2}>{rec.exercise_name}</Text>
-          <Text style={styles.category}>{rec.category}</Text>
+          <Text style={[styles.name, { color: isDark ? colors.text : C.white }]} numberOfLines={2}>{rec.exercise_name}</Text>
+          <Text style={[styles.category, { color: isDark ? colors.textMuted : C.lightText }]}>{rec.category}</Text>
 
           {/* Star rating */}
           <StarRating rating={rating} />
@@ -125,43 +135,43 @@ export default function RecommendationCard({ rec, onBrowsePress }: Props) {
           {/* Tags */}
           <View style={styles.tags}>
             {rec.target && (
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>{rec.target}</Text>
+              <View style={[styles.tag, { backgroundColor: isDark ? colors.inputBg : C.tagBg, borderColor: isDark ? colors.border : "transparent", borderWidth: isDark ? 1 : 0 }]}>
+                <Text style={[styles.tagText, { color: isDark ? colors.primary : "#D6EEF7" }]}>{rec.target}</Text>
               </View>
             )}
             {rec.equipment && rec.equipment !== "body weight" && (
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>{rec.equipment}</Text>
+              <View style={[styles.tag, { backgroundColor: isDark ? colors.inputBg : C.tagBg, borderColor: isDark ? colors.border : "transparent", borderWidth: isDark ? 1 : 0 }]}>
+                <Text style={[styles.tagText, { color: isDark ? colors.primary : "#D6EEF7" }]}>{rec.equipment}</Text>
               </View>
             )}
           </View>
         </View>
 
         {rec.image_url ? (
-          <Image source={{ uri: rec.image_url }} style={styles.thumb} />
+          <Image source={{ uri: rec.image_url }} style={[styles.thumb, isDark && { borderColor: colors.border, borderWidth: 1 }]} />
         ) : (
-          <View style={[styles.thumb, styles.thumbPlaceholder]}>
-            <MaterialCommunityIcons name="dumbbell" size={scale(30)} color={C.sun} />
+          <View style={[styles.thumb, styles.thumbPlaceholder, { backgroundColor: isDark ? colors.inputBg : C.iconBg }]}>
+            <MaterialCommunityIcons name="dumbbell" size={scale(30)} color={isDark ? colors.primary : C.sun} />
           </View>
         )}
       </View>
 
       {/* ── Divider ──────────────────────────────────────────────── */}
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: isDark ? colors.border : C.lightBorder }]} />
 
       {/* ── Meta row ─────────────────────────────────────────────── */}
       <View style={styles.metaRow}>
         <View style={styles.metaItem}>
-          <Ionicons name="flame-outline" size={scale(14)} color={C.sun} />
-          <Text style={styles.metaText}>{rec.caloriesPerHour ?? "~280 kcal/hr"}</Text>
+          <Ionicons name="flame-outline" size={scale(14)} color={isDark ? colors.primary : C.sun} />
+          <Text style={[styles.metaText, { color: isDark ? colors.textMuted : C.lightText }]}>{rec.caloriesPerHour ?? "~280 kcal/hr"}</Text>
         </View>
         <View style={styles.metaItem}>
-          <Ionicons name="time-outline" size={scale(14)} color={C.sun} />
-          <Text style={styles.metaText}>{rec.duration ?? "30–45 min"}</Text>
+          <Ionicons name="time-outline" size={scale(14)} color={isDark ? colors.primary : C.sun} />
+          <Text style={[styles.metaText, { color: isDark ? colors.textMuted : C.lightText }]}>{rec.duration ?? "30–45 min"}</Text>
         </View>
         <View style={styles.metaItem}>
-          <Ionicons name="bar-chart-outline" size={scale(14)} color={C.sun} />
-          <Text style={styles.metaText}>{rec.difficulty ?? "Intermediate"}</Text>
+          <Ionicons name="bar-chart-outline" size={scale(14)} color={isDark ? colors.primary : C.sun} />
+          <Text style={[styles.metaText, { color: isDark ? colors.textMuted : C.lightText }]}>{rec.difficulty ?? "Intermediate"}</Text>
         </View>
       </View>
 

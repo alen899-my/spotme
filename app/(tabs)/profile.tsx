@@ -76,7 +76,7 @@ export default function ProfileScreen() {
     try {
       await AsyncStorage.removeItem("userToken");
       await AsyncStorage.removeItem("userData");
-      router.replace("/");
+      router.replace("/login");
     } catch (e) {
       console.error("Logout error in profile:", e);
     }
@@ -95,7 +95,7 @@ export default function ProfileScreen() {
                 <Ionicons name="person" size={40} color={colors.border} />
               </View>
             )}
-            <TouchableOpacity style={[styles.cameraBtn, { borderColor: colors.card }]}>
+            <TouchableOpacity style={[styles.cameraBtn, { backgroundColor: colors.primary, borderColor: colors.card }]}>
               <Ionicons name="camera" size={16} color="#FFF" />
             </TouchableOpacity>
           </View>
@@ -105,9 +105,9 @@ export default function ProfileScreen() {
           {user && (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 }}>
               {user.league_tier && (
-                <View style={[styles.badge, { backgroundColor: 'rgba(224,0,0,0.1)', paddingVertical: 4, paddingHorizontal: 10 }]}>
-                  <Ionicons name="trophy" size={12} color="#E00000" />
-                  <Text style={styles.badgeText}>{user.league_tier}</Text>
+                <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(37,150,190,0.1)', paddingVertical: 4, paddingHorizontal: 10 }]}>
+                  <Ionicons name="trophy" size={12} color={colors.primary} />
+                  <Text style={[styles.badgeText, { color: colors.primary }]}>{user.league_tier}</Text>
                 </View>
               )}
               <Text style={{ fontFamily: FONTS.bodyBold, color: colors.textMuted, fontSize: 13 }}>

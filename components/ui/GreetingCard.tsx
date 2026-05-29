@@ -22,6 +22,7 @@ import Svg, {
   Line,
 } from "react-native-svg";
 import { FONTS } from "../../constants/theme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const { width: SW, height: SH } = Dimensions.get("window");
 const BASE_W = 390;
@@ -232,6 +233,7 @@ interface GreetingCardProps {
 }
 
 export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardProps) {
+  const { colors, isDark } = useTheme();
   const hour   = new Date().getHours();
   const config = useMemo(() => getSlot(hour), [hour]);
 
@@ -254,21 +256,22 @@ export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardPro
     ]).start();
   }, []);
 
-  const isNight = config.slot === "night" || config.slot === "evening";
+  const isNight = config.slot === "night" || config.slot === "evening" || isDark;
 
   return (
     <Animated.View
       style={[
         styles.card,
         {
-          backgroundColor: config.cardBg,
-          borderColor:     config.border,
+          backgroundColor: isDark ? colors.card : config.cardBg,
+          borderColor:     isDark ? colors.border : config.border,
+          borderWidth:     isDark ? 1 : 1.5,
           opacity:         fadeAnim,
           transform:       [{ translateY: slideAnim }],
         },
       ]}
     >
-      {/* Stars for night/evening — behind everything */}
+      {/* Stars for night/evening/dark mode — behind everything */}
       {isNight && <StarField count={24} />}
 
       {/* ── Content (full width, no right padding eaten by icon) ── */}
@@ -276,11 +279,11 @@ export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardPro
 
         {/* Row 1: GREETING label (left)  +  time pill (right) */}
         <View style={styles.topRow}>
-          <Text style={[styles.greetLabel, { color: config.greetColor }]}>
+          <Text style={[styles.greetLabel, { color: isDark ? colors.primary : config.greetColor }]}>
             {config.greeting.toUpperCase()}
           </Text>
-          <View style={[styles.timePill, { backgroundColor: config.pillBg, borderColor: config.pillBorder }]}>
-            <Text style={[styles.timePillText, { color: config.pillText }]}>
+          <View style={[styles.timePill, { backgroundColor: isDark ? colors.inputBg : config.pillBg, borderColor: isDark ? colors.border : config.pillBorder }]}>
+            <Text style={[styles.timePillText, { color: isDark ? colors.primary : config.pillText }]}>
               {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </Text>
           </View>
@@ -288,7 +291,7 @@ export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardPro
 
         {/* Row 2: Name (left, flex) + Icon (right, fixed size, aligned to name row) */}
         <View style={styles.nameRow}>
-          <Text style={[styles.name, { color: config.nameColor, flex: 1 }]} numberOfLines={1}>
+          <Text style={[styles.name, { color: isDark ? colors.text : config.nameColor, flex: 1 }]} numberOfLines={1}>
             {firstName} 👋
           </Text>
 
@@ -307,14 +310,14 @@ export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardPro
         </View>
 
         {/* Sub message */}
-        <Text style={[styles.sub, { color: config.subColor }]}>
+        <Text style={[styles.sub, { color: isDark ? colors.textMuted : config.subColor }]}>
           {config.sub}
         </Text>
 
         {/* Goal pill */}
         {fitnessGoal && (
-          <View style={[styles.goalPill, { backgroundColor: config.pillBg, borderColor: config.pillBorder }]}>
-            <Text style={[styles.goalPillText, { color: config.pillText }]}>🎯  {fitnessGoal}</Text>
+          <View style={[styles.goalPill, { backgroundColor: isDark ? colors.inputBg : config.pillBg, borderColor: isDark ? colors.border : config.pillBorder }]}>
+            <Text style={[styles.goalPillText, { color: isDark ? colors.primary : config.pillText }]}>🎯  {fitnessGoal}</Text>
           </View>
         )}
 

@@ -36,7 +36,7 @@ export default function SessionDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   
   const [exercises, setExercises] = useState<any[]>([]);
@@ -126,7 +126,14 @@ export default function SessionDetailScreen() {
 
   const renderExercise = ({ item }: { item: any }) => (
     <TouchableOpacity 
-      style={styles.exerciseCard}
+      style={[
+        styles.exerciseCard, 
+        { 
+          backgroundColor: isDark ? colors.card : P.cta, 
+          borderColor: isDark ? colors.border : P.cta, 
+          borderWidth: isDark ? 1 : 0 
+        }
+      ]}
       activeOpacity={0.8}
       onPress={() => setPreviewEx(item)}
     >
@@ -142,7 +149,15 @@ export default function SessionDetailScreen() {
               </View>
             )}
           </View>
-          <Text style={[styles.exMeta, { color: colors.textMuted }]}>{item.target} • {item.equipment}</Text>
+          <Text style={[
+            styles.exMeta, 
+            { 
+              color: isDark ? colors.text : P.ink, 
+              backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.88)' 
+            }
+          ]}>
+            {item.target} • {item.equipment}
+          </Text>
         </View>
       </View>
 
@@ -202,7 +217,7 @@ export default function SessionDetailScreen() {
         </View>
 
         {loading ? (
-          <View style={styles.centered}><ActivityIndicator size="large" color="#E00000" /></View>
+          <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>
         ) : (
           <FlatList
             data={exercises}
@@ -255,7 +270,7 @@ export default function SessionDetailScreen() {
               behavior={Platform.OS === 'ios' ? 'padding' : undefined}
               style={styles.modalContentWrap}
             >
-              <View style={styles.modalContent}>
+              <View style={[styles.modalContent, { backgroundColor: isDark ? colors.card : P.cta, borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Edit Performance</Text>
                   <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>

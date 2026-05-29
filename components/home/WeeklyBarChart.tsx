@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text } from "react-native";
 import { FONTS } from "../../constants/theme";
 import { P, scale, vs } from "../../constants/homeTheme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface DayData {
   date: string;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function WeeklyBarChart({ data }: Props) {
+  const { colors, isDark } = useTheme();
   const maxVal = Math.max(...data.map((d) => d.duration_seconds), 1);
   const chartH = vs(80);
 
@@ -38,14 +40,14 @@ export default function WeeklyBarChart({ data }: Props) {
                 width: "100%",
                 height: barH,
                 borderRadius: scale(6),
-                backgroundColor: isToday ? P.sun : d.workouts > 0 ? P.cta : P.border,
+                backgroundColor: isToday ? P.sun : d.workouts > 0 ? P.cta : (isDark ? "#262626" : P.border),
               }}
             />
             <Text
               style={{
                 fontFamily: FONTS.bodySemiBold,
                 fontSize: scale(10),
-                color: isToday ? P.ink : P.muted,
+                color: isToday ? (isDark ? "#FFFFFF" : P.ink) : (isDark ? colors.textMuted : P.muted),
               }}
             >
               {d.label}

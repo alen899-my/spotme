@@ -14,6 +14,7 @@ import axios from "axios";
 
 import { P, scale, vs } from "../constants/homeTheme";
 import { FONTS } from "../constants/theme";
+import { useTheme } from "../contexts/ThemeContext";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 import GreetingCard       from "../components/ui/GreetingCard";
@@ -29,6 +30,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
 
   const [dashboard, setDashboard] = useState<any>(null);
   const [loading, setLoading]     = useState(true);
@@ -60,8 +62,8 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: P.offWhite }}>
-        <ActivityIndicator size="large" color={P.cta} />
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.bg }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -87,7 +89,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: P.offWhite }}
+      style={{ flex: 1, backgroundColor: colors.bg }}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
     >
@@ -111,9 +113,9 @@ export default function HomeScreen() {
 
       {/* ── Exercise of the Day ──────────────────────────────────────────── */}
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Exercise to Try</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Exercise to Try</Text>
         <TouchableOpacity onPress={() => router.push("/(tabs)/exercises")} activeOpacity={0.7}>
-          <Text style={styles.seeAll}>See all →</Text>
+          <Text style={[styles.seeAll, { color: colors.primary }]}>See all →</Text>
         </TouchableOpacity>
       </View>
       <RecommendationCard
@@ -163,12 +165,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontFamily: FONTS.heading,
     fontSize: scale(18),
-    color: P.ink,
     letterSpacing: -0.3,
   },
   seeAll: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: scale(13),
-    color: P.cta,
   },
 });

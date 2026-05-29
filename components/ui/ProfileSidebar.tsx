@@ -21,6 +21,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import StreakIcon from "./StreakIcon";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const SIDEBAR_WIDTH = SCREEN_WIDTH;
@@ -50,13 +51,9 @@ interface ProfileSidebarProps {
 }
 
 const MENU_ITEMS = [
-  { id: "home",      title: "Home",            subtitle: "Dashboard overview",         icon: "home-outline",            iconType: "Ionicons",               href: "/(tabs)/",          accent: false },
-  { id: "exercises", title: "Exercises",       subtitle: "Browse & manage exercises",  icon: "fitness-outline",         iconType: "Ionicons",               href: "/(tabs)/exercises", accent: false },
-  { id: "meals",     title: "Meals",           subtitle: "Nutrition & food tracking",  icon: "restaurant-outline",      iconType: "Ionicons",               href: "/(tabs)/meals",     accent: false },
-  { id: "daily",     title: "Daily Log",       subtitle: "Today's workout activity",   icon: "calendar-outline",        iconType: "Ionicons",               href: "/(tabs)/daily",     accent: false },
   { id: "splits",    title: "Splits",          subtitle: "Training splits & programs", icon: "layers-outline",          iconType: "Ionicons",               href: "/(tabs)/splits",    accent: false },
-  { id: "details",   title: "Profile Details", subtitle: "Personal stats & data",      icon: "account-details-outline", iconType: "MaterialCommunityIcons", href: "/profile/details",  accent: true  },
-  { id: "goals",     title: "Fitness Goals",   subtitle: "Adjust your targets",        icon: "target",                  iconType: "MaterialCommunityIcons", href: null,                accent: true  },
+  { id: "details",   title: "Profile Details", subtitle: "Personal stats & data",      icon: "account-details-outline", iconType: "MaterialCommunityIcons", href: "/profile/details",  accent: false },
+  { id: "goals",     title: "Fitness Goals",   subtitle: "Adjust your targets",        icon: "target",                  iconType: "MaterialCommunityIcons", href: null,                accent: false },
   { id: "settings",  title: "Settings",        subtitle: "Preferences & theme",        icon: "settings-outline",        iconType: "Ionicons",               href: "/profile/settings", accent: false },
 ];
 
@@ -70,6 +67,7 @@ function MenuItem({
   onPress: () => void;
   entranceAnim: Animated.Value;
 }) {
+  const { colors } = useTheme();
   const pressAnim = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
@@ -83,24 +81,33 @@ function MenuItem({
   return (
     <Animated.View style={{ transform: [{ translateY }, { scale: pressAnim }], opacity }}>
       <TouchableOpacity
-        style={[styles.menuItem, item.accent && styles.menuItemAccent]}
+        style={[
+          styles.menuItem,
+          {
+            backgroundColor: "transparent",
+            borderColor: "transparent",
+            borderWidth: 0,
+            paddingHorizontal: scale(8),
+            paddingVertical: vs(10),
+          }
+        ]}
         onPress={onPress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
-        activeOpacity={1}
+        activeOpacity={0.7}
       >
-        <View style={[styles.iconWrap, item.accent ? styles.iconWrapAccent : styles.iconWrapDefault]}>
+        <View style={[styles.iconWrap, { backgroundColor: "transparent", width: scale(28), height: scale(28) }]}>
           {item.iconType === "MaterialCommunityIcons" ? (
-            <MaterialCommunityIcons name={item.icon as any} size={scale(20)} color={P.white} />
+            <MaterialCommunityIcons name={item.icon as any} size={scale(22)} color={colors.text} />
           ) : (
-            <Ionicons name={item.icon as any} size={scale(20)} color={P.white} />
+            <Ionicons name={item.icon as any} size={scale(22)} color={colors.text} />
           )}
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.menuTitle}>{item.title}</Text>
-          <Text style={styles.menuSub}>{item.subtitle}</Text>
+        <View style={{ flex: 1, marginLeft: scale(6) }}>
+          <Text style={[styles.menuTitle, { color: colors.text }]}>{item.title}</Text>
+          <Text style={[styles.menuSub, { color: colors.textMuted }]}>{item.subtitle}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={scale(15)} color="rgba(255,255,255,0.4)" />
+        <Ionicons name="chevron-forward" size={scale(15)} color={colors.textDim} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -114,6 +121,7 @@ function LogoutButton({
   onPress: () => void;
   entranceAnim: Animated.Value;
 }) {
+  const { colors } = useTheme();
   const pressAnim = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
@@ -127,20 +135,29 @@ function LogoutButton({
   return (
     <Animated.View style={{ transform: [{ translateY }, { scale: pressAnim }], opacity }}>
       <TouchableOpacity
-        style={styles.logoutBtn}
+        style={[
+          styles.logoutBtn,
+          {
+            backgroundColor: "transparent",
+            borderColor: "transparent",
+            borderWidth: 0,
+            paddingHorizontal: scale(8),
+            paddingVertical: vs(10),
+          }
+        ]}
         onPress={onPress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
-        activeOpacity={1}
+        activeOpacity={0.7}
       >
-        <View style={styles.logoutIconWrap}>
-          <Ionicons name="log-out-outline" size={scale(20)} color={P.danger} />
+        <View style={[styles.logoutIconWrap, { backgroundColor: "transparent", width: scale(28), height: scale(28) }]}>
+          <Ionicons name="log-out-outline" size={scale(22)} color={colors.error} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.logoutTitle}>Logout</Text>
-          <Text style={styles.logoutSub}>Sign out of your account</Text>
+        <View style={{ flex: 1, marginLeft: scale(6) }}>
+          <Text style={[styles.logoutTitle, { color: colors.error }]}>Logout</Text>
+          <Text style={[styles.logoutSub, { color: colors.textMuted }]}>Sign out of your account</Text>
         </View>
-        <Ionicons name="chevron-forward" size={scale(15)} color="rgba(255,77,77,0.4)" />
+        <Ionicons name="chevron-forward" size={scale(15)} color={colors.error + "66"} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -150,6 +167,7 @@ function LogoutButton({
 export default function ProfileSidebar({ visible, user, onClose }: ProfileSidebarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors, isDark } = useTheme();
 
   const slideAnim   = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
@@ -201,7 +219,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
         setTimeout(async () => {
           await AsyncStorage.removeItem("userToken");
           await AsyncStorage.removeItem("userData");
-          router.replace("/" as any);
+          router.replace("/login" as any);
         }, 300);
       } catch (e) {
         console.error("Logout error:", e);
@@ -238,7 +256,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
       animationType="none"
       statusBarTranslucent
     >
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar translucent backgroundColor="transparent" barStyle={isDark ? "light-content" : "dark-content"} />
 
       <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]} pointerEvents={visible ? "auto" : "none"}>
 
@@ -247,24 +265,24 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
           <Animated.View
             style={[
               styles.overlay,
-              { opacity: overlayAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.65] }) },
+              { opacity: overlayAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.4] }) },
             ]}
           />
         </TouchableWithoutFeedback>
 
         {/* Sidebar */}
         <Animated.View
-          style={[styles.sidebar, { width: SIDEBAR_WIDTH, transform: [{ translateX: slideAnim }] }]}
+          style={[
+            styles.sidebar,
+            {
+              width: SIDEBAR_WIDTH,
+              transform: [{ translateX: slideAnim }],
+              backgroundColor: colors.bg,
+              borderRightWidth: 1,
+              borderRightColor: colors.border,
+            }
+          ]}
         >
-          {/* Background image */}
-          <ImageBackground
-            source={require("../../assets/authscreenimages/authback2.png")}
-            style={StyleSheet.absoluteFill}
-            imageStyle={styles.bgImage}
-          />
-          {/* Dark scrim */}
-          <View style={styles.gradientOverlay} pointerEvents="none" />
-
           {/* ── Single full-page scroll ── */}
           <ScrollView
             style={{ flex: 1 }}
@@ -276,73 +294,73 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
 
             {/* ── Close button ── */}
             <TouchableOpacity
-              style={[styles.closeBtn, { top: topPad - vs(4) }]}
+              style={[styles.closeBtn, { top: topPad - vs(4), backgroundColor: colors.inputBg }]}
               onPress={onClose}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Ionicons name="close" size={scale(18)} color={P.white} />
+              <Ionicons name="close" size={scale(18)} color={colors.text} />
             </TouchableOpacity>
 
             {/* ── Wordmark ── */}
             <View style={[styles.wordmarkRow, { marginBottom: vs(20) }]}>
-              <Text style={styles.wordmarkSpot}>spot</Text>
-              <Text style={styles.wordmarkMe}>ME</Text>
+              <Text style={[styles.wordmarkSpot, { color: colors.text }]}>spot</Text>
+              <Text style={[styles.wordmarkMe, { color: P.sun }]}>ME</Text>
             </View>
 
             {/* ── Avatar + name ── */}
             <View style={[styles.avatarRow, { marginBottom: vs(14) }]}>
               {user?.profile_pic_url ? (
-                <Image source={{ uri: user.profile_pic_url }} style={styles.avatar} />
+                <Image source={{ uri: user.profile_pic_url }} style={[styles.avatar, { borderColor: colors.border }]} />
               ) : (
-                <View style={[styles.avatar, styles.avatarFallback]}>
-                  <Ionicons name="person" size={scale(30)} color={P.cta} />
+                <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                  <Ionicons name="person" size={scale(30)} color={colors.primary} />
                 </View>
               )}
               <View style={{ flex: 1, marginLeft: scale(14) }}>
-                <Text style={styles.userName} numberOfLines={1}>
+                <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
                   {user?.full_name || "Gym Warrior"}
                 </Text>
-                <Text style={styles.userEmail} numberOfLines={1}>
+                <Text style={[styles.userEmail, { color: colors.textMuted }]} numberOfLines={1}>
                   {user?.email || "warrior@spotme.com"}
                 </Text>
                 <TouchableOpacity
-                  style={styles.editPill}
+                  style={[styles.editPill, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
                   onPress={() => handleNav("/profile/details")}
                   activeOpacity={0.75}
                 >
-                  <Ionicons name="pencil-outline" size={scale(10)} color={P.sun} />
-                  <Text style={styles.editPillText}>Edit Profile</Text>
+                  <Ionicons name="pencil-outline" size={scale(10)} color={colors.primary} />
+                  <Text style={[styles.editPillText, { color: colors.text }]}>Edit Profile</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* ── Streak badge (only when streak > 0) ── */}
             {user?.current_streak > 0 && (
-              <View style={[styles.streakWrap, { marginBottom: vs(14) }]}>
+              <View style={[styles.streakWrap, { marginBottom: vs(14), backgroundColor: colors.inputBg, borderColor: colors.border }]}>
                 <StreakIcon streak={user.current_streak} size={scale(26)} />
-                <Text style={styles.streakLabel}>{user.current_streak} DAY STREAK</Text>
+                <Text style={[styles.streakLabel, { color: colors.text }]}>{user.current_streak} DAY STREAK</Text>
               </View>
             )}
 
             {/* ── Stats row ── */}
-            <View style={[styles.statsRow, { marginBottom: vs(18) }]}>
+            <View style={[styles.statsRow, { marginBottom: vs(18), backgroundColor: colors.inputBg, borderColor: colors.border }]}>
               {[
                 { label: "Workouts",    value: user?.total_workouts ?? "—" },
                 { label: "This Week",   value: user?.week_workouts  ?? "—" },
                 { label: "Best Streak", value: user?.best_streak ? `${user.best_streak}d` : "—" },
               ].map((stat, i) => (
                 <React.Fragment key={stat.label}>
-                  {i > 0 && <View style={styles.statDivider} />}
+                  {i > 0 && <View style={[styles.statDivider, { backgroundColor: colors.border }]} />}
                   <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{stat.value}</Text>
-                    <Text style={styles.statLabel}>{stat.label}</Text>
+                    <Text style={[styles.statValue, { color: colors.text }]}>{stat.value}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>{stat.label}</Text>
                   </View>
                 </React.Fragment>
               ))}
             </View>
 
             {/* ── Thin rule before menu ── */}
-            <View style={[styles.sectionRule, { marginBottom: vs(16) }]} />
+            <View style={[styles.sectionRule, { backgroundColor: colors.border, marginBottom: vs(16) }]} />
 
             {/* ── Menu items ── */}
             <View style={{ gap: scale(8) }}>
@@ -360,7 +378,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
             </View>
 
             {/* ── Divider before logout ── */}
-            <View style={[styles.sectionRule, { marginTop: vs(16), marginBottom: vs(12) }]} />
+            <View style={[styles.sectionRule, { backgroundColor: colors.border, marginTop: vs(16), marginBottom: vs(12) }]} />
 
             {/* ── Logout button ── */}
             <LogoutButton
@@ -369,7 +387,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
             />
 
             {/* ── Version ── */}
-            <Text style={[styles.versionText, { marginTop: vs(20) }]}>spotME v1.0.0</Text>
+            <Text style={[styles.versionText, { color: colors.textDim, marginTop: vs(20) }]}>spotME v1.0.0</Text>
 
           </ScrollView>
         </Animated.View>
@@ -381,7 +399,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: P.inkDeep,
+    backgroundColor: "#000000",
   },
 
   sidebar: {

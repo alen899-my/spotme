@@ -23,41 +23,49 @@ interface ThemeColors {
 }
 
 const LIGHT_COLORS: ThemeColors = {
-  bg: '#FBFBFB',
+  bg: '#F5F7FA',
   card: '#FFFFFF',
-  text: '#111111',
-  textMuted: '#666666',
-  textDim: '#999999',
-  border: '#EEEEEE',
-  inputBg: '#F7F7F7',
+  text: '#0F1923',
+  textMuted: '#64748B',
+  textDim: '#94A3B8',
+  border: '#E2E8F0',
+  inputBg: '#F8FAFC',
   tabBar: '#FFFFFF',
-  tabBarBorder: '#E5E5E5',
-  pill: '#F9F9F9',
+  tabBarBorder: '#E2E8F0',
+  pill: '#F1F5F9',
   activeBg: '#FFFFFF',
-  iconCircle: '#F5F5F5',
-  primary: '#E00000',
-  primaryDark: '#8B0000',
-  error: '#E00000',
-  success: '#4CAF50',
+  iconCircle: '#EFF6FF',
+  primary: '#2596BE',
+  primaryDark: '#1a6e8a',
+  error: '#EF4444',
+  success: '#10B981',
 };
 
 const DARK_COLORS: ThemeColors = {
-  bg: '#000000',
-  card: '#000000',
-  text: '#FFFFFF',
-  textMuted: 'rgba(255,255,255,0.6)',
-  textDim: 'rgba(255,255,255,0.4)',
-  border: 'rgba(255,255,255,0.12)',
-  inputBg: '#09090b',
-  tabBar: '#000000',
-  tabBarBorder: 'rgba(255,255,255,0.12)',
-  pill: '#09090b',
-  activeBg: '#111111',
-  iconCircle: 'rgba(224,0,0,0.15)',
-  primary: '#E00000',
-  primaryDark: '#8B0000',
-  error: '#E00000',
-  success: '#4CAF50',
+  // Pure black background — the hero of dark mode
+  bg:           '#000000',
+  // Elevated card surface — barely lifted zinc-950
+  card:         '#0D0D0D',
+  // Text
+  text:         '#F1F5F9',
+  textMuted:    'rgba(241,245,249,0.55)',
+  textDim:      'rgba(241,245,249,0.30)',
+  // Borders — subtle glass-like
+  border:       'rgba(255,255,255,0.07)',
+  // Inputs — one step above card
+  inputBg:      '#1A1A1A',
+  // Tab bar
+  tabBar:       '#000000',
+  tabBarBorder: 'rgba(255,255,255,0.08)',
+  // Misc surfaces
+  pill:         '#111111',
+  activeBg:     '#111111',
+  iconCircle:   'rgba(37,150,190,0.18)',
+  // Brand
+  primary:      '#2596BE',
+  primaryDark:  '#1a6e8a',
+  error:        '#F87171',
+  success:      '#34D399',
 };
 
 interface ThemeContextType {

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import Body, { ExtendedBodyPart, Slug } from "react-native-body-highlighter";
 import { FONTS } from "../../constants/theme";
 import { scale, vs, getBMIStatus } from "../../constants/homeTheme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -37,6 +38,7 @@ export default function BodyStatusCard({
   weeklyWorkouts,
   dbMuscleActivity,
 }: Props) {
+  const { colors, isDark } = useTheme();
   const [bodySide, setBodySide]               = useState<"front" | "back">("front");
   const [selectedMuscles, setSelectedMuscles] = useState<Slug[]>([]);
 
@@ -77,17 +79,26 @@ export default function BodyStatusCard({
     <>
       {/* ── Section header ───────────────────────────────────── */}
       <View style={[styles.headerRow, { marginTop: vs(4) }]}>
-        <Text style={styles.sectionTitle}>Body status</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Body status</Text>
 
-        <View style={styles.toggleTrack}>
+        <View style={[styles.toggleTrack, { backgroundColor: isDark ? '#1A1A1A' : C.toggleBg }]}>
           {(["front", "back"] as const).map((side) => (
             <TouchableOpacity
               key={side}
               onPress={() => setBodySide(side)}
-              style={[styles.toggleBtn, bodySide === side && styles.toggleBtnActive]}
+              style={[
+                styles.toggleBtn,
+                bodySide === side && { backgroundColor: isDark ? colors.primary : C.sun },
+              ]}
               activeOpacity={0.8}
             >
-              <Text style={[styles.toggleTxt, bodySide === side && styles.toggleTxtActive]}>
+              <Text
+                style={[
+                  styles.toggleTxt,
+                  { color: isDark ? colors.textMuted : C.lightText },
+                  bodySide === side && { color: isDark ? "#FFFFFF" : C.ink },
+                ]}
+              >
                 {side.charAt(0).toUpperCase() + side.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -96,11 +107,20 @@ export default function BodyStatusCard({
       </View>
 
       {/* ── Card ─────────────────────────────────────────────── */}
-      <View style={styles.card}>
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: isDark ? colors.card : C.cardBg,
+            borderWidth: isDark ? 1 : 0,
+            borderColor: isDark ? colors.border : "transparent",
+          },
+        ]}
+      >
 
         {/* BMI badge */}
         <View style={styles.badgeRow}>
-          <View style={styles.badge}>
+          <View style={[styles.badge, { backgroundColor: isDark ? "#1A1A1A" : C.iconBg }]}>
             <View style={[styles.badgeDot, { backgroundColor: fitnessColor }]} />
             <Text style={styles.badgeStatus}>{fitnessStatus}</Text>
             <View style={styles.bmiChip}>
@@ -118,8 +138,8 @@ export default function BodyStatusCard({
               side={bodySide}
               scale={1.15}
               colors={["#F7CB1644", "#F7CB16AA", "#F7CB16"]}
-              defaultFill={"#1a3a45"}
-              defaultStroke={"rgba(255,255,255,0.2)"}
+              defaultFill={isDark ? "#222222" : "#1a3a45"}
+              defaultStroke={isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.2)"}
               defaultStrokeWidth={0.5}
               onBodyPartPress={handleMusclePress}
             />
@@ -127,7 +147,7 @@ export default function BodyStatusCard({
         </View>
 
         {/* Divider */}
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : C.lightBorder }]} />
 
         {/* Stats row */}
         <View style={styles.statsRow}>
@@ -135,14 +155,18 @@ export default function BodyStatusCard({
             <React.Fragment key={s.lbl}>
               <View style={styles.statItem}>
                 <Text style={[styles.statVal, { color: s.color }]}>{s.val}</Text>
-                <Text style={styles.statLbl}>{s.lbl}</Text>
+                <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : C.lightText }]}>{s.lbl}</Text>
               </View>
-              {i < arr.length - 1 && <View style={styles.statSep} />}
+              {i < arr.length - 1 && (
+                <View style={[styles.statSep, { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : C.lightBorder }]} />
+              )}
             </React.Fragment>
           ))}
         </View>
 
-        <Text style={styles.tapHint}>Tap a muscle to highlight it</Text>
+        <Text style={[styles.tapHint, { color: isDark ? colors.textMuted : C.lightText }]}>
+          Tap a muscle to highlight it
+        </Text>
       </View>
     </>
   );
@@ -161,7 +185,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontFamily: FONTS.heading,
     fontSize: scale(18),
-    color: C.ink,
     letterSpacing: -0.3,
   },
 

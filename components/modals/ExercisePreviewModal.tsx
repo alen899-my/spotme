@@ -24,7 +24,7 @@ interface ExercisePreviewModalProps {
 }
 
 const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, exercise, onClose }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   if (!exercise) return null;
 
@@ -50,8 +50,8 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, ex
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.guideOverlay}>
-        <View style={[styles.guideContent, { backgroundColor: colors.card, borderColor: P.border }]}>
+      <View style={[styles.guideOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(4,40,43,0.78)' }]}>
+        <View style={[styles.guideContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TouchableOpacity style={styles.closeGuide} onPress={onClose}>
             <Ionicons name="close-circle" size={32} color="rgba(255,255,255,0.85)" />
           </TouchableOpacity>
@@ -64,19 +64,19 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, ex
                 resizeMode="contain" 
               />
             </View>
-            <View style={styles.guideBody}>
+             <View style={styles.guideBody}>
               <Text style={[styles.guideName, { color: colors.text }]}>{exercise.name}</Text>
               
               <View style={styles.guideMetaRow}>
-                <View style={styles.guideBadge}>
-                  <Text style={styles.guideBadgeText}>{exercise.equipment}</Text>
+                <View style={[styles.guideBadge, { backgroundColor: isDark ? colors.inputBg : 'rgba(37,150,190,0.12)', borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
+                  <Text style={[styles.guideBadgeText, { color: isDark ? colors.primary : P.ctaDeep }]}>{exercise.equipment}</Text>
                 </View>
-                <View style={styles.guideBadge}>
-                  <Text style={styles.guideBadgeText}>{exercise.target}</Text>
+                <View style={[styles.guideBadge, { backgroundColor: isDark ? colors.inputBg : 'rgba(37,150,190,0.12)', borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
+                  <Text style={[styles.guideBadgeText, { color: isDark ? colors.primary : P.ctaDeep }]}>{exercise.target}</Text>
                 </View>
               </View>
               
-              <Text style={styles.guideSectionTitle}>Instructions</Text>
+              <Text style={[styles.guideSectionTitle, { color: isDark ? colors.primary : P.cta }]}>Instructions</Text>
               {steps.length > 0 ? (
                 steps.map((step, index) => (
                   <View key={index} style={styles.stepRow}>
@@ -97,7 +97,7 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, ex
           </ScrollView>
 
           <TouchableOpacity style={styles.gotItBtn} onPress={onClose}>
-            <View style={styles.gotItBtnGrad}>
+            <View style={[styles.gotItBtnGrad, { backgroundColor: isDark ? colors.primary : P.cta }]}>
               <Text style={styles.gotItBtnText}>GOT IT, LET'S GO!</Text>
             </View>
           </TouchableOpacity>

@@ -41,21 +41,33 @@ function CalendarModal({
   onSelect: (d: Date) => void;
   variant?: 'default' | 'nutrition';
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [viewYear, setViewYear]   = useState(baseDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(baseDate.getMonth());
   const isNutrition = variant === 'nutrition';
+  
   const palette = isNutrition
-    ? {
-        sheetBg: '#2596BE',
-        sheetBorder: 'rgba(247,203,22,0.34)',
-        text: '#FFFFFF',
-        muted: 'rgba(255,255,255,0.70)',
-        accent: '#F7CB16',
-        accentSoft: 'rgba(247,203,22,0.16)',
-        inactiveText: '#FFFFFF',
-        activeText: '#04282B',
-      }
+    ? (isDark
+        ? {
+            sheetBg: colors.card,
+            sheetBorder: colors.border,
+            text: colors.text,
+            muted: colors.textDim,
+            accent: '#F7CB16',
+            accentSoft: 'rgba(247,203,22,0.16)',
+            inactiveText: colors.text,
+            activeText: '#04282B',
+          }
+        : {
+            sheetBg: '#2596BE',
+            sheetBorder: 'rgba(247,203,22,0.34)',
+            text: '#FFFFFF',
+            muted: 'rgba(255,255,255,0.70)',
+            accent: '#F7CB16',
+            accentSoft: 'rgba(247,203,22,0.16)',
+            inactiveText: '#FFFFFF',
+            activeText: '#04282B',
+          })
     : {
         sheetBg: colors.card,
         sheetBorder: colors.border,
@@ -211,25 +223,41 @@ const cal = StyleSheet.create({
 
 // ── Main DatePicker ────────────────────────────────────────────────────────────
 export default function DatePicker({ selectedDate, onSelectDate, variant = 'default' }: DatePickerProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const [showCal, setShowCal] = useState(false);
   const isNutrition = variant === 'nutrition';
+  
   const palette = isNutrition
-    ? {
-        cardBg: '#2596BE',
-        cardBorder: 'rgba(247,203,22,0.34)',
-        text: '#FFFFFF',
-        muted: 'rgba(255,255,255,0.72)',
-        accent: '#F7CB16',
-        accentSoft: 'rgba(247,203,22,0.16)',
-        pillBg: '#FBE58A',
-        pillBorder: '#F7CB16',
-        pillText: '#04282B',
-        pillMuted: 'rgba(4,40,43,0.72)',
-        activeText: '#04282B',
-        shadow: '#2596BE',
-      }
+    ? (isDark
+        ? {
+            cardBg: colors.card,
+            cardBorder: colors.border,
+            text: colors.text,
+            muted: colors.textDim,
+            accent: '#F7CB16',
+            accentSoft: 'rgba(247,203,22,0.15)',
+            pillBg: colors.inputBg,
+            pillBorder: colors.border,
+            pillText: colors.text,
+            pillMuted: colors.textDim,
+            activeText: '#04282B',
+            shadow: 'transparent',
+          }
+        : {
+            cardBg: '#2596BE',
+            cardBorder: 'rgba(247,203,22,0.34)',
+            text: '#FFFFFF',
+            muted: 'rgba(255,255,255,0.72)',
+            accent: '#F7CB16',
+            accentSoft: 'rgba(247,203,22,0.16)',
+            pillBg: '#FBE58A',
+            pillBorder: '#F7CB16',
+            pillText: '#04282B',
+            pillMuted: 'rgba(4,40,43,0.72)',
+            activeText: '#04282B',
+            shadow: '#2596BE',
+          })
     : {
         cardBg: 'transparent',
         cardBorder: 'transparent',
@@ -434,4 +462,3 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.7)', marginTop: 4,
   },
 });
-

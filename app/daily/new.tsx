@@ -19,7 +19,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 export default function NewDailyWorkout() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
 
   const [splits, setSplits] = useState<any[]>([]);
@@ -107,13 +107,14 @@ export default function NewDailyWorkout() {
         </View>
 
         {/* Date/Time Hero Card */}
-        <View style={styles.heroCard}>
+        {/* Date/Time Hero Card */}
+        <View style={[styles.heroCard, isDark && { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
           <View style={styles.heroBadge}>
-            <Ionicons name="flash" size={14} color="#FFF" />
-            <Text style={styles.heroBadgeText}>TODAY'S SESSION</Text>
+            <Ionicons name="flash" size={14} color={isDark ? colors.primary : "#FFF"} />
+            <Text style={[styles.heroBadgeText, isDark && { color: colors.textMuted }]}>TODAY'S SESSION</Text>
           </View>
-          <Text style={styles.heroDate}>{dateStr}</Text>
-          <Text style={styles.heroTime}>{timeStr}</Text>
+          <Text style={[styles.heroDate, isDark && { color: colors.text }]}>{dateStr}</Text>
+          <Text style={[styles.heroTime, isDark && { color: colors.textMuted }]}>{timeStr}</Text>
         </View>
 
         <ScrollView
@@ -125,7 +126,7 @@ export default function NewDailyWorkout() {
         >
           {/* Step 1: Choose Split */}
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            <Text style={{ color: P.cta }}>1. </Text>Choose Program
+            <Text style={{ color: colors.primary }}>1. </Text>Choose Program
           </Text>
 
           {loadingSplits ? (
@@ -146,11 +147,11 @@ export default function NewDailyWorkout() {
                   style={[
                     styles.splitCard,
                     { backgroundColor: colors.card, borderColor: colors.border },
-                    selectedSplit?.id === split.id && { borderColor: P.cta, backgroundColor: 'rgba(37,150,190,0.08)' }
+                    selectedSplit?.id === split.id && { borderColor: colors.primary, backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(37,150,190,0.08)' }
                   ]}
                   onPress={() => handleSelectSplit(split)}
                 >
-                  <View style={[styles.splitIcon, { backgroundColor: selectedSplit?.id === split.id ? P.cta : colors.inputBg }]}>
+                  <View style={[styles.splitIcon, { backgroundColor: selectedSplit?.id === split.id ? colors.primary : colors.inputBg }]}>
                     <MaterialCommunityIcons
                       name="dumbbell"
                       size={20}
@@ -162,7 +163,7 @@ export default function NewDailyWorkout() {
                     <Text style={[styles.splitMeta, { color: colors.textMuted }]}>{split.session_count} sessions</Text>
                   </View>
                   {selectedSplit?.id === split.id && (
-                    <Ionicons name="checkmark-circle" size={22} color={P.cta} />
+                    <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -173,11 +174,11 @@ export default function NewDailyWorkout() {
           {selectedSplit && (
             <>
               <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>
-                <Text style={{ color: P.cta }}>2. </Text>Choose Day
+                <Text style={{ color: colors.primary }}>2. </Text>Choose Day
               </Text>
 
               {loadingSessions ? (
-                <ActivityIndicator color={P.cta} style={{ marginVertical: 20 }} />
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
               ) : sessions.length === 0 ? (
                 <Text style={[styles.noSessions, { color: colors.textMuted }]}>No sessions in this program yet.</Text>
               ) : (
@@ -188,11 +189,11 @@ export default function NewDailyWorkout() {
                       style={[
                         styles.splitCard,
                         { backgroundColor: colors.card, borderColor: colors.border },
-                        selectedSession?.id === session.id && { borderColor: P.cta, backgroundColor: 'rgba(37,150,190,0.08)' }
+                        selectedSession?.id === session.id && { borderColor: colors.primary, backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(37,150,190,0.08)' }
                       ]}
                       onPress={() => setSelectedSession(session)}
                     >
-                      <View style={[styles.splitIcon, { backgroundColor: selectedSession?.id === session.id ? P.cta : colors.inputBg }]}>
+                      <View style={[styles.splitIcon, { backgroundColor: selectedSession?.id === session.id ? colors.primary : colors.inputBg }]}>
                         <Ionicons
                           name="calendar"
                           size={18}
@@ -204,7 +205,7 @@ export default function NewDailyWorkout() {
                         <Text style={[styles.splitMeta, { color: colors.textMuted }]}>{session.exercise_count} exercises</Text>
                       </View>
                       {selectedSession?.id === session.id && (
-                        <Ionicons name="checkmark-circle" size={22} color={P.cta} />
+                        <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -228,7 +229,7 @@ export default function NewDailyWorkout() {
             onPress={handleStart}
             disabled={!selectedSplit || !selectedSession || starting}
           >
-            <View style={styles.startBtnGradient}>
+            <View style={[styles.startBtnGradient, { backgroundColor: colors.primary }]}>
               {starting ? <ActivityIndicator color="#FFF" /> : (
                 <>
                   <Ionicons name="play" size={20} color="#FFF" />

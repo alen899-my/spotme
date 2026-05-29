@@ -10,14 +10,16 @@ import {
   Outfit_900Black 
 } from "@expo-google-fonts/outfit";
 import { BebasNeue_400Regular } from "@expo-google-fonts/bebas-neue";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { ToastProvider } from "../contexts/ToastContext";
 import SilentUpdateManager from "../components/SilentUpdateManager";
+import AnimatedSplash from "../components/ui/AnimatedSplash";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const [splashFinished, setSplashFinished] = useState(false);
   const [loaded, error] = useFonts({
     Outfit_400Regular,
     Outfit_600SemiBold,
@@ -40,8 +42,14 @@ export default function RootLayout() {
     <ThemeProvider>
       <SafeAreaProvider>
         <ToastProvider>
-          <Stack screenOptions={{ headerShown: false }} />
-          <SilentUpdateManager />
+          {!splashFinished ? (
+            <AnimatedSplash onFinish={() => setSplashFinished(true)} />
+          ) : (
+            <>
+              <Stack screenOptions={{ headerShown: false }} />
+              <SilentUpdateManager />
+            </>
+          )}
         </ToastProvider>
       </SafeAreaProvider>
     </ThemeProvider>

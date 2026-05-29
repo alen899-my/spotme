@@ -67,6 +67,7 @@ const ExerciseCard = React.memo(({
   openSetModal: (item: any) => void; handleRateExercise: (id: number, rating: number) => Promise<void>;
   loadingSkip: boolean; loadingLogSet: boolean;
 }) => {
+  const { isDark } = useTheme();
   const [localRating, setLocalRating] = useState<number | null>(item.rating || null);
   // ── 2. Accordion state ──
   const [expanded, setExpanded] = useState(true);
@@ -88,7 +89,11 @@ const ExerciseCard = React.memo(({
   return (
     <View style={[
       styles.exCard,
-      { backgroundColor: P.cta, borderColor: isSkipped ? P.border : (isDone ? '#10B981' : P.ctaDark) },
+      { 
+        backgroundColor: isDark ? colors.card : P.cta, 
+        borderColor: isDark ? colors.border : (isSkipped ? P.border : (isDone ? '#10B981' : P.ctaDark)),
+        borderWidth: isDark ? 1 : 0 
+      },
       isSkipped && { opacity: 0.7 },
     ]}>
       {/* ── HEADER (always visible) ── */}
@@ -101,36 +106,36 @@ const ExerciseCard = React.memo(({
         <View style={{ flex: 1 }}>
           {/* ── 3. Title wraps, no truncation ── */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap' }}>
-            <Text style={styles.exName}>{item.name}</Text>
+            <Text style={[styles.exName, { color: isDark ? colors.text : '#FFF' }]}>{item.name}</Text>
             <TouchableOpacity onPress={(e) => { e.stopPropagation(); openGuide(item); }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-              <Ionicons name="information-circle-outline" size={16} color={P.sun} style={{ marginTop: 3 }} />
+              <Ionicons name="information-circle-outline" size={16} color={isDark ? colors.primary : P.sun} style={{ marginTop: 3 }} />
             </TouchableOpacity>
           </View>
           {/* ── 4. Progress bar instead of meta text ── */}
           <View style={styles.headerProgressWrap}>
-            <View style={[styles.headerProgressBar, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+            <View style={[styles.headerProgressBar, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
               <View style={[
                 styles.headerProgressFill,
                 {
                   width: `${Math.min((completedSets / targetSets) * 100, 100)}%` as any,
-                  backgroundColor: isDone ? '#10B981' : P.sun,
+                  backgroundColor: isDone ? '#10B981' : (isDark ? colors.primary : P.sun),
                 },
               ]} />
             </View>
-            <Text style={styles.headerProgressLabel}>{completedSets}/{targetSets} sets</Text>
+            <Text style={[styles.headerProgressLabel, { color: isDark ? colors.textMuted : '#FFF' }]}>{completedSets}/{targetSets} sets</Text>
           </View>
         </View>
         <View style={{ alignItems: 'center', gap: 4, marginLeft: 8 }}>
           {isDone && !isSkipped && <Ionicons name="checkmark-circle" size={22} color="#10B981" />}
           {isSkipped && <Text style={styles.skipLabel}>SKIPPED</Text>}
-          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color="rgba(255,255,255,0.6)" />
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={isDark ? colors.textMuted : "rgba(255,255,255,0.6)"} />
         </View>
         {workoutStatus === 'active' && (
           <TouchableOpacity
             onPress={(e) => { e.stopPropagation(); removeExercise(item.id); }}
             style={{ padding: 6, marginLeft: 4 }}
           >
-            <Ionicons name="trash-outline" size={20} color="rgba(255,255,255,0.72)" />
+            <Ionicons name="trash-outline" size={20} color={isDark ? colors.textMuted : "rgba(255,255,255,0.72)"} />
           </TouchableOpacity>
         )}
       </TouchableOpacity>
@@ -285,10 +290,11 @@ const RestShakeIcon = ({ restTimer, restRunning }: { restTimer: number; restRunn
   }, [restTimer, restRunning]);
 
   const isAlert = restTimer === 0 && restRunning;
+  const { colors, isDark } = useTheme();
   return (
     <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
-      <View style={[styles.dashIconBox, { backgroundColor: isAlert ? '#EF4444' : P.ctaDark }]}>
-        <Ionicons name={isAlert ? 'alert-circle' : 'cafe'} size={16} color="#FFF" />
+      <View style={[styles.dashIconBox, { backgroundColor: isAlert ? '#EF4444' : (isDark ? colors.inputBg : P.ctaDark) }]}>
+        <Ionicons name={isAlert ? 'alert-circle' : 'cafe'} size={16} color={isDark ? colors.primary : '#FFF'} />
       </View>
     </Animated.View>
   );
@@ -301,7 +307,7 @@ export default function ActiveWorkoutScreen() {
   const router = useRouter();
   const { id: workoutId } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
 
   const [workout, setWorkout] = useState<any>(null);
@@ -873,40 +879,48 @@ export default function ActiveWorkoutScreen() {
         {/* ── Dashboard row with ① rest shake icon ── */}
         {workout?.status === 'active' && (
           <View style={[styles.dashboardRow, { backgroundColor: colors.bg }]}>
-            <View style={styles.dashboardPill}>
+            <View style={[
+              styles.dashboardPill, 
+              { 
+                backgroundColor: isDark ? colors.card : P.cta, 
+                borderColor: isDark ? colors.border : P.ctaDark,
+                borderWidth: isDark ? 1 : 1,
+                shadowColor: isDark ? 'transparent' : P.ctaDeep,
+              }
+            ]}>
               <TouchableOpacity style={styles.dashSegment} onPress={() => openTimerDetail('workout')}>
                 <View style={[styles.dashIconBox, { backgroundColor: P.sun }]}>
-                  <Ionicons name="timer" size={16} color="#FFF" />
+                  <Ionicons name="timer" size={16} color={isDark ? P.ink : "#FFF"} />
                 </View>
                 <View style={styles.dashTextWrap}>
-                  <Text style={styles.dashLabel}>WORKOUT</Text>
-                  <Text style={styles.dashText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatTime(workoutElapsed)}</Text>
+                  <Text style={[styles.dashLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>WORKOUT</Text>
+                  <Text style={[styles.dashText, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatTime(workoutElapsed)}</Text>
                 </View>
               </TouchableOpacity>
 
-              <View style={styles.dashDivider} />
+              <View style={[styles.dashDivider, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.16)' }]} />
 
               {/* ① Shake icon instead of toast */}
               <TouchableOpacity style={styles.dashSegment} onPress={() => openTimerDetail('rest')}>
                 <RestShakeIcon restTimer={restTimer} restRunning={restRunning} />
                 <View style={styles.dashTextWrap}>
-                  <Text style={styles.dashLabel}>REST</Text>
-                  <Text style={[styles.dashText, restTimer === 0 && restRunning ? { color: '#EF4444' } : null]}
+                  <Text style={[styles.dashLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>REST</Text>
+                  <Text style={[styles.dashText, { color: isDark ? colors.text : '#FFF' }, restTimer === 0 && restRunning ? { color: '#EF4444' } : null]}
                     numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     {formatTime(restTimer)}
                   </Text>
                 </View>
               </TouchableOpacity>
 
-              <View style={styles.dashDivider} />
+              <View style={[styles.dashDivider, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.16)' }]} />
 
               <TouchableOpacity style={styles.dashSegment} onPress={() => openTimerDetail('totalRest')}>
                 <View style={[styles.dashIconBox, { backgroundColor: '#10B981' }]}>
                   <Ionicons name="hourglass" size={16} color="#FFF" />
                 </View>
                 <View style={styles.dashTextWrap}>
-                  <Text style={styles.dashLabel}>TOTAL REST</Text>
-                  <Text style={styles.dashText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatTime(totalRestElapsed)}</Text>
+                  <Text style={[styles.dashLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>TOTAL REST</Text>
+                  <Text style={[styles.dashText, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatTime(totalRestElapsed)}</Text>
                 </View>
               </TouchableOpacity>
             </View>

@@ -5,17 +5,12 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppHeader from "../../components/ui/AppHeader";
 import ProfileSidebar from "../../components/ui/ProfileSidebar";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const { width: W } = Dimensions.get("window");
 
-const C = {
-  sun: "#F7CB16",
-  ink: "#04282B",
-  white: "#FFFFFF",
-  pageBg: "#F5F9FC",
-  border: "rgba(37,150,190,0.14)",
-  text: "rgba(4,40,43,0.72)",
-};
+const SUN = "#F7CB16";
+const INK = "#04282B";
 
 const TABS = [
   { name: "index", icon: "home" as const, iconOutline: "home-outline" as const, href: "/(tabs)/" },
@@ -28,6 +23,7 @@ const TABS = [
 function TopTabBar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   const [barWidth, setBarWidth] = useState(W - 16);
 
   const activeIndex = TABS.findIndex((tab) =>
@@ -39,7 +35,7 @@ function TopTabBar() {
   const tabWidth = Math.max(60, Math.min(82, Math.floor(barWidth / TABS.length) - 2));
 
   return (
-    <View style={styles.topBar}>
+    <View style={[styles.topBar, { backgroundColor: colors.tabBar, borderBottomColor: colors.tabBarBorder, borderBottomWidth: isDark ? 1 : 0 }]}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -48,18 +44,21 @@ function TopTabBar() {
       >
         {TABS.map((tab, i) => {
           const isActive = i === current;
-
           return (
             <TouchableOpacity
               key={tab.name}
               onPress={() => router.push(tab.href as any)}
               activeOpacity={0.8}
-              style={[styles.tabPill, { width: tabWidth }, isActive && styles.tabPillActive]}
+              style={[
+                styles.tabPill,
+                { width: tabWidth, borderWidth: isDark ? 0 : 1, borderColor: 'rgba(37,150,190,0.14)' },
+                isActive && (isDark ? { backgroundColor: colors.inputBg, borderColor: colors.primary, borderWidth: 1 } : styles.tabPillActive),
+              ]}
             >
               <Ionicons
                 name={isActive ? tab.icon : tab.iconOutline}
                 size={21}
-                color={isActive ? C.ink : C.text}
+                color={isActive ? (isDark ? colors.primary : INK) : (isDark ? colors.textMuted : 'rgba(4,40,43,0.72)')}
               />
             </TouchableOpacity>
           );
@@ -70,6 +69,7 @@ function TopTabBar() {
 }
 
 export default function TabsLayout() {
+  const { colors } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const pathname = usePathname();
@@ -85,7 +85,7 @@ export default function TabsLayout() {
   }, [pathname]);
 
   return (
-    <View style={styles.shell}>
+    <View style={[styles.shell, { backgroundColor: colors.bg }]}>
       <AppHeader user={user} onProfilePress={() => setSidebarOpen(true)} />
       <TopTabBar />
       <Tabs screenOptions={{ headerShown: false }} tabBar={() => null}>
@@ -110,10 +110,8 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   shell: {
     flex: 1,
-    backgroundColor: C.pageBg,
   },
   topBar: {
-    backgroundColor: "transparent",
     paddingTop: 0,
     marginBottom: 8,
   },
@@ -132,10 +130,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: C.border,
   },
   tabPillActive: {
-    backgroundColor: C.sun,
-    borderColor: C.sun,
+    backgroundColor: SUN,
+    borderColor: SUN,
   },
 });

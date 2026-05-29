@@ -23,7 +23,8 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 // Hero gradient: vibrant blue → deep blue
-const HERO_GRADIENT: [string, string] = ['#2596BE', '#1a6e8a'];
+const HERO_GRADIENT_LIGHT: [string, string] = ['#2596BE', '#1a6e8a'];
+const HERO_GRADIENT_DARK: [string, string] = ['#0D0D0D', '#050505'];
 
 // Six stat cards — distinct shades that all live in a blue-teal family
 const STAT_COLORS = [
@@ -60,7 +61,7 @@ function formatRecord(metricType?: string, value?: number | string) {
 export default function WorkoutCompleteScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const params = useLocalSearchParams();
 
@@ -225,20 +226,26 @@ export default function WorkoutCompleteScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── 1. Hero — green completion gradient ── */}
-        <LinearGradient colors={HERO_GRADIENT} style={styles.hero}>
+        <LinearGradient 
+          colors={isDark ? HERO_GRADIENT_DARK : HERO_GRADIENT_LIGHT} 
+          style={[
+            styles.hero,
+            isDark && { borderBottomWidth: 1, borderColor: colors.border }
+          ]}
+        >
           {newStreak !== null && newStreak > 0 ? (
             <View style={{ marginBottom: 20 }}>
               <StreakIcon streak={newStreak} size={100} />
             </View>
           ) : (
-            <View style={styles.heroIcon}>
-              <Ionicons name="trophy" size={48} color="#FFF" />
+            <View style={[styles.heroIcon, isDark && { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
+              <Ionicons name="trophy" size={48} color={isDark ? colors.primary : "#FFF"} />
             </View>
           )}
-          <Text style={styles.heroTitle}>
+          <Text style={[styles.heroTitle, isDark && { color: colors.text }]}>
             {newStreak !== null && newStreak > 0 ? 'Perfect Workout!' : 'Workout Complete!'}
           </Text>
-          <Text style={styles.heroSub}>
+          <Text style={[styles.heroSub, isDark && { color: colors.textMuted }]}>
             {newStreak !== null && newStreak > 0
               ? `You kept your ${newStreak} day streak alive! 🔥`
               : 'You crushed it today 💪'}
@@ -250,14 +257,23 @@ export default function WorkoutCompleteScreen() {
           {stats.map((s, i) => (
             <View
               key={i}
-              style={[styles.perfCard, { backgroundColor: STAT_COLORS[i] }]}
+              style={[
+                styles.perfCard,
+                { backgroundColor: STAT_COLORS[i] },
+                isDark && {
+                  backgroundColor: colors.card,
+                  borderColor: STAT_COLORS[i],
+                  borderWidth: 1,
+                  shadowColor: '#000000',
+                }
+              ]}
             >
-              <View style={styles.perfIconBox}>
-                <Ionicons name={s.icon as any} size={18} color="#FFF" />
+              <View style={[styles.perfIconBox, isDark && { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
+                <Ionicons name={s.icon as any} size={18} color={isDark ? STAT_COLORS[i] : "#FFF"} />
               </View>
-              <Text style={styles.perfLabel}>{s.label}</Text>
-              <Text style={styles.perfValue}>{s.value}</Text>
-              <Text style={styles.perfSub}>{s.sub}</Text>
+              <Text style={[styles.perfLabel, isDark && { color: colors.textMuted }]}>{s.label}</Text>
+              <Text style={[styles.perfValue, isDark && { color: colors.text }]}>{s.value}</Text>
+              <Text style={[styles.perfSub, isDark && { color: colors.textDim }]}>{s.sub}</Text>
             </View>
           ))}
         </View>
@@ -294,14 +310,22 @@ export default function WorkoutCompleteScreen() {
                   return (
                     <View
                       key={ex.id}
-                      style={[styles.exCard, isSkipped && { opacity: 0.55 }]}
+                      style={[
+                        styles.exCard, 
+                        isSkipped && { opacity: 0.55 },
+                        isDark && { 
+                          backgroundColor: colors.pill, 
+                          borderColor: colors.border,
+                          borderWidth: 1 
+                        }
+                      ]}
                     >
                       {/* Card header row */}
                       <View style={styles.exHeader}>
                         <Image source={{ uri: ex.image_url }} style={styles.exImage} />
                         <View style={styles.exMeta}>
-                          <Text style={styles.exName} numberOfLines={2}>{ex.name}</Text>
-                          <Text style={styles.exSetsSub}>
+                          <Text style={[styles.exName, isDark && { color: colors.text }]} numberOfLines={2}>{ex.name}</Text>
+                          <Text style={[styles.exSetsSub, isDark && { color: colors.textMuted }]}>
                             {isSkipped ? 'Movement skipped' : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
                           </Text>
                         </View>
@@ -328,21 +352,21 @@ export default function WorkoutCompleteScreen() {
                       {/* Record row */}
                       {!isSkipped && (
                         <View style={styles.recordRow}>
-                          <View style={styles.recordPill}>
-                            <Text style={styles.recordPillLabel}>BEST SET</Text>
-                            <Text style={styles.recordPillVal}>
+                          <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
+                            <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>BEST SET</Text>
+                            <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
                               {Number(ex.best_set_weight || 0).toFixed(1)}kg × {ex.best_set_reps || 0}
                             </Text>
                           </View>
-                          <View style={styles.recordPill}>
-                            <Text style={styles.recordPillLabel}>MY PR</Text>
-                            <Text style={styles.recordPillVal}>
+                          <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
+                            <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>MY PR</Text>
+                            <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
                               {formatRecord(ex.record_metric_type, ex.personal_record_value)}
                             </Text>
                           </View>
-                          <View style={styles.recordPill}>
-                            <Text style={styles.recordPillLabel}>WORLD PR</Text>
-                            <Text style={styles.recordPillVal}>
+                          <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
+                            <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>WORLD PR</Text>
+                            <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
                               {formatRecord(ex.record_metric_type, ex.world_record_value)}
                             </Text>
                           </View>
@@ -358,9 +382,9 @@ export default function WorkoutCompleteScreen() {
                             { label: 'TOTAL REPS', value: `${totalReps}` },
                             { label: 'AVG TIME / SET', value: formatTime(avgTime) },
                           ].map((item, idx) => (
-                            <View key={idx} style={styles.exStatCell}>
-                              <Text style={styles.exStatLabel}>{item.label}</Text>
-                              <Text style={styles.exStatValue}>{item.value}</Text>
+                            <View key={idx} style={[styles.exStatCell, isDark && { backgroundColor: colors.inputBg }]}>
+                              <Text style={[styles.exStatLabel, isDark && { color: colors.textMuted }]}>{item.label}</Text>
+                              <Text style={[styles.exStatValue, isDark && { color: colors.text }]}>{item.value}</Text>
                             </View>
                           ))}
                         </View>
@@ -374,69 +398,90 @@ export default function WorkoutCompleteScreen() {
 
           {/* ── 4. Body Weight — warm yellow card ── */}
           <LinearGradient
-            colors={['#F59E0B', '#D97706']}
-            style={styles.weightCard}
+            colors={isDark ? ['#0D0D0D', '#050505'] : ['#F59E0B', '#D97706']}
+            style={[
+              styles.weightCard,
+              isDark && { borderColor: '#D97706', borderWidth: 1 }
+            ]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
             <View style={styles.weightCardTop}>
-              <View style={styles.weightIconBox}>
-                <Ionicons name="scale-outline" size={22} color="#78350F" />
+              <View style={[styles.weightIconBox, isDark && { backgroundColor: 'rgba(217,119,6,0.15)' }]}>
+                <Ionicons name="scale-outline" size={22} color={isDark ? '#F59E0B' : "#78350F"} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.weightCardTitle}>Post-Workout Weight</Text>
-                <Text style={styles.weightCardSub}>Log your body weight to track progress over time</Text>
+                <Text style={[styles.weightCardTitle, isDark && { color: colors.text }]}>Post-Workout Weight</Text>
+                <Text style={[styles.weightCardSub, isDark && { color: colors.textMuted }]}>Log your body weight to track progress over time</Text>
               </View>
             </View>
-            <View style={styles.weightInputWrap}>
+            <View style={[
+              styles.weightInputWrap,
+              isDark && { 
+                backgroundColor: colors.inputBg,
+                borderColor: colors.border,
+              }
+            ]}>
               <TextInput
-                style={styles.weightInput}
+                style={[styles.weightInput, isDark && { color: colors.text }]}
                 placeholder="e.g. 75.5"
-                placeholderTextColor="rgba(120,53,15,0.45)"
+                placeholderTextColor={isDark ? colors.textDim : "rgba(120,53,15,0.45)"}
                 keyboardType="decimal-pad"
                 value={weight}
                 onChangeText={setWeight}
               />
-              <View style={styles.weightUnit}>
-                <Text style={styles.weightUnitText}>kg</Text>
+              <View style={[styles.weightUnit, isDark && { backgroundColor: 'rgba(217,119,6,0.12)' }]}>
+                <Text style={[styles.weightUnitText, isDark && { color: '#F59E0B' }]}>kg</Text>
               </View>
             </View>
             {!!weight && (
-              <Text style={styles.weightHint}>
+              <Text style={[styles.weightHint, isDark && { color: '#F59E0B' }]}>
                 Logged: <Text style={{ fontFamily: FONTS.bodyBold }}>{weight} kg</Text> ✓
               </Text>
             )}
           </LinearGradient>
 
           {/* ── 5. Hydration — blue-tinted card, slider inside ── */}
-          <View style={[styles.section, styles.hydrationCard, { borderColor: '#BFDBFE' }]}>
+          <View style={[
+            styles.section, 
+            styles.hydrationCard, 
+            isDark ? { 
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+            } : { borderColor: '#BFDBFE' }
+          ]}>
             <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
-                <Ionicons name="water" size={20} color="#3B82F6" />
+              <View style={[styles.sectionIcon, { backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(59,130,246,0.15)' }]}>
+                <Ionicons name="water" size={20} color={isDark ? colors.primary : "#3B82F6"} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.sectionTitle, { color: '#1E40AF' }]}>Hydration Tracker</Text>
-                <Text style={[styles.sectionSub, { color: '#3B82F6' }]}>
+                <Text style={[styles.sectionTitle, isDark ? { color: colors.text } : { color: '#1E40AF' }]}>Hydration Tracker</Text>
+                <Text style={[styles.sectionSub, isDark ? { color: colors.textMuted } : { color: '#3B82F6' }]}>
                   How much water did you drink?
                 </Text>
               </View>
-              <View style={styles.hydrationBadge}>
-                <Text style={styles.hydrationBadgeText}>{waterIntake.toFixed(1)}L</Text>
+              <View style={[styles.hydrationBadge, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+                <Text style={[styles.hydrationBadgeText, isDark && { color: colors.primary }]}>{waterIntake.toFixed(1)}L</Text>
               </View>
             </View>
 
             {/* Water level visualiser */}
-            <View style={styles.waterBar}>
+            <View style={[styles.waterBar, isDark && { backgroundColor: colors.inputBg }]}>
               <View
                 style={[
                   styles.waterFill,
                   { width: `${Math.min((waterIntake / 5) * 100, 100)}%` },
+                  isDark && { backgroundColor: colors.primary }
                 ]}
               />
               {[1, 2, 3, 4].map(tick => (
                 <View
                   key={tick}
-                  style={[styles.waterTick, { left: `${(tick / 5) * 100}%` as any }]}
+                  style={[
+                    styles.waterTick,
+                    { left: `${(tick / 5) * 100}%` as any },
+                    isDark && { backgroundColor: colors.card }
+                  ]}
                 />
               ))}
             </View>
@@ -448,13 +493,13 @@ export default function WorkoutCompleteScreen() {
               step={0.1}
               value={waterIntake}
               onValueChange={setWaterIntake}
-              minimumTrackTintColor="#3B82F6"
-              maximumTrackTintColor="#BFDBFE"
-              thumbTintColor="#1D4ED8"
+              minimumTrackTintColor={isDark ? colors.primary : "#3B82F6"}
+              maximumTrackTintColor={isDark ? colors.border : "#BFDBFE"}
+              thumbTintColor={isDark ? colors.primary : "#1D4ED8"}
             />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 }}>
-              <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: FONTS.body }}>0L</Text>
-              <Text style={{ color: '#93C5FD', fontSize: 11, fontFamily: FONTS.body }}>5L</Text>
+              <Text style={{ color: isDark ? colors.textDim : '#93C5FD', fontSize: 11, fontFamily: FONTS.body }}>0L</Text>
+              <Text style={{ color: isDark ? colors.textDim : '#93C5FD', fontSize: 11, fontFamily: FONTS.body }}>5L</Text>
             </View>
           </View>
 
@@ -506,7 +551,7 @@ export default function WorkoutCompleteScreen() {
         },
       ]}>
         <TouchableOpacity style={styles.saveBtn} onPress={handleFinalSave} disabled={saving}>
-          <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.saveBtnGradient}>
+          <LinearGradient colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} style={styles.saveBtnGradient}>
             {saving ? <ActivityIndicator color="#FFF" /> : (
               <>
                 <Ionicons name="checkmark-done" size={22} color="#FFF" />

@@ -135,7 +135,7 @@ router.post('/update-profile', async (req, res) => {
       neck, waist, hip, chest, arm, thigh,
       medicalConditions, medication, allergies,
       dietType, foodPreference, waterIntake, foodAllergies,
-      full_name, email
+      full_name, email, gender
     } = req.body;
 
     if (!userId) return res.status(400).json({ error: "User ID required" });
@@ -147,15 +147,15 @@ router.post('/update-profile', async (req, res) => {
         neck = $8, waist = $9, hip = $10, chest = $11, arm = $12, thigh = $13,
         medical_conditions = $14, medication = $15, allergies = $16,
         diet_type = $17, food_preference = $18, water_intake = $19, food_allergies = $20,
-        full_name = $21, email = $22
-      WHERE id = $23
+        full_name = $21, email = $22, gender = $23
+      WHERE id = $24
     `, [
       age || null, height || null, weight || null, bodyFat || null,
       fitnessGoal || null, experienceLevel || null, activityLevel || null,
       neck || null, waist || null, hip || null, chest || null, arm || null, thigh || null,
       medicalConditions || null, medication || null, allergies || null,
       dietType || null, foodPreference || null, waterIntake || null, foodAllergies || null,
-      full_name || null, email || null,
+      full_name || null, email || null, gender || null,
       userId
     ]);
 

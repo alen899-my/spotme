@@ -8,8 +8,6 @@ import {
   Platform,
   ScrollView,
   StatusBar,
-  Modal,
-  TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
@@ -18,8 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Input from "../../components/ui/Input";
@@ -47,7 +44,6 @@ const PALETTE = {
 
 const AUTH_INPUT_ICON = "#0C2E35";
 
-const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
 
 // ─── How tall the image hero section is ──────────────────────────────────────
@@ -66,11 +62,7 @@ export default function AuthScreen() {
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
   const [phoneNumber, setPhoneNumber]   = useState("");
-  const [gender, setGender]             = useState("");
-  const [dob, setDob]                   = useState<Date | null>(null);
 
-  const [showGenderModal, setShowGenderModal] = useState(false);
-  const [showDatePicker, setShowDatePicker]   = useState(false);
   const [rememberMe, setRememberMe]           = useState(false);
   const [loading, setLoading]                 = useState(false);
   const [errorMsg, setErrorMsg]               = useState("");
@@ -79,21 +71,6 @@ export default function AuthScreen() {
   const router = useRouter();
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-
-  const handleGenderSelect = (option: string) => {
-    setGender(option);
-    setShowGenderModal(false);
-  };
-
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === "ios");
-    if (selectedDate) setDob(selectedDate);
-  };
-
-  const formatDate = (date: Date) =>
-    `${date.getDate().toString().padStart(2, "0")} / ${(date.getMonth() + 1)
-      .toString()
-      .padStart(2, "0")} / ${date.getFullYear()}`;
 
   const switchTab = (login: boolean) => {
     setIsLogin(login);
@@ -115,12 +92,10 @@ export default function AuthScreen() {
       } else {
         const res = await axios.post(`${API_URL}/auth/signup`, {
           fullName, email, password, phoneNumber,
-          dob: dob ? dob.toISOString().split("T")[0] : undefined,
-          gender,
         });
         await AsyncStorage.setItem("userToken", res.data.token);
         await AsyncStorage.setItem("userData", JSON.stringify(res.data.user));
-        router.replace("/(tabs)");
+        router.replace("/onboarding");
       }
     } catch (error: any) {
       const message = error.response?.data?.message || "An error occurred. Please try again.";
@@ -286,84 +261,15 @@ locations={[0.4, 0.75, 1]}
             />
 
             {!isLogin && (
-              <>
-                <Input
-                  tone="light"
-                  label="Phone Number"
-                  placeholder="+91 98765 43210"
-                  icon={<Ionicons name="call-outline" size={17} color={AUTH_INPUT_ICON} />}
-                  keyboardType="phone-pad"
-                  value={phoneNumber}
-                  onChangeText={setPhoneNumber}
-                />
-
-                {/* Date of Birth */}
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    if (Platform.OS === "web") {
-                      const el = document.getElementById("web-date-picker") as any;
-                      if (el?.showPicker) el.showPicker();
-                    } else {
-                      setShowDatePicker(true);
-                    }
-                  }}
-                >
-                  <View pointerEvents="none">
-                    <Input
-                      tone="light"
-                      label="Date of Birth"
-                      placeholder="DD / MM / YYYY"
-                      value={dob ? formatDate(dob) : ""}
-                      editable={false}
-                      icon={<MaterialCommunityIcons name="calendar-outline" size={17} color={AUTH_INPUT_ICON} />}
-                    />
-                  </View>
-                </TouchableOpacity>
-
-                {Platform.OS === "web" && (
-                  <input
-                    id="web-date-picker"
-                    type="date"
-                    style={{ position: "absolute", opacity: 0, width: 0, height: 0, pointerEvents: "none" }}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val) {
-                        const [year, month, day] = val.split("-").map(Number);
-                        setDob(new Date(year, month - 1, day));
-                      }
-                    }}
-                  />
-                )}
-
-                {/* Gender */}
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => setShowGenderModal(true)}
-                >
-                  <View pointerEvents="none">
-                    <Input
-                      tone="light"
-                      label="Gender"
-                      placeholder="Select gender"
-                      value={gender}
-                      editable={false}
-                      icon={<MaterialCommunityIcons name="gender-male-female" size={17} color={AUTH_INPUT_ICON} />}
-                      rightIcon={<Ionicons name="chevron-down" size={16} color={AUTH_INPUT_ICON} />}
-                    />
-                  </View>
-                </TouchableOpacity>
-
-                {Platform.OS !== "web" && showDatePicker && (
-                  <DateTimePicker
-                    value={dob || new Date()}
-                    mode="date"
-                    display={Platform.OS === "ios" ? "spinner" : "default"}
-                    onChange={onDateChange}
-                    maximumDate={new Date()}
-                  />
-                )}
-              </>
+              <Input
+                tone="light"
+                label="Phone Number"
+                placeholder="+91 98765 43210"
+                icon={<Ionicons name="call-outline" size={17} color={AUTH_INPUT_ICON} />}
+                keyboardType="phone-pad"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+              />
             )}
 
             {/* Remember me / Forgot password */}
@@ -415,52 +321,6 @@ locations={[0.4, 0.75, 1]}
           </View>
         </ScrollView>
       </View>
-
-      {/* ── Gender Modal ──────────────────────────────────────── */}
-      <Modal
-        visible={showGenderModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowGenderModal(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setShowGenderModal(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 20) + 8 }]}>
-
-                <View style={styles.modalHandle} />
-                <Text style={styles.modalTitle}>SELECT GENDER</Text>
-                <View style={styles.modalTitleRule} />
-
-                {GENDER_OPTIONS.map((option) => (
-                  <TouchableOpacity
-                    key={option}
-                    style={[
-                      styles.optionBtn,
-                      gender === option && styles.optionBtnActive,
-                    ]}
-                    onPress={() => handleGenderSelect(option)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={[
-                      styles.optionText,
-                      gender === option && styles.optionTextActive,
-                    ]}>
-                      {option}
-                    </Text>
-                    {gender === option && (
-                      <View style={styles.optionCheck}>
-                        <Ionicons name="checkmark" size={13} color={PALETTE.ink} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
 
     </KeyboardAvoidingView>
   );
@@ -755,80 +615,4 @@ errorText: {
     color: PALETTE.sun,
   },
 
-  // ── Gender Modal ───────────────────────────────────────────────────────────
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.65)",
-    justifyContent: "flex-end",
-  },
-
-  modalContent: {
-    backgroundColor: PALETTE.panelBg,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    paddingTop: 16,
-    paddingHorizontal: 26,
-    borderTopWidth: 1.5,
-    borderLeftWidth: 1.5,
-    borderRightWidth: 1.5,
-    borderColor: PALETTE.panelBorder,
-  },
-
-  modalHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.16)",
-    alignSelf: "center",
-    marginBottom: 22,
-  },
-
-  modalTitle: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 11,
-    letterSpacing: 3,
-    color: PALETTE.sun,
-    marginBottom: 12,
-  },
-
-  modalTitleRule: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    marginBottom: 10,
-  },
-
-  optionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
-    paddingHorizontal: 2,
-  },
-
-  optionBtnActive: {
-    borderBottomColor: "rgba(247, 203, 22, 0.15)",
-  },
-
-  optionText: {
-    fontFamily: FONTS.body,
-    fontSize: 15,
-    color: "rgba(247, 251, 248, 0.6)",
-  },
-
-  optionTextActive: {
-    fontFamily: FONTS.bodyBold,
-    color: "#FFFFFF",
-  },
-
-  optionCheck: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: PALETTE.sun,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });
