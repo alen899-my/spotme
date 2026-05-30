@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
@@ -7,7 +8,8 @@ import { useTheme } from "../../contexts/ThemeContext";
 
 interface StatCardProps {
   icon: any;
-  cardBg: string;
+  gradient: [string, string];
+  gradientDark: [string, string];
   iconBg: string;
   iconColor: string;
   valueColor: string;
@@ -20,7 +22,8 @@ interface StatCardProps {
 
 function StatCard({
   icon,
-  cardBg,
+  gradient,
+  gradientDark,
   iconBg,
   iconColor,
   valueColor,
@@ -35,13 +38,15 @@ function StatCard({
     <View
       style={[
         styles.statCard,
-        {
-          backgroundColor: isDark ? colors.card : cardBg,
-          borderWidth: isDark ? 1 : 0,
-          borderColor: isDark ? colors.border : "transparent",
-        },
+        isDark && { borderWidth: 1, borderColor: colors.border },
       ]}
     >
+      <LinearGradient
+        colors={isDark ? gradientDark : gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <View
         style={[
           styles.statIconWrap,
@@ -76,38 +81,42 @@ export interface StatCardsProps {
   caloriesConsumed: number;
 }
 
-// Card colour configs — all solid fills from your yellow/blue palette
+// Card colour configs
 const CARD_CONFIGS = [
   {
-    cardBg:     "#F7CB16", // sun yellow
-    iconBg:     "#E7B100", // sunDeep
-    iconColor:  "#04282B", // ink
+    gradient:     ["#F7CB16", "#E7B100"],
+    gradientDark: ["#3a2e00", "#1a1500"],
+    iconBg:     "#E7B100",
+    iconColor:  "#04282B",
     valueColor: "#04282B",
     labelColor: "#5a4200",
     darkIconBg: "rgba(255, 69, 58, 0.18)",
     darkIconColor: "#FF453A",
   },
   {
-    cardBg:     "#2596BE", // cta blue
-    iconBg:     "#1a6e8a", // ctaDark
-    iconColor:  "#D6EEF7", // ctaLight
+    gradient:     ["#2596BE", "#1a6e8a"],
+    gradientDark: ["#1a3a4a", "#0d2028"],
+    iconBg:     "#1a6e8a",
+    iconColor:  "#D6EEF7",
     valueColor: "#FFFFFF",
     labelColor: "#a8dff0",
     darkIconBg: "rgba(255, 214, 10, 0.18)",
     darkIconColor: "#FFD60A",
   },
   {
-    cardBg:     "#0d4d65", // ctaDeep
-    iconBg:     "#04282B", // ink
-    iconColor:  "#F7CB16", // sun (accent pop)
+    gradient:     ["#0d4d65", "#0a3a4a"],
+    gradientDark: ["#0a1a25", "#050f15"],
+    iconBg:     "#04282B",
+    iconColor:  "#F7CB16",
     valueColor: "#FFFFFF",
     labelColor: "#7ec6db",
     darkIconBg: "rgba(10, 132, 255, 0.18)",
     darkIconColor: "#0A84FF",
   },
   {
-    cardBg:     "#E7B100", // sunDeep
-    iconBg:     "#c99800", // slightly darker gold
+    gradient:     ["#E7B100", "#c99800"],
+    gradientDark: ["#3a2e00", "#1a1500"],
+    iconBg:     "#c99800",
     iconColor:  "#04282B",
     valueColor: "#04282B",
     labelColor: "#5a4200",
@@ -161,6 +170,8 @@ const styles = StyleSheet.create({
     padding: scale(10),
     alignItems: "center",
     gap: vs(5),
+    position: "relative",
+    overflow: "hidden",
   },
   statIconWrap: {
     width: scale(36),

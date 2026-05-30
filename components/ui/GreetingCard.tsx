@@ -13,6 +13,7 @@ import {
   Dimensions,
   Easing,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import Svg, {
   Circle,
   Path,
@@ -32,17 +33,20 @@ const vs    = (n: number) => Math.round((SH / 844) * n);
 export type TimeSlot = "dawn" | "morning" | "afternoon" | "dusk" | "evening" | "night";
 
 interface SlotConfig {
-  slot:       TimeSlot;
-  greeting:   string;
-  sub:        string;
-  cardBg:     string;
-  border:     string;
-  nameColor:  string;
-  greetColor: string;
-  subColor:   string;
-  pillBg:     string;
-  pillBorder: string;
-  pillText:   string;
+  slot:        TimeSlot;
+  greeting:    string;
+  sub:         string;
+  cardBg:      string;
+  cardBgDark:  string;
+  skyGradient: [string, string];
+  skyGradientDark: [string, string];
+  border:      string;
+  nameColor:   string;
+  greetColor:  string;
+  subColor:    string;
+  pillBg:      string;
+  pillBorder:  string;
+  pillText:    string;
 }
 
 const SLOTS: SlotConfig[] = [
@@ -50,7 +54,10 @@ const SLOTS: SlotConfig[] = [
     slot: "dawn",
     greeting: "Rise & Shine",
     sub: "The world starts fresh — so do you.",
-    cardBg: "#3D1F6E", border: "#F4845F60",
+    cardBg: "#3D1F6E", cardBgDark: "#1E0F37",
+    skyGradient: ["#1a0533", "#F4845F"],
+    skyGradientDark: ["#0d0219", "#7a3f2e"],
+    border: "#F4845F60",
     nameColor: "#FFFFFF", greetColor: "#F4845F", subColor: "rgba(255,255,255,0.65)",
     pillBg: "rgba(244,132,95,0.22)", pillBorder: "rgba(244,132,95,0.45)", pillText: "#F4845F",
   },
@@ -58,7 +65,10 @@ const SLOTS: SlotConfig[] = [
     slot: "morning",
     greeting: "Good Morning",
     sub: "Fuel up and crush it today.",
-    cardBg: "#2596BE", border: "#F7CB1650",
+    cardBg: "#2596BE", cardBgDark: "#134B5F",
+    skyGradient: ["#2596BE", "#87CEEB"],
+    skyGradientDark: ["#134B5F", "#1a3a4f"],
+    border: "#F7CB1650",
     nameColor: "#FFFFFF", greetColor: "#F7CB16", subColor: "rgba(255,255,255,0.72)",
     pillBg: "rgba(247,203,22,0.18)", pillBorder: "rgba(247,203,22,0.50)", pillText: "#F7CB16",
   },
@@ -66,7 +76,10 @@ const SLOTS: SlotConfig[] = [
     slot: "afternoon",
     greeting: "Good Afternoon",
     sub: "Keep the momentum going strong.",
-    cardBg: "#1a6e8a", border: "#2596BE80",
+    cardBg: "#1a6e8a", cardBgDark: "#0D3745",
+    skyGradient: ["#1a6e8a", "#4A90D9"],
+    skyGradientDark: ["#0D3745", "#1a2e4a"],
+    border: "#2596BE80",
     nameColor: "#FFFFFF", greetColor: "#F7CB16", subColor: "rgba(255,255,255,0.68)",
     pillBg: "rgba(255,255,255,0.15)", pillBorder: "rgba(255,255,255,0.30)", pillText: "#FFFFFF",
   },
@@ -74,7 +87,10 @@ const SLOTS: SlotConfig[] = [
     slot: "dusk",
     greeting: "Good Evening",
     sub: "How did your session go today?",
-    cardBg: "#0d4d65", border: "#E87D3E55",
+    cardBg: "#0d4d65", cardBgDark: "#062632",
+    skyGradient: ["#E87D3E", "#3D1F6E"],
+    skyGradientDark: ["#7a3f1e", "#1E0F37"],
+    border: "#E87D3E55",
     nameColor: "#FFFFFF", greetColor: "#E87D3E", subColor: "rgba(255,255,255,0.65)",
     pillBg: "rgba(232,125,62,0.20)", pillBorder: "rgba(232,125,62,0.45)", pillText: "#E87D3E",
   },
@@ -82,7 +98,10 @@ const SLOTS: SlotConfig[] = [
     slot: "evening",
     greeting: "Good Evening",
     sub: "Wind down and recover well.",
-    cardBg: "#0d2e45", border: "#2596BE40",
+    cardBg: "#0d2e45", cardBgDark: "#061724",
+    skyGradient: ["#0d2e45", "#1a1a3e"],
+    skyGradientDark: ["#061724", "#0d0d1a"],
+    border: "#2596BE40",
     nameColor: "#FFFFFF", greetColor: "#2596BE", subColor: "rgba(255,255,255,0.60)",
     pillBg: "rgba(37,150,190,0.20)", pillBorder: "rgba(37,150,190,0.45)", pillText: "#2596BE",
   },
@@ -90,7 +109,10 @@ const SLOTS: SlotConfig[] = [
     slot: "night",
     greeting: "Good Night",
     sub: "Rest hard — muscles grow while you sleep.",
-    cardBg: "#04282B", border: "#F7CB1625",
+    cardBg: "#04282B", cardBgDark: "#021415",
+    skyGradient: ["#04282B", "#0a0a1a"],
+    skyGradientDark: ["#021415", "#050510"],
+    border: "#F7CB1625",
     nameColor: "#FFFFFF", greetColor: "#F7CB16", subColor: "rgba(255,255,255,0.55)",
     pillBg: "rgba(247,203,22,0.12)", pillBorder: "rgba(247,203,22,0.35)", pillText: "#F7CB16",
   },
@@ -263,15 +285,22 @@ export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardPro
       style={[
         styles.card,
         {
-          backgroundColor: isDark ? colors.card : config.cardBg,
-          borderColor:     isDark ? colors.border : config.border,
-          borderWidth:     isDark ? 1 : 1.5,
-          opacity:         fadeAnim,
-          transform:       [{ translateY: slideAnim }],
+          borderColor: isDark ? colors.border : config.border,
+          borderWidth: isDark ? 1 : 1.5,
+          opacity:     fadeAnim,
+          transform:   [{ translateY: slideAnim }],
         },
       ]}
     >
-      {/* Stars for night/evening/dark mode — behind everything */}
+      {/* Sky gradient background */}
+      <LinearGradient
+        colors={isDark ? config.skyGradientDark : config.skyGradient}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* Stars for night/evening/dark mode — behind content but above gradient */}
       {isNight && <StarField count={24} />}
 
       {/* ── Content (full width, no right padding eaten by icon) ── */}
@@ -331,6 +360,7 @@ const styles = StyleSheet.create({
     borderRadius: scale(22),
     borderWidth: 1.5,
     marginBottom: vs(20),
+    position: "relative",
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },

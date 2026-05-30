@@ -135,19 +135,22 @@ router.post('/update-profile', async (req, res) => {
       neck, waist, hip, chest, arm, thigh,
       medicalConditions, medication, allergies,
       dietType, foodPreference, waterIntake, foodAllergies,
-      full_name, email, gender
+      full_name, email, gender, dob
     } = req.body;
 
     if (!userId) return res.status(400).json({ error: "User ID required" });
 
-    await pool.query(`
+    const parsedUserId = parseInt(userId);
+    if (isNaN(parsedUserId)) return res.status(400).json({ error: "Invalid User ID format" });
+
+    const result = await pool.query(`
       UPDATE users SET
         age = $1, height = $2, weight = $3, body_fat = $4,
         fitness_goal = $5, experience_level = $6, activity_level = $7,
         neck = $8, waist = $9, hip = $10, chest = $11, arm = $12, thigh = $13,
         medical_conditions = $14, medication = $15, allergies = $16,
         diet_type = $17, food_preference = $18, water_intake = $19, food_allergies = $20,
-        full_name = $21, email = $22, gender = $23
+        full_name = COALESCE($21, full_name), email = COALESCE($22, email), gender = $23, dob = COALESCE($25, dob)
       WHERE id = $24
     `, [
       age || null, height || null, weight || null, bodyFat || null,
@@ -156,8 +159,13 @@ router.post('/update-profile', async (req, res) => {
       medicalConditions || null, medication || null, allergies || null,
       dietType || null, foodPreference || null, waterIntake || null, foodAllergies || null,
       full_name || null, email || null, gender || null,
-      userId
+      parsedUserId,
+      dob || null
     ]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "User not found or profile not updated" });
+    }
 
     res.json({ success: true, message: "Profile updated" });
   } catch (err) {

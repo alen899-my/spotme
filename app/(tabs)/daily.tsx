@@ -281,73 +281,13 @@ export default function DailyTab() {
   // ── Profile incomplete gate ───────────────────────────────────────────────
   if (profileComplete === null) {
     return (
-      <View style={{ flex: 1, backgroundColor: G.bgDeep, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color={G.primary} size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
 
-  if (profileComplete === false) {
-    return (
-      <View style={{ flex: 1 }}>
-        <LinearGradient colors={[G.bgDeep, G.bg]} style={StyleSheet.absoluteFillObject} />
-        <View style={gateStyles.root}>
-          {/* Decorative rings */}
-          <View style={gateStyles.ring1} />
-          <View style={gateStyles.ring2} />
 
-          {/* Wordmark */}
-          <View style={gateStyles.wordmark}>
-            <View style={gateStyles.dot} />
-            <Text style={gateStyles.wordSpot}>spot</Text>
-            <Text style={gateStyles.wordMe}>ME</Text>
-          </View>
-
-          {/* Icon */}
-          <View style={gateStyles.iconCircle}>
-            <Ionicons name="person-outline" size={42} color={G.gold} />
-          </View>
-
-          {/* Copy */}
-          <Text style={gateStyles.title}>Complete Your Profile</Text>
-          <Text style={gateStyles.sub}>
-            Set up your profile to unlock your personalised workout plan, nutrition guidance, and progress tracking.
-          </Text>
-
-          {/* Steps preview */}
-          <View style={gateStyles.stepsRow}>
-            {[
-              { icon: 'body-outline',       label: 'Body Stats' },
-              { icon: 'flag-outline',       label: 'Goals' },
-              { icon: 'restaurant-outline', label: 'Nutrition' },
-              { icon: 'camera-outline',     label: 'Photos' },
-            ].map((s, i) => (
-              <View key={i} style={gateStyles.stepItem}>
-                <View style={gateStyles.stepIcon}>
-                  <Ionicons name={s.icon as any} size={16} color={G.gold} />
-                </View>
-                <Text style={gateStyles.stepLabel}>{s.label}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* CTA */}
-          <TouchableOpacity
-            style={gateStyles.cta}
-            onPress={() => router.push('/onboarding')}
-            activeOpacity={0.87}
-          >
-            <LinearGradient colors={[G.gold, '#E7B100']} style={gateStyles.ctaGrad}>
-              <Text style={gateStyles.ctaText}>Set Up Profile</Text>
-              <Ionicons name="arrow-forward" size={18} color={G.bgDeep} />
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <Text style={gateStyles.time}>Takes about 3 minutes</Text>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

@@ -1086,7 +1086,9 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     // ── 1. User stats ─────────────────────────────────────────────────────────
     const userRes = await pool.query(
       `SELECT full_name, fitness_goal, experience_level, total_xp, level, league_tier,
-              current_streak, weight, profile_pic_url, gender, height, body_fat, water_intake
+              current_streak, weight, profile_pic_url, gender, height, body_fat, water_intake,
+              dob, onboarding_completed, activity_level, neck, waist, chest, medication,
+              diet_type, food_preference
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -1184,21 +1186,21 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     );
     const weightProgress = weightRes.rows.reverse();
 
-    // ── 7. Top recommended exercise ───────────────────────────────────────────
+    // ── 7. Top recommended exercises ───────────────────────────────────────────
     const topExerciseRes = await pool.query(
       `SELECT e.id AS exercise_id, e.name AS exercise_name, e.target, e.category, e.image_url, e.equipment,
-              COALESCE(AVG(dwe.rating), 5.0) as avg_rating
+              ROUND(AVG(dwe.rating)::numeric, 1)::float8 as rating
        FROM exercises e
-       LEFT JOIN daily_workout_exercises dwe ON e.id = dwe.exercise_id AND dwe.rating IS NOT NULL
+       INNER JOIN daily_workout_exercises dwe ON e.id = dwe.exercise_id AND dwe.rating IS NOT NULL
        GROUP BY e.id
-       ORDER BY avg_rating DESC, RANDOM()
-       LIMIT 1`
+       ORDER BY rating DESC
+       LIMIT 4`
     );
     
-    let topRec = topExerciseRes.rows[0] || null;
-    if (topRec) {
-      topRec.scoreTag = parseFloat(topRec.avg_rating) >= 8.0 ? 'Highly Rated' : 'Recommended';
-    }
+    const topRecs = topExerciseRes.rows.map(r => ({
+      ...r,
+      scoreTag: r.rating >= 8.0 ? 'Highly Rated' : 'Recommended',
+    }));
 
     // ── 8. Muscle Activity (last 7 days) ───────────────────────────────────────
     const muscleRes = await pool.query(
@@ -1264,6 +1266,15 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         height: user.height,
         body_fat: user.body_fat,
         water_intake: user.water_intake,
+        dob: user.dob,
+        onboarding_completed: user.onboarding_completed,
+        activity_level: user.activity_level,
+        neck: user.neck,
+        waist: user.waist,
+        chest: user.chest,
+        medication: user.medication,
+        diet_type: user.diet_type,
+        food_preference: user.food_preference,
       },
       today: {
         workouts_completed: todayWorkoutsRes.rows.length,
@@ -1275,7 +1286,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       },
       weekly_stats: weeklyStats,
       weight_progress: weightProgress,
-      top_recommendation: topRec,
+      top_recommendations: topRecs,
       muscle_activity: muscleActivity,
     });
   } catch (err) {

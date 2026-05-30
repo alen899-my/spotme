@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Image,
   Platform,
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -52,6 +53,7 @@ export default function LandingScreen() {
   const insets            = useSafeAreaInsets();
   const router            = useRouter();
   const { width, height } = useWindowDimensions();
+  const [checking, setChecking] = useState(true);
 
   // ── Layout breakpoints
   const isShort   = height < 740;
@@ -75,15 +77,24 @@ export default function LandingScreen() {
         const token = await AsyncStorage.getItem("userToken");
         if (token && isMounted) {
           router.replace("/(tabs)");
+          return;
         }
       } catch (error) {
         console.log(error);
+      } finally {
+        if (isMounted) setChecking(false);
       }
     };
 
     void checkAuth();
     return () => { isMounted = false; };
   }, [router]);
+
+  if (checking) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#04282B" }} />
+    );
+  }
 
   return (
     <View style={styles.root}>

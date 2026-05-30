@@ -29,7 +29,7 @@ router.post('/complete', upload.fields([
     const sidePhotoUrl = getFileUrl('sidePhoto');
 
     const {
-      age, height, weight, bodyFat,
+      dob, age, height, weight, bodyFat,
       fitnessGoal, experienceLevel, activityLevel,
       neck, waist, hip, chest, arm, thigh,
       medicalConditions, medication, allergies,
@@ -38,9 +38,9 @@ router.post('/complete', upload.fields([
 
     // "if every step completed eveu fields added only set it to yes"
     // Optional fields: bodyFat, measurements, health conditions.
-    // Required fields based on UI: age, height, weight, fitnessGoal, expLevel, activityLevel, diet, foodPref, waterIntake, all 4 photos.
+    // Required fields based on UI: age/dob, height, weight, fitnessGoal, expLevel, activityLevel, diet, foodPref, waterIntake, all 4 photos.
     const isCompleted = !!(
-      age && height && weight &&
+      (dob || age) && height && weight &&
       fitnessGoal && experienceLevel && activityLevel &&
       dietType && foodPreference && waterIntake &&
       profilePicUrl && frontPhotoUrl && backPhotoUrl && sidePhotoUrl
@@ -57,7 +57,8 @@ router.post('/complete', upload.fields([
         front_photo_url = COALESCE($22, front_photo_url),
         back_photo_url = COALESCE($23, back_photo_url),
         side_photo_url = COALESCE($24, side_photo_url),
-        onboarding_completed = $25
+        onboarding_completed = $25,
+        dob = COALESCE($27, dob)
       WHERE id = $26
     `, [
       age || null, height || null, weight || null, bodyFat || null,
@@ -67,7 +68,8 @@ router.post('/complete', upload.fields([
       dietType || null, foodPreference || null, waterIntake || null, foodAllergies || null,
       profilePicUrl, frontPhotoUrl, backPhotoUrl, sidePhotoUrl,
       isCompleted,
-      userId
+      userId,
+      dob || null
     ]);
 
     res.json({ 

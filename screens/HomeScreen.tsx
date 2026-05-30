@@ -4,9 +4,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   ScrollView,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -21,6 +21,7 @@ import GreetingCard       from "../components/ui/GreetingCard";
 import XPCard             from "../components/home/XPCard";
 import { StatCards }      from "../components/home/StatCards";
 import RecommendationCard from "../components/home/RecommendationCard";
+import { HomeSkeleton } from "../components/ui/Skeleton";
 import BodyStatusCard     from "../components/home/BodyStatusCard";
 import WeeklyActivityCard from "../components/home/WeeklyActivityCard";
 import WeightTrendCard    from "../components/home/WeightTrendCard";
@@ -35,6 +36,8 @@ export default function HomeScreen() {
   const [dashboard, setDashboard] = useState<any>(null);
   const [loading, setLoading]     = useState(true);
   const [gender, setGender]       = useState<"male" | "female">("male");
+  const [profileComplete, setProfileComplete] = useState<boolean>(true);
+  const { width } = useWindowDimensions();
 
   useEffect(() => {
     if (dashboard?.user?.gender) {
@@ -51,8 +54,18 @@ export default function HomeScreen() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setDashboard(res.data);
+      
+      const completed = !!res.data.user?.onboarding_completed;
+      setProfileComplete(completed);
     } catch (err) {
       console.error("Dashboard fetch error:", err);
+      try {
+        const userStr = await AsyncStorage.getItem("userData");
+        const cached = userStr ? JSON.parse(userStr) : null;
+        if (cached) {
+          setProfileComplete(!!cached.onboarding_completed);
+        }
+      } catch {}
     } finally {
       setLoading(false);
     }
@@ -61,11 +74,7 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => { fetchDashboard(); }, []));
 
   if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <HomeSkeleton />;
   }
 
   // ── Derived data ─────────────────────────────────────────────────────────────
@@ -73,7 +82,7 @@ export default function HomeScreen() {
   const today          = dashboard?.today       || {};
   const weekly         = dashboard?.weekly_stats || [];
   const weightProgress = dashboard?.weight_progress || [];
-  const rec            = dashboard?.top_recommendation || null;
+  const recs           = dashboard?.top_recommendations || [];
 
   const firstName = (u.full_name || "User").split(" ")[0];
 
@@ -87,6 +96,36 @@ export default function HomeScreen() {
 
   const weeklyWorkouts = weekly.filter((d: any) => d.workouts > 0).length;
 
+  // ── Profile step completion ──────────────────────────────────────────────────
+  const sv = (s: any) => { // split "175 cm" -> "175"
+    if (s === null || s === undefined) return "";
+    return String(s).trim().split(" ")[0];
+  };
+  const measurementsDone = !!(sv(u.neck) || sv(u.waist) || sv(u.chest)) || !!u.medication || !!(u.diet_type && u.food_preference && u.water_intake);
+
+  const stepsDone = [
+    !!u.gender,                                                                    // 1 gender
+    !!(u.dob && sv(u.height) && sv(u.weight)),                                    // 2 basic info
+    !!u.fitness_goal,                                                              // 3 goal
+    !!u.experience_level,                                                          // 4 experience
+    !!u.activity_level,                                                            // 5 activity
+    measurementsDone,                                                             // 6 measurements
+    !!(u.medication),                                                              // 7 health
+    !!(u.diet_type && u.food_preference && u.water_intake),                       // 8 nutrition
+    !!(u.profile_pic_url),                                                         // 9 photos
+  ].filter(Boolean).length;
+  const TOTAL_ONBOARDING = 9;
+
+  const getBannerColor = (done: number) => {
+    if (done <= 1) return "#EF4444";   // red
+    if (done <= 3) return "#F97316";   // orange
+    if (done <= 5) return "#F59E0B";   // amber
+    if (done <= 7) return "#84CC16";   // yellow-green
+    return "#10B981";                  // green
+  };
+  const bannerColor = getBannerColor(stepsDone);
+  const progressPct = stepsDone / TOTAL_ONBOARDING;
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
@@ -95,6 +134,42 @@ export default function HomeScreen() {
     >
       {/* ── Greeting ─────────────────────────────────────────────────────── */}
       <GreetingCard firstName={firstName} fitnessGoal={u.fitness_goal} />
+
+      {/* ── Profile Incomplete Banner ────────────────────────────────────── */}
+      {!profileComplete && (
+        <TouchableOpacity
+          style={[styles.bannerCard, { backgroundColor: bannerColor }]}
+          onPress={() => router.push("/onboarding")}
+          activeOpacity={0.88}
+        >
+          {/* Top row: title + steps badge */}
+          <View style={styles.bannerTopRow}>
+            <Text style={styles.bannerTitle}>Complete Your Profile</Text>
+            <View style={styles.bannerBadge}>
+              <Text style={styles.bannerBadgeText}>{stepsDone}/{TOTAL_ONBOARDING}</Text>
+            </View>
+          </View>
+
+          {/* Progress bar */}
+          <View style={styles.bannerTrack}>
+            <View style={[styles.bannerFill, { width: `${progressPct * 100}%` as any }]} />
+          </View>
+
+          {/* Sub text */}
+          <Text style={styles.bannerSub}>
+            {stepsDone === 0
+              ? "Let's get started — set up your profile to unlock spotME."
+              : `${TOTAL_ONBOARDING - stepsDone} step${TOTAL_ONBOARDING - stepsDone !== 1 ? "s" : ""} left to complete your profile.`}
+          </Text>
+
+          {/* CTA pill */}
+          <View style={styles.bannerCTA}>
+            <Text style={[styles.bannerCTAText, { color: bannerColor }]}>
+              {stepsDone === 0 ? "Get Started" : "Continue Setup"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* ── XP / Level ───────────────────────────────────────────────────── */}
       <XPCard
@@ -111,17 +186,31 @@ export default function HomeScreen() {
         caloriesConsumed={today.calories_consumed || 0}
       />
 
-      {/* ── Exercise of the Day ──────────────────────────────────────────── */}
+      {/* ── Exercises to Try ──────────────────────────────────────────── */}
       <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Exercise to Try</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Exercises to Try</Text>
         <TouchableOpacity onPress={() => router.push("/(tabs)/exercises")} activeOpacity={0.7}>
           <Text style={[styles.seeAll, { color: colors.primary }]}>See all →</Text>
         </TouchableOpacity>
       </View>
-      <RecommendationCard
-        rec={rec}
-        onBrowsePress={() => router.push("/(tabs)/exercises")}
-      />
+      {recs.length === 0 ? (
+        <RecommendationCard rec={null} onBrowsePress={() => router.push("/(tabs)/exercises")} />
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingRight: 16, gap: 16 }}
+          snapToInterval={width * 0.75 + 16}
+          decelerationRate="fast"
+          style={{ marginLeft: -16, marginBottom: vs(20) }}
+        >
+          {recs.map((item: any, i: number) => (
+            <View key={i} style={{ width: width * 0.75 }}>
+              <RecommendationCard rec={item} onBrowsePress={() => router.push("/(tabs)/exercises")} />
+            </View>
+          ))}
+        </ScrollView>
+      )}
 
       {/* ── Body Status ──────────────────────────────────────────────────── */}
       <BodyStatusCard
@@ -171,4 +260,70 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodySemiBold,
     fontSize: scale(13),
   },
-});
+
+  // ── Banner card ────────────────────────────────────────────────────────────
+  bannerCard: {
+    borderRadius: 20,
+    padding: scale(18),
+    marginBottom: vs(20),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  bannerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: vs(10),
+  },
+  bannerTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: scale(16),
+    color: "#FFFFFF",
+    flex: 1,
+  },
+  bannerBadge: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+    borderRadius: 20,
+    paddingHorizontal: scale(10),
+    paddingVertical: vs(3),
+    marginLeft: scale(8),
+  },
+  bannerBadgeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(12),
+    color: "#FFFFFF",
+  },
+  bannerTrack: {
+    height: 5,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    marginBottom: vs(10),
+    overflow: "hidden",
+  },
+  bannerFill: {
+    height: "100%" as any,
+    borderRadius: 4,
+    backgroundColor: "#FFFFFF",
+  },
+  bannerSub: {
+    fontFamily: FONTS.body,
+    fontSize: scale(12),
+    color: "rgba(255,255,255,0.85)",
+    lineHeight: scale(17),
+    marginBottom: vs(14),
+  },
+  bannerCTA: {
+    alignSelf: "flex-start",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingHorizontal: scale(16),
+    paddingVertical: vs(7),
+  },
+  bannerCTAText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(12),
+  },
+});

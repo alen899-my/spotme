@@ -2,6 +2,7 @@ import React from "react";
 import {
   View, Text, Image, TouchableOpacity, StyleSheet,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
@@ -85,11 +86,19 @@ export default function RecommendationCard({ rec, onBrowsePress }: Props) {
       <TouchableOpacity
         style={[
           styles.emptyCard, 
-          isDark ? { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 } : { backgroundColor: C.emptyBg }
+          isDark ? { borderColor: colors.border, borderWidth: 1 } : { backgroundColor: C.emptyBg }
         ]}
         onPress={onBrowsePress}
         activeOpacity={0.88}
       >
+        {isDark && (
+          <LinearGradient
+            colors={["#1a3a4a", "#0d2028"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
         <View style={[styles.emptyIconWrap, { backgroundColor: isDark ? colors.inputBg : C.emptyIconBg }]}>
           <Ionicons name="fitness-outline" size={scale(28)} color={isDark ? colors.primary : C.emptyInk} />
         </View>
@@ -105,11 +114,20 @@ export default function RecommendationCard({ rec, onBrowsePress }: Props) {
 
   const rating = rec.rating ?? 4.8;
 
+  const gradientLight: [string, string] = ["#2596BE", "#1a6e8a"];
+  const gradientDark: [string, string]  = ["#1a3a4a", "#0d2028"];
+
   return (
     <View style={[
       styles.card, 
-      isDark ? { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 } : { backgroundColor: C.cardBg }
+      isDark && { borderColor: colors.border, borderWidth: 1 }
     ]}>
+      <LinearGradient
+        colors={isDark ? gradientDark : gradientLight}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
 
       {/* ── Top pill row ─────────────────────────────────────────── */}
       <View style={styles.pillRow}>
@@ -156,25 +174,6 @@ export default function RecommendationCard({ rec, onBrowsePress }: Props) {
         )}
       </View>
 
-      {/* ── Divider ──────────────────────────────────────────────── */}
-      <View style={[styles.divider, { backgroundColor: isDark ? colors.border : C.lightBorder }]} />
-
-      {/* ── Meta row ─────────────────────────────────────────────── */}
-      <View style={styles.metaRow}>
-        <View style={styles.metaItem}>
-          <Ionicons name="flame-outline" size={scale(14)} color={isDark ? colors.primary : C.sun} />
-          <Text style={[styles.metaText, { color: isDark ? colors.textMuted : C.lightText }]}>{rec.caloriesPerHour ?? "~280 kcal/hr"}</Text>
-        </View>
-        <View style={styles.metaItem}>
-          <Ionicons name="time-outline" size={scale(14)} color={isDark ? colors.primary : C.sun} />
-          <Text style={[styles.metaText, { color: isDark ? colors.textMuted : C.lightText }]}>{rec.duration ?? "30–45 min"}</Text>
-        </View>
-        <View style={styles.metaItem}>
-          <Ionicons name="bar-chart-outline" size={scale(14)} color={isDark ? colors.primary : C.sun} />
-          <Text style={[styles.metaText, { color: isDark ? colors.textMuted : C.lightText }]}>{rec.difficulty ?? "Intermediate"}</Text>
-        </View>
-      </View>
-
     </View>
   );
 }
@@ -184,10 +183,12 @@ const styles = StyleSheet.create({
 
   // Filled card
   card: {
-    backgroundColor: C.cardBg,
+    flex: 1,
     borderRadius: scale(20),
     padding: scale(18),
     marginBottom: vs(20),
+    position: "relative",
+    overflow: "hidden",
   },
   pillRow: {
     flexDirection: "row",
@@ -294,12 +295,13 @@ const styles = StyleSheet.create({
 
   // Empty state card
   emptyCard: {
-    backgroundColor: C.emptyBg,
     borderRadius: scale(20),
     padding: scale(28),
     marginBottom: vs(20),
     alignItems: "center",
     gap: vs(8),
+    position: "relative",
+    overflow: "hidden",
   },
   emptyIconWrap: {
     width: scale(56),
