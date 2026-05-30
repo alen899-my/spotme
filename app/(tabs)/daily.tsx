@@ -14,6 +14,7 @@ import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import DatePicker from '../../components/ui/DatePicker';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -109,6 +110,28 @@ export default function DailyTab() {
   // Deletion
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Date filter
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const isSameDay = (d1: Date, d2: Date) =>
+    d1.getDate() === d2.getDate() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getFullYear() === d2.getFullYear();
+
+  const filteredWorkouts = workouts.filter(w => {
+    if (!w.started_at) return false;
+    const d = new Date(w.started_at.replace(' ', 'T'));
+    return isSameDay(d, selectedDate);
+  });
+
+  const pastWorkouts = workouts
+    .filter(w => {
+      if (!w.started_at) return false;
+      const d = new Date(w.started_at.replace(' ', 'T'));
+      return !isSameDay(d, selectedDate);
+    })
+    .slice(0, 3);
 
   const checkProfileCompletion = useCallback(async () => {
     try {
@@ -292,7 +315,7 @@ export default function DailyTab() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <FlatList
-        data={loading ? [] : workouts}
+        data={loading ? [] : filteredWorkouts}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderWorkout}
         contentContainerStyle={styles.listContent}
@@ -396,20 +419,43 @@ export default function DailyTab() {
               )}
             </View>
 
+            {/* Date Picker */}
+            <View style={{ marginBottom: 20 }}>
+              <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" />
+            </View>
+
+            {/* Workouts for selected date */}
             <View style={styles.historyHeader}>
               <View style={styles.sectionCopy}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
-                <Text style={[styles.sectionSub, { color: colors.textMuted }]}>Your latest logged workout sessions</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {isSameDay(selectedDate, new Date()) ? "Today's Workouts" : "Workouts"}
+                </Text>
+                <Text style={[styles.sectionSub, { color: colors.textMuted }]}>
+                  {filteredWorkouts.length} session{filteredWorkouts.length !== 1 ? "s" : ""} logged
+                </Text>
               </View>
             </View>
           </View>
         )}
+        ListFooterComponent={pastWorkouts.length > 0 ? (
+          <View style={{ marginTop: 24 }}>
+            <View style={styles.historyHeader}>
+              <View style={styles.sectionCopy}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Past Workouts</Text>
+                <Text style={[styles.sectionSub, { color: colors.textMuted }]}>Recent sessions from other days</Text>
+              </View>
+            </View>
+            {pastWorkouts.map((item: any) => (
+              <View key={item.id}>{renderWorkout({ item })}</View>
+            ))}
+          </View>
+        ) : null}
         ListEmptyComponent={(
           loading ? (
             <View style={styles.centered}>
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
-          ) : (
+          ) : workouts.length === 0 ? (
             <View style={styles.centered}>
               <MaterialCommunityIcons name="calendar-plus" size={80} color={colors.border} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>No Workouts Yet</Text>
@@ -422,6 +468,14 @@ export default function DailyTab() {
                   <Text style={styles.startBtnText}>START TODAY'S WORKOUT</Text>
                 </LinearGradient>
               </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={[styles.centered, { paddingVertical: 32 }]}>
+              <Ionicons name="calendar-outline" size={48} color={colors.border} />
+              <Text style={[styles.emptyTitle, { color: colors.text, fontSize: 20 }]}>No Workouts This Day</Text>
+              <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+                Pick another date or log a new session.
+              </Text>
             </View>
           )
         )}

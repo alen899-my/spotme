@@ -183,23 +183,13 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
   useEffect(() => {
     if (visible) {
       setShouldRender(true);
-      menuAnims.forEach((a) => a.setValue(0));
-
-      Animated.parallel([
-        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }),
-        Animated.timing(overlayAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-      ]).start(() => {
-        Animated.stagger(
-          44,
-          menuAnims.map((a) =>
-            Animated.spring(a, { toValue: 1, useNativeDriver: true, tension: 80, friction: 14 })
-          )
-        ).start();
-      });
+      slideAnim.setValue(0);
+      overlayAnim.setValue(1);
+      menuAnims.forEach((a) => a.setValue(1));
     } else {
       Animated.parallel([
-        Animated.timing(slideAnim, { toValue: -SIDEBAR_WIDTH, duration: 220, useNativeDriver: true }),
-        Animated.timing(overlayAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: -SIDEBAR_WIDTH, duration: 180, useNativeDriver: true }),
+        Animated.timing(overlayAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
       ]).start(() => setShouldRender(false));
     }
   }, [visible]);
@@ -342,26 +332,9 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
               </View>
             )}
 
-            {/* ── Stats row ── */}
-            <View style={[styles.statsRow, { marginBottom: vs(18), backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-              {[
-                { label: "Workouts",    value: user?.total_workouts ?? "—" },
-                { label: "This Week",   value: user?.week_workouts  ?? "—" },
-                { label: "Best Streak", value: user?.best_streak ? `${user.best_streak}d` : "—" },
-              ].map((stat, i) => (
-                <React.Fragment key={stat.label}>
-                  {i > 0 && <View style={[styles.statDivider, { backgroundColor: colors.border }]} />}
-                  <View style={styles.statItem}>
-                    <Text style={[styles.statValue, { color: colors.text }]}>{stat.value}</Text>
-                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>{stat.label}</Text>
-                  </View>
-                </React.Fragment>
-              ))}
-            </View>
+         
 
-            {/* ── Thin rule before menu ── */}
-            <View style={[styles.sectionRule, { backgroundColor: colors.border, marginBottom: vs(16) }]} />
-
+         
             {/* ── Menu items ── */}
             <View style={{ gap: scale(8) }}>
               {MENU_ITEMS.map((item) => {
@@ -377,9 +350,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
               })}
             </View>
 
-            {/* ── Divider before logout ── */}
-            <View style={[styles.sectionRule, { backgroundColor: colors.border, marginTop: vs(16), marginBottom: vs(12) }]} />
-
+       
             {/* ── Logout button ── */}
             <LogoutButton
               onPress={handleLogout}

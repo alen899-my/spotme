@@ -43,7 +43,6 @@ function BottomTabBar() {
         styles.bottomBar,
         {
           backgroundColor: isDark ? "#0D0D0D" : "#FFFFFF",
-          borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
         },
       ]}>
         <ScrollView
@@ -132,7 +131,6 @@ const styles = StyleSheet.create({
   },
   contentWrap: {
     flex: 1,
-    paddingBottom: 90,
   },
   bottomBarWrapper: {
     position: "absolute",
@@ -144,7 +142,6 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     borderRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth,
     paddingVertical: 6,
     paddingHorizontal: 6,
     marginHorizontal: 20,
