@@ -183,12 +183,11 @@ const styles = StyleSheet.create({
 
   // Filled card
   card: {
-    flex: 1,
     borderRadius: scale(20),
     padding: scale(18),
-    marginBottom: vs(20),
     position: "relative",
     overflow: "hidden",
+    backgroundColor: C.cardBg,
   },
   pillRow: {
     flexDirection: "row",

@@ -16,18 +16,40 @@ import axios from "axios";
 import StreakIcon from "../../components/ui/StreakIcon";
 import XPBar from "../../components/ui/XPBar";
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
+
+const SectionHeader = ({ title, colors }: { title: string; colors: any }) => (
+  <View style={styles.sectionHeader}>
+    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{title}</Text>
+    <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
+  </View>
+);
+
+const InfoRow = ({ label, value, colors }: { label: string; value: any; colors: any }) => (
+  <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+    <Text style={[styles.infoLabel, { color: colors.textMuted }]}>{label}</Text>
+    <Text style={[styles.infoValue, { color: colors.text }]}>{value || "—"}</Text>
+  </View>
+);
+
+const Badge = ({ value, colors }: { value: any; colors: any }) => (
+  value ? (
+    <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+      <Text style={styles.badgeText}>{value}</Text>
+    </View>
+  ) : (
+    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: colors.text }}>—</Text>
+  )
+);
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
-
   useFocusEffect(
-    useCallback(() => {
-      fetchUserData();
-    }, [])
+    useCallback(() => { fetchUserData(); }, [])
   );
 
   const fetchUserData = async () => {
@@ -45,33 +67,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const menuItems = [
-    {
-      id: "details",
-      title: "My Profile Details",
-      subtitle: "Personal stats & physical data",
-      icon: "account-details-outline",
-      iconType: "MaterialCommunityIcons",
-      onPress: () => router.push("/profile/details"),
-    },
-    {
-      id: "goals",
-      title: "Fitness Goals",
-      subtitle: "Adjust your targets",
-      icon: "target",
-      iconType: "MaterialCommunityIcons",
-      onPress: () => alert("Goals module coming soon"),
-    },
-    {
-      id: "settings",
-      title: "Settings",
-      subtitle: "Preferences & theme",
-      icon: "cog-outline",
-      iconType: "Ionicons",
-      onPress: () => router.push("/profile/settings"),
-    },
-  ];
-
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem("userToken");
@@ -82,14 +77,17 @@ export default function ProfileScreen() {
     }
   };
 
+  const u = user || {};
+  const hasBodyStats = u.neck || u.waist || u.chest || u.arm || u.thigh;
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-        {/* Header Section - Centered */}
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <View style={styles.avatarContainer}>
-            {user?.profile_pic_url ? (
-              <Image source={{ uri: user.profile_pic_url }} style={[styles.avatar, { borderColor: colors.card }]} />
+            {u.profile_pic_url ? (
+              <Image source={{ uri: u.profile_pic_url }} style={[styles.avatar, { borderColor: colors.card }]} />
             ) : (
               <View style={[styles.avatar, styles.placeholderAvatar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
                 <Ionicons name="person" size={40} color={colors.border} />
@@ -99,67 +97,127 @@ export default function ProfileScreen() {
               <Ionicons name="camera" size={16} color="#FFF" />
             </TouchableOpacity>
           </View>
-          <Text style={[styles.userName, { color: colors.text }]}>{user?.full_name || "Gym Warrior"}</Text>
-          <Text style={[styles.userEmail, { color: colors.textMuted }]}>{user?.email || "warrior@spotme.com"}</Text>
+          <Text style={[styles.userName, { color: colors.text }]}>{u.full_name || "Gym Warrior"}</Text>
+          <Text style={[styles.userEmail, { color: colors.textMuted }]}>{u.email || "warrior@spotme.com"}</Text>
 
-          {user && (
+          {u && (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 }}>
-              {user.league_tier && (
-                <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(37,150,190,0.1)', paddingVertical: 4, paddingHorizontal: 10 }]}>
+              {u.league_tier && (
+                <View style={[styles.badgeRow, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(37,150,190,0.1)' }]}>
                   <Ionicons name="trophy" size={12} color={colors.primary} />
-                  <Text style={[styles.badgeText, { color: colors.primary }]}>{user.league_tier}</Text>
+                  <Text style={[styles.badgeRowText, { color: colors.primary }]}>{u.league_tier}</Text>
                 </View>
               )}
               <Text style={{ fontFamily: FONTS.bodyBold, color: colors.textMuted, fontSize: 13 }}>
-                {user.total_xp?.toLocaleString() || 0} XP
+                {u.total_xp?.toLocaleString() || 0} XP
               </Text>
             </View>
           )}
 
-          {user?.current_streak > 0 && (
+          {u?.current_streak > 0 && (
             <View style={{ marginTop: 12 }}>
-              <StreakIcon streak={user.current_streak} size={50} />
+              <StreakIcon streak={u.current_streak} size={50} />
             </View>
           )}
 
-          {user && (
+          {u && (
             <View style={{ width: '85%', marginTop: 24 }}>
-              <XPBar level={user.level} currentXp={user.total_xp % (user.level * 1000)} />
+              <XPBar level={u.level} currentXp={u.total_xp % (u.level * 1000)} />
             </View>
           )}
         </View>
 
-        {/* Menu Section */}
-        <View style={{ padding: 20, paddingTop: 30 }}>
-          {menuItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.menuItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={item.onPress}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.menuIconWrap, { backgroundColor: colors.inputBg }]}>
-                {item.iconType === "MaterialCommunityIcons" ? (
-                  <MaterialCommunityIcons name={item.icon as any} size={24} color={colors.text} />
-                ) : (
-                  <Ionicons name={item.icon as any} size={24} color={colors.text} />
-                )}
+        {/* Onboarding Details */}
+        <View style={{ padding: 20, paddingTop: 24 }}>
+
+          {/* Physical Metrics */}
+          <View style={{ marginBottom: 28 }}>
+            <SectionHeader title="Physical Metrics" colors={colors} />
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <InfoRow label="Gender" value={u.gender} colors={colors} />
+              <InfoRow label="Age" value={u.age} colors={colors} />
+              <InfoRow label="Height" value={u.height} colors={colors} />
+              <InfoRow label="Weight" value={u.weight} colors={colors} />
+              <InfoRow label="Body Fat" value={u.body_fat ? `${u.body_fat}%` : null} colors={colors} />
+            </View>
+          </View>
+
+          {/* Fitness Strategy */}
+          <View style={{ marginBottom: 28 }}>
+            <SectionHeader title="Fitness Strategy" colors={colors} />
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {["fitness_goal", "experience_level", "activity_level"].map(key => (
+                <View key={key} style={[styles.badgeRowLayout, { borderBottomColor: colors.border }]}>
+                  <Text style={[styles.infoLabel, { color: colors.textMuted }]}>
+                    {key === "fitness_goal" ? "Fitness Goal" : key === "experience_level" ? "Experience" : "Activity"}
+                  </Text>
+                  <Badge value={u[key]} colors={colors} />
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Body Stats */}
+          {hasBodyStats && (
+            <View style={{ marginBottom: 28 }}>
+              <SectionHeader title="Body Stats" colors={colors} />
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {["neck", "chest", "waist", "hip", "arm", "thigh"].map(key => (
+                  <InfoRow key={key} label={key.charAt(0).toUpperCase() + key.slice(1)} value={u[key]} colors={colors} />
+                ))}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.menuTitle, { color: colors.text }]}>{item.title}</Text>
-                <Text style={[styles.menuSubtitle, { color: colors.textMuted }]}>{item.subtitle}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.border} />
-            </TouchableOpacity>
-          ))}
+            </View>
+          )}
+
+          {/* Nutrition */}
+          <View style={{ marginBottom: 28 }}>
+            <SectionHeader title="Nutrition & Health" colors={colors} />
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <InfoRow label="Diet Type" value={u.diet_type} colors={colors} />
+              <InfoRow label="Food Preference" value={u.food_preference} colors={colors} />
+              <InfoRow label="Water Intake" value={u.water_intake} colors={colors} />
+              <InfoRow label="Medication" value={u.medication} colors={colors} />
+              <InfoRow label="Medical Issues" value={u.medical_conditions} colors={colors} />
+              <InfoRow label="Allergies" value={u.allergies} colors={colors} />
+            </View>
+          </View>
+
+          {/* Menu Items */}
+          <View style={{ marginTop: 8 }}>
+            {[
+              { id: "details", title: "Edit Profile Details", subtitle: "Edit your personal stats & physical data", icon: "account-details-outline", iconType: "MaterialCommunityIcons", onPress: () => router.push("/profile/details") },
+              { id: "goals", title: "Fitness Goals", subtitle: "Adjust your targets", icon: "target", iconType: "MaterialCommunityIcons", onPress: () => router.push("/profile/details") },
+              { id: "settings", title: "Settings", subtitle: "Preferences & theme", icon: "cog-outline", iconType: "Ionicons", onPress: () => router.push("/profile/settings") },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.menuItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={item.onPress}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.menuIconWrap, { backgroundColor: colors.inputBg }]}>
+                  {item.iconType === "MaterialCommunityIcons" ? (
+                    <MaterialCommunityIcons name={item.icon as any} size={24} color={colors.text} />
+                  ) : (
+                    <Ionicons name={item.icon as any} size={24} color={colors.text} />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.menuTitle, { color: colors.text }]}>{item.title}</Text>
+                  <Text style={[styles.menuSubtitle, { color: colors.textMuted }]}>{item.subtitle}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.border} />
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Logout */}
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Text style={styles.logoutText}>Log Out</Text>
+          </TouchableOpacity>
+
+          <Text style={[styles.version, { color: colors.textDim }]}>SpotMe v1.0.4 • Beta Access</Text>
         </View>
-
-        {/* Instagram-style logout */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Log Out</Text>
-        </TouchableOpacity>
-
-        <Text style={[styles.version, { color: colors.textDim }]}>SpotMe v1.0.4 • Beta Access</Text>
       </ScrollView>
     </View>
   );
@@ -190,14 +248,12 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: "#E00000",
     width: 32,
     height: 32,
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 3,
-    borderColor: "#FFFFFF", // fallback, overridden inline
   },
   userName: {
     fontFamily: FONTS.heading,
@@ -210,18 +266,72 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
-  badge: {
+  badgeRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
     borderRadius: 12,
     gap: 6,
   },
-  badgeText: {
+  badgeRowText: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: 12,
-    color: "#E00000",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 16,
+    marginRight: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+  },
+  card: {
+    borderRadius: 20,
+    padding: 4,
+    borderWidth: 1,
+  },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  infoLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+  },
+  infoValue: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 15,
+  },
+  badgeRowLayout: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  badge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  badgeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+    color: "#FFF",
   },
   menuItem: {
     flexDirection: "row",
