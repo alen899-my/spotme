@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "description": "Your ultimate fitness companion for tracking workouts and progress.",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/appicn/appicon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "jsEngine": "hermes",

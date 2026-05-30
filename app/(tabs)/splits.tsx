@@ -20,6 +20,7 @@ import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import { SplitsSkeleton } from '../../components/ui/Skeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -183,11 +184,7 @@ export default function SplitsTab() {
           </View>
         </View>
 
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : splits.length === 0 ? (
+        {loading ? <SplitsSkeleton /> : splits.length === 0 ? (
           <View style={styles.centered}>
             <View style={styles.emptyIconWrap}>
               <MaterialCommunityIcons name="layers-plus" size={80} color={colors.border} />

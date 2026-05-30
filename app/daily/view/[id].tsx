@@ -17,6 +17,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import Slider from '@react-native-community/slider';
+import { ViewSessionSkeleton } from '../../../components/ui/Skeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -212,18 +213,20 @@ export default function WorkoutViewScreen() {
             <View 
               key={idx} 
               style={[
-                styles.perfCard, 
-                { backgroundColor: item.color, borderRightColor: 'rgba(255,255,255,0.3)', borderRightWidth: 4, borderWidth: 0 },
+                styles.perfCard,
                 isDark && {
-                  backgroundColor: colors.card,
                   borderColor: colors.border,
                   borderWidth: 1,
-                  borderRightColor: item.color,
-                  borderRightWidth: 4,
                   shadowColor: '#000000',
                 }
               ]}
             >
+              <LinearGradient
+                colors={isDark ? [colors.card, item.color] : [item.color, 'rgba(255,255,255,0.85)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
               <View style={[styles.perfIconBox, { backgroundColor: 'rgba(255,255,255,0.2)' }, isDark && { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
                 <Ionicons name={item.icon as any} size={18} color={isDark ? item.color : "#FFF"} />
               </View>
@@ -311,9 +314,7 @@ export default function WorkoutViewScreen() {
     );
   };
 
-  if (loading) {
-    return <View style={[styles.centered, { backgroundColor: colors.bg }]}><ActivityIndicator size="large" color={P.cta} /></View>;
-  }
+  if (loading) return <ViewSessionSkeleton />;
   if (!workout) return null;
 
   return (

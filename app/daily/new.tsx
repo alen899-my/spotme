@@ -13,6 +13,7 @@ import { P } from '../../constants/homeTheme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
+import { NewWorkoutSkeleton } from '../../components/ui/Skeleton';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -94,6 +95,8 @@ export default function NewDailyWorkout() {
       setStarting(false);
     }
   };
+
+  if (loadingSplits) return <NewWorkoutSkeleton />;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>

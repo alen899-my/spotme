@@ -15,6 +15,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import axios from "axios";
 import StreakIcon from "../../components/ui/StreakIcon";
 import XPBar from "../../components/ui/XPBar";
+import { ProfileSkeleton } from "../../components/ui/Skeleton";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
 
@@ -76,6 +77,8 @@ export default function ProfileScreen() {
       console.error("Logout error in profile:", e);
     }
   };
+
+  if (loading) return <ProfileSkeleton />;
 
   const u = user || {};
   const hasBodyStats = u.neck || u.waist || u.chest || u.arm || u.thigh;

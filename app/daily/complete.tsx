@@ -17,6 +17,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import Slider from '@react-native-community/slider';
 import StreakIcon from '../../components/ui/StreakIcon';
+import { CompleteSkeleton } from '../../components/ui/Skeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -259,15 +260,19 @@ export default function WorkoutCompleteScreen() {
               key={i}
               style={[
                 styles.perfCard,
-                { backgroundColor: STAT_COLORS[i] },
                 isDark && {
-                  backgroundColor: colors.card,
                   borderColor: STAT_COLORS[i],
                   borderWidth: 1,
                   shadowColor: '#000000',
                 }
               ]}
             >
+              <LinearGradient
+                colors={isDark ? [colors.card, STAT_COLORS[i]] : [STAT_COLORS[i], 'rgba(255,255,255,0.85)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
               <View style={[styles.perfIconBox, isDark && { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
                 <Ionicons name={s.icon as any} size={18} color={isDark ? STAT_COLORS[i] : "#FFF"} />
               </View>
@@ -610,7 +615,7 @@ const styles = StyleSheet.create({
   },
   perfCard: {
     width: (SCREEN_WIDTH - 52) / 2,
-    padding: 16, borderRadius: 20,
+    padding: 16, borderRadius: 20, overflow: 'hidden',
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

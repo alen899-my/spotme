@@ -17,6 +17,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ExercisePreviewModal from '../../components/modals/ExercisePreviewModal';
+import { ActiveWorkoutSkeleton } from '../../components/ui/Skeleton';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -847,13 +848,7 @@ export default function ActiveWorkoutScreen() {
   ), [colors, workout?.status, activeExercise?.id, setTimer, setTimerRunning, openGuide,
     removeExercise, removeSet, handleSkipExercise, openSetModal, handleRateExercise, loadingSkip, loadingLogSet]);
 
-  if (loading) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={P.cta} />
-      </SafeAreaView>
-    );
-  }
+  if (loading) return <ActiveWorkoutSkeleton />;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>

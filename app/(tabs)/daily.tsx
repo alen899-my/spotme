@@ -15,6 +15,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import DatePicker from '../../components/ui/DatePicker';
+import { DailySkeleton } from '../../components/ui/Skeleton';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -310,12 +311,12 @@ export default function DailyTab() {
     );
   }
 
-
+  if (loading) return <DailySkeleton />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <FlatList
-        data={loading ? [] : filteredWorkouts}
+        data={filteredWorkouts}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderWorkout}
         contentContainerStyle={styles.listContent}
@@ -451,11 +452,7 @@ export default function DailyTab() {
           </View>
         ) : null}
         ListEmptyComponent={(
-          loading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : workouts.length === 0 ? (
+          workouts.length === 0 ? (
             <View style={styles.centered}>
               <MaterialCommunityIcons name="calendar-plus" size={80} color={colors.border} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>No Workouts Yet</Text>

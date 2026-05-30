@@ -12,6 +12,7 @@ import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { P } from '../../constants/homeTheme';
+import { LeaderboardSkeleton } from '../../components/ui/Skeleton';
 
 const { width: W } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -315,6 +316,8 @@ export default function LeaderboardScreen() {
 
   const myTier = me ? getTier(me.league_tier ?? 'Bronze') : TIERS[1];
 
+  if (loading) return <LeaderboardSkeleton />;
+
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
       {/* Background */}
@@ -324,7 +327,7 @@ export default function LeaderboardScreen() {
       />
 
       <FlatList
-        data={loading ? [] : leaders}
+        data={leaders}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -457,17 +460,10 @@ export default function LeaderboardScreen() {
           </View>
         }
         ListEmptyComponent={
-          loading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator size="large" color={P.cta} />
-              <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading rankings…</Text>
-            </View>
-          ) : (
-            <View style={styles.centered}>
-              <MaterialCommunityIcons name="trophy-outline" size={64} color={colors.textDim} />
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No warriors in this tier yet</Text>
-            </View>
-          )
+          <View style={styles.centered}>
+            <MaterialCommunityIcons name="trophy-outline" size={64} color={colors.textDim} />
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>No warriors in this tier yet</Text>
+          </View>
         }
         renderItem={({ item, index }) => <LeaderRow item={item} isMe={item.id === myId} index={index} />}
       />
