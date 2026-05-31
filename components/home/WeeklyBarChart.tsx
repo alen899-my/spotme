@@ -55,7 +55,7 @@ export default function WeeklyBarChart({ data }: Props) {
         scrollToEnd
         initialSpacing={scale(2)}
         endSpacing={scale(2)}
-        yAxisTextStyle={{ fontSize: 0 }}
+        hideYAxisText
       />
     </View>
   );
