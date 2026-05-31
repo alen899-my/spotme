@@ -51,9 +51,9 @@ async function awardXP(client, userId, amount, reason) {
   let total_xp = (userRes.rows[0]?.total_xp || 0) + amount;
   total_xp = Math.max(0, total_xp);
 
-  // Recalculate level (level 1 = 0-999, level 2 = 1000-1999, etc. based on previous logic)
+  // Recalculate level (level 1 = 0-1999, level 2 = 2000-3999, etc.)
   let level = 1;
-  while (total_xp >= level * 1000) {
+  while (total_xp >= level * 2000) {
     level++;
   }
 

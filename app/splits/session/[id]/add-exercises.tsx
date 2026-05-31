@@ -29,7 +29,7 @@ export default function AddSessionExercisesScreen() {
   const router = useRouter();
   const { id: sessionId } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { showToast } = useToast();
 
   const [query, setQuery] = useState('');
@@ -165,7 +165,7 @@ export default function AddSessionExercisesScreen() {
 
   const renderExercise = ({ item }: { item: any }) => (
     <TouchableOpacity 
-      style={styles.exCard}
+      style={[styles.exCard, { backgroundColor: isDark ? '#000000' : P.cta }]}
       activeOpacity={0.7}
       onPress={() => setPreviewEx(item)}
     >

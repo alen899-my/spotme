@@ -127,58 +127,68 @@ export default function NewDailyWorkout() {
             { paddingBottom: 140 + Math.max(insets.bottom, 12) }
           ]}
         >
-          {/* Step 1: Choose Split */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            <Text style={{ color: colors.primary }}>1. </Text>Choose Program
-          </Text>
-
-          {loadingSplits ? (
-            <ActivityIndicator color={P.cta} style={{ marginVertical: 20 }} />
-          ) : splits.length === 0 ? (
-            <TouchableOpacity
-              style={[styles.createSplitCard, { borderColor: colors.border }]}
-              onPress={() => router.push('/splits/create')}
-            >
-              <Ionicons name="add-circle-outline" size={32} color={P.cta} />
-              <Text style={[styles.createSplitText, { color: colors.textMuted }]}>No programs yet. Create one first.</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.splitList}>
-              {splits.map((split) => (
-                <TouchableOpacity
-                  key={split.id}
-                  style={[
-                    styles.splitCard,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                    selectedSplit?.id === split.id && { borderColor: colors.primary, backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(37,150,190,0.08)' }
-                  ]}
-                  onPress={() => handleSelectSplit(split)}
-                >
-                  <View style={[styles.splitIcon, { backgroundColor: selectedSplit?.id === split.id ? colors.primary : colors.inputBg }]}>
-                    <MaterialCommunityIcons
-                      name="dumbbell"
-                      size={20}
-                      color={selectedSplit?.id === split.id ? '#FFF' : colors.textMuted}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.splitName, { color: colors.text }]}>{split.name}</Text>
-                    <Text style={[styles.splitMeta, { color: colors.textMuted }]}>{split.session_count} sessions</Text>
-                  </View>
-                  {selectedSplit?.id === split.id && (
-                    <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* Step 2: Choose Session */}
-          {selectedSplit && (
+          {!selectedSplit ? (
             <>
-              <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>
-                <Text style={{ color: colors.primary }}>2. </Text>Choose Day
+              {/* Step 1: Choose Split */}
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                <Text style={{ color: colors.primary }}>1. </Text>Choose Program
               </Text>
+
+              {loadingSplits ? (
+                <ActivityIndicator color={P.cta} style={{ marginVertical: 20 }} />
+              ) : splits.length === 0 ? (
+                <TouchableOpacity
+                  style={[styles.createSplitCard, { borderColor: colors.border }]}
+                  onPress={() => router.push('/splits/create')}
+                >
+                  <Ionicons name="add-circle-outline" size={32} color={P.cta} />
+                  <Text style={[styles.createSplitText, { color: colors.textMuted }]}>No programs yet. Create one first.</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.splitList}>
+                  {splits.map((split) => (
+                    <TouchableOpacity
+                      key={split.id}
+                      style={[
+                        styles.splitCard,
+                        { backgroundColor: colors.card, borderColor: colors.border },
+                      ]}
+                      onPress={() => handleSelectSplit(split)}
+                    >
+                      <View style={[styles.splitIcon, { backgroundColor: colors.inputBg }]}>
+                        <MaterialCommunityIcons
+                          name="dumbbell"
+                          size={20}
+                          color={colors.textMuted}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.splitName, { color: colors.text }]}>{split.name}</Text>
+                        <Text style={[styles.splitMeta, { color: colors.textMuted }]}>{split.session_count} sessions</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Step 2: Choose Session */}
+              <View style={[styles.sessionHeaderWrap, { marginBottom: 14 }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text, paddingHorizontal: 0, marginBottom: 0 }]}>
+                  <Text style={{ color: colors.primary }}>2. </Text>Choose Day
+                </Text>
+                <TouchableOpacity
+                  onPress={() => { setSelectedSplit(null); setSelectedSession(null); }}
+                  style={styles.sessionCloseBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close-circle" size={28} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.selectedSplitLabel, { color: colors.textMuted }]}>Program: {selectedSplit.name}</Text>
 
               {loadingSessions ? (
                 <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
@@ -267,6 +277,9 @@ const styles = StyleSheet.create({
   createSplitCard: { marginHorizontal: 20, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', padding: 24, alignItems: 'center', gap: 10 },
   createSplitText: { fontFamily: FONTS.body, fontSize: 14, textAlign: 'center' },
   noSessions: { fontFamily: FONTS.body, fontSize: 14, paddingHorizontal: 20, marginTop: 8 },
+  sessionHeaderWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+  sessionCloseBtn: { padding: 4 },
+  selectedSplitLabel: { fontFamily: FONTS.body, fontSize: 13, paddingHorizontal: 20, marginBottom: 14, marginTop: -6 },
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingTop: 12 },
   startBtn: { borderRadius: 18, overflow: 'hidden' },
   startBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, height: 60, backgroundColor: P.cta },

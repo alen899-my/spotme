@@ -42,8 +42,8 @@ const LABELS = [
   'Terrible', 'Very Bad', 'Okayish', 'Decent', 'Good',
   'Very Good', 'Strong Lift', 'Amazing', 'Beast Mode', 'Legendary!',
 ];
-// Single accent colour for selected state — vivid indigo
-const RATING_ACCENT = '#7C6EF7';
+// Accent colour matching the app theme
+const RATING_ACCENT = P.sun;
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -87,15 +87,19 @@ const ExerciseCard = React.memo(({
     handleRateExercise(item.id, num);
   };
 
+  const isActive = activeExerciseId === item.id;
+  const isPending = !isDone && !isSkipped && completedSets === 0;
+
   return (
     <View style={[
       styles.exCard,
       { 
         backgroundColor: isDark ? colors.card : P.cta, 
-        borderColor: isDark ? colors.border : (isSkipped ? P.border : (isDone ? '#10B981' : P.ctaDark)),
-        borderWidth: isDark ? 1 : 0 
+        borderColor: isDark ? colors.border : (isSkipped ? P.border : (isDone ? '#10B981' : (isActive ? P.cta : P.ctaDark))),
+        borderWidth: isActive ? 2 : (isDark ? 1 : 0),
       },
       isSkipped && { opacity: 0.7 },
+      isActive && !isDark && { borderColor: P.sun },
     ]}>
       {/* ── HEADER (always visible) ── */}
       <TouchableOpacity
@@ -112,23 +116,55 @@ const ExerciseCard = React.memo(({
               <Ionicons name="information-circle-outline" size={16} color={isDark ? colors.primary : P.sun} style={{ marginTop: 3 }} />
             </TouchableOpacity>
           </View>
-          {/* ── 4. Progress bar instead of meta text ── */}
-          <View style={styles.headerProgressWrap}>
-            <View style={[styles.headerProgressBar, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
-              <View style={[
-                styles.headerProgressFill,
-                {
-                  width: `${Math.min((completedSets / targetSets) * 100, 100)}%` as any,
-                  backgroundColor: isDone ? '#10B981' : (isDark ? colors.primary : P.sun),
-                },
-              ]} />
-            </View>
-            <Text style={[styles.headerProgressLabel, { color: isDark ? colors.textMuted : '#FFF' }]}>{completedSets}/{targetSets} sets</Text>
+          {/* Status indicator row */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            {isDone && !isSkipped && (
+              <View style={[styles.statusPill, { backgroundColor: '#10B981' }]}>
+                <Ionicons name="checkmark-circle" size={12} color="#FFF" />
+                <Text style={styles.statusPillText}>COMPLETED</Text>
+              </View>
+            )}
+            {isActive && !isDone && !isSkipped && (
+              <View style={[styles.statusPill, { backgroundColor: P.cta }]}>
+                <Ionicons name="flash" size={12} color="#FFF" />
+                <Text style={styles.statusPillText}>ACTIVE</Text>
+              </View>
+            )}
+            {isPending && !isSkipped && (
+              <View style={[styles.statusPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.2)' }]}>
+                <Ionicons name="hourglass-outline" size={12} color={isDark ? colors.textMuted : '#FFF'} />
+                <Text style={[styles.statusPillText, { color: isDark ? colors.textMuted : '#FFF' }]}>PENDING</Text>
+              </View>
+            )}
+            {isSkipped && (
+              <View style={[styles.statusPill, { backgroundColor: isDark ? '#444' : 'rgba(255,255,255,0.2)' }]}>
+                <Text style={styles.statusPillText}>SKIPPED</Text>
+              </View>
+            )}
           </View>
+          {/* ── 4. Progress bar instead of meta text ── */}
+          {item.category?.toLowerCase() === 'cardio' ? (
+            <View style={styles.headerProgressWrap}>
+              <Text style={[styles.headerProgressLabel, { color: isDark ? colors.textMuted : '#FFF' }]}>
+                {formatTime(item.sets?.reduce((acc: number, s: any) => acc + (s.duration_seconds || 0), 0) || 0)} logged
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.headerProgressWrap}>
+              <View style={[styles.headerProgressBar, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
+                <View style={[
+                  styles.headerProgressFill,
+                  {
+                    width: `${Math.min((completedSets / targetSets) * 100, 100)}%` as any,
+                    backgroundColor: isDone ? '#10B981' : (isDark ? colors.primary : P.sun),
+                  },
+                ]} />
+              </View>
+              <Text style={[styles.headerProgressLabel, { color: isDark ? colors.textMuted : '#FFF' }]}>{completedSets}/{targetSets} sets</Text>
+            </View>
+          )}
         </View>
         <View style={{ alignItems: 'center', gap: 4, marginLeft: 8 }}>
-          {isDone && !isSkipped && <Ionicons name="checkmark-circle" size={22} color="#10B981" />}
-          {isSkipped && <Text style={styles.skipLabel}>SKIPPED</Text>}
           <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={isDark ? colors.textMuted : "rgba(255,255,255,0.6)"} />
         </View>
         {workoutStatus === 'active' && (
@@ -147,85 +183,97 @@ const ExerciseCard = React.memo(({
           {/* Sets table */}
           {item.sets && item.sets.length > 0 && (
             <View style={styles.setsTable}>
-              <View style={styles.tableHeader}>
-                {['SET', 'KG', 'REPS', 'TIME', ''].map((h, i) => (
-                  <Text key={i} style={[styles.tableHeaderText, i === 4 && { flex: 0.4 }]}>{h}</Text>
-                ))}
-              </View>
-              {item.sets.map((s: any) => (
-                <View key={s.id} style={styles.tableRow}>
-                  <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{s.set_number}</Text>
-                  <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{s.weight}</Text>
-                  <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{s.is_skipped ? 'SKIP' : s.reps}</Text>
-                  <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{formatTime(s.duration_seconds || 0)}</Text>
-                  {/* ── 5. Solid red delete button ── */}
-                  <View style={{ flex: 0.4, alignItems: 'center' }}>
-                    {workoutStatus === 'active' && (
-                      <TouchableOpacity
-                        onPress={() => removeSet(s.id)}
-                        style={styles.setDeleteBtn}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      >
-                        <Ionicons name="trash" size={13} color="#FFF" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              ))}
+              {(() => {
+                const isCardio = item.category?.toLowerCase() === 'cardio';
+                const headers = isCardio ? ['TIME', ''] : ['SET', 'KG', 'REPS', 'TIME', ''];
+                return (
+                  <>
+                    <View style={styles.tableHeader}>
+                      {headers.map((h, i) => (
+                        <Text key={i} style={[styles.tableHeaderText, i === headers.length - 1 && { flex: 0.7 }]}>{h}</Text>
+                      ))}
+                    </View>
+                    {item.sets.map((s: any) => (
+                      <View key={s.id} style={styles.tableRow}>
+                        {isCardio ? null : <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{s.set_number}</Text>}
+                        {isCardio ? null : <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{s.weight}</Text>}
+                        {isCardio ? null : <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{s.is_skipped ? 'SKIP' : s.reps}</Text>}
+                        <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{formatTime(s.duration_seconds || 0)}</Text>
+                        {/* ── 5. Solid red delete button ── */}
+                        <View style={{ flex: 0.7, alignItems: 'center', paddingLeft: 8 }}>
+                          {workoutStatus === 'active' && (
+                            <TouchableOpacity
+                              onPress={() => removeSet(s.id)}
+                              style={styles.setDeleteBtn}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons name="trash" size={14} color="#FFF" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    ))}
+                  </>
+                );
+              })()}
             </View>
           )}
 
           {/* ── Rating accordion ── */}
           {isDone && !isSkipped && (
-            <View style={styles.ratingBanner}>
-              {/* Yellow header strip */}
+            <View style={[styles.ratingBanner, { borderColor: isDark ? colors.border : '#F5C842' }]}>
               <TouchableOpacity
-                style={styles.ratingBannerHeader}
+                style={[styles.ratingBannerHeader, { backgroundColor: isDark ? colors.inputBg : '#FEF3C7' }]}
                 onPress={() => setRatingOpen(v => !v)}
                 activeOpacity={0.85}
               >
-                <Ionicons name="star" size={15} color="#92610A" />
-                <Text style={styles.ratingBannerTitle}>RATE THIS EXERCISE</Text>
+                <Ionicons name="star" size={15} color={isDark ? P.sun : '#92610A'} />
+                <Text style={[styles.ratingBannerTitle, { color: isDark ? colors.text : '#92610A' }]}>RATE THIS EXERCISE</Text>
                 {localRating ? (
-                  <View style={styles.ratingBannerBadge}>
-                    <Text style={styles.ratingBannerBadgeText}>{localRating}/10 · {LABELS[localRating - 1]}</Text>
+                  <View style={[styles.ratingBannerBadge, { backgroundColor: isDark ? P.sun : '#F59E0B' }]}>
+                    <Text style={[styles.ratingBannerBadgeText, { color: isDark ? '#000' : '#FFF' }]}>{localRating}/10</Text>
                   </View>
                 ) : null}
-                <Ionicons name={ratingOpen ? 'chevron-up' : 'chevron-down'} size={15} color="#92610A" />
+                <Ionicons name={ratingOpen ? 'chevron-up' : 'chevron-down'} size={15} color={isDark ? colors.textMuted : '#92610A'} />
               </TouchableOpacity>
 
-              {/* Dark card grid — only when open */}
               {ratingOpen && (
-                <View style={styles.ratingGrid}>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
-                    const isSelected = localRating === num;
-                    const baseOpacity = 0.22 + (num - 1) * 0.07;
-                    return (
-                      <TouchableOpacity
-                        key={num}
-                        style={[
-                          styles.ratingCard,
-                          isSelected
-                            ? { backgroundColor: RATING_ACCENT, borderColor: RATING_ACCENT }
-                            : { backgroundColor: `rgba(255,255,255,${baseOpacity * 0.13})`, borderColor: `rgba(255,255,255,${baseOpacity})` },
-                        ]}
-                        onPress={() => onRate(num)}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name={RATING_ICONS[num - 1] as any}
-                          size={16}
-                          color={isSelected ? '#FFF' : `rgba(255,255,255,${0.45 + (num - 1) * 0.058})`}
-                        />
-                        <Text style={[
-                          styles.ratingCardNum,
-                          { color: isSelected ? '#FFF' : `rgba(255,255,255,${0.55 + (num - 1) * 0.05})` },
-                        ]}>
-                          {num}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                <View style={[styles.ratingGrid, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.25)' }]}>
+                  <View style={styles.ratingGridInner}>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+                      const isSelected = localRating === num;
+                      return (
+                        <TouchableOpacity
+                          key={num}
+                          style={[
+                            styles.ratingCard,
+                            isSelected
+                              ? { backgroundColor: RATING_ACCENT, borderColor: RATING_ACCENT }
+                              : { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.12)' },
+                          ]}
+                          onPress={() => onRate(num)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={RATING_ICONS[num - 1] as any}
+                            size={16}
+                            color={isSelected ? '#1A1A1A' : (isDark ? colors.primary : '#FFF')}
+                          />
+                          <Text style={[
+                            styles.ratingCardNum,
+                            { color: isSelected ? '#1A1A1A' : (isDark ? colors.text : '#FFF') },
+                          ]}>
+                            {num}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  {localRating ? (
+                    <Text style={[styles.ratingLabel, { color: isDark ? P.sun : '#FFF' }]}>{LABELS[localRating - 1]}</Text>
+                  ) : (
+                    <Text style={[styles.ratingHint, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.5)' }]}>Tap a rating above</Text>
+                  )}
                 </View>
               )}
             </View>
@@ -268,32 +316,59 @@ const ExerciseCard = React.memo(({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RestShakeIcon — ① animated shake when rest hits 0
+// RestShakeIcon — bouncing ring animation when rest hits 0
 // ─────────────────────────────────────────────────────────────────────────────
 const RestShakeIcon = ({ restTimer, restRunning }: { restTimer: number; restRunning: boolean }) => {
-  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const bounceAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
   const prevTimer = useRef(restTimer);
+  const [alertTriggered, setAlertTriggered] = useState(false);
+  const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    // Trigger shake when timer reaches 0 while running
-    if (restRunning && restTimer === 0 && prevTimer.current > 0) {
-      Animated.sequence([
-        Animated.timing(shakeAnim, { toValue: 8,  duration: 60, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 6,  duration: 60, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -6, duration: 60, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 4,  duration: 60, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -4, duration: 60, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 0,  duration: 40, useNativeDriver: true }),
-      ]).start();
+    if (restTimer === 0 && prevTimer.current > 0) {
+      setAlertTriggered(true);
+      const bounce = Animated.loop(
+        Animated.sequence([
+          Animated.timing(bounceAnim, { toValue: 1.25, duration: 200, useNativeDriver: true }),
+          Animated.timing(bounceAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+        ])
+      );
+      const rotate = Animated.loop(
+        Animated.sequence([
+          Animated.timing(rotateAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+          Animated.timing(rotateAnim, { toValue: -1, duration: 150, useNativeDriver: true }),
+          Animated.timing(rotateAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+        ])
+      );
+      loopRef.current = Animated.parallel([bounce, rotate]);
+      loopRef.current.start();
+    } else if (restTimer > 0) {
+      setAlertTriggered(false);
+      if (loopRef.current) {
+        loopRef.current.stop();
+        loopRef.current = null;
+      }
+      bounceAnim.setValue(1);
+      rotateAnim.setValue(0);
     }
     prevTimer.current = restTimer;
-  }, [restTimer, restRunning]);
+    return () => {
+      if (loopRef.current) {
+        loopRef.current.stop();
+        loopRef.current = null;
+      }
+    };
+  }, [restTimer]);
 
-  const isAlert = restTimer === 0 && restRunning;
+  const isAlert = alertTriggered;
   const { colors, isDark } = useTheme();
+  const rotateInterpolation = rotateAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-15deg', '0deg', '15deg'],
+  });
   return (
-    <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
+    <Animated.View style={{ transform: [{ scale: bounceAnim }, { rotate: rotateInterpolation }] }}>
       <View style={[styles.dashIconBox, { backgroundColor: isAlert ? '#EF4444' : (isDark ? colors.inputBg : P.ctaDark) }]}>
         <Ionicons name={isAlert ? 'alert-circle' : 'cafe'} size={16} color={isDark ? colors.primary : '#FFF'} />
       </View>
@@ -376,6 +451,14 @@ export default function ActiveWorkoutScreen() {
     }
   }, [workout?.status]);
 
+  const restTimerPrevRef = useRef(restTimer);
+  useEffect(() => {
+    if (restTimer === 0 && restTimerPrevRef.current > 0) {
+      showToast("Time's up! Get ready for next set 🔔");
+    }
+    restTimerPrevRef.current = restTimer;
+  }, [restTimer]);
+
   const [guideModalVisible, setGuideModalVisible] = useState(false);
   const [guideExercise, setGuideExercise] = useState<any>(null);
 
@@ -392,7 +475,6 @@ export default function ActiveWorkoutScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const LIMIT = 20;
 
-  const [finishWater, setFinishWater] = useState(0);
   const [finishWeight, setFinishWeight] = useState('');
   const [uploadingPhotos, setUploadingPhotos] = useState<string[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
@@ -502,7 +584,8 @@ export default function ActiveWorkoutScreen() {
 
   const handleLogSet = async () => {
     if (loadingLogSet) return;
-    if (!inputReps || parseInt(inputReps) === 0) {
+    const isCardio = activeExercise?.category?.toLowerCase() === 'cardio';
+    if (!isCardio && (!inputReps || parseInt(inputReps) === 0)) {
       showToast('Enter reps completed', 'info');
       return;
     }
@@ -511,22 +594,24 @@ export default function ActiveWorkoutScreen() {
     try {
       const token = await AsyncStorage.getItem('userToken');
       await axios.post(`${API_URL}/daily/exercises/${activeExercise.id}/sets`, {
-        set_number: activeSetNum,
-        weight: parseFloat(inputWeight) || 0,
-        reps: parseInt(inputReps),
-        duration_seconds: setTimer,
+        set_number: isCardio ? 1 : activeSetNum,
+        weight: isCardio ? 0 : (parseFloat(inputWeight) || 0),
+        reps: isCardio ? 1 : parseInt(inputReps),
+        duration_seconds: isCardio ? setTimer : setTimer,
         rest_seconds: 0,
         workout_duration: workoutElapsed,
         total_rest_duration: totalRestElapsed,
       }, { headers: { Authorization: `Bearer ${token}` } });
-      showToast(`Set ${activeSetNum} logged! 🔥`);
+      showToast(isCardio ? `Duration logged! 🔥` : `Set ${activeSetNum} logged! 🔥`);
       setSetModalVisible(false);
       setSetTimer(0);
       setSetTimerRunning(false);
       fetchWorkout();
-      const restMatch = (activeExercise.target_rest_time || '60s').match(/\d+/);
-      const restSec = restMatch ? parseInt(restMatch[0]) : 60;
-      startRest(restSec);
+      if (!isCardio) {
+        const restMatch = (activeExercise.target_rest_time || '60s').match(/\d+/);
+        const restSec = restMatch ? parseInt(restMatch[0]) : 60;
+        startRest(restSec);
+      }
     } catch (err) {
       console.error('Error logging set:', err);
       showToast('Failed to log set', 'error');
@@ -738,10 +823,9 @@ export default function ActiveWorkoutScreen() {
         total_duration_seconds: workoutElapsed,
         total_rest_seconds: totalRestElapsed,
         total_volume: Math.round(totalVolume),
-        water_intake_liters: finishWater,
       }, { headers: { Authorization: `Bearer ${token}` } });
       showToast('Workout finished! Great job! 🏆');
-      router.replace(`/daily/complete?id=${workoutId}&duration=${workoutElapsed}&volume=${totalVolume}&water=${finishWater}&rest=${totalRestElapsed}`);
+      router.replace(`/daily/complete?id=${workoutId}&duration=${workoutElapsed}&volume=${totalVolume}&rest=${totalRestElapsed}`);
     } catch (err: any) {
       console.error('Error finishing workout:', err);
       showToast('Failed to save workout', 'error');
@@ -818,7 +902,6 @@ export default function ActiveWorkoutScreen() {
     try {
       const token = await AsyncStorage.getItem('userToken');
       await axios.patch(`${API_URL}/daily/workouts/${workoutId}/metrics`, {
-        water_intake_liters: finishWater,
         post_workout_weight: parseFloat(finishWeight) || 0,
       }, { headers: { Authorization: `Bearer ${token}` } });
       showToast('Metrics updated!');
@@ -829,13 +912,23 @@ export default function ActiveWorkoutScreen() {
   };
 
   const openEditMetrics = () => {
-    setFinishWater(Number(workout?.water_intake_liters) || 0);
     setFinishWeight(String(workout?.post_workout_weight || ''));
     setShowEditMetricsModal(true);
   };
 
   const completedCount = workout?.exercises?.filter((e: any) => e.is_completed).length || 0;
   const totalCount = workout?.exercises?.length || 0;
+  const sortedExercises = [...(workout?.exercises || [])].sort((a: any, b: any) => {
+    const aActive = activeExercise?.id === a.id ? 1 : 0;
+    const bActive = activeExercise?.id === b.id ? 1 : 0;
+    const aDone = a.is_completed ? 1 : 0;
+    const bDone = b.is_completed ? 1 : 0;
+    const aSkipped = a.is_skipped ? 1 : 0;
+    const bSkipped = b.is_skipped ? 1 : 0;
+    const aScore = aSkipped ? 4 : aDone ? 3 : aActive ? 0 : 1;
+    const bScore = bSkipped ? 4 : bDone ? 3 : bActive ? 0 : 1;
+    return aScore - bScore;
+  });
 
   const renderExercise = useCallback(({ item }: { item: any }) => (
     <ExerciseCard
@@ -923,7 +1016,7 @@ export default function ActiveWorkoutScreen() {
         )}
 
         <FlatList
-          data={workout?.exercises || []}
+          data={sortedExercises}
           keyExtractor={item => String(item.id)}
           renderItem={renderExercise}
           contentContainerStyle={styles.listContent}
@@ -985,52 +1078,66 @@ export default function ActiveWorkoutScreen() {
       {/* Set Logger Modal */}
       <Modal visible={setModalVisible} transparent animationType="slide" onRequestClose={() => setSetModalVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>{activeExercise?.name}</Text>
-                <Text style={[styles.modalSub, { color: colors.textMuted }]}>Set {activeSetNum} of {activeExercise?.target_sets}</Text>
-              </View>
-              <TouchableOpacity onPress={() => setSetModalVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.clockWrap}>
-              <Text style={[styles.clockTime, { color: colors.text }]}>{formatTime(setTimer)}</Text>
-              <TouchableOpacity style={styles.clockBtn} onPress={toggleSetTimer}>
-                <LinearGradient colors={setTimerRunning ? [P.ctaDark, P.ctaDeep] : [P.cta, P.ctaDark]} style={styles.clockBtnGrad}>
-                  <Ionicons name={setTimerRunning ? 'pause' : 'play'} size={28} color="#FFF" />
-                </LinearGradient>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => { setSetTimer(0); clearInterval(setTimerRef.current); setSetTimerRunning(false); }}>
-                <Text style={[styles.resetText, { color: colors.textMuted }]}>Reset</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.inputRow}>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>WEIGHT (kg)</Text>
-                <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="decimal-pad" value={inputWeight} onChangeText={setInputWeight} placeholder="0" placeholderTextColor={colors.textDim} />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>REPS DONE</Text>
-                <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="numeric" value={inputReps} onChangeText={setInputReps} placeholder="0" placeholderTextColor={colors.textDim} />
-              </View>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity style={[styles.modalSkipBtn, { borderColor: colors.border, opacity: loadingSkip ? 0.5 : 1 }]} onPress={handleSkipSet} disabled={loadingSkip}>
-                <Text style={[styles.modalSkipBtnText, { color: colors.textMuted }]}>{loadingSkip ? 'SKIPPING...' : 'SKIP SET'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.saveSetBtn, { opacity: loadingLogSet ? 0.8 : 1 }]} onPress={handleLogSet} disabled={loadingLogSet}>
-                <LinearGradient colors={['#10B981', '#059669']} style={styles.saveSetBtnGrad}>
-                  {loadingLogSet ? <ActivityIndicator color="#FFF" /> : (
-                    <>
-                      <Ionicons name="checkmark" size={22} color="#FFF" />
-                      <Text style={styles.saveSetBtnText}>SAVE SET</Text>
-                    </>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 24) + 60 }]}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+              {(() => {
+                const isCardio = activeExercise?.category?.toLowerCase() === 'cardio';
+                return (
+                  <>
+                    <View style={styles.modalHeader}>
+                      <View>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>{activeExercise?.name}</Text>
+                        <Text style={[styles.modalSub, { color: colors.textMuted }]}>
+                          {isCardio ? 'Log duration' : `Set ${activeSetNum} of ${activeExercise?.target_sets}`}
+                        </Text>
+                      </View>
+                      <TouchableOpacity onPress={() => setSetModalVisible(false)}>
+                        <Ionicons name="close" size={24} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.clockWrap}>
+                      {isCardio ? <Text style={[styles.inputLabel, { color: colors.textMuted, textAlign: 'center', marginBottom: 4 }]}>DURATION</Text> : null}
+                      <Text style={[styles.clockTime, { color: colors.text }]}>{formatTime(setTimer)}</Text>
+                      <TouchableOpacity style={styles.clockBtn} onPress={toggleSetTimer}>
+                        <LinearGradient colors={setTimerRunning ? [P.ctaDark, P.ctaDeep] : [P.cta, P.ctaDark]} style={styles.clockBtnGrad}>
+                          <Ionicons name={setTimerRunning ? 'pause' : 'play'} size={28} color="#FFF" />
+                        </LinearGradient>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => { setSetTimer(0); clearInterval(setTimerRef.current); setSetTimerRunning(false); }}>
+                        <Text style={[styles.resetText, { color: colors.textMuted }]}>Reset</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {!isCardio && (
+                      <View style={styles.inputRow}>
+                        <View style={styles.inputGroup}>
+                          <Text style={[styles.inputLabel, { color: colors.textMuted }]}>WEIGHT (kg)</Text>
+                          <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="decimal-pad" value={inputWeight} onChangeText={setInputWeight} placeholder="0" placeholderTextColor={colors.textDim} />
+                        </View>
+                        <View style={styles.inputGroup}>
+                          <Text style={[styles.inputLabel, { color: colors.textMuted }]}>REPS DONE</Text>
+                          <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="numeric" value={inputReps} onChangeText={setInputReps} placeholder="0" placeholderTextColor={colors.textDim} />
+                        </View>
+                      </View>
+                    )}
+                    <View style={styles.setModalActions}>
+                      <TouchableOpacity style={[styles.modalSkipBtn, { borderColor: colors.border, opacity: loadingSkip ? 0.5 : 1 }]} onPress={handleSkipSet} disabled={loadingSkip}>
+                        <Text style={[styles.modalSkipBtnText, { color: colors.textMuted }]}>{loadingSkip ? 'SKIPPING...' : 'SKIP SET'}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.saveSetBtn, { opacity: loadingLogSet ? 0.8 : 1 }]} onPress={handleLogSet} disabled={loadingLogSet}>
+                        <LinearGradient colors={['#10B981', '#059669']} style={styles.saveSetBtnGrad}>
+                          {loadingLogSet ? <ActivityIndicator color="#FFF" /> : (
+                            <>
+                              <Ionicons name="checkmark" size={22} color="#FFF" />
+                              <Text style={styles.saveSetBtnText}>{isCardio ? 'SAVE DURATION' : 'SAVE SET'}</Text>
+                            </>
+                          )}
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                );
+              })()}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1210,6 +1317,8 @@ const styles = StyleSheet.create({
   progressPercent: { fontFamily: FONTS.heading, fontSize: 16 },
   progressBar:     { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressFill:    { height: '100%', backgroundColor: P.cta, borderRadius: 3 },
+  statusPill:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  statusPillText:  { fontFamily: FONTS.bodyBold, fontSize: 9, color: '#FFF', letterSpacing: 0.5 },
 
   // Exercise card
   exCard:          { borderRadius: 28, padding: 20, marginBottom: 20, borderWidth: 1.5 },
@@ -1231,17 +1340,20 @@ const styles = StyleSheet.create({
   tableCell:         { flex: 1, textAlign: 'center', fontFamily: FONTS.bodySemiBold, fontSize: 15, color: '#FFF' },
   tableCellMuted:    { color: 'rgba(255,255,255,0.42)' },
   // ── 5. Solid red delete ──
-  setDeleteBtn:      { width: 26, height: 26, borderRadius: 7, backgroundColor: '#EF4444', justifyContent: 'center', alignItems: 'center' },
+  setDeleteBtn:      { width: 32, height: 32, borderRadius: 8, backgroundColor: '#EF4444', justifyContent: 'center', alignItems: 'center', marginVertical: 2 },
 
   // ── Rating banner ──
-  ratingBanner:           { marginTop: 4, marginBottom: 12, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#F5C842' },
-  ratingBannerHeader:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#FEF3C7' },
-  ratingBannerTitle:      { flex: 1, fontFamily: FONTS.bodyBold, fontSize: 12, color: '#92610A', letterSpacing: 0.8 },
-  ratingBannerBadge:      { backgroundColor: '#F59E0B', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
-  ratingBannerBadgeText:  { fontFamily: FONTS.bodyBold, fontSize: 11, color: '#FFF' },
-  ratingGrid:             { flexDirection: 'row', flexWrap: 'wrap', gap: 7, padding: 12, backgroundColor: 'rgba(0,0,0,0.25)' },
-  ratingCard:             { width: (SCREEN_WIDTH - 40 - 40 - 67) / 5, aspectRatio: 1, borderRadius: 10, borderWidth: 1, justifyContent: 'center', alignItems: 'center', gap: 3 },
+  ratingBanner:           { marginTop: 4, marginBottom: 12, borderRadius: 14, overflow: 'hidden', borderWidth: 1 },
+  ratingBannerHeader:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11 },
+  ratingBannerTitle:      { flex: 1, fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.8 },
+  ratingBannerBadge:      { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  ratingBannerBadgeText:  { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  ratingGrid:             { padding: 12 },
+  ratingGridInner:        { flexDirection: 'row', flexWrap: 'wrap', gap: 7, justifyContent: 'center' },
+  ratingCard:             { width: (SCREEN_WIDTH - 76) / 5, aspectRatio: 1, borderRadius: 12, borderWidth: 1, justifyContent: 'center', alignItems: 'center', gap: 3 },
   ratingCardNum:          { fontFamily: FONTS.heading, fontSize: 13 },
+  ratingLabel:            { fontFamily: FONTS.bodyBold, fontSize: 13, textAlign: 'center', marginTop: 10, letterSpacing: 0.5 },
+  ratingHint:             { fontFamily: FONTS.body, fontSize: 11, textAlign: 'center', marginTop: 10 },
 
   // Footer
   exFooter:          { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
@@ -1276,7 +1388,7 @@ const styles = StyleSheet.create({
   clockBtn:          { borderRadius: 40, overflow: 'hidden', marginBottom: 10 },
   clockBtnGrad:      { width: 80, height: 80, justifyContent: 'center', alignItems: 'center' },
   resetText:         { fontFamily: FONTS.body, fontSize: 13 },
-  inputRow:          { flexDirection: 'row', gap: 16, marginBottom: 20 },
+  inputRow:          { flexDirection: 'row', gap: 20, marginBottom: 24 },
   inputGroup:        { flex: 1 },
   inputLabel:        { fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 1, marginBottom: 8 },
   numInput:          { height: 60, borderRadius: 14, borderWidth: 1, textAlign: 'center', fontFamily: FONTS.heading, fontSize: 28 },
@@ -1285,6 +1397,7 @@ const styles = StyleSheet.create({
   saveSetBtnText:    { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF', letterSpacing: 1 },
   modalSkipBtn:      { flex: 0.8, height: 58, borderRadius: 18, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   modalSkipBtnText:  { fontFamily: FONTS.bodyBold, fontSize: 14, letterSpacing: 1 },
+  setModalActions:   { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 12 },
 
   // Browse
   catGrid:       { gap: 12 },

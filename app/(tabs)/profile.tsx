@@ -125,7 +125,7 @@ export default function ProfileScreen() {
 
           {u && (
             <View style={{ width: '85%', marginTop: 24 }}>
-              <XPBar level={u.level} currentXp={u.total_xp % (u.level * 1000)} />
+              <XPBar level={u.level} currentXp={u.total_xp % (u.level * 2000)} />
             </View>
           )}
         </View>

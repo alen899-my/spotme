@@ -12,7 +12,7 @@ interface XPBarProps {
 
 const XPBar: React.FC<XPBarProps> = ({ level, currentXp, animated = true }) => {
   const { colors } = useTheme();
-  const xpForNext = level * 1000;
+  const xpForNext = level * 2000;
   const progress = Math.min(currentXp / xpForNext, 1);
   
   const animatedWidth = useRef(new Animated.Value(0)).current;

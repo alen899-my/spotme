@@ -106,7 +106,7 @@ export default function SplitSessionsScreen() {
       
       <View style={styles.cardFooter}>
         <Text style={styles.actionText}>Manage Routine</Text>
-        <Ionicons name="chevron-forward" size={14} color={P.sun} />
+        <Ionicons name="chevron-forward" size={14} color="#FFF" />
       </View>
     </TouchableOpacity>
   );
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
   titleArea: { flex: 1 },
-  sessionName: { fontFamily: FONTS.bodyBold, fontSize: 17, marginBottom: 4, color: P.sun },
+  sessionName: { fontFamily: FONTS.bodyBold, fontSize: 17, marginBottom: 4, color: P.cta },
   sessionMeta: { fontFamily: FONTS.body, fontSize: 12, flexDirection: 'row', alignItems: 'center', gap: 4, color: '#FFF' },
   deleteBtn: {
     width: 34,
@@ -250,9 +250,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 8,
     marginTop: 4,
-    backgroundColor: P.sun,
+    backgroundColor: P.cta,
   },
-  actionText: { fontFamily: FONTS.bodyBold, fontSize: 12, color: P.ink },
+  actionText: { fontFamily: FONTS.bodyBold, fontSize: 12, color: '#FFF' },
 
   // States
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },

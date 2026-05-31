@@ -132,7 +132,7 @@ const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => 
     >
       <View style={styles.cardMedia}>
         <LinearGradient
-          colors={isDark ? ['#0D0D0D', '#050505'] : [P.offWhite, P.ctaLight]}
+          colors={isDark ? ['#000000', '#000000'] : [P.offWhite, P.ctaLight]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
@@ -153,7 +153,7 @@ const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => 
         </View>
       </View>
 
-      <View style={[styles.cardFooter, { backgroundColor: isDark ? colors.card : P.ctaDeep }]}>
+<View style={[styles.cardFooter, { backgroundColor: isDark ? '#000000' : P.ctaDeep }]}>
         <Text style={styles.cardLabel}>{label}</Text>
         <View style={styles.cardInfoRow}>
           <Text style={[styles.cardCountText, { color: isDark ? colors.textMuted : P.sunLight }]}>{item.exercise_count || 0} exercises</Text>
@@ -185,7 +185,7 @@ const ExerciseCard = React.memo(({ item }: { item: any }) => {
         styles.card,
         styles.exerciseTryCard,
         {
-          backgroundColor: isDark ? colors.card : P.cta,
+          backgroundColor: isDark ? colors.bg : P.cta,
           borderWidth: isDark ? 1 : 0,
           borderColor: isDark ? colors.border : 'transparent',
         },
@@ -242,7 +242,7 @@ const ExerciseCard = React.memo(({ item }: { item: any }) => {
         {!imageUri || imgError ? (
           <View style={[styles.exerciseThumb, styles.exerciseThumbPlaceholder]}>
             <LinearGradient
-              colors={isDark ? [colors.card, '#050505'] : [P.ctaDark, P.ctaDeep]}
+              colors={isDark ? ['#000000', '#000000'] : [P.ctaDark, P.ctaDeep]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFillObject}

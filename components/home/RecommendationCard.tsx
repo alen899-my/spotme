@@ -115,19 +115,20 @@ export default function RecommendationCard({ rec, onBrowsePress }: Props) {
   const rating = rec.rating ?? 4.8;
 
   const gradientLight: [string, string] = ["#2596BE", "#1a6e8a"];
-  const gradientDark: [string, string]  = ["#1a3a4a", "#0d2028"];
 
   return (
     <View style={[
       styles.card, 
-      isDark && { borderColor: colors.border, borderWidth: 1 }
+      isDark ? { backgroundColor: '#000000', borderColor: colors.border, borderWidth: 1 } : {}
     ]}>
-      <LinearGradient
-        colors={isDark ? gradientDark : gradientLight}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      {!isDark && (
+        <LinearGradient
+          colors={gradientLight}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
       {/* ── Top pill row ─────────────────────────────────────────── */}
       <View style={styles.pillRow}>

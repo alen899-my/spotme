@@ -605,6 +605,14 @@ router.patch(
         }
       }
 
+      // Sync post-workout weight to weight_logs for weight tracker
+      if (post_workout_weight && parseFloat(post_workout_weight) > 0) {
+        await pool.query(
+          'INSERT INTO weight_logs (user_id, weight, notes) VALUES ($1, $2, $3)',
+          [userId, parseFloat(post_workout_weight), `Post-workout: ${id}`]
+        );
+      }
+
       const analytics = await syncWorkoutCompletionAnalytics(pool, workoutId, userId);
       result.rows[0].calories_burned = analytics.calorieSummary.caloriesBurned;
       result.rows[0].workout_met = analytics.calorieSummary.workoutMet;

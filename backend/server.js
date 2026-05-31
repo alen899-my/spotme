@@ -11,6 +11,7 @@ const dailyRoutes = require('./routes/daily');
 const mealsRoutes = require('./routes/meals');
 const waterRoutes = require('./routes/water');
 const leaderboardRoutes = require('./routes/leaderboard');
+const weightRoutes = require('./routes/weight');
 
 const app = express();
 
@@ -35,7 +36,7 @@ app.use('/api/daily', dailyRoutes);
 app.use('/api/meals', mealsRoutes);
 app.use('/api/water', waterRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
-
+app.use('/api/weight', weightRoutes);
 
 const PORT = process.env.PORT || 5000;
 

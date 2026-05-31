@@ -222,6 +222,14 @@ const initDB = async () => {
         logged_at TIMESTAMP DEFAULT NOW()
       );
 
+      CREATE TABLE IF NOT EXISTS weight_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        weight NUMERIC(6,2) NOT NULL,
+        notes VARCHAR(255),
+        logged_at TIMESTAMP DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS meal_recommendations (
         id SERIAL PRIMARY KEY,
         user_id INT REFERENCES users(id) ON DELETE CASCADE UNIQUE,

@@ -111,6 +111,7 @@ export default function TabsLayout() {
           <Tabs.Screen name="daily" />
           <Tabs.Screen name="leaderboard" />
           <Tabs.Screen name="splits" />
+          <Tabs.Screen name="weight" />
           <Tabs.Screen name="workout" />
           <Tabs.Screen name="profile" />
         </Tabs>
