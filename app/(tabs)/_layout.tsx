@@ -8,9 +8,11 @@ import AppHeader from "../../components/ui/AppHeader";
 import ProfileSidebar from "../../components/ui/ProfileSidebar";
 import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
+import axios from "axios";
 
 const BLUE = "#2596BE";
 const INK = "#04282B";
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 const TABS = [
   { name: "index",       icon: "home",          label: "Home" },
@@ -88,22 +90,47 @@ export default function TabsLayout() {
   const { colors } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const pathname = usePathname();
+  const router = useRouter();
+
+  const loadUser = async () => {
+    try {
+      const data = await AsyncStorage.getItem("userData");
+      if (data) setUser(JSON.parse(data));
+    } catch {}
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) return;
+      const res = await axios.get(`${API_URL}/notifications`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUnreadCount(res.data.unread_count || 0);
+    } catch {}
+  };
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const data = await AsyncStorage.getItem("userData");
-        if (data) setUser(JSON.parse(data));
-      } catch {}
-    };
     loadUser();
   }, [pathname]);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <View style={[styles.shell, { backgroundColor: colors.bg }]}>
       <View style={styles.contentWrap}>
-        <AppHeader user={user} onProfilePress={() => setSidebarOpen(true)} />
+        <AppHeader
+          user={user}
+          onProfilePress={() => setSidebarOpen(true)}
+          onActionPress={() => router.push("/notifications" as any)}
+          actionBadge={unreadCount}
+        />
         <Tabs screenOptions={{ headerShown: false }} tabBar={() => null}>
           <Tabs.Screen name="index" />
           <Tabs.Screen name="exercises" />

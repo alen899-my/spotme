@@ -23,7 +23,6 @@ import { StatCards }      from "../components/home/StatCards";
 import RecommendationCard from "../components/home/RecommendationCard";
 import { HomeSkeleton } from "../components/ui/Skeleton";
 import BodyStatusCard     from "../components/home/BodyStatusCard";
-import WeeklyActivityCard from "../components/home/WeeklyActivityCard";
 import WeightTrendCard    from "../components/home/WeightTrendCard";
 import HydrationCard      from "../components/home/HydrationCard";
 
@@ -223,7 +222,6 @@ export default function HomeScreen() {
       />
 
       {/* ── Weekly Activity ──────────────────────────────────────────────── */}
-      <WeeklyActivityCard weekly={weekly} />
 
       {/* ── Weight Trend ─────────────────────────────────────────────────── */}
       <WeightTrendCard weightProgress={weightProgress} />

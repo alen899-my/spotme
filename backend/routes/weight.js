@@ -7,7 +7,7 @@ const authenticateToken = require('../middleware/auth');
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const { weight, notes } = req.body;
-    if (!weight || isNaN(parseFloat(weight))) {
+    if (weight === undefined || weight === null || weight === '' || isNaN(parseFloat(weight))) {
       return res.status(400).json({ error: 'Valid weight is required' });
     }
     const result = await pool.query(

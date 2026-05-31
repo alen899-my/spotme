@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,23 +6,80 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
 import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors, isDark, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadPrivacySetting();
+  }, []);
+
+  const loadPrivacySetting = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await axios.get(`${API_URL}/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setIsPrivate(res.data.is_private || false);
+    } catch (err) {
+      console.error('Failed to load privacy setting:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const togglePrivacy = async (value: boolean) => {
+    setIsPrivate(value);
+    setSaving(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.put(`${API_URL}/profile/update`,
+        { is_private: value },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Update local storage user data
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        userData.is_private = value;
+        await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      }
+    } catch (err) {
+      console.error('Failed to update privacy:', err);
+      setIsPrivate(!value);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const s = makeStyles(colors);
 
+  if (loading) {
+    return (
+      <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={s.container}>
-      {/* Header */}
       <View style={[
         s.header,
         {
@@ -43,7 +100,6 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Appearance Section */}
         <Text style={s.sectionLabel}>APPEARANCE</Text>
         <View style={s.card}>
           <View style={s.settingRow}>
@@ -66,8 +122,36 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-
-        {/* About Section */}
+        <Text style={s.sectionLabel}>PRIVACY</Text>
+        <View style={s.card}>
+          <View style={[s.settingRow, { borderBottomWidth: 0 }]}>
+            <View style={s.settingLeft}>
+              <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,150,190,0.1)' }]}>
+                <Ionicons
+                  name={isPrivate ? "lock-closed" : "lock-open"}
+                  size={20}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.settingTitle}>Private Profile</Text>
+                <Text style={s.settingSubtitle}>
+                  {isPrivate
+                    ? "Only approved followers can see your full profile"
+                    : "Everyone can see your full profile"}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={isPrivate}
+              onValueChange={togglePrivacy}
+              trackColor={{ false: "#E0E0E0", true: colors.primary }}
+              thumbColor="#FFFFFF"
+              ios_backgroundColor="#E0E0E0"
+              disabled={saving}
+            />
+          </View>
+        </View>
 
         <Text style={s.sectionLabel}>ABOUT</Text>
         <View style={s.card}>
@@ -146,6 +230,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
+    flex: 1,
+    marginRight: 12,
   },
   iconCircle: {
     width: 40,
@@ -164,25 +250,5 @@ const makeStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
     marginTop: 2,
-  },
-  previewRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-  },
-  previewChip: {
-    alignItems: "center",
-    gap: 8,
-  },
-  previewDot: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  previewChipText: {
-    fontFamily: FONTS.body,
-    fontSize: 11,
-    color: colors.textMuted,
   },
 });

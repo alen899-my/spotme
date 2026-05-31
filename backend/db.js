@@ -24,32 +24,11 @@ const initDB = async () => {
     // Add onboarding fields
     await pool.query(`
       ALTER TABLE users 
-      ADD COLUMN IF NOT EXISTS age INT,
-      ADD COLUMN IF NOT EXISTS height VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS weight VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS body_fat VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS fitness_goal VARCHAR(100),
-      ADD COLUMN IF NOT EXISTS experience_level VARCHAR(100),
-      ADD COLUMN IF NOT EXISTS activity_level VARCHAR(100),
-      ADD COLUMN IF NOT EXISTS neck VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS waist VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS hip VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS chest VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS arm VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS thigh VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS medical_conditions TEXT,
-      ADD COLUMN IF NOT EXISTS medication VARCHAR(10),
-      ADD COLUMN IF NOT EXISTS allergies TEXT,
-      ADD COLUMN IF NOT EXISTS diet_type VARCHAR(100),
-      ADD COLUMN IF NOT EXISTS food_preference VARCHAR(100),
-      ADD COLUMN IF NOT EXISTS water_intake VARCHAR(100),
-      ADD COLUMN IF NOT EXISTS food_allergies TEXT,
-      ADD COLUMN IF NOT EXISTS profile_pic_url VARCHAR(500),
-      ADD COLUMN IF NOT EXISTS front_photo_url VARCHAR(500),
-      ADD COLUMN IF NOT EXISTS back_photo_url VARCHAR(500),
-      ADD COLUMN IF NOT EXISTS side_photo_url VARCHAR(500),
-      ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS meals_per_day INT DEFAULT 4;
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE;
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS target_weight VARCHAR(50) DEFAULT '0';
     `);
 
     // Create exercises table
@@ -212,6 +191,54 @@ const initDB = async () => {
       CREATE INDEX IF NOT EXISTS idx_global_exercise_prs_exercise
       ON global_exercise_prs (exercise_id);
     `);
+
+    // ── Social Features (follows & notifications) ─────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS follows (
+        id SERIAL PRIMARY KEY,
+        follower_id INT REFERENCES users(id) ON DELETE CASCADE,
+        following_id INT REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(follower_id, following_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        from_user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        reference_id INT,
+        message TEXT,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Add reference_id to existing notifications
+    try {
+      await pool.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_id INT`);
+    } catch (_) {}
+
+    // ── Workout Reports ──────────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS workout_reports (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        daily_workout_id INT REFERENCES daily_workouts(id) ON DELETE CASCADE,
+        summary TEXT NOT NULL,
+        good_things TEXT NOT NULL,
+        areas_to_improve TEXT NOT NULL,
+        recommendations TEXT NOT NULL,
+        status VARCHAR(20) DEFAULT 'completed',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Add status column to existing workout_reports table
+    try {
+      await pool.query(`ALTER TABLE workout_reports ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'completed'`);
+    } catch (_) {}
 
     // ── Water Intake Logging ─────────────────────────────────────────────────
     await pool.query(`

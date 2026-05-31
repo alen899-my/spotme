@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Image, ActivityIndicator,
-  Dimensions,
+  TouchableOpacity, Image, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -13,11 +12,11 @@ import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { P, getXPProgress, TIER_COLORS } from '../../constants/homeTheme';
+import { UserProfileSkeleton } from '../../components/ui/Skeleton';
 
 const { width: SW } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-// ── Tier helpers ───────────────────────────────────────────────────────────
 const TIERS = [
   { name: 'Bronze',      color: '#CD7F32', gradient: ['#CD7F32','#8B4513'] as [string,string], mcIcon: 'shield' },
   { name: 'Silver',      color: '#B0B8C1', gradient: ['#C0C0C0','#808080'] as [string,string], mcIcon: 'shield-half-full' },
@@ -32,7 +31,6 @@ const TIERS = [
 ];
 function getTier(name: string) { return TIERS.find(t => t.name === name) ?? TIERS[0]; }
 
-// ── Utility formatters ─────────────────────────────────────────────────────
 function formatDuration(sec: number) {
   if (!sec) return '0m';
   const m = Math.floor(sec / 60);
@@ -64,7 +62,6 @@ function formatShortDate(dateStr: string) {
   } catch { return '—'; }
 }
 
-// ── Main Screen ────────────────────────────────────────────────────────────
 export default function PublicProfileScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -73,6 +70,10 @@ export default function PublicProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [workouts, setWorkouts] = useState<any[]>([]);
+  const [canViewFull, setCanViewFull] = useState(true);
+  const [followStatus, setFollowStatus] = useState<string | null>(null);
+  const [hasPendingFromTarget, setHasPendingFromTarget] = useState(false);
+  const [myId, setMyId] = useState<number | null>(null);
 
   useEffect(() => { fetchData(); }, [id]);
 
@@ -80,11 +81,17 @@ export default function PublicProfileScreen() {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('userToken');
+      const userData = await AsyncStorage.getItem('userData');
+      if (userData) setMyId(JSON.parse(userData).id);
+
       const res = await axios.get(`${API_URL}/profile/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUser(res.data.user);
       setWorkouts(res.data.workouts || []);
+      setCanViewFull(res.data.can_view_full !== false);
+      setFollowStatus(res.data.follow_status);
+      setHasPendingFromTarget(res.data.has_pending_from_target || false);
     } catch (err: any) {
       console.error('Profile fetch error:', err?.response?.status, err?.message);
     } finally {
@@ -92,13 +99,54 @@ export default function PublicProfileScreen() {
     }
   };
 
+  const handleFollow = async () => {
+    const prevStatus = followStatus;
+    const optimistic = followStatus === 'accepted' ? null : (user?.is_private ? 'pending' : 'accepted');
+    setFollowStatus(optimistic);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (prevStatus === 'accepted') {
+        await axios.post(`${API_URL}/profile/${id}/unfollow`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        await axios.post(`${API_URL}/profile/${id}/follow`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (err) {
+      setFollowStatus(prevStatus);
+    }
+  };
+
+  const handleAccept = async () => {
+    const prevPending = hasPendingFromTarget;
+    setHasPendingFromTarget(false);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(`${API_URL}/profile/${id}/accept-follow`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      setHasPendingFromTarget(prevPending);
+    }
+  };
+
+  const handleDeny = async () => {
+    const prevPending = hasPendingFromTarget;
+    setHasPendingFromTarget(false);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(`${API_URL}/profile/${id}/deny-follow`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      setHasPendingFromTarget(prevPending);
+    }
+  };
+
   if (loading) {
-    return (
-      <View style={[styles.centered, { backgroundColor: colors.bg }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: P.muted }]}>Loading athlete…</Text>
-      </View>
-    );
+    return <UserProfileSkeleton />;
   }
 
   if (!user) {
@@ -117,34 +165,95 @@ export default function PublicProfileScreen() {
   const tier = getTier(user.league_tier ?? 'Bronze');
   const xpInfo = getXPProgress(user.league_tier ?? 'Bronze', user.xp ?? 0);
   const isDarkText = ['Silver','Gold','Diamond','Legend'].includes(user.league_tier ?? '');
+  const isOwnProfile = myId === Number(id);
+
+  const getFollowButton = () => {
+    if (isOwnProfile) return null;
+
+    if (hasPendingFromTarget && followStatus !== 'accepted') {
+      return (
+        <View style={styles.followActions}>
+          <TouchableOpacity
+            style={styles.acceptBtn}
+            onPress={handleAccept}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="checkmark" size={14} color="#FFF" />
+            <Text style={styles.followBtnText}>Accept</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.rejectBtn}
+            onPress={handleDeny}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close" size={14} color="#FFF" />
+            <Text style={styles.followBtnText}>Reject</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (followStatus === 'accepted') {
+      return (
+        <TouchableOpacity
+          style={[styles.followBtn, { backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }]}
+          onPress={handleFollow}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="person-remove" size={16} color="#FFF" />
+          <Text style={styles.followBtnText}>Following</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    if (followStatus === 'pending') {
+      return (
+        <TouchableOpacity
+          style={[styles.followBtn, { backgroundColor: 'rgba(247,203,22,0.2)', borderWidth: 1, borderColor: P.sun }]}
+          onPress={handleFollow}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="time" size={16} color={P.sun} />
+          <Text style={[styles.followBtnText, { color: P.sun }]}>Requested</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={[styles.followBtn, { backgroundColor: colors.primary }]}
+        onPress={handleFollow}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="person-add" size={16} color="#FFF" />
+        <Text style={styles.followBtnText}>Follow</Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── HEADER ── */}
       <View style={[
         styles.header, 
         { 
-          backgroundColor: isDark ? colors.bg : colors.primary, 
-          paddingTop: Math.max(insets.top, 12),
-          borderBottomWidth: isDark ? 1 : 0,
-          borderBottomColor: colors.border,
+          backgroundColor: isDark ? colors.bg : colors.primary,
+          paddingTop: insets.top,
+          paddingBottom: 8,
         }
       ]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
-          <Ionicons name="chevron-back" size={24} color={isDark ? colors.primary : '#FFF'} />
-          <Text style={[styles.headerBackText, { color: isDark ? colors.primary : '#FFF' }]}>Back</Text>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.headerBack, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.15)' }]}>
+          <Ionicons name="chevron-back" size={22} color={isDark ? colors.primary : '#FFF'} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: isDark ? colors.text : '#FFF' }]}>ATHLETE PROFILE</Text>
-        <View style={styles.headerRightPlaceholder} />
+        <View style={{ flex: 1 }} />
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── HERO CARD ── */}
+        {/* ── HERO CARD (always shown) ── */}
         <TouchableOpacity activeOpacity={1} style={[styles.heroCardWrap, { borderColor: isDark ? colors.border : 'rgba(37,150,190,0.2)' }]}>
           <LinearGradient
             colors={isDark ? ['#0D0D0D', '#050505'] : ['#2596BE', '#0d4d65']}
@@ -152,7 +261,6 @@ export default function PublicProfileScreen() {
             style={styles.heroCard}
           >
             <View style={styles.heroRow}>
-              {/* Avatar */}
               <View style={styles.heroAvatarWrap}>
                 <View style={[styles.avatarRing, { borderColor: tier.color }]}>
                   {user.profile_pic_url ? (
@@ -163,7 +271,6 @@ export default function PublicProfileScreen() {
                     </View>
                   )}
                 </View>
-                {/* Tier badge */}
                 <View style={styles.tierBadgeWrap}>
                   <LinearGradient colors={tier.gradient} style={styles.tierBadge}>
                     <MaterialCommunityIcons
@@ -175,7 +282,6 @@ export default function PublicProfileScreen() {
                 </View>
               </View>
 
-              {/* Name + tier */}
               <View style={styles.heroInfo}>
                 <Text style={[styles.heroName, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1}>{user.full_name ?? 'Athlete'}</Text>
                 <Text style={[styles.heroTier, { color: tier.color }]}>
@@ -189,7 +295,6 @@ export default function PublicProfileScreen() {
                 ) : null}
               </View>
 
-              {/* XP block */}
               <View style={styles.heroXPBlock}>
                 <Text style={[styles.heroXPVal, { color: isDark ? colors.text : '#FFF' }]}>
                   {(user.xp ?? 0) >= 1000
@@ -200,7 +305,6 @@ export default function PublicProfileScreen() {
               </View>
             </View>
 
-            {/* XP Progress bar */}
             <View style={styles.xpBarArea}>
               <View style={styles.xpBarLabels}>
                 <Text style={[styles.xpBarTierText, { color: tier.color }]}>{user.league_tier}</Text>
@@ -217,168 +321,165 @@ export default function PublicProfileScreen() {
                 />
               </View>
             </View>
+
+            {/* Follow button in hero card */}
+            {!isOwnProfile && (
+              <View style={styles.heroFollowRow}>
+                {getFollowButton()}
+              </View>
+            )}
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* ── STATS ROW ── */}
-        <View style={styles.statsRow}>
-          {/* Streak */}
-          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
-            <View style={styles.statIconRow}>
-              <Ionicons name="flame" size={18} color="#FF9F43" />
-              <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>STREAK</Text>
-            </View>
-            <Text style={[styles.statCardValue, { color: colors.text }]}>
-              {user.current_streak || 0}
-            </Text>
-            <Text style={[styles.statCardUnit, { color: colors.textDim }]}>days</Text>
-            <View style={[styles.statCardDivider, { backgroundColor: colors.border }]} />
-            <Text style={[styles.statCardFooter, { color: colors.textMuted }]}>
-              Last active: {formatDate(user.last_workout_date)}
+        {/* ── PRIVATE PROFILE LOCK MESSAGE ── */}
+        {!canViewFull && !isOwnProfile && (
+          <View style={[styles.lockedCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
+            <Ionicons name="lock-closed" size={40} color={colors.textMuted} />
+            <Text style={[styles.lockedTitle, { color: colors.text }]}>Private Profile</Text>
+            <Text style={[styles.lockedSub, { color: colors.textMuted }]}>
+              {followStatus === 'pending'
+                ? 'Follow request sent. Wait for approval to see full details.'
+                : 'Follow this athlete to see their full profile details.'}
             </Text>
           </View>
+        )}
 
-          {/* Workouts logged */}
-          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
-            <View style={styles.statIconRow}>
-              <MaterialCommunityIcons name="dumbbell" size={18} color={colors.primary} />
-              <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>WORKOUTS</Text>
+        {/* ── FULL PROFILE CONTENT (only when canViewFull) ── */}
+        {canViewFull && (
+          <>
+            {/* Stats Row */}
+            <View style={styles.statsRow}>
+              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
+                <View style={styles.statIconRow}>
+                  <Ionicons name="flame" size={18} color="#FF9F43" />
+                  <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>STREAK</Text>
+                </View>
+                <Text style={[styles.statCardValue, { color: colors.text }]}>
+                  {user.current_streak || 0}
+                </Text>
+                <Text style={[styles.statCardUnit, { color: colors.textDim }]}>days</Text>
+                <View style={[styles.statCardDivider, { backgroundColor: colors.border }]} />
+                <Text style={[styles.statCardFooter, { color: colors.textMuted }]}>
+                  Last active: {formatDate(user.last_workout_date)}
+                </Text>
+              </View>
+
+              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
+                <View style={styles.statIconRow}>
+                  <MaterialCommunityIcons name="dumbbell" size={18} color={colors.primary} />
+                  <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>WORKOUTS</Text>
+                </View>
+                <Text style={[styles.statCardValue, { color: colors.text }]}>
+                  {workouts.length}
+                </Text>
+                <Text style={[styles.statCardUnit, { color: colors.textDim }]}>logged</Text>
+                <View style={[styles.statCardDivider, { backgroundColor: colors.border }]} />
+                <Text style={[styles.statCardFooter, { color: colors.textMuted }]}>
+                  {user.experience_level?.split('(')[0]?.trim() || 'Intermediate'}
+                </Text>
+              </View>
             </View>
-            <Text style={[styles.statCardValue, { color: colors.text }]}>
-              {workouts.length}
-            </Text>
-            <Text style={[styles.statCardUnit, { color: colors.textDim }]}>logged</Text>
-            <View style={[styles.statCardDivider, { backgroundColor: colors.border }]} />
-            <Text style={[styles.statCardFooter, { color: colors.textMuted }]}>
-              {user.experience_level?.split('(')[0]?.trim() || 'Intermediate'}
-            </Text>
-          </View>
-        </View>
 
-        {/* ── PHYSICAL METRICS GRID ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Physical Metrics</Text>
-          <View style={[styles.sectionLine, { backgroundColor: colors.primary }]} />
-        </View>
-
-        <View style={styles.metricsGrid}>
-          {[
-            { label: 'Height', value: user.height ? `${user.height} cm` : '—', icon: 'human-male-height' },
-            { label: 'Weight', value: user.weight ? `${user.weight} kg` : '—', icon: 'scale-bathroom' },
-            { label: 'Age',    value: user.age    ? `${user.age} yrs`  : '—', icon: 'calendar-account' },
-            { label: 'Gender', value: user.gender || '—',                      icon: 'gender-male-female' },
-          ].map((m) => (
-            <View
-              key={m.label}
-              style={[
-                styles.metricTile, 
-                { 
-                  backgroundColor: colors.card, 
-                  borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)',
-                  shadowColor: isDark ? '#000000' : P.ctaDeep,
-                }
-              ]}
-            >
-              <MaterialCommunityIcons name={m.icon as any} size={20} color={colors.primary} />
-              <Text style={[styles.metricValue, { color: colors.text }]}>{m.value}</Text>
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{m.label}</Text>
+            {/* Physical Metrics */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Physical Metrics</Text>
+              <View style={[styles.sectionLine, { backgroundColor: colors.primary }]} />
             </View>
-          ))}
-        </View>
 
-        {/* ── RECENT WORKOUTS ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Workouts</Text>
-          <View style={[styles.sectionLine, { backgroundColor: colors.primary }]} />
-        </View>
+            <View style={styles.metricsGrid}>
+              {[
+                { label: 'Height', value: user.height ? `${user.height} cm` : '—', icon: 'human-male-height' },
+                { label: 'Weight', value: user.weight ? `${user.weight} kg` : '—', icon: 'scale-bathroom' },
+                { label: 'Age',    value: user.age    ? `${user.age} yrs`  : '—', icon: 'calendar-account' },
+                { label: 'Gender', value: user.gender || '—',                      icon: 'gender-male-female' },
+              ].map((m) => (
+                <View key={m.label} style={[styles.metricTile, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)', shadowColor: isDark ? '#000000' : P.ctaDeep }]}>
+                  <MaterialCommunityIcons name={m.icon as any} size={20} color={colors.primary} />
+                  <Text style={[styles.metricValue, { color: colors.text }]}>{m.value}</Text>
+                  <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{m.label}</Text>
+                </View>
+              ))}
+            </View>
 
-        {workouts.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
-            <MaterialCommunityIcons name="calendar-plus" size={52} color={colors.primary} />
-            <Text style={[styles.emptyCardTitle, { color: colors.text }]}>No Workouts Yet</Text>
-            <Text style={[styles.emptyCardSub, { color: colors.textMuted }]}>This athlete hasn't logged any workouts.</Text>
-          </View>
-        ) : (
-          workouts.map((w) => {
-            const totalExs  = parseInt(w.exercise_count   || 0);
-            const totalSets = parseInt(w.total_sets       || 0);
-            const vol       = formatVolume(w.total_volume);
-            const dur       = formatDuration(w.total_duration_seconds);
-            const hasPhoto  = !!(w.cover_photo_url || w.completion_photo_url);
-            const title     = w.session_name || w.title || 'Workout Session';
-            const split     = w.split_name && w.split_name !== title ? w.split_name : '';
+            {/* Recent Workouts */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Workouts</Text>
+              <View style={[styles.sectionLine, { backgroundColor: colors.primary }]} />
+            </View>
 
-            return (
-              <View 
-                key={w.id} 
-                style={[
-                  styles.wCard, 
-                  { 
-                    borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)', 
-                    backgroundColor: colors.card,
-                    shadowColor: isDark ? '#000000' : P.ctaDeep,
-                  }
-                ]}
-              >
-                <View style={styles.wCardGradient}>
-                  <View style={styles.wCardRow}>
-                    {/* Photo / Placeholder */}
-                    <View style={[styles.wImgWrap, { borderColor: colors.border }]}>
-                      {hasPhoto ? (
-                        <Image
-                          source={{ uri: w.cover_photo_url || w.completion_photo_url }}
-                          style={styles.wImg}
-                        />
-                      ) : (
-                        <View style={[styles.wImgPlaceholder, { backgroundColor: colors.inputBg }]}>
-                          <MaterialCommunityIcons name="arm-flex" size={28} color={colors.primary} />
+            {workouts.length === 0 ? (
+              <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
+                <MaterialCommunityIcons name="calendar-plus" size={52} color={colors.primary} />
+                <Text style={[styles.emptyCardTitle, { color: colors.text }]}>No Workouts Yet</Text>
+                <Text style={[styles.emptyCardSub, { color: colors.textMuted }]}>This athlete hasn't logged any workouts.</Text>
+              </View>
+            ) : (
+              workouts.map((w) => {
+                const totalExs  = parseInt(w.exercise_count   || 0);
+                const totalSets = parseInt(w.total_sets       || 0);
+                const vol       = formatVolume(w.total_volume);
+                const dur       = formatDuration(w.total_duration_seconds);
+                const hasPhoto  = !!(w.cover_photo_url || w.completion_photo_url);
+                const title     = w.session_name || w.title || 'Workout Session';
+                const split     = w.split_name && w.split_name !== title ? w.split_name : '';
+
+                return (
+                  <View key={w.id} style={[styles.wCard, { borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)', backgroundColor: colors.card, shadowColor: isDark ? '#000000' : P.ctaDeep }]}>
+                    <View style={styles.wCardGradient}>
+                      <View style={styles.wCardRow}>
+                        <View style={[styles.wImgWrap, { borderColor: colors.border }]}>
+                          {hasPhoto ? (
+                            <Image source={{ uri: w.cover_photo_url || w.completion_photo_url }} style={styles.wImg} />
+                          ) : (
+                            <View style={[styles.wImgPlaceholder, { backgroundColor: colors.inputBg }]}>
+                              <MaterialCommunityIcons name="arm-flex" size={28} color={colors.primary} />
+                            </View>
+                          )}
+                          <View style={styles.doneBadge}>
+                            <Text style={styles.doneBadgeText}>DONE</Text>
+                          </View>
                         </View>
-                      )}
-                      <View style={styles.doneBadge}>
-                        <Text style={styles.doneBadgeText}>DONE</Text>
-                      </View>
-                    </View>
 
-                    {/* Info */}
-                    <View style={styles.wInfo}>
-                      <Text style={[styles.wDate, { color: colors.textMuted }]}>{formatShortDate(w.completed_at || w.started_at)}</Text>
-                      <Text style={[styles.wTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
-                      {!!split && <Text style={[styles.wSplit, { color: colors.primary }]}>{split}</Text>}
+                        <View style={styles.wInfo}>
+                          <Text style={[styles.wDate, { color: colors.textMuted }]}>{formatShortDate(w.completed_at || w.started_at)}</Text>
+                          <Text style={[styles.wTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+                          {!!split && <Text style={[styles.wSplit, { color: colors.primary }]}>{split}</Text>}
 
-                      <View style={styles.wStatsRow}>
-                        <View style={styles.wStatItem}>
-                          <Text style={[styles.wStatVal, { color: colors.text }]}>{totalExs}</Text>
-                          <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Exs</Text>
-                        </View>
-                        <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
-                        <View style={styles.wStatItem}>
-                          <Text style={[styles.wStatVal, { color: colors.text }]}>{totalSets}</Text>
-                          <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Sets</Text>
-                        </View>
-                        <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
-                        <View style={styles.wStatItem}>
-                          <Text style={[styles.wStatVal, { color: colors.text }]}>{vol}</Text>
-                          <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>kg</Text>
-                        </View>
-                        <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
-                        <View style={styles.wStatItem}>
-                          <Text style={[styles.wStatVal, { color: colors.text }]}>{dur}</Text>
-                          <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Time</Text>
+                          <View style={styles.wStatsRow}>
+                            <View style={styles.wStatItem}>
+                              <Text style={[styles.wStatVal, { color: colors.text }]}>{totalExs}</Text>
+                              <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Exs</Text>
+                            </View>
+                            <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
+                            <View style={styles.wStatItem}>
+                              <Text style={[styles.wStatVal, { color: colors.text }]}>{totalSets}</Text>
+                              <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Sets</Text>
+                            </View>
+                            <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
+                            <View style={styles.wStatItem}>
+                              <Text style={[styles.wStatVal, { color: colors.text }]}>{vol}</Text>
+                              <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>kg</Text>
+                            </View>
+                            <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
+                            <View style={styles.wStatItem}>
+                              <Text style={[styles.wStatVal, { color: colors.text }]}>{dur}</Text>
+                              <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Time</Text>
+                            </View>
+                          </View>
                         </View>
                       </View>
                     </View>
                   </View>
-                </View>
-              </View>
-            );
-          })
+                );
+              })
+            )}
+          </>
         )}
       </ScrollView>
     </View>
   );
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 },
@@ -390,39 +491,21 @@ const styles = StyleSheet.create({
   },
   backPillText: { fontFamily: FONTS.bodyBold, color: '#FFF', fontSize: 14 },
 
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 14,
   },
   headerBack: {
-    flexDirection: 'row',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 4,
-    minWidth: 72,
-  },
-  headerBackText: {
-    fontFamily: FONTS.bodyBold,
-    color: '#FFF',
-    fontSize: 15,
-  },
-  headerTitle: {
-    fontFamily: FONTS.heading,
-    color: '#FFF',
-    fontSize: 18,
-    letterSpacing: 1.2,
-    textAlign: 'center',
-  },
-  headerRightPlaceholder: {
-    minWidth: 72,
   },
 
   scroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40 },
 
-  // Hero Card (matches daily card exactly)
   heroCardWrap: {
     borderRadius: 24, marginTop: 16, marginBottom: 14,
     borderWidth: 1, borderColor: P.ctaDeep,
@@ -458,7 +541,47 @@ const styles = StyleSheet.create({
   heroXPVal: { fontFamily: FONTS.heading, fontSize: 28, lineHeight: 30 },
   heroXPLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: 1 },
 
-  // XP Bar
+  heroFollowRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+  },
+  followBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  followBtnText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+    color: '#FFF',
+  },
+  followActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  acceptBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#10B981',
+  },
+  rejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
+  },
+
   xpBarArea: { marginTop: 14 },
   xpBarLabels: {
     flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5,
@@ -471,7 +594,16 @@ const styles = StyleSheet.create({
   },
   xpBarFill: { height: '100%', borderRadius: 4, minWidth: 6 },
 
-  // Stats row
+  // Private locked card
+  lockedCard: {
+    borderRadius: 24, padding: 36,
+    alignItems: 'center', gap: 12,
+    borderWidth: 1,
+    marginBottom: 24,
+  },
+  lockedTitle: { fontFamily: FONTS.heading, fontSize: 20 },
+  lockedSub: { fontFamily: FONTS.body, fontSize: 13, color: 'rgba(255,255,255,0.5)', textAlign: 'center' },
+
   statsRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
   statCard: {
     flex: 1, borderRadius: 20, padding: 14,
@@ -486,12 +618,10 @@ const styles = StyleSheet.create({
   statCardDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 10 },
   statCardFooter: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  // Section header
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   sectionTitle: { fontFamily: FONTS.heading, fontSize: 16, letterSpacing: 0.5 },
   sectionLine: { flex: 1, height: 1 },
 
-  // Metrics grid (2×2)
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
   metricTile: {
     width: (SW - 32 - 10) / 2,
@@ -504,7 +634,6 @@ const styles = StyleSheet.create({
   metricValue: { fontFamily: FONTS.heading, color: '#FFF', fontSize: 20 },
   metricLabel: { fontFamily: FONTS.bodyBold, color: 'rgba(255,255,255,0.5)', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' },
 
-  // Workout cards (mirror daily.tsx exactly)
   wCard: {
     borderRadius: 24, marginBottom: 14,
     borderWidth: 1, borderColor: P.ctaDeep,
@@ -537,7 +666,6 @@ const styles = StyleSheet.create({
   wStatLbl: { fontFamily: FONTS.body, fontSize: 9.5, color: 'rgba(255,255,255,0.72)', marginTop: 1 },
   wStatLine: { width: 1, height: 18, backgroundColor: 'rgba(255,255,255,0.18)' },
 
-  // Empty state card
   emptyCard: {
     borderRadius: 24, padding: 36,
     alignItems: 'center', gap: 12,

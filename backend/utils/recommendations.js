@@ -171,11 +171,29 @@ else if (activity.includes('very')) multiplier = 1.725;
 else if (activity.includes('moderate')) multiplier = 1.55;
   let tdee = bmr * multiplier;
 
-  // Adjust for Goal
+  // Adjust for Goal using target_weight if available
+  let adjustmentReason = '';
+  const targetW = parseFloat(user.target_weight);
   if (goal.includes('lose') || goal.includes('burn') || goal.includes('cut') || goal.includes('fat_burn')) {
-    tdee -= 500;
+    let deficit = 500;
+    if (!isNaN(targetW) && targetW > 20 && weight > targetW) {
+      const gap = weight - targetW;
+      const weeklyRate = Math.min(Math.max(weight * 0.007, 0.3), 1.0);
+      deficit = Math.round((weeklyRate * 7700) / 7);
+      deficit = Math.min(Math.max(deficit, 300), 1000);
+      adjustmentReason = ` (${gap.toFixed(1)} kg gap → ${deficit} cal deficit)`;
+    }
+    tdee -= deficit;
   } else if (goal.includes('gain') || goal.includes('build') || goal.includes('muscle') || goal.includes('muscle_gain')) {
-    tdee += 500;
+    let surplus = 500;
+    if (!isNaN(targetW) && targetW > 20 && weight < targetW) {
+      const gap = targetW - weight;
+      const weeklyRate = Math.min(Math.max(weight * 0.0035, 0.15), 0.5);
+      surplus = Math.round((weeklyRate * 7700) / 7);
+      surplus = Math.min(Math.max(surplus, 200), 500);
+      adjustmentReason = ` (${gap.toFixed(1)} kg gap → ${surplus} cal surplus)`;
+    }
+    tdee += surplus;
   }
 
   const caloriesTarget = Math.round(tdee);

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, Image, ActivityIndicator,
-  Dimensions, Animated, ScrollView,
+  Dimensions, Animated, ScrollView, TextInput,
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -287,6 +287,10 @@ export default function LeaderboardScreen() {
   const [me, setMe] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [myId, setMyId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const searchTimer = useRef<any>(null);
   const headerAnim = useRef(new Animated.Value(0)).current;
 
   const fetchData = useCallback(async () => {
@@ -314,6 +318,27 @@ export default function LeaderboardScreen() {
 
   useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
 
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (!searchQuery.trim()) { setSearchResults([]); setSearching(false); return; }
+    setSearching(true);
+    searchTimer.current = setTimeout(async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const res = await axios.get(`${API_URL}/leaderboard/search`, {
+          params: { q: searchQuery.trim() },
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setSearchResults(res.data);
+      } catch (err) {
+        console.error('Search error:', err);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [searchQuery]);
+
   const myTier = me ? getTier(me.league_tier ?? 'Bronze') : TIERS[1];
 
   if (loading) return <LeaderboardSkeleton />;
@@ -327,7 +352,7 @@ export default function LeaderboardScreen() {
       />
 
       <FlatList
-        data={leaders}
+        data={searchQuery.trim() ? [] : leaders}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -346,6 +371,70 @@ export default function LeaderboardScreen() {
               </View>
             </View>
 
+            {/* ── SEARCH BAR ── */}
+            <View style={[styles.searchWrap, { backgroundColor: isDark ? colors.inputBg : '#FFF', borderColor: isDark ? colors.border : 'rgba(37,150,190,0.2)' }]}>
+              <Ionicons name="search" size={18} color={colors.textMuted} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Search athletes..."
+                placeholderTextColor={colors.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* ── SEARCH RESULTS ── */}
+            {searchQuery.trim() !== '' && (
+              <View style={styles.searchResultsWrap}>
+                {searching ? (
+                  <View style={styles.searchingWrap}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={[styles.searchingText, { color: colors.textMuted }]}>Searching...</Text>
+                  </View>
+                ) : searchResults.length === 0 ? (
+                  <View style={styles.searchingWrap}>
+                    <Ionicons name="search-outline" size={24} color={colors.textDim} />
+                    <Text style={[styles.searchingText, { color: colors.textMuted }]}>No athletes found</Text>
+                  </View>
+                ) : (
+                  searchResults.map((item) => {
+                    const stier = getTier(item.league_tier);
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[styles.searchRow, { borderColor: colors.border }]}
+                        onPress={() => router.push(`/profile/${item.id}`)}
+                        activeOpacity={0.7}
+                      >
+                        <Avatar uri={item.profile_pic_url} size={36} border={stier.color} />
+                        <View style={styles.searchInfo}>
+                          <Text style={[styles.searchName, { color: colors.text }]} numberOfLines={1}>{item.full_name}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <LinearGradient colors={stier.gradient} style={styles.searchTierBadge}>
+                              <MaterialCommunityIcons name={stier.mcIcon as any} size={7} color={stier.textDark ? '#021518' : '#FFF'} />
+                            </LinearGradient>
+                            <Text style={[styles.searchTierText, { color: stier.color }]}>{item.league_tier}</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.searchXP, { color: colors.textMuted }]}>
+                          {item.xp >= 1000 ? `${(item.xp / 1000).toFixed(1)}k` : item.xp} XP
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
+            )}
+
+            {/* ── HIDE NORMAL CONTENT WHEN SEARCHING ── */}
+            {searchQuery.trim() === '' && (
+            <>
             {/* ── MY RANK CARD ── */}
             {me && (
               <Animated.View style={[
@@ -457,6 +546,8 @@ export default function LeaderboardScreen() {
               <Text style={[styles.listHeaderPlayer, { color: colors.textMuted }]}>ATHLETE</Text>
               <Text style={[styles.listHeaderXP, { color: colors.textMuted }]}>XP</Text>
             </View>
+            </>
+            )}
           </View>
         }
         ListEmptyComponent={
@@ -475,6 +566,70 @@ export default function LeaderboardScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   listContent: { paddingHorizontal: 14, paddingBottom: 130 },
+
+  // Search
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    height: 44,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: FONTS.body,
+    fontSize: 14,
+    height: '100%',
+  },
+  searchResultsWrap: {
+    marginBottom: 12,
+    gap: 2,
+  },
+  searchingWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 20,
+  },
+  searchingText: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  searchInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  searchName: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 14,
+  },
+  searchTierBadge: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchTierText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+  },
+  searchXP: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+  },
 
   // Page Header
   pageHeader: {
@@ -568,9 +723,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
-    marginBottom: 10,
+    marginBottom: 12,
     overflow: 'hidden',
     minHeight: 68,
+    paddingVertical: 8,
     shadowOffset: { width: 0, height: 4 },
   },
   cardGlossOverlay: {
@@ -582,12 +738,13 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
   },
   gameRankPlate: {
-    width: 44,
+    minWidth: 40,
     height: 44,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
+    marginLeft: 10,
+    paddingHorizontal: 6,
     borderWidth: 1,
   },
   topRankBadge: {
@@ -604,7 +761,8 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   gameAvatarWrap: {
-    marginHorizontal: 12,
+    marginLeft: 10,
+    marginRight: 10,
     position: 'relative',
   },
   youBadge: {
@@ -623,6 +781,8 @@ const styles = StyleSheet.create({
   gameInfo: {
     flex: 1,
     justifyContent: 'center',
+    minWidth: 0,
+    paddingRight: 4,
   },
   gameName: {
     fontFamily: FONTS.bodyBold,
@@ -632,13 +792,14 @@ const styles = StyleSheet.create({
   gameSubInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     marginTop: 4,
+    flexWrap: 'wrap',
   },
   gameTierBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     paddingHorizontal: 6,
     paddingVertical: 2.5,
     borderRadius: 6,
@@ -652,7 +813,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 159, 67, 0.12)',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 6,
     gap: 2.5,
@@ -667,22 +828,22 @@ const styles = StyleSheet.create({
   xpCapsule: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    marginRight: 12,
+    marginRight: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   gameXP: {
     fontFamily: FONTS.heading,
-    fontSize: 14,
+    fontSize: 13,
     letterSpacing: 0.5,
   },
   gameXPLabel: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 8.5,
+    fontSize: 8,
     color: 'rgba(255, 255, 255, 0.45)',
     marginLeft: 1,
   },

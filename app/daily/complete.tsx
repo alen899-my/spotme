@@ -141,6 +141,12 @@ export default function WorkoutCompleteScreen() {
       }
 
       showToast('Workout finalized! Great job! 🏆');
+
+      // Silently trigger AI report generation in background
+      axios.post(`${API_URL}/daily/workouts/${workoutId}/generate-report`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {});
+
       setTimeout(() => {
         router.replace('/(tabs)/daily');
       }, completeRes.data.new_streak > 0 ? 3500 : 1500);

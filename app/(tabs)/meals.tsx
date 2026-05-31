@@ -16,6 +16,7 @@ import { useToast } from '../../contexts/ToastContext';
 import NutritionMeter from '../../components/ui/NutritionMeter';
 import DatePicker from '../../components/ui/DatePicker';
 import WaterTracker from '../../components/ui/WaterTracker';
+import DietRecsScreen from '../../components/diet/DietRecsScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -42,7 +43,8 @@ export default function MealsScreen() {
   // New features state
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [userData, setUserData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'tracker' | 'water' | 'recommendations'>('tracker');
+  const [activeTab, setActiveTab] = useState<number>(0);
+  const TABS = ['Meals', 'Water', 'Browse Foods', 'Diet Plan'];
   const [recommendationData, setRecommendationData] = useState<any>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
@@ -104,17 +106,7 @@ export default function MealsScreen() {
     fetchMeals();
   }, []);
 
-  useEffect(() => {
-    if (activeTab === 'recommendations' && !recommendationData) {
-      fetchRecommendations();
-    }
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (activeTab === 'recommendations') {
-      loadFeaturedFoods();
-    }
-  }, [activeTab, recommendationData?.targets?.protein, recommendationData?.targets?.carbs, recommendationData?.targets?.fat]);
+  // DietRecsScreen handles its own data fetching internally
 
   const fetchRecommendations = async (forceRefresh = false) => {
     setRecommendationLoading(true);
@@ -1451,25 +1443,32 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   const proteinConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_protein || 0), 0);
   const carbsConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_carbs || 0), 0);
   const fatConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_fat || 0), 0);
-  const headerTitle = activeTab === 'water'
-    ? 'Water Intake'
-    : activeTab === 'recommendations'
-      ? 'Diet Recommendations'
-      : 'Nutrition';
-  const headerDescription = activeTab === 'tracker'
+  const headerTitle = TABS[activeTab] || 'Nutrition';
+  const headerDescription = activeTab === 0
     ? 'Track your meals and macros'
-    : activeTab === 'water'
+    : activeTab === 1
       ? 'Monitor water intake'
-      : 'Database meals and tailored guidance';
+      : activeTab === 2
+        ? 'Browse foods from the database'
+        : 'Your personalized diet plan';
 
-  const renderTopChrome = () => (
+  const tabScrollRef = useRef<ScrollView>(null);
+  const tabW = 90;
+
+  useEffect(() => {
+    tabScrollRef.current?.scrollTo({ animated: true, x: Math.max(0, activeTab - 1) * tabW });
+  }, [activeTab]);
+
+  const showLogBtn = activeTab === 0;
+
+  const renderHeaderBar = () => (
     <View>
-      <View style={[styles.header, { marginTop: 6 }]}>
+      <View style={[styles.header, { marginTop: 6, marginBottom: 0 }]}>
         <View style={styles.headerCopy}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{headerTitle}</Text>
           <Text style={[styles.headerSub, { color: colors.textMuted }]}>{headerDescription}</Text>
         </View>
-        {activeTab === 'tracker' && (
+        {showLogBtn && (
           <View style={styles.headerActionWrap}>
             <TouchableOpacity style={styles.logMealBtn} onPress={() => setShowLogForm(true)} activeOpacity={0.85}>
               <View style={styles.logMealBtnFill}>
@@ -1481,53 +1480,40 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         )}
       </View>
 
-      <View style={[styles.tabSelectorContainer, { backgroundColor: colors.inputBg, marginTop: 2 }]}>
-        <TouchableOpacity
-          style={[styles.tabSelectorBtn, activeTab === 'tracker' && [styles.tabSelectorActiveBtn, { backgroundColor: isDark ? colors.inputBg : '#2596BE', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]]}
-          onPress={() => setActiveTab('tracker')}
+      <View style={[styles.slidingTabContainer, { backgroundColor: colors.inputBg }]}>
+        <ScrollView
+          ref={tabScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.slidingTabContent}
         >
-          <Ionicons name="nutrition-outline" size={16} color={activeTab === 'tracker' ? (isDark ? colors.primary : '#FFF') : colors.textMuted} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabSelectorText, activeTab === 'tracker' ? { color: isDark ? colors.primary : '#FFF' } : { color: colors.textMuted }]}>Meals</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tabSelectorBtn, activeTab === 'water' && [styles.tabSelectorActiveBtn, { backgroundColor: isDark ? colors.inputBg : '#2596BE', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]]}
-          onPress={() => setActiveTab('water')}
-        >
-          <Ionicons name="water-outline" size={16} color={activeTab === 'water' ? (isDark ? colors.primary : '#FFF') : colors.textMuted} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabSelectorText, activeTab === 'water' ? { color: isDark ? colors.primary : '#FFF' } : { color: colors.textMuted }]}>Water</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.tabSelectorBtn, activeTab === 'recommendations' && [styles.tabSelectorActiveBtn, { backgroundColor: isDark ? colors.inputBg : '#2596BE', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]]}
-          onPress={() => setActiveTab('recommendations')}
-        >
-          <Ionicons name="sparkles-outline" size={16} color={activeTab === 'recommendations' ? (isDark ? colors.primary : '#FFF') : colors.textMuted} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabSelectorText, activeTab === 'recommendations' ? { color: isDark ? colors.primary : '#FFF' } : { color: colors.textMuted }]}>Diet Recs</Text>
-        </TouchableOpacity>
+          {TABS.map((tab, i) => (
+            <TouchableOpacity
+              key={tab}
+              style={styles.slidingTabBtn}
+              onPress={() => setActiveTab(i)}
+            >
+              <Text style={[
+                styles.slidingTabText,
+                { color: activeTab === i ? colors.primary : colors.textMuted }
+              ]} numberOfLines={1}>{tab}</Text>
+              {activeTab === i && <View style={[styles.slidingTabActiveBar, { backgroundColor: colors.primary }]} />}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
     </View>
   );
 
-  const renderWaterTab = () => (
-    <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-      {renderTopChrome()}
-      <View style={styles.trackerHeaderContent}>
-        <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" />
-        <WaterTracker selectedDate={selectedDate} />
-      </View>
-    </ScrollView>
-  );
-
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {activeTab === 'tracker' ? (
+      {activeTab === 0 ? (
         <FlatList
           data={loading ? [] : uploading ? [{ id: 'loading' }, ...filteredMeals] : filteredMeals}
           keyExtractor={(item) => item.id.toString()}
           ListHeaderComponent={
               <View>
-                {renderTopChrome()}
+                {renderHeaderBar()}
                 <View style={styles.trackerHeaderContent}>
                   <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" />
 
@@ -1588,10 +1574,18 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               )
             }
           />
-      ) : activeTab === 'water' ? (
-        renderWaterTab()
+      ) : activeTab === 1 ? (
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+          {renderHeaderBar()}
+          <View style={styles.trackerHeaderContent}>
+            <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" />
+            <WaterTracker selectedDate={selectedDate} />
+          </View>
+        </ScrollView>
+      ) : activeTab === 2 ? (
+        <DietRecsScreen tab="browse" header={renderHeaderBar()} />
       ) : (
-        renderRecommendations()
+        <DietRecsScreen tab="plan" header={renderHeaderBar()} />
       )}
 
       {/* ══════════════════════════════════════════════
@@ -2671,6 +2665,18 @@ const styles = StyleSheet.create({
   detectedMacroPill: { width: '48%', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 10 },
   detectedMacroValue: { fontFamily: FONTS.heading, fontSize: 15 },
   detectedMacroLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 10, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
+
+  // Sliding Tab Bar
+  slidingTabContainer: {
+    marginHorizontal: 16, marginBottom: 2, borderRadius: 14, padding: 4, overflow: 'hidden',
+  },
+  slidingTabContent: { flexDirection: 'row', gap: 2 },
+  slidingTabBtn: {
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center', minWidth: 80,
+  },
+  slidingTabText: { fontFamily: FONTS.bodyBold, fontSize: 13 },
+  slidingTabActiveBar: { height: 3, borderRadius: 2, marginTop: 6, width: '80%' },
 
   // Tab Selector
   tabSelectorContainer: {

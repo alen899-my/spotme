@@ -11,6 +11,7 @@ const {
   estimateWorkoutCalories,
   formatRecordValue,
 } = require('../utils/workoutAnalytics');
+const { callAI } = require('../utils/ai');
 
 async function syncWorkoutCompletionAnalytics(client, workoutId, userId) {
   const userRes = await client.query(
@@ -1250,10 +1251,21 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       const targetStr = r.target.charAt(0).toUpperCase() + r.target.slice(1).toLowerCase();
       const slug = targetToSlug[targetStr];
       if (slug) {
-        const intensity = parseInt(r.count) >= 3 ? 2 : 1;
+        const count = parseInt(r.count);
+        let intensity = 0;
+        if (count >= 20) intensity = 10;
+        else if (count >= 17) intensity = 9;
+        else if (count >= 14) intensity = 8;
+        else if (count >= 11) intensity = 7;
+        else if (count >= 9) intensity = 6;
+        else if (count >= 7) intensity = 5;
+        else if (count >= 5) intensity = 4;
+        else if (count >= 3) intensity = 3;
+        else if (count >= 2) intensity = 2;
+        else if (count >= 1) intensity = 1;
         const existing = muscleActivity.find(m => m.slug === slug);
         if (existing) {
-          existing.intensity = Math.min(2, existing.intensity + intensity);
+          existing.intensity = Math.max(existing.intensity, intensity);
         } else {
           muscleActivity.push({ slug, intensity });
         }
@@ -1299,6 +1311,227 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     });
   } catch (err) {
     console.error('GET /daily/dashboard error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /daily/workouts/:id/generate-report ── Generate AI workout report ──
+router.post('/workouts/:id/generate-report', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const workoutId = parseInt(req.params.id);
+    const userId = req.user.id;
+
+    // Fetch workout with exercises and sets
+    const workoutRes = await client.query(`
+      SELECT dw.*, u.fitness_goal, u.experience_level, u.weight AS user_weight,
+             u.gender, u.age, u.height
+      FROM daily_workouts dw
+      JOIN users u ON dw.user_id = u.id
+      WHERE dw.id = $1 AND dw.user_id = $2 AND dw.status = 'completed'
+    `, [workoutId, userId]);
+
+    if (workoutRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Completed workout not found' });
+    }
+
+    const w = workoutRes.rows[0];
+
+    // Check if report already exists
+    const existing = await client.query(
+      'SELECT id FROM workout_reports WHERE daily_workout_id = $1', [workoutId]
+    );
+    if (existing.rows.length > 0) {
+      return res.json({ report_id: existing.rows[0].id });
+    }
+
+    // Insert placeholder row with status 'generating'
+    const placeholder = await client.query(
+      `INSERT INTO workout_reports (user_id, daily_workout_id, summary, good_things, areas_to_improve, recommendations, status)
+       VALUES ($1, $2, '', '', '', '', 'generating') RETURNING id`,
+      [userId, workoutId]
+    );
+    const reportId = placeholder.rows[0].id;
+
+    // Respond immediately so the client knows report is being generated
+    res.json({ report_id: reportId, status: 'generating' });
+
+    // Continue generation in background
+    try {
+      // Fetch exercises and sets
+      const exercisesRes = await client.query(`
+        SELECT dwe.id, dwe.exercise_id, e.name, e.category, e.muscle_group, e.target,
+               dwe.target_sets, dwe.target_reps, dwe.target_weight,
+               dwe.is_completed, dwe.is_skipped, dwe.estimated_1rm, dwe.is_personal_record,
+               dwe.is_world_record, dwe.total_set_volume, dwe.rating
+        FROM daily_workout_exercises dwe
+        JOIN exercises e ON dwe.exercise_id = e.id
+        WHERE dwe.daily_workout_id = $1
+        ORDER BY dwe.sort_order
+      `, [workoutId]);
+
+      const setsRes = await client.query(`
+        SELECT dws.*, dwe.exercise_id
+        FROM daily_workout_sets dws
+        JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id
+        WHERE dwe.daily_workout_id = $1 AND dws.is_skipped = false
+        ORDER BY dwe.sort_order, dws.set_number
+      `, [workoutId]);
+
+      const exercises = exercisesRes.rows;
+      const sets = setsRes.rows;
+
+      // Build compact workout summary
+      const totalSets = sets.length;
+      const totalReps = sets.reduce((sum, s) => sum + (s.reps || 0), 0);
+      const totalVolume = sets.reduce((sum, s) => sum + ((s.weight || 0) * (s.reps || 0)), 0);
+      const durationMin = Math.round((w.total_duration_seconds || 0) / 60);
+      const skippedCount = exercises.filter(e => e.is_skipped).length;
+
+      const exerciseLines = exercises.map(e => {
+        const exSets = sets.filter(s => s.exercise_id === e.exercise_id);
+        const avgWeight = exSets.length ? (exSets.reduce((a, s) => a + Number(s.weight || 0), 0) / exSets.length).toFixed(1) : '-';
+        const totalRepsEx = exSets.reduce((a, s) => a + (s.reps || 0), 0);
+        const pr = e.is_personal_record ? ' [PR]' : '';
+        const wr = e.is_world_record ? ' [WR]' : '';
+        const skipped = e.is_skipped ? ' [SKIPPED]' : '';
+        return `${e.name} (${e.target || e.muscle_group || ''}): ${exSets.length}/${e.target_sets} sets × ${avgWeight}kg, ${totalRepsEx} reps${pr}${wr}${skipped}`;
+      }).join('\n');
+
+      const prompt = `You are an expert personal trainer. Analyze this workout and write a neat, motivating report organized into clear sections.
+
+WORKOUT DATA:
+- Goal: ${w.fitness_goal || 'General fitness'}
+- Level: ${w.experience_level || 'Intermediate'}
+- Duration: ${durationMin} min
+- Volume: ${Math.round(totalVolume)} kg (${totalSets} sets, ${totalReps} reps)
+- Skipped: ${skippedCount} exercises
+- Rest: ${Math.round((w.total_rest_seconds || 0) / 60)} min
+- Calories: ${w.calories_burned || 'N/A'}
+
+EXERCISES LOGGED:
+${exerciseLines}
+
+Write a clean report with these 4 sections. Use the exact markers shown below so I can parse it:
+
+===SUMMARY===
+Write 2-3 sentences giving an overall assessment of this session. Mention the goal alignment, intensity level, and overall effectiveness.
+
+===GOOD THINGS===
+List 3-4 things that went well. Use bullet points (•). Be specific — mention exercises, effort, consistency, PRs, form, etc.
+
+===AREAS TO IMPROVE===
+List 2-3 areas that could be better. Use bullet points (•). Be constructive — suggest what to focus on next time, form cues, volume adjustments, etc.
+
+===RECOMMENDATIONS===
+Give 2-3 specific, actionable tips for the next workout. Use bullet points (•). Include exercise substitutions, rep/weight progression advice, rest period changes, or warm-up/cool-down suggestions.
+
+Keep it concise, energetic, and helpful — like a real coach talking to an athlete.`;
+
+      const aiRaw = await callAI(prompt);
+
+      const extractSection = (text, marker) => {
+        const regex = new RegExp(`${marker}\\s*([\\s\\S]*?)(?=\\n===|$)`);
+        const match = text.match(regex);
+        return match ? match[1].trim() : '';
+      };
+
+      const report = {
+        summary: extractSection(aiRaw, '===SUMMARY==='),
+        good_things: extractSection(aiRaw, '===GOOD THINGS==='),
+        areas_to_improve: extractSection(aiRaw, '===AREAS TO IMPROVE==='),
+        recommendations: extractSection(aiRaw, '===RECOMMENDATIONS==='),
+      };
+
+      await client.query(
+        `UPDATE workout_reports SET summary = $1, good_things = $2, areas_to_improve = $3, recommendations = $4, status = 'completed'
+         WHERE id = $5`,
+        [report.summary, report.good_things, report.areas_to_improve, report.recommendations, reportId]
+      );
+
+      // Create notification with reference to the report
+      await client.query(
+        `INSERT INTO notifications (user_id, type, reference_id, message)
+         VALUES ($1, 'workout_report', $2, 'Your workout report is ready! Tap to view insights and recommendations.')`,
+        [userId, reportId]
+      );
+    } catch (bgErr) {
+      console.error('Background report generation failed:', bgErr);
+      // Delete the placeholder row so manual generation can retry
+      try {
+        await client.query('DELETE FROM workout_reports WHERE id = $1', [reportId]);
+      } catch (_) {}
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('POST /daily/workouts/:id/generate-report error:', err);
+    if (client) client.release();
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /daily/reports ── List user's workout reports ───────────────────────
+router.get('/reports', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT wr.id, wr.daily_workout_id, wr.summary, wr.created_at, wr.status,
+             dw.total_duration_seconds, dw.total_volume,
+             TO_CHAR(dw.completed_at, 'Mon DD, YYYY') AS workout_date
+      FROM workout_reports wr
+      JOIN daily_workouts dw ON wr.daily_workout_id = dw.id
+      WHERE wr.user_id = $1
+      ORDER BY wr.created_at DESC
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('GET /daily/reports error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /daily/reports/pending-workouts ── Completed workouts without reports ─
+router.get('/reports/pending-workouts', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT dw.id, dw.title, dw.total_duration_seconds, dw.total_volume,
+             TO_CHAR(dw.completed_at, 'Mon DD, YYYY') AS workout_date,
+             TO_CHAR(dw.completed_at, 'HH:MI AM') AS workout_time
+      FROM daily_workouts dw
+      WHERE dw.user_id = $1
+        AND dw.status = 'completed'
+        AND NOT EXISTS (
+          SELECT 1 FROM workout_reports wr WHERE wr.daily_workout_id = dw.id
+        )
+      ORDER BY dw.completed_at DESC
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('GET /daily/reports/pending-workouts error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /daily/reports/:id ── Get a specific report ─────────────────────────
+router.get('/reports/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT wr.*,
+             dw.total_duration_seconds, dw.total_volume, dw.total_rest_seconds,
+             dw.calories_burned, TO_CHAR(dw.completed_at, 'Mon DD, YYYY HH:MI AM') AS workout_date,
+             dw.title AS workout_title
+      FROM workout_reports wr
+      JOIN daily_workouts dw ON wr.daily_workout_id = dw.id
+      WHERE wr.id = $1 AND wr.user_id = $2
+    `, [req.params.id, req.user.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('GET /daily/reports/:id error:', err);
     res.status(500).json({ error: err.message });
   }
 });

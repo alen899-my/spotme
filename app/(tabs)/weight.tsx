@@ -130,6 +130,15 @@ export default function WeightScreen() {
             )}
           </View>
 
+          {logs.length > 0 && (
+            <View style={[styles.prevWeightBanner, { backgroundColor: isDark ? '#0f0f0f' : '#f0f0eb', borderColor: isDark ? '#1e1e1e' : '#e0e0d8' }]}>
+              <Ionicons name="refresh-outline" size={14} color={colors.textMuted} />
+              <Text style={[styles.prevWeightLabel, { color: colors.textMuted }]}>Previous: </Text>
+              <Text style={[styles.prevWeightValue, { color: colors.text }]}>{parseFloat(logs[0].weight).toFixed(1)}</Text>
+              <Text style={[styles.prevWeightUnit, { color: colors.textMuted }]}> kg</Text>
+            </View>
+          )}
+
           <WeightScale value={weightValue} onChange={setWeightValue} onSave={handleSave} saving={saving} />
 
           {logs.length > 0 ? (
@@ -170,8 +179,30 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     paddingTop: vs(8),
-    gap: vs(14),
+    gap: vs(10),
     marginBottom: vs(4),
+  },
+  prevWeightBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: vs(8),
+    borderRadius: scale(12),
+    borderWidth: 1,
+  },
+  prevWeightLabel: {
+    fontFamily: FONTS.body,
+    fontSize: scale(12),
+  },
+  prevWeightValue: {
+    fontFamily: FONTS.heading,
+    fontSize: scale(18),
+    letterSpacing: -0.3,
+  },
+  prevWeightUnit: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: scale(12),
   },
   titleRow: {
     flexDirection: 'row',

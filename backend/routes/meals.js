@@ -246,7 +246,8 @@ router.get('/recommendation', authenticateToken, async (req, res) => {
             activity_level: user.activity_level,
             diet_type: user.diet_type,
             food_preference: user.food_preference,
-            meals_per_day: user.meals_per_day
+            meals_per_day: user.meals_per_day,
+            target_weight: user.target_weight
           }
         });
       }
@@ -353,10 +354,10 @@ router.get('/recommendation', authenticateToken, async (req, res) => {
         activity_level: user.activity_level,
         diet_type: user.diet_type,
         food_preference: user.food_preference,
-        meals_per_day: user.meals_per_day
+        meals_per_day: user.meals_per_day,
+        target_weight: user.target_weight
       }
     });
-
   } catch (err) {
     console.error('Error generating recommendations:', err);
     res.status(500).json({ error: err.message });
@@ -369,7 +370,7 @@ router.post('/recommendation', authenticateToken, async (req, res) => {
     const {
       gender, age, height, weight, body_fat,
       fitness_goal, activity_level, diet_type, food_preference,
-      meals_per_day
+      meals_per_day, target_weight
     } = req.body;
 
     const parsedAge = age ? parseInt(age) : null;
@@ -388,12 +389,13 @@ router.post('/recommendation', authenticateToken, async (req, res) => {
         activity_level = COALESCE($7, activity_level),
         diet_type = COALESCE($8, diet_type),
         food_preference = COALESCE($9, food_preference),
-        meals_per_day = COALESCE($10, meals_per_day)
-      WHERE id = $11
+        meals_per_day = COALESCE($10, meals_per_day),
+        target_weight = COALESCE($11, target_weight)
+      WHERE id = $12
     `, [
       gender, parsedAge, height, weight, body_fat,
       fitness_goal, activity_level, diet_type, food_preference,
-      parsedMeals, req.user.id
+      parsedMeals, target_weight || '0', req.user.id
     ]);
 
     // 2. Fetch the updated user profile
@@ -503,7 +505,8 @@ router.post('/recommendation', authenticateToken, async (req, res) => {
         activity_level: user.activity_level,
         diet_type: user.diet_type,
         food_preference: user.food_preference,
-        meals_per_day: user.meals_per_day
+        meals_per_day: user.meals_per_day,
+        target_weight: user.target_weight
       }
     });
 
@@ -790,6 +793,110 @@ router.get('/food-alternatives', authenticateToken, async (req, res) => {
     });
   } catch (err) {
     console.error('Food alternatives error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /meals/food-browse — Browse & filter food database with dynamic sort ──
+router.get('/food-browse', authenticateToken, async (req, res) => {
+  try {
+    let {
+      q = '',
+      sort_by = 'nutrition_density',
+      sort_order = 'desc',
+      limit = 20,
+      offset = 0,
+      min_calories, max_calories,
+      min_protein, max_protein,
+      min_carbs, max_carbs,
+      min_fat, max_fat,
+      min_fiber, max_fiber,
+      min_sugar, max_sugar,
+      min_sodium, max_sodium,
+    } = req.query;
+
+    const lim = Math.min(parseInt(limit) || 20, 100);
+    const off = parseInt(offset) || 0;
+
+    const allowedSortColumns = [
+      'nutrition_density', 'calories_kcal', 'protein_g', 'carbohydrates_g',
+      'fat_g', 'fiber_g', 'sugars_g', 'sodium_mg', 'saturated_fat_g', 'food_name'
+    ];
+    const column = allowedSortColumns.includes(sort_by) ? sort_by : 'nutrition_density';
+    const order = sort_order === 'asc' ? 'ASC' : 'DESC';
+
+    const conditions = [
+      'calories_kcal IS NOT NULL',
+      'calories_kcal > 0',
+      'calories_kcal < 2000'
+    ];
+    const params = [];
+
+    // Search
+    if (q && q.trim().length >= 2) {
+      params.push(`%${q.trim()}%`);
+      conditions.push(`food_name ILIKE $${params.length}`);
+    }
+
+    // Range filters
+    const ranges = [
+      { min: min_calories, max: max_calories, col: 'calories_kcal' },
+      { min: min_protein, max: max_protein, col: 'protein_g' },
+      { min: min_carbs, max: max_carbs, col: 'carbohydrates_g' },
+      { min: min_fat, max: max_fat, col: 'fat_g' },
+      { min: min_fiber, max: max_fiber, col: 'fiber_g' },
+      { min: min_sugar, max: max_sugar, col: 'sugars_g' },
+      { min: min_sodium, max: max_sodium, col: 'sodium_mg' },
+    ];
+
+    for (const r of ranges) {
+      if (r.min !== undefined && r.min !== '') {
+        params.push(parseFloat(r.min));
+        conditions.push(`${r.col} >= $${params.length}`);
+      }
+      if (r.max !== undefined && r.max !== '') {
+        params.push(parseFloat(r.max));
+        conditions.push(`${r.col} <= $${params.length}`);
+      }
+    }
+
+    params.push(lim, off);
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const safeSortCol = /^[a-z_]+$/.test(column) ? column : 'nutrition_density';
+
+    const query = `
+      SELECT
+        id, food_name, category, meal_type, nutrition_grade,
+        serving_size, source_file,
+        calories_kcal, protein_g, carbohydrates_g, fat_g,
+        fiber_g, sugars_g, sodium_mg, saturated_fat_g,
+        nutrition_density, image_url, image_small_url
+      FROM food_database
+      ${whereClause}
+      ORDER BY (image_url IS NOT NULL AND image_url != '') DESC, ${safeSortCol} ${order} NULLS LAST, food_name ASC
+      LIMIT $${params.length - 1} OFFSET $${params.length}
+    `;
+
+    const result = await pool.query(query, params);
+
+    // Count (reuse same where params minus limit/offset)
+    const countParams = params.slice(0, params.length - 2);
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM food_database ${whereClause}`,
+      countParams
+    );
+
+    res.json({
+      results: result.rows.map(r => ({ ...r, food_name: cleanFoodName(r.food_name) })),
+      total: parseInt(countResult.rows[0].count),
+      limit: lim,
+      offset: off,
+      sort_by: column,
+      sort_order: order,
+    });
+  } catch (err) {
+    console.error('Food browse error:', err);
     res.status(500).json({ error: err.message });
   }
 });

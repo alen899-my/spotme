@@ -192,4 +192,28 @@ router.get('/xp-log', authenticateToken, async (req, res) => {
   }
 });
 
+// ── GET /leaderboard/search ── Search users by name ──────────────────────────
+router.get('/search', authenticateToken, async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.trim().length === 0) {
+      return res.json([]);
+    }
+
+    const result = await pool.query(
+      `SELECT id, full_name, profile_pic_url, total_xp AS xp, league_tier
+       FROM users
+       WHERE full_name ILIKE $1
+       ORDER BY total_xp DESC
+       LIMIT 20`,
+      [`%${q.trim()}%`]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('GET /leaderboard/search error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
