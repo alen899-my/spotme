@@ -8,6 +8,7 @@ import {
   Dimensions,
   ActivityIndicator,
   PanResponder,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FONTS } from '../../constants/theme';
@@ -411,6 +412,7 @@ export default function WaterTracker({ selectedDate }: Props) {
   const emptyGlowOpacity = useRef(new Animated.Value(0)).current;
   const emptyGlowScale = useRef(new Animated.Value(0.96)).current;
   const fillAnim = useRef(new Animated.Value(0)).current;
+  const waveAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     AsyncStorage.getItem('userData').then((d) => {
@@ -450,11 +452,11 @@ export default function WaterTracker({ selectedDate }: Props) {
   const goalRatio = maxSafe > 0 ? target / maxSafe : 0.625;
 
   useEffect(() => {
-    Animated.spring(fillAnim, {
+    Animated.timing(fillAnim, {
       toValue: Math.min(totalWater / maxSafe, 1.1),
+      duration: 900,
+      easing: Easing.inOut(Easing.cubic),
       useNativeDriver: false,
-      friction: 7,
-      tension: 35,
     }).start();
   }, [fillAnim, maxSafe, totalWater]);
 
@@ -492,6 +494,11 @@ export default function WaterTracker({ selectedDate }: Props) {
     outputRange: ['0%', '62.5%', '100%', '110%'],
   });
 
+  const waveTranslateX = waveAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 12],
+  });
+
   const handleLog = async (amount: number) => {
     const exceeds = totalWater + amount > maxSafe;
     if (exceeds) showToast('Overhydration warning. Logging anyway.', 'error');
@@ -509,6 +516,10 @@ export default function WaterTracker({ selectedDate }: Props) {
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.05, duration: 180, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
+      ]).start();
+      Animated.sequence([
+        Animated.timing(waveAnim, { toValue: 1, duration: 300, useNativeDriver: false }),
+        Animated.timing(waveAnim, { toValue: 0, duration: 600, useNativeDriver: false }),
       ]).start();
     } catch (e) {
       showToast('Failed to log water', 'error');
@@ -607,6 +618,19 @@ export default function WaterTracker({ selectedDate }: Props) {
               />
 
               <View style={[s.cup, { borderColor: hydrationState.primary, backgroundColor: hydrationState.cupBg }]}>
+                {totalWater === 0 && (
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[
+                      s.emptyInnerGlow,
+                      {
+                        opacity: emptyGlowOpacity,
+                        transform: [{ scale: emptyGlowScale }],
+                      },
+                    ]}
+                  />
+                )}
+
                 <Animated.View
                   style={[
                     s.cupFill,
@@ -616,6 +640,7 @@ export default function WaterTracker({ selectedDate }: Props) {
                     },
                   ]}
                 >
+                  <Animated.View style={[s.waveSurface, { transform: [{ translateX: waveTranslateX }] }]} />
                   <View style={s.cupFillGlow} />
                 </Animated.View>
 
@@ -849,10 +874,20 @@ const s = StyleSheet.create({
   cupWrap: { width: 122, height: 160, justifyContent: 'center', alignItems: 'center' },
   emptyGlow: {
     position: 'absolute',
-    width: 118,
-    height: 118,
-    borderRadius: 59,
+    width: 120,
+    height: 155,
+    borderRadius: 20,
     backgroundColor: 'rgba(225,75,75,0.45)',
+  },
+  emptyInnerGlow: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    right: 4,
+    bottom: 4,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(225,75,75,0.6)',
   },
   cup: {
     width: 120,
@@ -869,6 +904,15 @@ const s = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     overflow: 'hidden',
+  },
+  waveSurface: {
+    position: 'absolute',
+    top: -3,
+    left: -8,
+    right: -8,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   cupFillGlow: {
     position: 'absolute',

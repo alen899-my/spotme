@@ -1575,7 +1575,11 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
             }
           />
       ) : activeTab === 1 ? (
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 120 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {renderHeaderBar()}
           <View style={styles.trackerHeaderContent}>
             <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" />
