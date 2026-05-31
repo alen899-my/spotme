@@ -57,7 +57,6 @@ export default function WeightSparkline({ data }: Props) {
           dataPointsColor={P.sun}
           dataPointsRadius={4}
           showVerticalLines={false}
-          showHorizontalLines={false}
           xAxisThickness={0}
           yAxisThickness={0}
           hideDataPoints={false}

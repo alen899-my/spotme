@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, ScrollView } from "react-native";
+import { View } from "react-native";
+import { BarChart } from "react-native-gifted-charts";
 import { FONTS } from "../../constants/theme";
 import { P, scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -15,51 +16,47 @@ interface Props {
   data: DayData[];
 }
 
-const BAR_WIDTH = scale(36);
-const BAR_GAP = scale(8);
-
 export default function WeeklyBarChart({ data }: Props) {
   const { colors, isDark } = useTheme();
+
+  const chartData = data.map((d, i) => {
+    const isToday = i === data.length - 1;
+    return {
+      value: d.duration_seconds,
+      label: d.label,
+      frontColor: isToday ? P.sun : d.workouts > 0 ? P.cta : (isDark ? "#333" : P.border),
+      labelTextStyle: {
+        fontFamily: FONTS.bodySemiBold,
+        fontSize: scale(9),
+        color: isToday ? (isDark ? "#FFF" : P.ink) : (isDark ? colors.textMuted : P.muted),
+      },
+    };
+  });
+
   const maxVal = Math.max(...data.map((d) => d.duration_seconds), 1);
-  const chartH = vs(90);
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{
-        paddingHorizontal: scale(4),
-        gap: BAR_GAP,
-        alignItems: "flex-end",
-        height: chartH + vs(32),
-        paddingTop: vs(4),
-      }}
-    >
-      {data.map((d, i) => {
-        const barH = Math.max((d.duration_seconds / maxVal) * chartH, d.workouts > 0 ? 4 : 2);
-        const isToday = i === data.length - 1;
-        return (
-          <View key={d.date} style={{ width: BAR_WIDTH, alignItems: "center", gap: 4 }}>
-            <View
-              style={{
-                width: "100%",
-                height: barH,
-                borderRadius: scale(4),
-                backgroundColor: isToday ? P.sun : d.workouts > 0 ? P.cta : (isDark ? "#262626" : P.border),
-              }}
-            />
-            <Text
-              style={{
-                fontFamily: FONTS.bodySemiBold,
-                fontSize: scale(9),
-                color: isToday ? (isDark ? "#FFFFFF" : P.ink) : (isDark ? colors.textMuted : P.muted),
-              }}
-            >
-              {d.label}
-            </Text>
-          </View>
-        );
-      })}
-    </ScrollView>
+    <View style={{ paddingLeft: scale(4) }}>
+      <BarChart
+        data={chartData}
+        height={vs(90)}
+        width={data.length * (scale(36) + scale(6))}
+        barWidth={scale(28)}
+        barBorderRadius={scale(4)}
+        maxValue={maxVal}
+        noOfSections={3}
+        yAxisThickness={0}
+        xAxisThickness={0}
+        showVerticalLines={false}
+        isAnimated
+        animationDuration={400}
+        spacing={scale(6)}
+        hideRules
+        scrollToEnd
+        initialSpacing={scale(2)}
+        endSpacing={scale(2)}
+        yAxisTextStyle={{ fontSize: 0 }}
+      />
+    </View>
   );
 }

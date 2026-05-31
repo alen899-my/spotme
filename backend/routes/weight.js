@@ -27,7 +27,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const { limit } = req.query;
     const result = await pool.query(
       `SELECT id, weight::text, notes, logged_at FROM (
-        SELECT id, weight, notes, logged_at FROM weight_logs WHERE user_id = $1
+        SELECT id, weight::text AS weight, notes, logged_at FROM weight_logs WHERE user_id = $1
         UNION ALL
         SELECT -(dw.id) AS id, dw.post_workout_weight::text AS weight,
                'Post-workout: ' || dw.id AS notes,
