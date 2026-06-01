@@ -58,14 +58,16 @@ const ExerciseCard = React.memo(({
   item, colors, workoutStatus, activeExerciseId,
   setTimer, setTimerRunning,
   openGuide, removeExercise, removeSet,
-  handleSkipExercise, openSetModal, handleRateExercise,
+  handleSkipExercise, openSetModal, openEditSet,
+  handleRateExercise,
   loadingSkip, loadingLogSet,
 }: {
   item: any; colors: any; workoutStatus: string;
   activeExerciseId: number | null; setTimer: number; setTimerRunning: boolean;
   openGuide: (item: any) => void; removeExercise: (id: number) => void;
   removeSet: (id: number) => void; handleSkipExercise: (id: number) => void;
-  openSetModal: (item: any) => void; handleRateExercise: (id: number, rating: number) => Promise<void>;
+  openSetModal: (item: any) => void; openEditSet: (set: any, exercise: any) => void;
+  handleRateExercise: (id: number, rating: number) => Promise<void>;
   loadingSkip: boolean; loadingLogSet: boolean;
 }) => {
   const { isDark } = useTheme();
@@ -185,32 +187,56 @@ const ExerciseCard = React.memo(({
             <View style={styles.setsTable}>
               {(() => {
                 const isCardio = item.category?.toLowerCase() === 'cardio';
-                const headers = isCardio ? ['TIME', ''] : ['SET', 'KG', 'REPS', 'TIME', ''];
                 return (
                   <>
                     <View style={styles.tableHeader}>
-                      {headers.map((h, i) => (
-                        <Text key={i} style={[styles.tableHeaderText, i === headers.length - 1 && { flex: 0.7 }]}>{h}</Text>
-                      ))}
+                      <Text style={styles.tableHeaderText}>SETS</Text>
+                    </View>
+                    <View style={[styles.setBlockTop, { paddingBottom: 6, marginBottom: 2, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }]}>
+                      <View style={styles.setBlockLeft}>
+                        <View style={{ minWidth: 28 }} />
+                        <Ionicons name="barbell-outline" size={12} color="rgba(255,255,255,0.35)" />
+                        <Ionicons name="repeat-outline" size={12} color="rgba(255,255,255,0.35)" />
+                      </View>
+                      <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.35)" style={{ marginRight: 8 }} />
+                      <View style={{ width: 28, alignItems: 'center' }}>
+                        <Ionicons name="create-outline" size={12} color="rgba(255,255,255,0.35)" />
+                      </View>
                     </View>
                     {item.sets.map((s: any) => (
-                      <View key={s.id} style={styles.tableRow}>
-                        {isCardio ? null : <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{s.set_number}</Text>}
-                        {isCardio ? null : <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{s.weight}</Text>}
-                        {isCardio ? null : <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{s.is_skipped ? 'SKIP' : s.reps}</Text>}
-                        <Text style={[styles.tableCell, s.is_skipped && styles.tableCellMuted]}>{formatTime(s.duration_seconds || 0)}</Text>
-                        {/* ── 5. Solid red delete button ── */}
-                        <View style={{ flex: 0.7, alignItems: 'center', paddingLeft: 8 }}>
-                          {workoutStatus === 'active' && (
+                      <View key={s.id} style={styles.setBlock}>
+                        <View style={styles.setBlockTop}>
+                          <View style={styles.setBlockLeft}>
+                            <Text style={[styles.setBlockNum, s.is_skipped && styles.tableCellMuted]}>
+                              {s.is_skipped ? 'SKIP' : s.set_number}
+                            </Text>
+                            {!isCardio && !s.is_skipped && (
+                              <Text style={styles.setBlockWeight}>{s.weight} kg</Text>
+                            )}
+                            {!s.is_skipped && (
+                              <Text style={styles.setBlockReps}>
+                                {isCardio ? formatTime(s.duration_seconds || 0) : `${s.reps} reps`}
+                              </Text>
+                            )}
+                          </View>
+                          {isCardio ? null : (
+                            <Text style={[styles.setBlockTime, s.is_skipped && styles.tableCellMuted]}>
+                              {formatTime(s.duration_seconds || 0)}
+                            </Text>
+                          )}
+                          {workoutStatus === 'active' && !s.is_skipped && (
                             <TouchableOpacity
-                              onPress={() => removeSet(s.id)}
-                              style={styles.setDeleteBtn}
+                              onPress={() => openEditSet(s, item)}
+                              style={styles.setEditBtn}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
-                              <Ionicons name="trash" size={14} color="#FFF" />
+                              <Ionicons name="pencil" size={13} color="#FFF" />
                             </TouchableOpacity>
                           )}
                         </View>
+                        {s.is_skipped && (
+                          <Text style={styles.setBlockSkipped}>Skipped</Text>
+                        )}
                       </View>
                     ))}
                   </>
@@ -281,7 +307,7 @@ const ExerciseCard = React.memo(({
 
           {/* Footer */}
           <View style={styles.exFooter}>
-            {!isDone && !isSkipped && workoutStatus === 'active' && (
+            {!isSkipped && workoutStatus === 'active' && (completedSets < targetSets || !isDone) && (
               <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
                 <TouchableOpacity
                   style={[styles.skipBtn, { borderColor: 'rgba(255,255,255,0.3)', opacity: loadingSkip ? 0.5 : 1 }]}
@@ -381,7 +407,7 @@ const RestShakeIcon = ({ restTimer, restRunning }: { restTimer: number; restRunn
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ActiveWorkoutScreen() {
   const router = useRouter();
-  const { id: workoutId } = useLocalSearchParams();
+  const { id: workoutId, editing } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
@@ -444,12 +470,14 @@ export default function ActiveWorkoutScreen() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showDeleteSetModal, setShowDeleteSetModal] = useState(false);
   const [deleteSetId, setDeleteSetId] = useState<number | null>(null);
+  const [editingSet, setEditingSet] = useState<any>(null);
+  const [loadingEditSet, setLoadingEditSet] = useState(false);
 
   useEffect(() => {
-    if (workout?.status === 'completed') {
+    if (workout?.status === 'completed' && editing !== 'true') {
       router.replace(`/daily/view/${workoutId}`);
     }
-  }, [workout?.status]);
+  }, [workout?.status, editing]);
 
   const restTimerPrevRef = useRef(restTimer);
   useEffect(() => {
@@ -578,7 +606,18 @@ export default function ActiveWorkoutScreen() {
       setInputReps('');
     }
     setActiveExercise(ex);
+    setEditingSet(null);
     setActiveSetNum((ex.sets?.length || 0) + 1);
+    setSetModalVisible(true);
+  };
+
+  const openEditSet = (set: any, exercise: any) => {
+    if (setTimerRef.current) { clearInterval(setTimerRef.current); setSetTimerRunning(false); }
+    setActiveExercise(exercise);
+    setEditingSet(set);
+    setInputWeight(String(set.weight || ''));
+    setInputReps(String(set.reps || ''));
+    setSetTimer(set.duration_seconds || 0);
     setSetModalVisible(true);
   };
 
@@ -604,6 +643,7 @@ export default function ActiveWorkoutScreen() {
       }, { headers: { Authorization: `Bearer ${token}` } });
       showToast(isCardio ? `Duration logged! 🔥` : `Set ${activeSetNum} logged! 🔥`);
       setSetModalVisible(false);
+      setEditingSet(null);
       setSetTimer(0);
       setSetTimerRunning(false);
       fetchWorkout();
@@ -617,6 +657,31 @@ export default function ActiveWorkoutScreen() {
       showToast('Failed to log set', 'error');
     } finally {
       setLoadingLogSet(false);
+    }
+  };
+
+  const handleEditSet = async () => {
+    if (loadingEditSet || !editingSet) return;
+    setLoadingEditSet(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const payload: any = {
+        weight: parseFloat(inputWeight) || 0,
+        reps: parseInt(inputReps) || 0,
+        duration_seconds: setTimer,
+      };
+      await axios.patch(`${API_URL}/daily/sets/${editingSet.id}`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast('Set updated! ✏️');
+      setSetModalVisible(false);
+      setEditingSet(null);
+      fetchWorkout();
+    } catch (err) {
+      console.error('Error editing set:', err);
+      showToast('Failed to update set', 'error');
+    } finally {
+      setLoadingEditSet(false);
     }
   };
 
@@ -802,6 +867,24 @@ export default function ActiveWorkoutScreen() {
     }
   };
 
+  const handleSaveChanges = async () => {
+    if (!workoutId) { showToast('Workout ID missing', 'error'); return; }
+    setFinishing(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.patch(`${API_URL}/daily/workouts/${workoutId}/recalculate`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast('Workout updated! ✅');
+      router.back();
+    } catch (err) {
+      console.error('Error recalculating workout:', err);
+      showToast('Failed to save changes', 'error');
+    } finally {
+      setFinishing(false);
+    }
+  };
+
   const handleFinishWorkout = async () => {
     if (!workoutId) { showToast('Workout ID missing', 'error'); return; }
     setFinishing(true);
@@ -930,16 +1013,19 @@ export default function ActiveWorkoutScreen() {
     return aScore - bScore;
   });
 
+  const displayStatus = editing === 'true' ? 'active' : workout?.status;
+
   const renderExercise = useCallback(({ item }: { item: any }) => (
     <ExerciseCard
-      item={item} colors={colors} workoutStatus={workout?.status}
+      item={item} colors={colors} workoutStatus={displayStatus}
       activeExerciseId={activeExercise?.id} setTimer={setTimer} setTimerRunning={setTimerRunning}
       openGuide={openGuide} removeExercise={removeExercise} removeSet={removeSet}
       handleSkipExercise={handleSkipExercise} openSetModal={openSetModal}
+      openEditSet={openEditSet}
       handleRateExercise={handleRateExercise} loadingSkip={loadingSkip} loadingLogSet={loadingLogSet}
     />
-  ), [colors, workout?.status, activeExercise?.id, setTimer, setTimerRunning, openGuide,
-    removeExercise, removeSet, handleSkipExercise, openSetModal, handleRateExercise, loadingSkip, loadingLogSet]);
+  ), [colors, displayStatus, activeExercise?.id, setTimer, setTimerRunning, openGuide,
+    removeExercise, removeSet, handleSkipExercise, openSetModal, openEditSet, handleRateExercise, loadingSkip, loadingLogSet]);
 
   if (loading) return <ActiveWorkoutSkeleton />;
 
@@ -948,10 +1034,18 @@ export default function ActiveWorkoutScreen() {
       <View style={styles.container}>
         {/* Header */}
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
-          <TouchableOpacity onPress={() => workout?.status === 'completed' ? router.back() : setShowExitModal(true)}>
-            <Ionicons name={workout?.status === 'completed' ? 'arrow-back' : 'close'} size={28} color={colors.text} />
+          <TouchableOpacity onPress={() => editing === 'true' ? router.back() : (workout?.status === 'completed' ? router.back() : setShowExitModal(true))}>
+            <Ionicons name={editing === 'true' || workout?.status === 'completed' ? 'arrow-back' : 'close'} size={28} color={colors.text} />
           </TouchableOpacity>
-          {workout?.status === 'active' ? (
+          {editing === 'true' ? (
+            <TouchableOpacity
+              style={[styles.finishBtn, { opacity: finishing ? 0.7 : 1, backgroundColor: '#3B82F6' }]}
+              onPress={handleSaveChanges}
+              disabled={finishing}
+            >
+              {finishing ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.finishBtnText}>SAVE CHANGES</Text>}
+            </TouchableOpacity>
+          ) : workout?.status === 'active' ? (
             <TouchableOpacity
               style={[styles.finishBtn, { opacity: finishing ? 0.7 : 1 }]}
               onPress={() => setShowFinishModal(true)}
@@ -965,7 +1059,7 @@ export default function ActiveWorkoutScreen() {
         </View>
 
         {/* ── Dashboard row with ① rest shake icon ── */}
-        {workout?.status === 'active' && (
+        {workout?.status === 'active' && editing !== 'true' && (
           <View style={[styles.dashboardRow, { backgroundColor: colors.bg }]}>
             <View style={[
               styles.dashboardPill, 
@@ -1064,7 +1158,7 @@ export default function ActiveWorkoutScreen() {
               )}
             </View>
           }
-          ListFooterComponent={workout?.status === 'active' ? (
+          ListFooterComponent={workout?.status === 'active' || editing === 'true' ? (
             <View style={styles.footerContainer}>
               <TouchableOpacity style={[styles.addExFooterBtn, { borderColor: colors.border }]} onPress={openAddExercise}>
                 <Ionicons name="add-circle-outline" size={20} color={P.cta} />
@@ -1076,7 +1170,7 @@ export default function ActiveWorkoutScreen() {
       </View>
 
       {/* Set Logger Modal */}
-      <Modal visible={setModalVisible} transparent animationType="slide" onRequestClose={() => setSetModalVisible(false)}>
+      <Modal visible={setModalVisible} transparent animationType="slide" onRequestClose={() => { setSetModalVisible(false); setEditingSet(null); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 24) + 60 }]}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
@@ -1088,10 +1182,10 @@ export default function ActiveWorkoutScreen() {
                       <View>
                         <Text style={[styles.modalTitle, { color: colors.text }]}>{activeExercise?.name}</Text>
                         <Text style={[styles.modalSub, { color: colors.textMuted }]}>
-                          {isCardio ? 'Log duration' : `Set ${activeSetNum} of ${activeExercise?.target_sets}`}
+                          {editingSet ? `Edit Set ${editingSet.set_number}` : (isCardio ? 'Log duration' : `Set ${activeSetNum} of ${activeExercise?.target_sets}`)}
                         </Text>
                       </View>
-                      <TouchableOpacity onPress={() => setSetModalVisible(false)}>
+                      <TouchableOpacity onPress={() => { setSetModalVisible(false); setEditingSet(null); }}>
                         <Ionicons name="close" size={24} color={colors.text} />
                       </TouchableOpacity>
                     </View>
@@ -1120,19 +1214,34 @@ export default function ActiveWorkoutScreen() {
                       </View>
                     )}
                     <View style={styles.setModalActions}>
-                      <TouchableOpacity style={[styles.modalSkipBtn, { borderColor: colors.border, opacity: loadingSkip ? 0.5 : 1 }]} onPress={handleSkipSet} disabled={loadingSkip}>
-                        <Text style={[styles.modalSkipBtnText, { color: colors.textMuted }]}>{loadingSkip ? 'SKIPPING...' : 'SKIP SET'}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.saveSetBtn, { opacity: loadingLogSet ? 0.8 : 1 }]} onPress={handleLogSet} disabled={loadingLogSet}>
-                        <LinearGradient colors={['#10B981', '#059669']} style={styles.saveSetBtnGrad}>
-                          {loadingLogSet ? <ActivityIndicator color="#FFF" /> : (
-                            <>
-                              <Ionicons name="checkmark" size={22} color="#FFF" />
-                              <Text style={styles.saveSetBtnText}>{isCardio ? 'SAVE DURATION' : 'SAVE SET'}</Text>
-                            </>
-                          )}
-                        </LinearGradient>
-                      </TouchableOpacity>
+                      {!editingSet && (
+                        <TouchableOpacity style={[styles.modalSkipBtn, { borderColor: colors.border, opacity: loadingSkip ? 0.5 : 1 }]} onPress={handleSkipSet} disabled={loadingSkip}>
+                          <Text style={[styles.modalSkipBtnText, { color: colors.textMuted }]}>{loadingSkip ? 'SKIPPING...' : 'SKIP SET'}</Text>
+                        </TouchableOpacity>
+                      )}
+                      {editingSet ? (
+                        <TouchableOpacity style={[styles.saveSetBtn, { opacity: loadingEditSet ? 0.8 : 1 }]} onPress={handleEditSet} disabled={loadingEditSet}>
+                          <LinearGradient colors={['#3B82F6', '#2563EB']} style={styles.saveSetBtnGrad}>
+                            {loadingEditSet ? <ActivityIndicator color="#FFF" /> : (
+                              <>
+                                <Ionicons name="checkmark" size={22} color="#FFF" />
+                                <Text style={styles.saveSetBtnText}>UPDATE SET</Text>
+                              </>
+                            )}
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity style={[styles.saveSetBtn, { opacity: loadingLogSet ? 0.8 : 1 }]} onPress={handleLogSet} disabled={loadingLogSet}>
+                          <LinearGradient colors={['#10B981', '#059669']} style={styles.saveSetBtnGrad}>
+                            {loadingLogSet ? <ActivityIndicator color="#FFF" /> : (
+                              <>
+                                <Ionicons name="checkmark" size={22} color="#FFF" />
+                                <Text style={styles.saveSetBtnText}>{isCardio ? 'SAVE DURATION' : 'SAVE SET'}</Text>
+                              </>
+                            )}
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </>
                 );
@@ -1334,13 +1443,21 @@ const styles = StyleSheet.create({
 
   // Sets table
   setsTable:         { borderRadius: 16, padding: 16, marginTop: 16, marginBottom: 16, backgroundColor: 'rgba(255,255,255,0.08)' },
-  tableHeader:       { flexDirection: 'row', marginBottom: 10 },
-  tableHeaderText:   { flex: 1, textAlign: 'center', fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 0.5, color: 'rgba(255,255,255,0.72)' },
+  tableHeader:       { flexDirection: 'row', marginBottom: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
+  tableHeaderText:   { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 0.5, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' },
   tableRow:          { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)', alignItems: 'center' },
   tableCell:         { flex: 1, textAlign: 'center', fontFamily: FONTS.bodySemiBold, fontSize: 15, color: '#FFF' },
   tableCellMuted:    { color: 'rgba(255,255,255,0.42)' },
-  // ── 5. Solid red delete ──
-  setDeleteBtn:      { width: 32, height: 32, borderRadius: 8, backgroundColor: '#EF4444', justifyContent: 'center', alignItems: 'center', marginVertical: 2 },
+  // ── 5. Set blocks ──
+  setBlock:          { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  setBlockTop:       { flexDirection: 'row', alignItems: 'center' },
+  setBlockLeft:      { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  setBlockNum:       { fontFamily: FONTS.bodyBold, fontSize: 13, color: '#FFF', minWidth: 28, textAlign: 'left' },
+  setBlockWeight:    { fontFamily: FONTS.heading, fontSize: 16, color: '#FFF' },
+  setBlockReps:      { fontFamily: FONTS.body, fontSize: 14, color: 'rgba(255,255,255,0.8)' },
+  setBlockTime:      { fontFamily: FONTS.body, fontSize: 12, color: 'rgba(255,255,255,0.5)', marginRight: 8 },
+  setBlockSkipped:   { fontFamily: FONTS.bodyBold, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
+  setEditBtn:        { width: 28, height: 28, borderRadius: 7, backgroundColor: '#3B82F6', justifyContent: 'center', alignItems: 'center' },
 
   // ── Rating banner ──
   ratingBanner:           { marginTop: 4, marginBottom: 12, borderRadius: 14, overflow: 'hidden', borderWidth: 1 },

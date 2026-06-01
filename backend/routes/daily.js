@@ -768,6 +768,73 @@ router.patch('/workouts/:id/metrics', authenticateToken, async (req, res) => {
   }
 });
 
+// ── PATCH /daily/workouts/:id/recalculate — recalc volume, calories, PRs after edits ──
+router.patch('/workouts/:id/recalculate', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const workoutId = parseInt(id);
+
+    // Verify ownership
+    const workoutCheck = await pool.query(
+      'SELECT id FROM daily_workouts WHERE id = $1 AND user_id = $2',
+      [workoutId, userId]
+    );
+    if (workoutCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found or unauthorized' });
+    }
+
+    // Recalculate total_volume by summing weight * reps across non-skipped sets
+    const volumeRes = await pool.query(
+      `SELECT COALESCE(SUM(dws.weight * dws.reps), 0) AS total_volume
+       FROM daily_workout_sets dws
+       JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id
+       WHERE dwe.daily_workout_id = $1 AND COALESCE(dws.is_skipped, false) = false`,
+      [workoutId]
+    );
+    const totalVolume = parseFloat(volumeRes.rows[0]?.total_volume) || 0;
+    await pool.query(
+      'UPDATE daily_workouts SET total_volume = $1 WHERE id = $2',
+      [totalVolume, workoutId]
+    );
+
+    // Re-check exercise completion statuses
+    const exercises = await pool.query(
+      `SELECT dwe.id, dwe.target_sets,
+        (SELECT COUNT(*) FROM daily_workout_sets WHERE daily_exercise_id = dwe.id AND is_skipped = false) AS completed_sets
+       FROM daily_workout_exercises dwe
+       WHERE dwe.daily_workout_id = $1`,
+      [workoutId]
+    );
+    for (const ex of exercises.rows) {
+      if (parseInt(ex.completed_sets) >= ex.target_sets) {
+        await pool.query(
+          'UPDATE daily_workout_exercises SET is_completed = true WHERE id = $1 AND is_completed = false',
+          [ex.id]
+        );
+      } else if (parseInt(ex.completed_sets) < ex.target_sets) {
+        await pool.query(
+          'UPDATE daily_workout_exercises SET is_completed = false WHERE id = $1 AND is_completed = true',
+          [ex.id]
+        );
+      }
+    }
+
+    // Re-run analytics (calories, PRs, best sets, etc.)
+    await syncWorkoutCompletionAnalytics(pool, workoutId, userId);
+
+    // Fetch and return the updated workout
+    const updated = await pool.query(
+      'SELECT * FROM daily_workouts WHERE id = $1',
+      [workoutId]
+    );
+    res.json(updated.rows[0]);
+  } catch (err) {
+    console.error('PATCH /daily/workouts/:id/recalculate error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /daily/workouts/:id/photos — upload and append photos ────────────────
 router.post('/workouts/:id/photos', authenticateToken, upload.array('photos', 10), async (req, res) => {
   try {
@@ -857,7 +924,7 @@ router.delete('/sets/:id', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     const setCheck = await pool.query(
-      `SELECT dw.user_id 
+      `SELECT dw.user_id, dws.daily_exercise_id
        FROM daily_workout_sets dws
        JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id
        JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
@@ -868,11 +935,95 @@ router.delete('/sets/:id', authenticateToken, async (req, res) => {
     if (setCheck.rows.length === 0) return res.status(404).json({ error: 'Set not found' });
     if (setCheck.rows[0].user_id !== userId) return res.status(403).json({ error: 'Forbidden' });
 
+    const exerciseId = setCheck.rows[0].daily_exercise_id;
+
     await pool.query('DELETE FROM daily_workout_sets WHERE id = $1', [parseInt(id)]);
+
+    // If the exercise now has fewer sets than target, un-complete it
+    const remainingRes = await pool.query(
+      'SELECT COUNT(*) FROM daily_workout_sets WHERE daily_exercise_id = $1',
+      [exerciseId]
+    );
+    const targetRes = await pool.query(
+      'SELECT target_sets FROM daily_workout_exercises WHERE id = $1',
+      [exerciseId]
+    );
+    if (
+      targetRes.rows.length > 0 &&
+      parseInt(remainingRes.rows[0].count) < targetRes.rows[0].target_sets
+    ) {
+      await pool.query(
+        'UPDATE daily_workout_exercises SET is_completed = false WHERE id = $1',
+        [exerciseId]
+      );
+    }
 
     res.json({ success: true, message: 'Set deleted' });
   } catch (err) {
     console.error('DELETE /daily/sets/:id error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /daily/sets/:id — edit a single set ────────────────────────────────
+router.patch('/sets/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { weight, reps, duration_seconds, rest_seconds } = req.body;
+
+    // Verify ownership with same JOIN chain as DELETE
+    const setCheck = await pool.query(
+      `SELECT dw.user_id
+       FROM daily_workout_sets dws
+       JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id
+       JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
+       WHERE dws.id = $1`,
+      [parseInt(id)]
+    );
+
+    if (setCheck.rows.length === 0) return res.status(404).json({ error: 'Set not found' });
+    if (setCheck.rows[0].user_id !== userId) return res.status(403).json({ error: 'Forbidden' });
+
+    // Build dynamic update (only include fields that are provided)
+    const updateFields = [];
+    const queryParams = [];
+    let paramIdx = 1;
+
+    if (weight !== undefined) {
+      updateFields.push(`weight = $${paramIdx}`);
+      queryParams.push(parseFloat(weight));
+      paramIdx++;
+    }
+    if (reps !== undefined) {
+      updateFields.push(`reps = $${paramIdx}`);
+      queryParams.push(parseInt(reps));
+      paramIdx++;
+    }
+    if (duration_seconds !== undefined) {
+      updateFields.push(`duration_seconds = $${paramIdx}`);
+      queryParams.push(parseInt(duration_seconds));
+      paramIdx++;
+    }
+    if (rest_seconds !== undefined) {
+      updateFields.push(`rest_seconds = $${paramIdx}`);
+      queryParams.push(parseInt(rest_seconds));
+      paramIdx++;
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    queryParams.push(parseInt(id));
+    const result = await pool.query(
+      `UPDATE daily_workout_sets SET ${updateFields.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+      queryParams
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('PATCH /daily/sets/:id error:', err);
     res.status(500).json({ error: err.message });
   }
 });

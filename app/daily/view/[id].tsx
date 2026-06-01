@@ -153,7 +153,13 @@ export default function WorkoutViewScreen() {
             <Ionicons name="chevron-back" size={28} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>View Session</Text>
-          <View style={{ width: 40 }} />
+          <TouchableOpacity
+            style={[styles.editBtn, isDark && { backgroundColor: colors.inputBg }]}
+            onPress={() => router.push(`/daily/${workoutId}?editing=true`)}
+          >
+            <Ionicons name="create-outline" size={16} color={P.cta} />
+            <Text style={[styles.editBtnText, { color: P.cta }]}>EDIT</Text>
+          </TouchableOpacity>
         </View>
 
         <FlatList
@@ -233,6 +239,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8 },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 20 },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: 'rgba(37,149,190,0.12)' },
+  editBtnText: { fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.5 },
   listContent: { paddingBottom: 40 },
   listHeader: { marginBottom: 20, paddingHorizontal: 20 },
 
