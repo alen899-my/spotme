@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from "react";
 import {
-  View,
   Text,
   StyleSheet,
   Animated,
@@ -13,17 +12,17 @@ const { width: SW } = Dimensions.get("window");
 
 interface AnimatedSplashProps {
   onFinish: () => void;
+  fontsLoaded: boolean;
 }
 
-export default function AnimatedSplash({ onFinish }: AnimatedSplashProps) {
-  // Animatable values
+export default function AnimatedSplash({ onFinish, fontsLoaded }: AnimatedSplashProps) {
   const logoScale = useRef(new Animated.Value(0.75)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const containerFade = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Netflix-style cinematic timing
-    // Phase 1: Clean entrance fade + scale zoom-in
+    if (!fontsLoaded) return;
+
     Animated.parallel([
       Animated.timing(logoOpacity, {
         toValue: 1,
@@ -38,14 +37,12 @@ export default function AnimatedSplash({ onFinish }: AnimatedSplashProps) {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // Phase 2: Constant slow cinematic zoom drift (like Netflix logo hold)
       Animated.timing(logoScale, {
         toValue: 1.05,
         duration: 1000,
         easing: Easing.linear,
         useNativeDriver: true,
       }).start(() => {
-        // Phase 3: Dramatic zoom directly into the camera / screen + fade
         Animated.parallel([
           Animated.timing(logoScale, {
             toValue: 2.8,
@@ -70,7 +67,7 @@ export default function AnimatedSplash({ onFinish }: AnimatedSplashProps) {
         });
       });
     });
-  }, [onFinish]);
+  }, [onFinish, fontsLoaded]);
 
   return (
     <Animated.View
@@ -83,17 +80,18 @@ export default function AnimatedSplash({ onFinish }: AnimatedSplashProps) {
     >
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Unified logo element to maintain perfect kerning during the cinematic zoom */}
-      <Animated.View
-        style={{
-          opacity: logoOpacity,
-          transform: [{ scale: logoScale }],
-        }}
-      >
-        <Text style={styles.wordmark}>
-          spot<Text style={styles.wordmarkMe}>ME</Text>
-        </Text>
-      </Animated.View>
+      {fontsLoaded && (
+        <Animated.View
+          style={{
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }],
+          }}
+        >
+          <Text style={styles.wordmark}>
+            spot<Text style={styles.wordmarkMe}>ME</Text>
+          </Text>
+        </Animated.View>
+      )}
     </Animated.View>
   );
 }

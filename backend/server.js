@@ -43,7 +43,7 @@ app.use('/api/notifications', notificationRoutes);
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, async () => {
+  app.listen(PORT, '0.0.0.0', async () => {
     await initDB();
     console.log(`Server running on port ${PORT}`);
   });
