@@ -2432,7 +2432,7 @@ const styles = StyleSheet.create({
   },
   logMealBtnText: { color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 14, flexShrink: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent: { paddingBottom: 32 },
+  listContent: { paddingBottom: 32, flexGrow: 1 },
   trackerHeaderContent: { paddingHorizontal: 20, paddingTop: 20 },
   trackerItemWrap: { paddingHorizontal: 20 },
   recommendationStateWrap: { paddingHorizontal: 20, paddingTop: 20 },

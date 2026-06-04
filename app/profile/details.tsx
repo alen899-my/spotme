@@ -630,6 +630,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 60,
+    flexGrow: 1,
   },
   section: {
     marginBottom: 32,

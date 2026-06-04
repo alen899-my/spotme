@@ -193,7 +193,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 22, color: colors.text, letterSpacing: 1 },
   readAll: { fontFamily: FONTS.bodyBold, fontSize: 13 },
-  listContent: { padding: 16, paddingBottom: 40 },
+  listContent: { padding: 16, paddingBottom: 40, flexGrow: 1 },
   emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
   emptyText: { fontFamily: FONTS.body, fontSize: 15 },
   notifCard: {

@@ -24,7 +24,7 @@ export default function WorkoutScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView 
-        contentContainerStyle={{ padding: 20, paddingBottom: 40 }} 
+        contentContainerStyle={{ padding: 20, paddingBottom: 40, flexGrow: 1 }} 
         showsVerticalScrollIndicator={false}
       >
         {/* ── Header ─────────────────────────────────────────────────── */}

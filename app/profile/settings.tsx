@@ -198,9 +198,10 @@ const makeStyles = (colors: any) => StyleSheet.create({
     letterSpacing: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 60,
-  },
+      padding: 20,
+      paddingBottom: 60,
+      flexGrow: 1,
+    },
   sectionLabel: {
     fontFamily: FONTS.bodyBold,
     fontSize: 11,

@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  scroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40 },
+  scroll: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40, flexGrow: 1 },
 
   heroCardWrap: {
     borderRadius: 24, marginTop: 16, marginBottom: 14,

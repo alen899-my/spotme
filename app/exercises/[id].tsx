@@ -111,7 +111,7 @@ export default function ExerciseDetailScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 28 }}
+        contentContainerStyle={{ paddingBottom: 28, flexGrow: 1 }}
       >
         <View style={[styles.hero, { height: headerHeight, paddingTop: topOffset, backgroundColor: isDark ? colors.card : P.cta, borderBottomWidth: isDark ? 1 : 0, borderBottomColor: isDark ? colors.border : 'transparent' }]}>
           <View style={[styles.heroInner, { width: shellWidth }]}>

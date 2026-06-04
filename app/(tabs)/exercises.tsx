@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   FlatList,
   TouchableOpacity,
   Image,
@@ -603,20 +604,14 @@ export default function ExercisesScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       {!inSearchMode && viewMode === 'categories' && (
-        <FlatList
-          data={[] as number[]}
-          keyExtractor={(_, index) => String(index)}
-          renderItem={() => null}
-          ListHeaderComponent={() => (
-            <View>
-              {renderTopChrome()}
-              {renderCategoryState()}
-            </View>
-          )}
-          contentContainerStyle={styles.scrollContent}
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-        />
+        >
+          {renderTopChrome()}
+          {renderCategoryState()}
+        </ScrollView>
       )}
 
       {(inSearchMode || viewMode === 'exercises') && (
@@ -873,6 +868,7 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     paddingBottom: 40,
+    flexGrow: 1,
   },
   sectionContent: {
     paddingHorizontal: H_PADDING,

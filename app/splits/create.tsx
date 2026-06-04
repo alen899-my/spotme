@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   backBtn: { marginLeft: -8 },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 24 },
   
-  scrollContent: { paddingHorizontal: 20 },
+  scrollContent: { paddingHorizontal: 20, flexGrow: 1 },
   form: { paddingTop: 10 },
   label: { fontFamily: FONTS.bodyBold, fontSize: 16, marginBottom: 10 },
   input: {

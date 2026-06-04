@@ -565,7 +565,7 @@ export default function LeaderboardScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  listContent: { paddingHorizontal: 14, paddingBottom: 130 },
+  listContent: { paddingHorizontal: 14, paddingBottom: 130, flexGrow: 1 },
 
   // Search
   searchWrap: {

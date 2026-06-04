@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   },
   bannerBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 10, color: '#7C3AED' },
   
-  listContent: { paddingBottom: 40 },
+  listContent: { paddingBottom: 40, flexGrow: 1 },
   columnWrapper: { justifyContent: 'space-between', gap: 12 },
   
   // Split Card

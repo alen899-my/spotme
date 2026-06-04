@@ -176,6 +176,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: scale(16),
+    flexGrow: 1,
   },
   headerSection: {
     paddingTop: vs(8),

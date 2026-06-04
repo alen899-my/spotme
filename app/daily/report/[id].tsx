@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 10,
     justifyContent: 'center', alignItems: 'center',
   },
-  scroll: { padding: 16, paddingBottom: 40 },
+  scroll: { padding: 16, paddingBottom: 40, flexGrow: 1 },
   titleSection: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     marginBottom: 4,

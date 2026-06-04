@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   heroBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 11, color: 'rgba(255,255,255,0.8)', letterSpacing: 1 },
   heroDate: { fontFamily: FONTS.heading, fontSize: 26, color: '#FFF', marginBottom: 4 },
   heroTime: { fontFamily: FONTS.body, fontSize: 16, color: 'rgba(255,255,255,0.7)' },
-  scrollContent: { paddingBottom: 120 },
+  scrollContent: { paddingBottom: 120, flexGrow: 1 },
   sectionTitle: { fontFamily: FONTS.bodyBold, fontSize: 16, paddingHorizontal: 20, marginBottom: 14 },
   splitList: { paddingHorizontal: 20, gap: 12 },
   splitCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 18, padding: 16, borderWidth: 1.5 },
