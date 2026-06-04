@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -55,6 +55,10 @@ const loginSchema = z.object({
 
 const signupSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
+  username: z.string()
+    .min(3, "Username must be at least 3 characters")
+    .max(30, "Username must be at most 30 characters")
+    .regex(/^[a-z0-9_]+$/, "Only lowercase letters, numbers and underscores"),
   email: z.string().min(1, "Email is required").email("Invalid email address"),
   phoneNumber: z.string().optional().refine(
     (val) => !val || (val.length >= 10 && val.length <= 15),
@@ -86,15 +90,17 @@ export default function AuthScreen() {
   const isLogin = tab === "login";
 
   const [fullName,        setFullName]        = useState("");
+  const [username,        setUsername]        = useState("");
   const [email,           setEmail]           = useState("");
   const [password,        setPassword]        = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [phoneNumber,     setPhoneNumber]     = useState("");
   const [secureMode,      setSecureMode]      = useState(true);
   const [confirmSecure,   setConfirmSecure]   = useState(true);
   const [loading,         setLoading]         = useState(false);
   const [errorMsg,        setErrorMsg]        = useState("");
+  const [successMsg,      setSuccessMsg]      = useState("");
   const [fieldErrors,     setFieldErrors]     = useState<Record<string, string>>({});
+  const [usernameStatus,  setUsernameStatus]  = useState<"idle" | "checking" | "available" | "taken">("idle");
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -109,9 +115,31 @@ export default function AuthScreen() {
 
   const switchTab = (login: boolean) => {
     setErrorMsg("");
+    setSuccessMsg("");
     setFieldErrors({});
+    setUsernameStatus("idle");
     setTab(login ? "login" : "signup");
   };
+
+  // Debounced username availability check
+  const usernameCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const checkUsername = useCallback((value: string) => {
+    if (usernameCheckTimer.current) clearTimeout(usernameCheckTimer.current);
+    const trimmed = value.toLowerCase().trim();
+    if (trimmed.length < 3) { setUsernameStatus("idle"); return; }
+    setUsernameStatus("checking");
+    usernameCheckTimer.current = setTimeout(async () => {
+      try {
+        const res = await axios.get(`${API_URL}/auth/check-username`, { params: { username: trimmed } });
+        setUsernameStatus(res.data.available ? "available" : "taken");
+        if (!res.data.available) {
+          setFieldErrors(prev => ({ ...prev, username: "Username is already taken" }));
+        } else {
+          setFieldErrors(prev => { const c = { ...prev }; delete c.username; return c; });
+        }
+      } catch { setUsernameStatus("idle"); }
+    }, 500);
+  }, []);
 
   const handleAuth = async () => {
     setErrorMsg("");
@@ -119,7 +147,7 @@ export default function AuthScreen() {
 
     const data = isLogin
       ? { email, password }
-      : { fullName, email, phoneNumber, password, confirmPassword };
+      : { fullName, username, email, password, confirmPassword };
 
     const result = isLogin
       ? loginSchema.safeParse(data)
@@ -141,12 +169,27 @@ export default function AuthScreen() {
         const res = await axios.post(`${API_URL}/auth/login`, { email, password });
         await AsyncStorage.setItem("userToken", res.data.token);
         await AsyncStorage.setItem("userData", JSON.stringify(res.data.user));
-        router.replace("/(tabs)");
+        if (res.data.user?.onboarding_completed) {
+          router.replace("/(tabs)");
+        } else {
+          router.replace("/onboarding");
+        }
       } else {
-        const res = await axios.post(`${API_URL}/auth/signup`, { fullName, email, password, phoneNumber });
-        await AsyncStorage.setItem("userToken", res.data.token);
-        await AsyncStorage.setItem("userData", JSON.stringify(res.data.user));
-        router.replace("/onboarding");
+        if (usernameStatus === "taken") {
+          setFieldErrors(prev => ({ ...prev, username: "Username is already taken" }));
+          setLoading(false);
+          return;
+        }
+        await axios.post(`${API_URL}/auth/signup`, { fullName, username: username.toLowerCase(), email, password });
+        // Reset signup fields and switch to login tab
+        setFullName("");
+        setUsername("");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+        setUsernameStatus("idle");
+        setSuccessMsg("Account created! Please log in.");
+        setTab("login");
       }
     } catch (err: any) {
       const msg = err.response?.data?.message || "An error occurred. Please try again.";
@@ -171,7 +214,7 @@ export default function AuthScreen() {
       />
 
       <LinearGradient
-        colors={["rgba(2,13,14,0.3)", "rgba(2,13,14,0.65)", "rgba(2,13,14,0.97)"]}
+        colors={["rgba(2,13,14,0.62)", "rgba(2,13,14,0.82)", "rgba(2,13,14,0.97)"]}
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFillObject}
       />
@@ -214,6 +257,13 @@ export default function AuthScreen() {
 
         {/* ── FORM ── */}
         <Animated.View style={[s.form, anim1]}>
+          {!!successMsg && (
+            <View style={[s.errBox, s.successBox]}>
+              <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+              <Text style={[s.errTxt, s.successTxt]}>{successMsg}</Text>
+            </View>
+          )}
+
           {!!errorMsg && (
             <View style={s.errBox}>
               <Ionicons name="alert-circle" size={14} color={C.red} />
@@ -237,6 +287,38 @@ export default function AuthScreen() {
             </View>
           )}
 
+          {!isLogin && (
+            <View style={s.fieldWrap}>
+              <Text style={s.label}>Username</Text>
+              <View style={[s.pwRow, fieldErrors.username && s.inputErr, usernameStatus === "available" && s.inputOk]}>
+                <TextInput
+                  style={s.pwInput}
+                  placeholder="john_doe123"
+                  placeholderTextColor={C.mist}
+                  value={username}
+                  onChangeText={(v) => {
+                    const clean = v.toLowerCase().replace(/[^a-z0-9_]/g, "");
+                    setUsername(clean);
+                    clearFieldError("username");
+                    checkUsername(clean);
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="next"
+                />
+                {usernameStatus === "checking" && <ActivityIndicator size="small" color={C.mist} style={{ marginRight: 14 }} />}
+                {usernameStatus === "available" && <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={{ marginRight: 14 }} />}
+                {usernameStatus === "taken"     && <Ionicons name="close-circle"     size={18} color={C.red}    style={{ marginRight: 14 }} />}
+              </View>
+              {fieldErrors.username
+                ? <Text style={s.fieldErr}>{fieldErrors.username}</Text>
+                : usernameStatus === "available"
+                ? <Text style={s.fieldOk}>Username is available ✓</Text>
+                : null
+              }
+            </View>
+          )}
+
           <View style={s.fieldWrap}>
             <Text style={s.label}>Email</Text>
             <TextInput
@@ -253,21 +335,6 @@ export default function AuthScreen() {
             {fieldErrors.email && <Text style={s.fieldErr}>{fieldErrors.email}</Text>}
           </View>
 
-          {!isLogin && (
-            <View style={s.fieldWrap}>
-              <Text style={s.label}>Phone number</Text>
-              <TextInput
-                style={[s.input, fieldErrors.phoneNumber && s.inputErr]}
-                placeholder="+91 98765 43210"
-                placeholderTextColor={C.mist}
-                value={phoneNumber}
-                onChangeText={(v) => { setPhoneNumber(v); clearFieldError("phoneNumber"); }}
-                keyboardType="phone-pad"
-                returnKeyType="done"
-              />
-              {fieldErrors.phoneNumber && <Text style={s.fieldErr}>{fieldErrors.phoneNumber}</Text>}
-            </View>
-          )}
 
           <View style={s.fieldWrap}>
             <Text style={s.label}>Password</Text>
@@ -501,25 +568,31 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
 
-  /* ── Error ── */
+  /* ── Error / Success ── */
 
   errBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,77,77,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,77,77,0.2)",
+    backgroundColor: "#E53935",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 18,
   },
 
+  successBox: {
+    backgroundColor: "#2E7D32",
+  },
+
+  successTxt: {
+    color: C.white,
+  },
+
   errTxt: {
     flex: 1,
     fontSize: 13,
     fontFamily: F.reg,
-    color: C.red,
+    color: C.white,
     marginLeft: 8,
   },
 
@@ -533,6 +606,18 @@ const s = StyleSheet.create({
 
   inputErr: {
     borderColor: C.red,
+  },
+
+  inputOk: {
+    borderColor: "#4CAF50",
+  },
+
+  fieldOk: {
+    fontSize: 11,
+    fontFamily: F.reg,
+    color: "#4CAF50",
+    marginTop: 4,
+    marginLeft: 2,
   },
 
   /* ── CTA ── */

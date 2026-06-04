@@ -35,9 +35,12 @@ router.get('/me', async (req, res) => {
 // Validation Schemas
 const signupSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
+  username: z.string()
+    .min(3, "Username must be at least 3 characters")
+    .max(30, "Username must be at most 30 characters")
+    .regex(/^[a-z0-9_]+$/, "Username can only contain lowercase letters, numbers and underscores"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  phoneNumber: z.string().optional(),
   dob: z.string().optional(),
   gender: z.string().optional(),
 });
@@ -47,16 +50,31 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+// CHECK USERNAME AVAILABILITY
+router.get('/check-username', async (req, res) => {
+  const { username } = req.query;
+  if (!username) return res.status(400).json({ message: 'Username is required' });
+  const exists = await pool.query('SELECT id FROM users WHERE username = $1', [username.toLowerCase()]);
+  res.json({ available: exists.rows.length === 0 });
+});
+
 // SIGNUP
 router.post('/signup', async (req, res) => {
   try {
     const validatedData = signupSchema.parse(req.body);
-    const { fullName, email, password, phoneNumber, dob, gender } = validatedData;
+    const { fullName, username, email, password, dob, gender } = validatedData;
+    const normalizedUsername = username.toLowerCase();
 
-    // Check if user exists
+    // Check if email exists
     const userExists = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (userExists.rows.length > 0) {
       return res.status(400).json({ message: 'User already exists' });
+    }
+
+    // Check if username is taken
+    const usernameExists = await pool.query('SELECT id FROM users WHERE username = $1', [normalizedUsername]);
+    if (usernameExists.rows.length > 0) {
+      return res.status(400).json({ message: 'Username is already taken' });
     }
 
     // Hash password
@@ -65,8 +83,8 @@ router.post('/signup', async (req, res) => {
 
     // Insert user
     const newUser = await pool.query(
-      'INSERT INTO users (full_name, email, password, phone_number, dob, gender) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, email',
-      [fullName, email, hashedPassword, phoneNumber, dob, gender]
+      'INSERT INTO users (full_name, username, email, password, dob, gender) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, username, email',
+      [fullName, normalizedUsername, email, hashedPassword, dob, gender]
     );
 
     const user = newUser.rows[0];

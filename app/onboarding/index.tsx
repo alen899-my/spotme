@@ -393,14 +393,15 @@ export default function OnboardingScreen() {
   };
 
   const isSectionComplete = (section: string) => {
-    switch (section) {
+    const cleanSection = section.replace(" (Optional)", "");
+    switch (cleanSection) {
       case "Gender": return gender !== "";
       case "Basic Information": return dob !== "" && heightVal.trim() !== "" && weightVal.trim() !== "";
       case "Fitness Goal": return fitnessGoal !== "";
       case "Experience Level": return experienceLevel !== "";
       case "Activity Level": return activityLevel !== "";
-      case "Measurements": return neck !== "" || waist !== "" || chest !== "";
-      case "Health Info": return medication !== null;
+      case "Measurements": return true;
+      case "Health Info": return true;
       case "Nutrition": return dietType !== "" && foodPref !== "" && waterIntake !== "";
       case "Photos": return photos.profile !== null;
       default: return false;
@@ -476,7 +477,8 @@ export default function OnboardingScreen() {
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => {
             const stepNum = i + 1;
             const isActive = stepNum === step;
-            const completed = isStepCompleted(stepNum);
+            const isOptional = stepNum === 6 || stepNum === 7;
+            const completed = isStepCompleted(stepNum) || isOptional;
             
             return (
               <TouchableOpacity
@@ -1135,8 +1137,8 @@ export default function OnboardingScreen() {
           { name: "Fitness Goal",      step: 3 },
           { name: "Experience Level",  step: 4 },
           { name: "Activity Level",    step: 5 },
-          { name: "Measurements",      step: 6 },
-          { name: "Health Info",       step: 7 },
+          { name: "Measurements (Optional)", step: 6 },
+          { name: "Health Info (Optional)",  step: 7 },
           { name: "Nutrition",         step: 8 },
           { name: "Photos",            step: 9 },
         ];
@@ -1166,10 +1168,7 @@ export default function OnboardingScreen() {
               })}
             </View>
 
-            <View style={[styles.secureNotice, { backgroundColor: isDark ? "rgba(37,150,190,0.10)" : "rgba(37,150,190,0.08)" }]}>
-              <Ionicons name="shield-half-outline" size={20} color={colors.primary} />
-              <Text style={[styles.secureText, { color: colors.textMuted }]}>Your data is encrypted and never shared.</Text>
-            </View>
+          
 
             <TouchableOpacity
               style={[styles.primaryBtn, { opacity: isSubmitting ? 0.7 : 1 }]}

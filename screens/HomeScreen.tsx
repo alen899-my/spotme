@@ -23,7 +23,6 @@ import { StatCards }      from "../components/home/StatCards";
 import RecommendationCard from "../components/home/RecommendationCard";
 import { HomeSkeleton } from "../components/ui/Skeleton";
 import BodyStatusCard     from "../components/home/BodyStatusCard";
-import WeightTrendCard    from "../components/home/WeightTrendCard";
 import HydrationCard      from "../components/home/HydrationCard";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
@@ -104,38 +103,38 @@ export default function HomeScreen() {
 
   const stepsDone = [
     !!u.gender,                                                                    // 1 gender
-    !!(u.dob && sv(u.height) && sv(u.weight)),                                    // 2 basic info
+    !!(u.dob && sv(u.height) && sv(u.weight)),                                     // 2 basic info
     !!u.fitness_goal,                                                              // 3 goal
     !!u.experience_level,                                                          // 4 experience
     !!u.activity_level,                                                            // 5 activity
-    measurementsDone,                                                             // 6 measurements
-    !!(u.medication),                                                              // 7 health
-    !!(u.diet_type && u.food_preference && u.water_intake),                       // 8 nutrition
-    !!(u.profile_pic_url),                                                         // 9 photos
+    !!(u.diet_type && u.food_preference && u.water_intake),                        // 6 nutrition
+    !!(u.profile_pic_url),                                                         // 7 photos
   ].filter(Boolean).length;
-  const TOTAL_ONBOARDING = 9;
+  const TOTAL_ONBOARDING = 7;
 
   const getBannerColor = (done: number) => {
     if (done <= 1) return "#EF4444";   // red
-    if (done <= 3) return "#F97316";   // orange
-    if (done <= 5) return "#F59E0B";   // amber
-    if (done <= 7) return "#84CC16";   // yellow-green
+    if (done <= 2) return "#F97316";   // orange
+    if (done <= 4) return "#F59E0B";   // amber
+    if (done <= 5) return "#84CC16";   // yellow-green
     return "#10B981";                  // green
   };
   const bannerColor = getBannerColor(stepsDone);
   const progressPct = stepsDone / TOTAL_ONBOARDING;
 
+  const isProfileComplete = profileComplete || (stepsDone >= TOTAL_ONBOARDING);
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[styles.container, { flexGrow: 1 }]}
       showsVerticalScrollIndicator={false}
     >
       {/* ── Greeting ─────────────────────────────────────────────────────── */}
       <GreetingCard firstName={firstName} fitnessGoal={u.fitness_goal} />
 
       {/* ── Profile Incomplete Banner ────────────────────────────────────── */}
-      {!profileComplete && (
+      {!isProfileComplete && (
         <TouchableOpacity
           style={[styles.bannerCard, { backgroundColor: bannerColor }]}
           onPress={() => router.push("/onboarding")}
@@ -170,67 +169,68 @@ export default function HomeScreen() {
         </TouchableOpacity>
       )}
 
-      {/* ── XP / Level ───────────────────────────────────────────────────── */}
-      <XPCard
-        tier={u.league_tier || "Bronze"}
-        level={u.level || 1}
-        totalXP={u.total_xp || 0}
-      />
+      {isProfileComplete && (
+        <>
+          {/* ── XP / Level ───────────────────────────────────────────────────── */}
+          <XPCard
+            tier={u.league_tier || "Bronze"}
+            level={u.level || 1}
+            totalXP={u.total_xp || 0}
+          />
 
-      {/* ── Today stats ──────────────────────────────────────────────────── */}
-      <StatCards
-        caloriesBurned={today.calories_burned || 0}
-        currentStreak={u.current_streak || 0}
-        waterMl={today.water_ml || 0}
-        caloriesConsumed={today.calories_consumed || 0}
-      />
+          {/* ── Today stats ──────────────────────────────────────────────────── */}
+          <StatCards
+            caloriesBurned={today.calories_burned || 0}
+            currentStreak={u.current_streak || 0}
+            waterMl={today.water_ml || 0}
+            caloriesConsumed={today.calories_consumed || 0}
+          />
 
-      {/* ── Exercises to Try ──────────────────────────────────────────── */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Exercises to Try</Text>
-        <TouchableOpacity onPress={() => router.push("/(tabs)/exercises")} activeOpacity={0.7}>
-          <Text style={[styles.seeAll, { color: colors.primary }]}>See all →</Text>
-        </TouchableOpacity>
-      </View>
-      {recs.length === 0 ? (
-        <RecommendationCard rec={null} onBrowsePress={() => router.push("/(tabs)/exercises")} />
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingRight: 16, gap: 16 }}
-          snapToInterval={width * 0.75 + 16}
-          decelerationRate="fast"
-          style={{ marginLeft: -16, marginBottom: vs(20) }}
-        >
-          {recs.map((item: any, i: number) => (
-            <View key={i} style={{ width: width * 0.75 }}>
-              <RecommendationCard rec={item} onBrowsePress={() => router.push("/(tabs)/exercises")} />
-            </View>
-          ))}
-        </ScrollView>
+          {/* ── Exercises to Try ──────────────────────────────────────────── */}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Exercises to Try</Text>
+            <TouchableOpacity onPress={() => router.push("/(tabs)/exercises")} activeOpacity={0.7}>
+              <Text style={[styles.seeAll, { color: colors.primary }]}>See all →</Text>
+            </TouchableOpacity>
+          </View>
+          {recs.length === 0 ? (
+            <RecommendationCard rec={null} onBrowsePress={() => router.push("/(tabs)/exercises")} />
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingRight: 16, gap: 16 }}
+              snapToInterval={width * 0.75 + 16}
+              decelerationRate="fast"
+              style={{ marginLeft: -16, marginBottom: vs(20) }}
+            >
+              {recs.map((item: any, i: number) => (
+                <View key={i} style={{ width: width * 0.75 }}>
+                  <RecommendationCard rec={item} onBrowsePress={() => router.push("/(tabs)/exercises")} />
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* ── Body Status ──────────────────────────────────────────────────── */}
+          <BodyStatusCard
+            gender={gender}
+            weightKg={weightKg}
+            heightCm={heightCm}
+            bodyFat={u.body_fat}
+            weeklyWorkouts={weeklyWorkouts}
+            dbMuscleActivity={dashboard?.muscle_activity || []}
+          />
+
+          {/* ── Weekly Activity ──────────────────────────────────────────────── */}
+
+          {/* ── Hydration ────────────────────────────────────────────────────── */}
+          <HydrationCard
+            waterMl={today.water_ml || 0}
+            onLogWaterPress={() => router.push("/(tabs)/meals")}
+          />
+        </>
       )}
-
-      {/* ── Body Status ──────────────────────────────────────────────────── */}
-      <BodyStatusCard
-        gender={gender}
-        weightKg={weightKg}
-        heightCm={heightCm}
-        bodyFat={u.body_fat}
-        weeklyWorkouts={weeklyWorkouts}
-        dbMuscleActivity={dashboard?.muscle_activity || []}
-      />
-
-      {/* ── Weekly Activity ──────────────────────────────────────────────── */}
-
-      {/* ── Weight Trend ─────────────────────────────────────────────────── */}
-      <WeightTrendCard weightProgress={weightProgress} />
-
-      {/* ── Hydration ────────────────────────────────────────────────────── */}
-      <HydrationCard
-        waterMl={today.water_ml || 0}
-        onLogWaterPress={() => router.push("/(tabs)/meals")}
-      />
 
       <View style={{ height: vs(32) }} />
     </ScrollView>
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: scale(20),
     paddingTop: Platform.OS === "ios" ? vs(16) : vs(12),
-    paddingBottom: vs(40),
+    paddingBottom: vs(120),
   },
   sectionHeaderRow: {
     flexDirection: "row",

@@ -28,25 +28,25 @@ import { useTheme } from "../../contexts/ThemeContext";
 const { width: SW, height: SH } = Dimensions.get("window");
 const BASE_W = 390;
 const scale = (n: number) => Math.round((SW / BASE_W) * n);
-const vs    = (n: number) => Math.round((SH / 844) * n);
+const vs = (n: number) => Math.round((SH / 844) * n);
 
 export type TimeSlot = "dawn" | "morning" | "afternoon" | "dusk" | "evening" | "night";
 
 interface SlotConfig {
-  slot:        TimeSlot;
-  greeting:    string;
-  sub:         string;
-  cardBg:      string;
-  cardBgDark:  string;
+  slot: TimeSlot;
+  greeting: string;
+  sub: string;
+  cardBg: string;
+  cardBgDark: string;
   skyGradient: [string, string];
   skyGradientDark: [string, string];
-  border:      string;
-  nameColor:   string;
-  greetColor:  string;
-  subColor:    string;
-  pillBg:      string;
-  pillBorder:  string;
-  pillText:    string;
+  border: string;
+  nameColor: string;
+  greetColor: string;
+  subColor: string;
+  pillBg: string;
+  pillBorder: string;
+  pillText: string;
 }
 
 const SLOTS: SlotConfig[] = [
@@ -119,8 +119,8 @@ const SLOTS: SlotConfig[] = [
 ];
 
 function getSlot(hour: number): SlotConfig {
-  if (hour >= 5  && hour < 7)  return SLOTS[0];
-  if (hour >= 7  && hour < 12) return SLOTS[1];
+  if (hour >= 5 && hour < 7) return SLOTS[0];
+  if (hour >= 7 && hour < 12) return SLOTS[1];
   if (hour >= 12 && hour < 17) return SLOTS[2];
   if (hour >= 17 && hour < 19) return SLOTS[3];
   if (hour >= 19 && hour < 22) return SLOTS[4];
@@ -142,11 +142,11 @@ function SunIcon({ size = 44, rayColor = "#F7CB16" }: { size?: number; rayColor?
       <Svg width={size} height={size} viewBox="0 0 44 44">
         <Defs>
           <RadialGradient id="sg" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%"   stopColor="#FFF9C4" />
+            <Stop offset="0%" stopColor="#FFF9C4" />
             <Stop offset="100%" stopColor={rayColor} />
           </RadialGradient>
         </Defs>
-        {[0,45,90,135,180,225,270,315].map((deg, i) => {
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => {
           const r = (deg * Math.PI) / 180;
           return (
             <Line key={i}
@@ -167,7 +167,7 @@ function MoonIcon({ size = 42 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 42 42">
       <Defs>
         <RadialGradient id="mg" cx="40%" cy="35%" r="60%">
-          <Stop offset="0%"   stopColor="#FFF9E0" />
+          <Stop offset="0%" stopColor="#FFF9E0" />
           <Stop offset="100%" stopColor="#F7CB16" />
         </RadialGradient>
       </Defs>
@@ -184,7 +184,7 @@ function DawnIcon({ size = 44 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 44 44">
       <Path d="M4 32 Q22 12 40 32" fill="none" stroke="#F4845F" strokeWidth="2.5" strokeLinecap="round" />
       <Path d="M12 32 A10 10 0 0 1 32 32Z" fill="#F7CB16" />
-      {[-50,-28,-8,8,28,50].map((deg, i) => {
+      {[-50, -28, -8, 8, 28, 50].map((deg, i) => {
         const r = (deg * Math.PI) / 180;
         return (
           <Line key={i}
@@ -203,7 +203,7 @@ function DuskIcon({ size = 44 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 44 44">
       <Path d="M4 30 Q22 10 40 30" fill="none" stroke="#E87D3E" strokeWidth="2.5" strokeLinecap="round" />
       <Path d="M11 30 A11 11 0 0 1 33 30Z" fill="#E87D3E" />
-      {[-55,-32,-10,10,32,55].map((deg, i) => {
+      {[-55, -32, -10, 10, 32, 55].map((deg, i) => {
         const r = (deg * Math.PI) / 180;
         return (
           <Line key={i}
@@ -222,7 +222,7 @@ function StarField({ count = 20 }: { count?: number }) {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(twinkle, { toValue: 1,    duration: 2000, useNativeDriver: true }),
+        Animated.timing(twinkle, { toValue: 1, duration: 2000, useNativeDriver: true }),
         Animated.timing(twinkle, { toValue: 0.25, duration: 2000, useNativeDriver: true }),
       ])
     ).start();
@@ -232,8 +232,8 @@ function StarField({ count = 20 }: { count?: number }) {
   const stars = useMemo(() =>
     Array.from({ length: count }, (_, i) => ({
       x: ((i * 79 + 11) % 100),
-      y: ((i * 53 + 7)  % 85),
-      r: ((i * 11 + 3)  % 3) * 0.6 + 0.7,
+      y: ((i * 53 + 7) % 85),
+      r: ((i * 11 + 3) % 3) * 0.6 + 0.7,
     })), [count]);
 
   return (
@@ -250,29 +250,29 @@ function StarField({ count = 20 }: { count?: number }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 interface GreetingCardProps {
-  firstName:    string;
+  firstName: string;
   fitnessGoal?: string;
 }
 
 export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardProps) {
   const { colors, isDark } = useTheme();
-  const hour   = new Date().getHours();
+  const hour = new Date().getHours();
   const config = useMemo(() => getSlot(hour), [hour]);
 
-  const fadeAnim    = useRef(new Animated.Value(0)).current;
-  const slideAnim   = useRef(new Animated.Value(vs(18))).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(vs(18))).current;
   const iconOpacity = useRef(new Animated.Value(0)).current;
-  const iconScale   = useRef(new Animated.Value(0.5)).current;
+  const iconScale = useRef(new Animated.Value(0.5)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 550, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 550, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 550, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
     Animated.sequence([
       Animated.delay(220),
       Animated.parallel([
-        Animated.spring(iconScale,   { toValue: 1, tension: 80, friction: 8, useNativeDriver: true }),
+        Animated.spring(iconScale, { toValue: 1, tension: 80, friction: 8, useNativeDriver: true }),
         Animated.timing(iconOpacity, { toValue: 1, duration: 380, useNativeDriver: true }),
       ]),
     ]).start();
@@ -287,8 +287,8 @@ export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardPro
         {
           borderColor: isDark ? colors.border : config.border,
           borderWidth: isDark ? 1 : 1.5,
-          opacity:     fadeAnim,
-          transform:   [{ translateY: slideAnim }],
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
         },
       ]}
     >
@@ -329,12 +329,12 @@ export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardPro
             style={[styles.iconInline, { opacity: iconOpacity, transform: [{ scale: iconScale }] }]}
             pointerEvents="none"
           >
-            {config.slot === "morning"   && <SunIcon  size={scale(48)} rayColor="#F7CB16" />}
-            {config.slot === "afternoon" && <SunIcon  size={scale(44)} rayColor="rgba(255,255,255,0.9)" />}
-            {config.slot === "dawn"      && <DawnIcon size={scale(48)} />}
-            {config.slot === "dusk"      && <DuskIcon size={scale(48)} />}
-            {config.slot === "evening"   && <MoonIcon size={scale(42)} />}
-            {config.slot === "night"     && <MoonIcon size={scale(46)} />}
+            {config.slot === "morning" && <SunIcon size={scale(48)} rayColor="#F7CB16" />}
+            {config.slot === "afternoon" && <SunIcon size={scale(44)} rayColor="rgba(255,255,255,0.9)" />}
+            {config.slot === "dawn" && <DawnIcon size={scale(48)} />}
+            {config.slot === "dusk" && <DuskIcon size={scale(48)} />}
+            {config.slot === "evening" && <MoonIcon size={scale(42)} />}
+            {config.slot === "night" && <MoonIcon size={scale(46)} />}
           </Animated.View>
         </View>
 
@@ -343,12 +343,6 @@ export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardPro
           {config.sub}
         </Text>
 
-        {/* Goal pill */}
-        {fitnessGoal && (
-          <View style={[styles.goalPill, { backgroundColor: isDark ? colors.inputBg : config.pillBg, borderColor: isDark ? colors.border : config.pillBorder }]}>
-            <Text style={[styles.goalPillText, { color: isDark ? colors.primary : config.pillText }]}>🎯  {fitnessGoal}</Text>
-          </View>
-        )}
 
       </View>
     </Animated.View>

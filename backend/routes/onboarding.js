@@ -39,11 +39,14 @@ router.post('/complete', upload.fields([
     // "if every step completed eveu fields added only set it to yes"
     // Optional fields: bodyFat, measurements, health conditions.
     // Required fields based on UI: age/dob, height, weight, fitnessGoal, expLevel, activityLevel, diet, foodPref, waterIntake, all 4 photos.
+    const userQuery = await pool.query('SELECT profile_pic_url FROM users WHERE id = $1', [userId]);
+    const existingProfilePic = userQuery.rows[0]?.profile_pic_url;
+
     const isCompleted = !!(
       (dob || age) && height && weight &&
       fitnessGoal && experienceLevel && activityLevel &&
       dietType && foodPreference && waterIntake &&
-      profilePicUrl && frontPhotoUrl && backPhotoUrl && sidePhotoUrl
+      (profilePicUrl || existingProfilePic)
     );
 
     await pool.query(`
