@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -17,6 +17,8 @@ import NutritionMeter from '../../components/ui/NutritionMeter';
 import DatePicker from '../../components/ui/DatePicker';
 import WaterTracker from '../../components/ui/WaterTracker';
 import DietRecsScreen from '../../components/diet/DietRecsScreen';
+import LogMealSheet, { LogMealPayload } from '../../components/meals/LogMealSheet';
+import MealNutrientCard from '../../components/meals/MealNutrientCard';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -24,21 +26,16 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 export default function MealsScreen() {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
   const [meals, setMeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   
-  // Log Meal Form State
-  const [showLogForm, setShowLogForm] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [manualIngredients, setManualIngredients] = useState([{ name: '', quantity: '' }]);
-
-  // Analysis Modal State
-  const [showAnalysis, setShowAnalysis] = useState(false);
-  const [analysisData, setAnalysisData] = useState<any>(null);
-  const [analyzedImageUrl, setAnalyzedImageUrl] = useState('');
-  const [mealType, setMealType] = useState('Morning');
-  const [saving, setSaving] = useState(false);
+  // Log Meal Sheet State
+  const [showLogSheet, setShowLogSheet] = useState(false);
+  const [initialImageUri, setInitialImageUri] = useState<string | null>(null);
+  const [initialIngredients, setInitialIngredients] = useState<{ name: string; quantity: string }[]>([]);
+  const [editingMealId, setEditingMealId] = useState<number | null>(null);
 
   // New features state
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -489,7 +486,7 @@ export default function MealsScreen() {
         saturated_fat: ing.saturated_fat !== undefined ? ing.saturated_fat : 0
       }));
 
-      const mealTypeMap = meal.meal_type === 'Snack' ? 'Snack' : (meal.meal_type === 'Breakfast' ? 'Morning' : (meal.meal_type === 'Lunch' ? 'Afternoon' : 'Evening'));
+      const mealTypeMap = meal.meal_type;
 
       const totalFiber = meal.ingredients.reduce((sum: number, ing: any) => sum + (ing.fiber || 0), 0);
       const totalSugar = meal.ingredients.reduce((sum: number, ing: any) => sum + (ing.sugar || 0), 0);
@@ -543,134 +540,116 @@ export default function MealsScreen() {
     }
   };
 
-  const handlePickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
-    }
-  };
-
-  const addManualIngredient = () => {
-    setManualIngredients(prev => [...prev, { name: '', quantity: '' }]);
-  };
-
-  const updateManualIngredient = (index: number, field: 'name' | 'quantity', value: string) => {
-    setManualIngredients(prev =>
-      prev.map((ingredient, idx) =>
-        idx === index ? { ...ingredient, [field]: value } : ingredient
-      )
-    );
-  };
-
-  const removeManualIngredient = (index: number) => {
-    setManualIngredients(prev => {
-      if (prev.length === 1) return [{ name: '', quantity: '' }];
-      return prev.filter((_, idx) => idx !== index);
-    });
-  };
-
-  const buildAnalysisContext = () => {
-    const filledIngredients = manualIngredients
-      .map(ingredient => ({
-        name: ingredient.name.trim(),
-        quantity: ingredient.quantity.trim(),
-      }))
-      .filter(ingredient => ingredient.name || ingredient.quantity);
-
-    const ingredientLines = filledIngredients.map((ingredient, index) =>
-      `${index + 1}. ${ingredient.name || 'Unnamed ingredient'}${ingredient.quantity ? ` - ${ingredient.quantity}` : ''}`
-    );
-
-    if (ingredientLines.length === 0) {
-      return '';
-    }
-
-    return `Ingredients:\n${ingredientLines.join('\n')}`;
-  };
-
-  const startAnalysis = async () => {
-    if (!selectedImage) {
-      showToast('Please select a meal image', 'error');
-      return;
-    }
+  /**
+   * Called by LogMealSheet when user taps "Analyze & Log".
+   * If an image is present we send it to the AI, otherwise we skip analysis
+   * and just save a meal entry with the manual ingredient description.
+   */
+  const handleLogMealSubmit = async (payload: LogMealPayload) => {
+    const { imageUri, ingredients } = payload;
 
     setUploading(true);
-    setShowLogForm(false);
-    
+    setShowLogSheet(false);
+
+    // Auto-detect meal type based on current hour
+    const hour = new Date().getHours();
+    let autoMealType = 'Snack';
+    if (hour >= 5 && hour < 11) autoMealType = 'Breakfast';
+    else if (hour >= 11 && hour < 16) autoMealType = 'Lunch';
+    else if (hour >= 16 && hour < 19) autoMealType = 'Snack';
+    else if (hour >= 19 && hour < 23) autoMealType = 'Dinner';
+
     try {
       const token = await AsyncStorage.getItem('userToken');
-      const formData = new FormData();
-      formData.append('description', buildAnalysisContext());
-      
-      if (Platform.OS === 'web') {
-        const response = await fetch(selectedImage);
-        const blob = await response.blob();
-        formData.append('photo', blob, 'meal.jpg');
+
+      if (imageUri) {
+        // ── AI photo analysis path ──
+        const description = ingredients
+          .filter(i => i.name.trim())
+          .map((i, idx) => `${idx + 1}. ${i.name}${i.quantity ? ` - ${i.quantity}` : ''}`)
+          .join('\n');
+
+        const formData = new FormData();
+        if (description) formData.append('description', `Ingredients:\n${description}`);
+
+        if (Platform.OS === 'web') {
+          const response = await fetch(imageUri);
+          const blob = await response.blob();
+          formData.append('photo', blob, 'meal.jpg');
+        } else {
+          const name = imageUri.split('/').pop();
+          const match = /\.(\w+)$/.exec(name || '');
+          const type = match ? `image/${match[1]}` : 'image';
+          formData.append('photo', { uri: imageUri, name, type } as any);
+        }
+
+        const res = await axios.post(`${API_URL}/meals/analyze`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` },
+        });
+
+        const analysis = res.data.analysis;
+        const imageUrl = res.data.imageUrl;
+
+        // Auto-save immediately — no second confirmation modal
+        await axios.post(`${API_URL}/meals`, {
+          image_url: imageUrl,
+          meal_type: autoMealType,
+          ...analysis,
+          items: analysis.items,
+        }, { headers: { Authorization: `Bearer ${token}` } });
+
+        if (editingMealId) {
+          await axios.delete(`${API_URL}/meals/${editingMealId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
+
+        const cals = Math.round(analysis?.total_calories || 0);
+        showToast(`Meal logged! 🎉 ~${cals} kcal detected`);
       } else {
-        const name = selectedImage.split('/').pop();
-        const match = /\.(\w+)$/.exec(name || '');
-        const type = match ? `image/${match[1]}` : `image`;
-        formData.append('photo', { uri: selectedImage, name, type } as any);
+        // ── Manual-only path (no photo) ──
+        const description = ingredients
+          .filter(i => i.name.trim())
+          .map(i => i.name)
+          .join(', ');
+
+        await axios.post(`${API_URL}/meals`, {
+          image_url: '',
+          meal_type: autoMealType,
+          total_calories: 0,
+          total_protein: 0,
+          total_carbs: 0,
+          total_fat: 0,
+          total_fiber: 0,
+          total_sugar: 0,
+          total_sodium: 0,
+          total_saturated_fat: 0,
+          total_cholesterol: 0,
+          items: ingredients.filter(i => i.name.trim()).map(i => ({
+            item_name: i.name,
+            quantity: i.quantity || '1 portion',
+            calories: 0, protein: 0, carbs: 0, fat: 0,
+          })),
+        }, { headers: { Authorization: `Bearer ${token}` } });
+
+        if (editingMealId) {
+          await axios.delete(`${API_URL}/meals/${editingMealId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
+
+        showToast(`Meal logged! 🥗`);
       }
 
-      const res = await axios.post(`${API_URL}/meals/analyze`, formData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}` 
-        }
-      });
-
-      setAnalyzedImageUrl(res.data.imageUrl);
-      setAnalysisData(res.data.analysis);
-      
-      // Auto-detect meal type based on current hour
-      const hour = new Date().getHours();
-      let type = 'Night';
-      if (hour >= 5 && hour < 11) type = 'Morning';
-      else if (hour >= 11 && hour < 16) type = 'Afternoon';
-      else if (hour >= 16 && hour < 20) type = 'Evening';
-      setMealType(type);
-
-      setShowAnalysis(true);
-      // Reset form
-      setSelectedImage(null);
-      setManualIngredients([{ name: '', quantity: '' }]);
-    } catch (err) {
-      console.error('Analysis error:', err);
-      showToast('Failed to analyze meal', 'error');
-      setShowLogForm(true); // Re-open form on error
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleSaveMeal = async () => {
-    setSaving(true);
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      await axios.post(`${API_URL}/meals`, {
-        image_url: analyzedImageUrl,
-        meal_type: mealType,
-        ...analysisData,
-        items: analysisData.items
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      showToast('Meal logged successfully! 🥗');
-      setShowAnalysis(false);
       fetchMeals();
     } catch (err) {
-      console.error('Error saving meal:', err);
-      showToast('Failed to save meal', 'error');
+      console.error('Meal log error:', err);
+      showToast('Failed to log meal', 'error');
     } finally {
-      setSaving(false);
+      setUploading(false);
+      setEditingMealId(null);
+      setInitialImageUri(null);
+      setInitialIngredients([]);
     }
   };
 
@@ -761,21 +740,21 @@ export default function MealsScreen() {
 
           {!open && (
             <View style={styles.mealStatsRow}>
-              <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#E7B100' } : { backgroundColor: '#E7B100' }]}>
+              <View style={[styles.mealStatCol, { backgroundColor: isDark ? '#E7B10015' : '#E7B100' }]}>
                 <Text style={[styles.mealStatNum, { color: isDark ? '#E7B100' : '#3F2C00' }]}>{Math.round(item.total_calories)}</Text>
-                <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : '#5B4300' }]}>kcal</Text>
+                <Text style={[styles.mealStatUnit, { color: isDark ? 'rgba(231,177,0,0.7)' : '#5B4300' }]}>kcal</Text>
               </View>
-              <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#10B981' } : { backgroundColor: '#10B981' }]}>
+              <View style={[styles.mealStatCol, { backgroundColor: isDark ? '#10B98115' : '#10B981' }]}>
                 <Text style={[styles.mealStatNum, { color: isDark ? '#10B981' : '#FFF' }]}>{Math.round(item.total_protein)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Protein</Text>
+                <Text style={[styles.mealStatUnit, { color: isDark ? 'rgba(16,185,129,0.7)' : 'rgba(255,255,255,0.9)' }]}>Protein</Text>
               </View>
-              <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#3B82F6' } : { backgroundColor: '#3B82F6' }]}>
+              <View style={[styles.mealStatCol, { backgroundColor: isDark ? '#3B82F615' : '#3B82F6' }]}>
                 <Text style={[styles.mealStatNum, { color: isDark ? '#3B82F6' : '#FFF' }]}>{Math.round(item.total_carbs)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
+                <Text style={[styles.mealStatUnit, { color: isDark ? 'rgba(59,130,246,0.7)' : 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
               </View>
-              <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#F59E0B' } : { backgroundColor: '#F59E0B' }]}>
+              <View style={[styles.mealStatCol, { backgroundColor: isDark ? '#F59E0B15' : '#F59E0B' }]}>
                 <Text style={[styles.mealStatNum, { color: isDark ? '#F59E0B' : '#4A2900' }]}>{Math.round(item.total_fat)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : '#6B3A00' }]}>Fats</Text>
+                <Text style={[styles.mealStatUnit, { color: isDark ? 'rgba(245,158,11,0.7)' : '#6B3A00' }]}>Fats</Text>
               </View>
             </View>
           )}
@@ -783,66 +762,51 @@ export default function MealsScreen() {
 
         {open && (
           <View style={[styles.accDetail, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
-            <View style={styles.openStatsRow}>
-              <View style={[styles.openStatCard, isDark ? { backgroundColor: colors.inputBg, borderColor: '#E7B100', borderWidth: 1 } : { backgroundColor: '#E7B100', borderColor: '#E7B100' }]}>
-                <Text style={[styles.openStatValue, { color: isDark ? '#E7B100' : '#3F2C00' }]}>{Math.round(item.total_calories)}</Text>
-                <Text style={[styles.openStatLabel, { color: isDark ? colors.textMuted : '#5B4300' }]}>kcal</Text>
-              </View>
-              <View style={[styles.openStatCard, isDark ? { backgroundColor: colors.inputBg, borderColor: '#10B981', borderWidth: 1 } : { backgroundColor: '#10B981', borderColor: '#10B981' }]}>
-                <Text style={[styles.openStatValue, { color: isDark ? '#10B981' : '#FFF' }]}>{Math.round(item.total_protein)}g</Text>
-                <Text style={[styles.openStatLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Protein</Text>
-              </View>
-              <View style={[styles.openStatCard, isDark ? { backgroundColor: colors.inputBg, borderColor: '#3B82F6', borderWidth: 1 } : { backgroundColor: '#3B82F6', borderColor: '#3B82F6' }]}>
-                <Text style={[styles.openStatValue, { color: isDark ? '#3B82F6' : '#FFF' }]}>{Math.round(item.total_carbs)}g</Text>
-                <Text style={[styles.openStatLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
-              </View>
-              <View style={[styles.openStatCard, isDark ? { backgroundColor: colors.inputBg, borderColor: '#F59E0B', borderWidth: 1 } : { backgroundColor: '#F59E0B', borderColor: '#F59E0B' }]}>
-                <Text style={[styles.openStatValue, { color: isDark ? '#F59E0B' : '#4A2900' }]}>{Math.round(item.total_fat)}g</Text>
-                <Text style={[styles.openStatLabel, { color: isDark ? colors.textMuted : '#6B3A00' }]}>Fats</Text>
-              </View>
+            {/* ── Edit / Re-analyze & Delete Buttons Row ── */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  const mapped = item.items ? item.items.map((it: any) => ({
+                    name: it.item_name,
+                    quantity: it.quantity || '',
+                  })) : [];
+                  setInitialImageUri(item.image_url || null);
+                  setInitialIngredients(mapped);
+                  setEditingMealId(item.id);
+                  setShowLogSheet(true);
+                }}
+                style={[
+                  styles.actionBtn,
+                  {
+                    borderColor: colors.primary + '30',
+                    backgroundColor: colors.primary + '08',
+                    marginRight: 8,
+                  }
+                ]}
+                activeOpacity={0.65}
+              >
+                <Ionicons name="create-outline" size={14} color={colors.primary} style={{ marginRight: 6 }} />
+                <Text style={[styles.actionBtnText, { color: colors.primary }]} numberOfLines={1}>Edit / Retry</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => deleteMeal(item.id)}
+                style={[
+                  styles.actionBtn,
+                  {
+                    borderColor: (colors.error || '#DC2626') + '30',
+                    backgroundColor: (colors.error || '#DC2626') + '08',
+                  }
+                ]}
+                activeOpacity={0.65}
+              >
+                <Ionicons name="trash-outline" size={14} color={colors.error || '#DC2626'} style={{ marginRight: 6 }} />
+                <Text style={[styles.actionBtnText, { color: colors.error || '#DC2626' }]} numberOfLines={1}>Delete</Text>
+              </TouchableOpacity>
             </View>
 
-            {item.items?.length > 0 && (
-              <View style={[styles.foodItemsWrap, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
-                <Text style={[styles.foodItemsTitle, { color: isDark ? colors.text : '#FFF' }]}>Items detected</Text>
-                {item.items.map((food: any, idx: number) => (
-                  <View
-                    key={idx}
-                    style={[
-                      styles.savedFoodCard,
-                      isDark
-                        ? { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }
-                        : {
-                            backgroundColor: idx % 2 === 0 ? '#E7B100' : '#1F7FA2',
-                            borderColor: idx % 2 === 0 ? '#E7B100' : '#1F7FA2',
-                          }
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.foodName, { color: isDark ? colors.text : (idx % 2 === 0 ? '#2D2200' : '#FFF') }]}>{food.item_name}</Text>
-                      <Text style={[styles.foodQty, { color: isDark ? colors.textMuted : (idx % 2 === 0 ? '#5B4300' : 'rgba(255,255,255,0.82)') }]}>{food.quantity || 'Estimated serving'}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[styles.foodCals, { color: isDark ? colors.text : (idx % 2 === 0 ? '#3F2C00' : '#FFF') }]}>{Math.round(food.calories || 0)} kcal</Text>
-                      <View style={styles.savedFoodMacroRow}>
-                        <Text style={[styles.savedFoodMacroText, styles.savedFoodMacroBadge, { backgroundColor: '#10B981', color: '#FFF' }]}>{Math.round(food.protein || 0)}P</Text>
-                        <Text style={[styles.savedFoodMacroText, styles.savedFoodMacroBadge, { backgroundColor: '#3B82F6', color: '#FFF' }]}>{Math.round(food.carbs || 0)}C</Text>
-                        <Text style={[styles.savedFoodMacroText, styles.savedFoodMacroBadge, { backgroundColor: '#F59E0B', color: '#4A2900' }]}>{Math.round(food.fat || 0)}F</Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <TouchableOpacity
-              onPress={() => deleteMeal(item.id)}
-              style={[styles.deleteMealBtn, isDark ? { borderColor: colors.error || '#DC2626', backgroundColor: 'transparent' } : { borderColor: '#DC2626', backgroundColor: '#DC2626' }]}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="trash-outline" size={14} color={isDark ? (colors.error || '#DC2626') : '#FFF'} style={{ marginRight: 6 }} />
-              <Text style={[styles.deleteMealBtnText, { color: isDark ? (colors.error || '#DC2626') : '#FFF' }]}>Delete Meal Entry</Text>
-            </TouchableOpacity>
+            {/* ── Inline nutrition summary (replaces analysis modal) ── */}
+            <MealNutrientCard meal={item} />
           </View>
         )}
       </View>
@@ -1072,8 +1036,8 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
 
   const renderRecommendations = () => {
     const renderRecommendationState = (content: React.ReactNode) => (
-      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-        {renderTopChrome()}
+      <ScrollView contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]} showsVerticalScrollIndicator={false}>
+        {renderHeaderBar()}
         <View style={styles.recommendationStateWrap}>
           {content}
         </View>
@@ -1132,8 +1096,8 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     }
 
     return (
-      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-        {renderTopChrome()}
+      <ScrollView contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]} showsVerticalScrollIndicator={false}>
+        {renderHeaderBar()}
 
         {recommendationData.profileIncomplete && (
           <View style={[styles.recCard, styles.recAlertCard, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30' }]}>
@@ -1275,8 +1239,8 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     );
 
     return (
-      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-        {renderTopChrome()}
+      <ScrollView contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]} showsVerticalScrollIndicator={false}>
+        {renderHeaderBar()}
         {recommendationData.profileIncomplete && (
           <View style={[styles.recCard, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30', padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 14 }]}>
             <Ionicons name="warning-outline" size={20} color="#F59E0B" style={{ marginRight: 10 }} />
@@ -1470,7 +1434,16 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         </View>
         {showLogBtn && (
           <View style={styles.headerActionWrap}>
-            <TouchableOpacity style={styles.logMealBtn} onPress={() => setShowLogForm(true)} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.logMealBtn}
+              onPress={() => {
+                setInitialImageUri(null);
+                setInitialIngredients([]);
+                setEditingMealId(null);
+                setShowLogSheet(true);
+              }}
+              activeOpacity={0.85}
+            >
               <View style={styles.logMealBtnFill}>
                 <Ionicons name="add-circle-outline" size={18} color="#FFF" />
                 <Text style={styles.logMealBtnText} numberOfLines={1}>Log Meal</Text>
@@ -1554,7 +1527,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                 </View>
               );
             }}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               uploading ? null : (
@@ -1565,7 +1538,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                     </View>
                     <Text style={[styles.emptyTitle, { color: colors.text }]}>No meals logged</Text>
                     <Text style={[styles.emptyText, { color: colors.textMuted }]}>Tap + to log a meal and track your nutrition</Text>
-                    <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: '#2596BE15', borderColor: '#2596BE30', borderWidth: 1 }]} onPress={() => setShowLogForm(true)}>
+                    <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: '#2596BE15', borderColor: '#2596BE30', borderWidth: 1 }]} onPress={() => setShowLogSheet(true)}>
                       <Ionicons name="add-circle-outline" size={16} color="#2596BE" />
                       <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Log Your First Meal</Text>
                     </TouchableOpacity>
@@ -1576,7 +1549,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           />
       ) : activeTab === 1 ? (
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 120 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 80, 120) }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -1846,10 +1819,11 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                             try {
                               const token = await AsyncStorage.getItem('userToken');
                               const hour = new Date().getHours();
-                              let mealTypeMap = 'Night';
-                              if (hour >= 5 && hour < 11) mealTypeMap = 'Morning';
-                              else if (hour >= 11 && hour < 16) mealTypeMap = 'Afternoon';
-                              else if (hour >= 16 && hour < 20) mealTypeMap = 'Evening';
+                              let mealTypeMap = 'Snack';
+                              if (hour >= 5 && hour < 11) mealTypeMap = 'Breakfast';
+                              else if (hour >= 11 && hour < 16) mealTypeMap = 'Lunch';
+                              else if (hour >= 16 && hour < 19) mealTypeMap = 'Snack';
+                              else if (hour >= 19 && hour < 23) mealTypeMap = 'Dinner';
                               await axios.post(`${API_URL}/meals`, {
                                 image_url: '',
                                 meal_type: mealTypeMap,
@@ -1887,212 +1861,20 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         </View>
       </Modal>
 
-      {/* Log Meal Form Modal */}
-      <Modal visible={showLogForm} animationType="fade" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, height: 'auto', maxHeight: '80%' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>New Meal</Text>
-              <TouchableOpacity onPress={() => setShowLogForm(false)}>
-                <Ionicons name="close" size={28} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <TouchableOpacity style={[styles.imageUploadBox, { borderColor: colors.border }]} onPress={handlePickImage}>
-                {selectedImage ? (
-                  <Image source={{ uri: selectedImage }} style={styles.previewImage} />
-                ) : (
-                  <View style={{ alignItems: 'center' }}>
-                    <Ionicons name="camera-outline" size={40} color={colors.textDim} />
-                    <Text style={{ color: colors.textDim, fontFamily: FONTS.bodyBold, marginTop: 8 }}>SELECT MEAL PHOTO</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.ingredientsHeaderRow}>
-                <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 20, marginBottom: 0 }]}>Ingredients (Optional)</Text>
-                <TouchableOpacity style={styles.addIngredientBtn} onPress={addManualIngredient} activeOpacity={0.85}>
-                  <Ionicons name="add" size={16} color="#2596BE" />
-                  <Text style={styles.addIngredientBtnText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-
-              {manualIngredients.map((ingredient, index) => (
-                <View key={`ingredient-${index}`} style={styles.ingredientRow}>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      styles.ingredientNameInput,
-                      { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }
-                    ]}
-                    placeholder="Ingredient"
-                    placeholderTextColor={colors.textDim}
-                    value={ingredient.name}
-                    onChangeText={(value) => updateManualIngredient(index, 'name', value)}
-                  />
-                  <TextInput
-                    style={[
-                      styles.input,
-                      styles.ingredientQtyInput,
-                      { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }
-                    ]}
-                    placeholder="Quantity"
-                    placeholderTextColor={colors.textDim}
-                    value={ingredient.quantity}
-                    onChangeText={(value) => updateManualIngredient(index, 'quantity', value)}
-                  />
-                  <TouchableOpacity
-                    style={[styles.removeIngredientBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
-                    onPress={() => removeManualIngredient(index)}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="close" size={18} color={colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              
-              <TouchableOpacity 
-                style={[styles.saveBtn, { marginTop: 30, opacity: selectedImage ? 1 : 0.5 }]} 
-                onPress={startAnalysis}
-                disabled={!selectedImage || uploading}
-              >
-                <View style={styles.saveBtnSolid}>
-                  {uploading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>ANALYZE & LOG</Text>}
-                </View>
-              </TouchableOpacity>
-              
-              <View style={{ height: 20 }} />
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Analysis Modal */}
-      <Modal visible={showAnalysis} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, height: '90%' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Meal Analysis</Text>
-              <TouchableOpacity onPress={() => setShowAnalysis(false)}>
-                <Ionicons name="close" size={28} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Image source={{ uri: analyzedImageUrl }} style={styles.analysisImage} />
-              
-              <View style={styles.typeSelector}>
-                {['Morning', 'Afternoon', 'Evening', 'Night'].map((t) => {
-                  const meta = mealTypeMeta[t];
-                  const active = mealType === t;
-                  const inactiveTextColor = meta.darkText ? meta.inactiveColor : meta.inactiveColor;
-                  const activeTextColor = meta.activeColor;
-
-                  return (
-                    <TouchableOpacity
-                      key={t}
-                      onPress={() => setMealType(t)}
-                      style={[
-                        styles.typeBtn,
-                        {
-                          borderColor: active ? meta.shadowColor : `${meta.inactiveColor}20`,
-                          shadowColor: active ? meta.shadowColor : 'transparent',
-                          shadowOpacity: active ? 0.28 : 0,
-                          shadowRadius: active ? 12 : 0,
-                          shadowOffset: { width: 0, height: 5 },
-                          elevation: active ? 6 : 0,
-                        }
-                      ]}
-                    >
-                      {active && meta.activeColors ? (
-                        <LinearGradient colors={meta.activeColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.typeBtnFill}>
-                          <Ionicons name={meta.icon} size={16} color={activeTextColor} />
-                          <Text style={[styles.typeBtnText, { color: activeTextColor }]}>{t}</Text>
-                        </LinearGradient>
-                      ) : (
-                        <View style={[styles.typeBtnFill, { backgroundColor: active ? meta.activeBg : meta.inactiveBg }]}>
-                          <Ionicons name={meta.icon} size={16} color={active ? activeTextColor : inactiveTextColor} />
-                          <Text style={[styles.typeBtnText, { color: active ? activeTextColor : inactiveTextColor }]}>{t}</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <View style={styles.summaryGrid}>
-                <SummaryItem label="Calories" value={Math.round(analysisData?.total_calories || 0)} unit="kcal" color="#E7B100" />
-                <SummaryItem label="Protein" value={Math.round(analysisData?.total_protein || 0)} unit="g" color="#10B981" />
-                <SummaryItem label="Carbs" value={Math.round(analysisData?.total_carbs || 0)} unit="g" color="#3B82F6" />
-                <SummaryItem label="Fat" value={Math.round(analysisData?.total_fat || 0)} unit="g" color="#F59E0B" />
-              </View>
-
-              <View style={styles.summaryGrid}>
-                <SummaryItem label="Fiber" value={Math.round(analysisData?.total_fiber || 0)} unit="g" color="#10B981" />
-                <SummaryItem label="Sugar" value={Math.round(analysisData?.total_sugar || 0)} unit="g" color="#E7B100" />
-                <SummaryItem label="Sodium" value={Math.round(analysisData?.total_sodium || 0)} unit="mg" color="#F59E0B" />
-                <SummaryItem label="Sat. Fat" value={Math.round(analysisData?.total_saturated_fat || 0)} unit="g" color="#E7B100" />
-              </View>
-
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Detected Items</Text>
-              {analysisData?.items?.map((item: any, idx: number) => {
-                const theme = detectedItemThemes[idx % detectedItemThemes.length];
-                const itemStats = [
-                  { label: 'Protein', value: `${Math.round(item.protein || 0)}g` },
-                  { label: 'Carbs', value: `${Math.round(item.carbs || 0)}g` },
-                  { label: 'Fat', value: `${Math.round(item.fat || 0)}g` },
-                  { label: 'Fiber', value: `${Math.round(item.fiber || 0)}g` },
-                  { label: 'Sugar', value: `${Math.round(item.sugar || 0)}g` },
-                  { label: 'Sodium', value: `${Math.round(item.sodium || 0)}mg` },
-                ];
-
-                return (
-                <View key={idx} style={[styles.detectedItemCard, { backgroundColor: theme.bg, borderColor: theme.bg }]}>
-                  <View style={styles.detectedItemHeader}>
-                    <View style={styles.detectedItemTitleWrap}>
-                      <View style={[styles.detectedItemIcon, { backgroundColor: theme.calorieBg }]}>
-                        <Ionicons
-                          name={idx % 2 === 0 ? 'restaurant' : 'nutrition'}
-                          size={18}
-                          color={theme.accent}
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.itemName, { color: theme.text }]}>{item.item_name}</Text>
-                        <Text style={[styles.itemQty, { color: theme.subtle }]}>{item.quantity || 'Estimated serving'}</Text>
-                      </View>
-                    </View>
-                    <View style={[styles.detectedCaloriesWrap, { backgroundColor: theme.calorieBg }]}>
-                      <Text style={[styles.itemCals, { color: theme.accent }]}>{Math.round(item.calories || 0)}</Text>
-                      <Text style={[styles.detectedCaloriesLabel, { color: theme.subtle }]}>kcal</Text>
-                    </View>
-                  </View>
-                  <View style={styles.detectedMacroGrid}>
-                    {itemStats.map((stat) => (
-                      <View key={`${item.item_name}-${stat.label}`} style={[styles.detectedMacroPill, { backgroundColor: theme.chipBg }]}>
-                        <Text style={[styles.detectedMacroLabel, { color: theme.chipLabel }]}>{stat.label}</Text>
-                        <Text style={[styles.detectedMacroValue, { color: theme.chipValue }]}>{stat.value}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-                );
-              })}
-
-              <View style={{ height: 100 }} />
-            </ScrollView>
-
-            <View style={[styles.modalFooter, { backgroundColor: colors.card }]}>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveMeal} disabled={saving}>
-                <View style={styles.saveBtnSolid}>
-                  {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>SAVE MEAL</Text>}
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* ── New Meal Logging Bottom Sheet ── */}
+      <LogMealSheet
+        visible={showLogSheet}
+        onClose={() => {
+          setShowLogSheet(false);
+          setEditingMealId(null);
+          setInitialImageUri(null);
+          setInitialIngredients([]);
+        }}
+        onSubmit={handleLogMealSubmit}
+        uploading={uploading}
+        initialImageUri={initialImageUri}
+        initialIngredients={initialIngredients}
+      />
 
       {/* ══════════════════════════════════════════════
            DIET PROFILE FORM MODAL
@@ -3095,6 +2877,24 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: '#888',
     marginTop: 1,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  actionBtnText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 13,
   },
 });
 

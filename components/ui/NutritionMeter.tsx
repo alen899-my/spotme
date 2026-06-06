@@ -131,7 +131,7 @@ function MacroBar({ macro }: { macro: Macro }) {
   const filledSegments = Math.max(0, Math.min(totalSegments, Math.round((pct / 100) * totalSegments)));
 
   return (
-    <View style={[s.macroCard, { backgroundColor: theme.bg, borderWidth: isDark ? 1 : 0, borderColor: theme.border }]}>
+    <View style={[s.macroCard, { backgroundColor: theme.bg, borderWidth: isDark ? 1 : 0}]}>
       <View style={s.macroHeader}>
         <View style={[s.macroIcon, { backgroundColor: theme.iconBg }]}>
           <Ionicons name={macro.icon as any} size={16} color={theme.iconColor} />
@@ -274,7 +274,7 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
             </View>
 
             <View style={{ flex: 1, gap: 7 }}>
-              <View style={[s.statCard, s.caloriesCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#F7CB16' }]}>
+              <View style={[s.statCard, s.caloriesCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1 }]}>
                 <View style={s.statHeader}>
                   <View style={[s.statIconDark, isDark && { backgroundColor: 'rgba(247,203,22,0.15)' }]}>
                     <Ionicons name="flame-outline" size={16} color={isDark ? '#F7CB16' : '#04282B'} />
@@ -284,7 +284,7 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
                 <Text style={[s.statValueDark, isDark && { color: colors.text }]}>{Math.round(caloriesConsumed).toLocaleString()} kcal</Text>
               </View>
 
-              <View style={[s.statCard, s.targetCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#10B981' }]}>
+              <View style={[s.statCard, s.targetCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1 }]}>
                 <View style={s.statHeader}>
                   <View style={[s.statIconLight, isDark && { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
                     <Ionicons name="flag-outline" size={16} color={isDark ? '#10B981' : '#FFF'} />
@@ -294,7 +294,7 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
                 <Text style={[s.statValueLight, isDark && { color: colors.text }]}>{caloriesTarget.toLocaleString()} kcal</Text>
               </View>
 
-              <View style={[s.statCard, over ? s.overCard : s.remainingCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: over ? '#E7B100' : '#D9A404' }]}>
+              <View style={[s.statCard, over ? s.overCard : s.remainingCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, }]}>
                 <View style={s.statHeader}>
                   <View style={[s.statIconLight, isDark && { backgroundColor: over ? 'rgba(231,177,0,0.15)' : 'rgba(217,164,4,0.15)' }]}>
                     <Ionicons name={over ? 'warning-outline' : 'checkmark-circle-outline'} size={16} color={isDark ? (over ? '#E7B100' : '#D9A404') : '#FFF'} />

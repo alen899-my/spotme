@@ -572,12 +572,7 @@ export default function WaterTracker({ selectedDate }: Props) {
           </View>
         </View>
 
-        <View style={[s.chip, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.14)', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]}>
-          <View style={[s.chipDot, { backgroundColor: hydrationState.primary }]} />
-          <Text style={[s.chipText, { color: isDark ? colors.text : HYDRATION.white }]} numberOfLines={1}>
-            {isGoal ? 'Goal Met' : isOver ? 'Over Limit' : hydrationState.chipLabel}
-          </Text>
-        </View>
+      
         <View style={[s.accordionIconWrap, isDark && { backgroundColor: colors.inputBg }]}>
           <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={isDark ? colors.text : '#FFF'} />
         </View>

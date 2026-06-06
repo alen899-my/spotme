@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -41,6 +42,7 @@ interface Props {
 export default function DietRecsScreen({ tab, header }: Props) {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
 
   const [userData, setUserData] = useState<any>(null);
 
@@ -559,6 +561,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
         <FlatList
           data={[]}
           keyExtractor={(_, i) => i.toString()}
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 80, 100) }}
           ListHeaderComponent={
             <View>
               {header}
@@ -591,7 +594,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
 
     if (foods.length === 0) {
       return (
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 80, 100) }} showsVerticalScrollIndicator={false}>
           {header}
           {browseContent}
           <View style={styles.centerFlex}>
@@ -609,6 +612,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
       <FlatList
         data={foods}
         keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 80, 100) }}
         ListHeaderComponent={
           <View>
             {header}
@@ -650,7 +654,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
   const renderPlanTab = () => {
     if (recommendationLoading) {
       return (
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 80, 100) }} showsVerticalScrollIndicator={false}>
           {header}
           <View style={styles.centerFlex}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -662,7 +666,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
 
     if (recommendationError) {
       return (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]} showsVerticalScrollIndicator={false}>
           {header}
           <View style={styles.centerFlex}>
             <View style={[styles.emptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -683,7 +687,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
 
     if (!recommendationData) {
       return (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]} showsVerticalScrollIndicator={false}>
           {header}
           <View style={styles.centerFlex}>
             <View style={[styles.emptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -704,7 +708,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
     }
 
     return (
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]} showsVerticalScrollIndicator={false}>
         {header}
         {/* BMI Card */}
         <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1028,11 +1032,11 @@ export default function DietRecsScreen({ tab, header }: Props) {
             </View>
           ) : selectorFoods.length === 0 ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 80 }}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.fsEmptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Ionicons name="search-outline" size={36} color={colors.textDim} />
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No alternatives found</Text>
-              <Text style={[styles.emptySub, { color: colors.textMuted }]}>Could not find similar items</Text>
+              <Text style={[styles.fsEmptyTitle, { color: colors.text }]}>No alternatives found</Text>
+              <Text style={[styles.fsEmptySub, { color: colors.textMuted }]}>Could not find similar items</Text>
             </View>
           ) : (
             <FlatList
@@ -1291,9 +1295,9 @@ const styles = StyleSheet.create({
   fsHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 48, borderBottomWidth: 1 },
   fsTitle: { fontFamily: FONTS.heading, fontSize: 18 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyIcon: { width: 70, height: 70, borderRadius: 24, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  emptyTitle: { fontFamily: FONTS.heading, fontSize: 18, marginBottom: 6 },
-  emptySub: { fontFamily: FONTS.body, fontSize: 13, textAlign: 'center' },
+  fsEmptyIcon: { width: 70, height: 70, borderRadius: 24, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  fsEmptyTitle: { fontFamily: FONTS.heading, fontSize: 18, marginBottom: 6 },
+  fsEmptySub: { fontFamily: FONTS.body, fontSize: 13, textAlign: 'center' },
   selectorFoodCard: { borderRadius: 20, borderWidth: 1, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
   selectorFoodImage: { width: 52, height: 52, borderRadius: 26 },
   selectorFoodImagePlaceholder: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center' },
