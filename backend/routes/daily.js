@@ -1362,66 +1362,127 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       scoreTag: r.rating >= 8.0 ? 'Highly Rated' : 'Recommended',
     }));
 
-    // ── 8. Muscle Activity (last 7 days) ───────────────────────────────────────
+    // ── 8. Muscle Activity — decay-weighted, date-aware ──────────────────────
+    // Pull target + body_part + category so we get the widest possible coverage
+    // across all exercises, regardless of which column was populated.
     const muscleRes = await pool.query(
-      `SELECT e.target, COUNT(*) as count
+      `SELECT e.target,
+              e.body_part,
+              e.category,
+              DATE(dw.completed_at AT TIME ZONE 'UTC') AS workout_date,
+              COUNT(*)::int                             AS count
        FROM daily_workout_exercises dwe
        JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
-       JOIN exercises e ON dwe.exercise_id = e.id
+       JOIN exercises e       ON dwe.exercise_id      = e.id
        WHERE dw.user_id = $1 AND dw.status = 'completed'
-         AND dw.completed_at >= NOW() - INTERVAL '7 days'
-       GROUP BY e.target`,
+       GROUP BY e.target, e.body_part, e.category,
+                DATE(dw.completed_at AT TIME ZONE 'UTC')`,
       [userId]
     );
-    
-    // Map db targets to react-native-body-highlighter slugs
-    const targetToSlug = {
-      'Chest': 'chest',
-      'Back': 'upper-back',
-      'Lats': 'upper-back',
-      'Lower Back': 'lower-back',
-      'Shoulders': 'deltoids',
-      'Biceps': 'biceps',
-      'Triceps': 'triceps',
-      'Forearms': 'forearm',
-      'Abs': 'abs',
-      'Obliques': 'obliques',
-      'Glutes': 'gluteal',
-      'Quads': 'quadriceps',
-      'Hamstrings': 'hamstring',
-      'Calves': 'calves',
-      'Traps': 'trapezius',
-      'Neck': 'neck',
-      'Adductors': 'adductors'
+
+    // ── 8b. Total completed workouts (all-time) ────────────────────────────────
+    const totalWorkoutsRes = await pool.query(
+      `SELECT COUNT(*) AS total FROM daily_workouts WHERE user_id = $1 AND status = 'completed'`,
+      [userId]
+    );
+    const totalWorkoutsAllTime = parseInt(totalWorkoutsRes.rows[0]?.total) || 0;
+
+    // ── Exhaustive slug map ────────────────────────────────────────────────────
+    // Covers every distinct value found in exercises.json across the
+    // `target`, `body_part`, `category`, and `muscle_group` columns.
+    // Each value (lower-cased) maps to a react-native-body-highlighter slug.
+    const toSlug = {
+      // ── target column values ───────────────────────────────────────────────
+      'abductors':            'abductors',
+      'abs':                  'abs',
+      'adductors':            'adductors',
+      'biceps':               'biceps',
+      'calves':               'calves',
+      'cardiovascular system':'cardiovascular system', // no body slug – skip
+      'delts':                'deltoids',
+      'forearms':             'forearm',
+      'glutes':               'gluteal',
+      'hamstrings':           'hamstring',
+      'lats':                 'upper-back',
+      'levator scapulae':     'trapezius',
+      'pectorals':            'chest',
+      'quads':                'quadriceps',
+      'serratus anterior':    'chest',        // serratus sits on the ribcage
+      'spine':                'lower-back',
+      'traps':                'trapezius',
+      'triceps':              'triceps',
+      'upper back':           'upper-back',
+
+      // ── category / body_part column values ────────────────────────────────
+      'back':                 'upper-back',
+      'cardio':               null,           // no specific muscle slug
+      'chest':                'chest',
+      'lower arms':           'forearm',
+      'lower legs':           'calves',
+      'neck':                 'neck',
+      'shoulders':            'deltoids',
+      'upper arms':           'biceps',       // covers both bi/tri; we'll also hit triceps via target
+      'upper legs':           'quadriceps',
+      'waist':                'abs',
+
+      // ── muscle_group column values ─────────────────────────────────────────
+      'abdominals':           'abs',
+      'ankle stabilizers':    'ankles',
+      'ankles':               'ankles',
+      'core':                 'abs',
+      'deltoids':             'deltoids',
+      'hands':                'hands',
+      'hip flexors':          'abs',          // closest body slug
+      'latissimus dorsi':     'upper-back',
+      'lower back':           'lower-back',
+      'obliques':             'obliques',
+      'quadriceps':           'quadriceps',
+      'rhomboids':            'upper-back',
+      'rotator cuff':         'deltoids',
+      'soleus':               'calves',
+      'trapezius':            'trapezius',
+      'upper back':           'upper-back',
+      'wrist extensors':      'forearm',
+      'wrist flexors':        'forearm',
+      'wrists':               'forearm',
     };
 
-    const muscleActivity = [];
+    // ── Decay parameters ──────────────────────────────────────────────────────
+    const HALF_LIFE_DAYS = 45;
+    const nowMs = Date.now();
+
+    // ── Build decay-weighted score per slug ───────────────────────────────────
+    // For each row we resolve a slug from target → body_part → category (priority order).
+    const slugScoreMap = {};
     muscleRes.rows.forEach(r => {
-      if (!r.target) return;
-      // Normalise to match dictionary keys (e.g., "chest" -> "Chest")
-      const targetStr = r.target.charAt(0).toUpperCase() + r.target.slice(1).toLowerCase();
-      const slug = targetToSlug[targetStr];
-      if (slug) {
-        const count = parseInt(r.count);
-        let intensity = 0;
-        if (count >= 20) intensity = 10;
-        else if (count >= 17) intensity = 9;
-        else if (count >= 14) intensity = 8;
-        else if (count >= 11) intensity = 7;
-        else if (count >= 9) intensity = 6;
-        else if (count >= 7) intensity = 5;
-        else if (count >= 5) intensity = 4;
-        else if (count >= 3) intensity = 3;
-        else if (count >= 2) intensity = 2;
-        else if (count >= 1) intensity = 1;
-        const existing = muscleActivity.find(m => m.slug === slug);
-        if (existing) {
-          existing.intensity = Math.max(existing.intensity, intensity);
-        } else {
-          muscleActivity.push({ slug, intensity });
-        }
+      // Try target first, then body_part, then category
+      const candidates = [r.target, r.body_part, r.category];
+      let slug = null;
+      for (const raw of candidates) {
+        if (!raw) continue;
+        const key = raw.trim().toLowerCase();
+        const mapped = toSlug[key];
+        if (mapped) { slug = mapped; break; }
       }
+      if (!slug) return; // unmapped / cardio – ignore
+
+      const daysAgo = (nowMs - new Date(r.workout_date).getTime()) / 86_400_000;
+      const decayFactor = Math.pow(2, -daysAgo / HALF_LIFE_DAYS);
+      slugScoreMap[slug] = (slugScoreMap[slug] || 0) + r.count * decayFactor;
     });
+
+    // ── Absolute threshold ladder ──────────────────────────────────────────────
+    const THRESHOLDS = Array.from({ length: 50 }, (_, idx) => {
+      const i = idx + 1;
+      return Math.round((0.5 + 0.1 * i + 0.118 * i * i) * 10) / 10;
+    });
+
+    const muscleActivity = Object.entries(slugScoreMap)
+      .map(([slug, score]) => {
+        const intensity = THRESHOLDS.filter(t => score >= t).length; // 0 – 10
+        return { slug, intensity };
+      })
+      .filter(m => m.intensity > 0);
     res.json({
       user: {
         full_name: user.full_name,
@@ -1459,6 +1520,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       weight_progress: weightProgress,
       top_recommendations: topRecs,
       muscle_activity: muscleActivity,
+      total_workouts: totalWorkoutsAllTime,
     });
   } catch (err) {
     console.error('GET /daily/dashboard error:', err);
@@ -1687,4 +1749,118 @@ router.get('/reports/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// ── GET /daily/muscle-detail/:slug — progress detail for a specific muscle ─────
+router.get('/muscle-detail/:slug', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { slug } = req.params;
+
+  // Reverse map: body-highlighter slug → all exercise target/body_part/category values
+  const slugToTargets = {
+    'chest':       ['pectorals', 'serratus anterior', 'chest'],
+    'upper-back':  ['upper back', 'lats', 'back', 'rhomboids', 'latissimus dorsi', 'upper-back'],
+    'lower-back':  ['spine', 'lower back'],
+    'deltoids':    ['delts', 'shoulders', 'rotator cuff', 'deltoids'],
+    'biceps':      ['biceps', 'upper arms'],
+    'triceps':     ['triceps'],
+    'forearm':     ['forearms', 'lower arms', 'wrist extensors', 'wrist flexors', 'wrists', 'forearm'],
+    'abs':         ['abs', 'waist', 'abdominals', 'core', 'hip flexors'],
+    'obliques':    ['obliques'],
+    'gluteal':     ['glutes', 'gluteal'],
+    'quadriceps':  ['quads', 'upper legs', 'quadriceps'],
+    'hamstring':   ['hamstrings', 'hamstring'],
+    'calves':      ['calves', 'lower legs', 'soleus'],
+    'trapezius':   ['traps', 'trapezius', 'levator scapulae'],
+    'neck':        ['neck'],
+    'adductors':   ['adductors'],
+    'abductors':   ['abductors'],
+    'ankles':      ['ankle stabilizers', 'ankles'],
+    'hands':       ['hands'],
+  };
+
+  const targets = slugToTargets[slug];
+  if (!targets) return res.status(404).json({ error: 'Unknown muscle slug' });
+
+  try {
+    // All workout dates + exercise counts for this muscle
+    const detailRes = await pool.query(
+      `SELECT DATE(dw.completed_at AT TIME ZONE 'UTC') AS workout_date,
+              COUNT(*)::int                             AS count
+       FROM daily_workout_exercises dwe
+       JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
+       JOIN exercises e       ON dwe.exercise_id      = e.id
+       WHERE dw.user_id = $1
+         AND dw.status  = 'completed'
+         AND (
+           LOWER(COALESCE(e.target,    '')) = ANY($2::text[])
+           OR LOWER(COALESCE(e.body_part,'')) = ANY($2::text[])
+           OR LOWER(COALESCE(e.category,  '')) = ANY($2::text[])
+         )
+       GROUP BY DATE(dw.completed_at AT TIME ZONE 'UTC')
+       ORDER BY workout_date DESC`,
+      [userId, targets]
+    );
+
+    const rows = detailRes.rows;
+    const totalDays = rows.length;
+    const lastWorkoutDate = rows[0]?.workout_date || null;
+    const daysSinceLast = lastWorkoutDate
+      ? Math.floor((Date.now() - new Date(lastWorkoutDate).getTime()) / 86_400_000)
+      : null;
+
+    // Compute current decay-weighted score (same algo as dashboard)
+    const HALF_LIFE_DAYS = 45;
+    const nowMs = Date.now();
+    let currentScore = 0;
+    rows.forEach(r => {
+      const daysAgo = (nowMs - new Date(r.workout_date).getTime()) / 86_400_000;
+      currentScore += r.count * Math.pow(2, -daysAgo / HALF_LIFE_DAYS);
+    });
+
+    const THRESHOLDS = Array.from({ length: 50 }, (_, idx) => {
+      const i = idx + 1;
+      return Math.round((0.5 + 0.1 * i + 0.118 * i * i) * 10) / 10;
+    });
+    const currentIntensity = THRESHOLDS.filter(t => currentScore >= t).length;
+
+    // Monthly totals (last 12 months) for a bar-style chart
+    const monthlyRes = await pool.query(
+      `SELECT TO_CHAR(DATE_TRUNC('month', dw.completed_at), 'YYYY-MM') AS month,
+              COUNT(DISTINCT DATE(dw.completed_at AT TIME ZONE 'UTC'))::int AS days
+       FROM daily_workout_exercises dwe
+       JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
+       JOIN exercises e       ON dwe.exercise_id      = e.id
+       WHERE dw.user_id = $1
+         AND dw.status  = 'completed'
+         AND (
+           LOWER(COALESCE(e.target,    '')) = ANY($2::text[])
+           OR LOWER(COALESCE(e.body_part,'')) = ANY($2::text[])
+           OR LOWER(COALESCE(e.category,  '')) = ANY($2::text[])
+         )
+       GROUP BY DATE_TRUNC('month', dw.completed_at)
+       ORDER BY month DESC
+       LIMIT 12`,
+      [userId, targets]
+    );
+
+    res.json({
+      slug,
+      totalDays,
+      lastWorkoutDate: lastWorkoutDate ? new Date(lastWorkoutDate).toISOString().split('T')[0] : null,
+      daysSinceLast,
+      currentScore:     Math.round(currentScore * 10) / 10,
+      currentIntensity,
+      // Per-day history (newest first) — front-end uses this to build 84-day grid
+      history: rows.map(r => ({
+        date:  new Date(r.workout_date).toISOString().split('T')[0],
+        count: r.count,
+      })),
+      monthlyStats: monthlyRes.rows,
+    });
+  } catch (err) {
+    console.error('GET /daily/muscle-detail/:slug error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
+

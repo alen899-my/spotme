@@ -92,7 +92,8 @@ export default function HomeScreen() {
     : parseFloat(heightStr) || 175;
   const weightKg  = parseFloat(u.weight) || 75;
 
-  const weeklyWorkouts = weekly.filter((d: any) => d.workouts > 0).length;
+  const weeklyWorkouts    = weekly.filter((d: any) => d.workouts > 0).length;
+  const totalWorkouts      = dashboard?.total_workouts || 0;
 
   // ── Profile step completion ──────────────────────────────────────────────────
   const sv = (s: any) => { // split "175 cm" -> "175"
@@ -219,6 +220,7 @@ export default function HomeScreen() {
             heightCm={heightCm}
             bodyFat={u.body_fat}
             weeklyWorkouts={weeklyWorkouts}
+            totalWorkouts={totalWorkouts}
             dbMuscleActivity={dashboard?.muscle_activity || []}
           />
 
