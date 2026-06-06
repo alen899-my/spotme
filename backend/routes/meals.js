@@ -254,7 +254,8 @@ router.get('/recommendation', authenticateToken, async (req, res) => {
     }
 
     // ── 2. Calculate nutrient targets via scientific calculations ────────────
-    const { loadCsvRecommendations, calculateNutrientTargets, generateDynamicMealPlan } = require('../utils/recommendations');
+    const { loadCsvRecommendations, calculateNutrientTargets } = require('../utils/recommendations');
+    const { generateAIDietPlan } = require('../utils/dietPlanGenerator');
     const { bmi, bmiCategory, caloriesTarget, proteinTarget, carbsTarget, fatTarget } =
       calculateNutrientTargets(user);
 
@@ -271,16 +272,10 @@ router.get('/recommendation', authenticateToken, async (req, res) => {
       mealPlan: 'Balanced diet with moderate protein and carbohydrates: Chicken breast, brown rice, spinach, eggs, apple',
     };
 
-    // ── 4. Generate dynamic scaled meals using scientific calorie/macro targets ──
+    // ── 4. AI-powered plan generation — SQL-based RAG ──────────────────────
     const mealsPerDay = user.meals_per_day || 4;
-    const recommendedMeals = generateDynamicMealPlan(
-      user,
-      caloriesTarget,
-      proteinTarget,
-      carbsTarget,
-      fatTarget,
-      mealsPerDay
-    );
+    const targets = { caloriesTarget, proteinTarget, carbsTarget, fatTarget };
+    const recommendedMeals = await generateAIDietPlan(user, targets, mealsPerDay, pool);
 
     // ── 5. Persist to user-specific cache ────────────────────────────────────
     try {
@@ -410,7 +405,8 @@ router.post('/recommendation', authenticateToken, async (req, res) => {
     const goalVal   = user.fitness_goal || 'Maintain';
 
     // 3. Calculate scientific targets
-    const { loadCsvRecommendations, calculateNutrientTargets, generateDynamicMealPlan } = require('../utils/recommendations');
+    const { loadCsvRecommendations, calculateNutrientTargets } = require('../utils/recommendations');
+    const { generateAIDietPlan } = require('../utils/dietPlanGenerator');
     const { bmi, bmiCategory, caloriesTarget, proteinTarget, carbsTarget, fatTarget } =
       calculateNutrientTargets(user);
 
@@ -427,15 +423,9 @@ router.post('/recommendation', authenticateToken, async (req, res) => {
       mealPlan: 'Balanced diet with moderate protein and carbohydrates: Chicken breast, brown rice, spinach, eggs, apple',
     };
 
-    // 5. Generate dynamic scaled meals
-    const recommendedMeals = generateDynamicMealPlan(
-      user,
-      caloriesTarget,
-      proteinTarget,
-      carbsTarget,
-      fatTarget,
-      parsedMeals
-    );
+    // 5. AI-powered plan generation — SQL-based RAG
+    const targets = { caloriesTarget, proteinTarget, carbsTarget, fatTarget };
+    const recommendedMeals = await generateAIDietPlan(user, targets, parsedMeals, pool);
 
     // 6. Cache to meal_recommendations database table
     await pool.query(`

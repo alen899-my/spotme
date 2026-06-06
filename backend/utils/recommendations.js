@@ -227,10 +227,10 @@ const baseRecipes = {
       instructions: "Scramble eggs with fresh spinach and crumbled feta in a lightly oiled pan. Serve alongside a crisp sliced apple.",
       base_calories: 450, base_protein: 24, base_carbs: 40, base_fat: 20,
       ingredients: [
-        { name: "Whole Eggs", base_quantity: 3, unit: "large" },
-        { name: "Fresh Spinach", base_quantity: 50, unit: "g" },
-        { name: "Feta Cheese", base_quantity: 30, unit: "g" },
-        { name: "Apple", base_quantity: 1, unit: "medium" }
+        { name: "Whole Eggs", base_quantity: 3, unit: "large", image_url: "https://images.unsplash.com/photo-1582722872445-44c5f7c3c8f7?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Fresh Spinach", base_quantity: 50, unit: "g", image_url: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Feta Cheese", base_quantity: 30, unit: "g", image_url: "https://images.unsplash.com/photo-1627054901630-1f6cfbac75b1?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Apple", base_quantity: 1, unit: "medium", image_url: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=120&h=120&q=80" }
       ]
     },
     {
@@ -239,10 +239,10 @@ const baseRecipes = {
       instructions: "Blend oats, milk, peanut butter, and a sliced banana. Top with honey and a dash of cinnamon.",
       base_calories: 550, base_protein: 22, base_carbs: 65, base_fat: 24,
       ingredients: [
-        { name: "Whole Rolled Oats", base_quantity: 60, unit: "g" },
-        { name: "Whole Milk", base_quantity: 250, unit: "ml" },
-        { name: "Peanut Butter", base_quantity: 30, unit: "g" },
-        { name: "Banana", base_quantity: 1, unit: "medium" }
+        { name: "Whole Rolled Oats", base_quantity: 60, unit: "g", image_url: "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Whole Milk", base_quantity: 250, unit: "ml", image_url: "https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Peanut Butter", base_quantity: 30, unit: "g", image_url: "https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Banana", base_quantity: 1, unit: "medium", image_url: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&w=120&h=120&q=80" }
       ]
     }
   ],
@@ -253,10 +253,10 @@ const baseRecipes = {
       instructions: "Grill chicken breast, boil brown rice, steam broccoli. Drizzle with sesame oil and season.",
       base_calories: 600, base_protein: 42, base_carbs: 65, base_fat: 16,
       ingredients: [
-        { name: "Chicken Breast", base_quantity: 150, unit: "g" },
-        { name: "Brown Rice", base_quantity: 150, unit: "g cooked" },
-        { name: "Broccoli", base_quantity: 100, unit: "g" },
-        { name: "Olive Oil", base_quantity: 2, unit: "tsp" }
+        { name: "Chicken Breast", base_quantity: 150, unit: "g", image_url: "https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Brown Rice", base_quantity: 150, unit: "g cooked", image_url: "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Broccoli", base_quantity: 100, unit: "g", image_url: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Olive Oil", base_quantity: 2, unit: "tsp", image_url: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=120&h=120&q=80" }
       ]
     },
     {
@@ -265,10 +265,10 @@ const baseRecipes = {
       instructions: "Sear salmon fillet. Serve alongside fluffy cooked quinoa and steam asparagus.",
       base_calories: 650, base_protein: 38, base_carbs: 55, base_fat: 24,
       ingredients: [
-        { name: "Salmon Fillet", base_quantity: 150, unit: "g" },
-        { name: "Quinoa", base_quantity: 120, unit: "g cooked" },
-        { name: "Asparagus", base_quantity: 100, unit: "g" },
-        { name: "Almonds", base_quantity: 15, unit: "g" }
+        { name: "Salmon Fillet", base_quantity: 150, unit: "g", image_url: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Quinoa", base_quantity: 120, unit: "g cooked", image_url: "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Asparagus", base_quantity: 100, unit: "g", image_url: "https://images.unsplash.com/photo-1515471204580-f7cbb77f5394?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Almonds", base_quantity: 15, unit: "g", image_url: "https://images.unsplash.com/photo-1508061253366-f7da158b6d4f?auto=format&fit=crop&w=120&h=120&q=80" }
       ]
     }
   ],
@@ -279,10 +279,10 @@ const baseRecipes = {
       instructions: "Sauté lean beef strips with sliced bell peppers, fresh baby spinach, and sesame oil.",
       base_calories: 500, base_protein: 40, base_carbs: 18, base_fat: 28,
       ingredients: [
-        { name: "Lean Beef Strips", base_quantity: 150, unit: "g" },
-        { name: "Bell Pepper", base_quantity: 1, unit: "medium" },
-        { name: "Spinach", base_quantity: 100, unit: "g" },
-        { name: "Sesame Oil", base_quantity: 1, unit: "tbsp" }
+        { name: "Lean Beef Strips", base_quantity: 150, unit: "g", image_url: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Bell Pepper", base_quantity: 1, unit: "medium", image_url: "https://images.unsplash.com/photo-1566393028639-d108a42c46a7?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Spinach", base_quantity: 100, unit: "g", image_url: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Sesame Oil", base_quantity: 1, unit: "tbsp", image_url: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=120&h=120&q=80" }
       ]
     },
     {
@@ -291,9 +291,9 @@ const baseRecipes = {
       instructions: "Bake cod fillet. Steam broccoli and plate next to fresh sliced cucumber.",
       base_calories: 350, base_protein: 30, base_carbs: 25, base_fat: 8,
       ingredients: [
-        { name: "Cod Fillet", base_quantity: 150, unit: "g" },
-        { name: "Steamed Broccoli", base_quantity: 120, unit: "g" },
-        { name: "Carrot Sticks", base_quantity: 80, unit: "g" }
+        { name: "Cod Fillet", base_quantity: 150, unit: "g", image_url: "https://images.unsplash.com/photo-1534482421-64566f976cfa?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Steamed Broccoli", base_quantity: 120, unit: "g", image_url: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Carrot Sticks", base_quantity: 80, unit: "g", image_url: "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?auto=format&fit=crop&w=120&h=120&q=80" }
       ]
     }
   ],
@@ -304,9 +304,9 @@ const baseRecipes = {
       instructions: "Serve greek yogurt in a bowl, top with almonds and fresh berries.",
       base_calories: 300, base_protein: 18, base_carbs: 25, base_fat: 12,
       ingredients: [
-        { name: "Greek Yogurt", base_quantity: 200, unit: "g" },
-        { name: "Blueberries", base_quantity: 50, unit: "g" },
-        { name: "Almonds", base_quantity: 15, unit: "g" }
+        { name: "Greek Yogurt", base_quantity: 200, unit: "g", image_url: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Blueberries", base_quantity: 50, unit: "g", image_url: "https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Almonds", base_quantity: 15, unit: "g", image_url: "https://images.unsplash.com/photo-1508061253366-f7da158b6d4f?auto=format&fit=crop&w=120&h=120&q=80" }
       ]
     },
     {
@@ -315,8 +315,8 @@ const baseRecipes = {
       instructions: "Slice cucumber into long sticks and dip into roasted garlic hummus.",
       base_calories: 200, base_protein: 6, base_carbs: 15, base_fat: 14,
       ingredients: [
-        { name: "Cucumber", base_quantity: 1, unit: "large" },
-        { name: "Hummus", base_quantity: 60, unit: "g" }
+        { name: "Cucumber", base_quantity: 1, unit: "large", image_url: "https://images.unsplash.com/photo-1604974244761-19a3b06efdec?auto=format&fit=crop&w=120&h=120&q=80" },
+        { name: "Hummus", base_quantity: 60, unit: "g", image_url: "https://images.unsplash.com/photo-1577906096429-f73c2c312435?auto=format&fit=crop&w=120&h=120&q=80" }
       ]
     }
   ]
@@ -338,26 +338,34 @@ function adaptIngredients(ingredients, dietType, foodPreference) {
 
   return ingredients.map(ing => {
     let name = ing.name;
+    let image_url = ing.image_url;
     if (isVegan) {
       if (name.includes('Chicken') || name.includes('Beef') || name.includes('Salmon') || name.includes('Cod') || name.includes('Fish')) {
         name = 'Extra Firm Tofu';
+        image_url = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&h=120&q=80';
       } else if (name.includes('Eggs')) {
         name = 'Scrambled Tofu';
+        image_url = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&h=120&q=80';
       } else if (name.includes('Feta') || name.includes('Cheese')) {
         name = 'Vegan Almond Feta';
+        image_url = 'https://images.unsplash.com/photo-1627054901630-1f6cfbac75b1?auto=format&fit=crop&w=120&h=120&q=80';
       } else if (name.includes('Yogurt')) {
         name = 'Plain Coconut Yogurt';
+        image_url = 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=120&h=120&q=80';
       } else if (name.includes('Milk')) {
         name = 'Almond Milk';
+        image_url = 'https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=120&h=120&q=80';
       } else if (name.includes('Honey')) {
         name = 'Maple Syrup';
+        image_url = 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=120&h=120&q=80';
       }
     } else if (isVeg) {
       if (name.includes('Chicken') || name.includes('Beef') || name.includes('Salmon') || name.includes('Cod') || name.includes('Fish')) {
         name = 'Tempeh / Paneer';
+        image_url = 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=120&h=120&q=80';
       }
     }
-    return { ...ing, name };
+    return { ...ing, name, image_url };
   });
 }
 
@@ -416,7 +424,8 @@ function generateDynamicMealPlan(user, caloriesTarget, proteinTarget, carbsTarge
     const adapted = adaptIngredients(base.ingredients, user.diet_type, user.food_preference);
     const scaledIngredients = adapted.map(ing => ({
       name: ing.name,
-      quantity: formatScaledQuantity(ing.base_quantity * scale, ing.unit)
+      quantity: formatScaledQuantity(ing.base_quantity * scale, ing.unit),
+      image_url: ing.image_url || null
     }));
 
     return {

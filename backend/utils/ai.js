@@ -9,8 +9,37 @@ require('dotenv').config({ path: __dirname + '/../.env' });
  * @param {object} options - Additional options
  */
 async function callAI(prompt, imageUrl = null, model = null, options = {}) {
-  // If we have an image and a Groq key, default to Groq's high-speed vision model
+  // ── Groq path: image vision OR explicit text-only Groq request ─────────────
   const groqKey = process.env.GROQ_API_KEY;
+
+  // Text-only Groq call (no image, but caller passed model='groq')
+  if (!imageUrl && groqKey && (model === 'groq' || model === 'groq-text')) {
+    try {
+      const messages = [{ role: 'user', content: prompt }];
+      const response = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          messages,
+          temperature: 0.3,
+          max_tokens: 4096,
+          ...options
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${groqKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      return response.data.choices[0].message.content;
+    } catch (error) {
+      console.warn('[Groq Text] Failed, falling back to OpenRouter:', error.response?.data || error.message);
+      // Fall through to OpenRouter logic below
+    }
+  }
+
+  // Image vision via Groq
   if (imageUrl && groqKey && (!model || model.includes('groq') || model === 'vision')) {
     try {
       const response = await axios.post(
@@ -55,7 +84,7 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
   }
 
   // Use a stable vision model for OpenRouter
-  const orModel = model || (imageUrl ? 'google/gemini-2.0-flash-exp:free' : 'minimax/minimax-01');
+  const orModel = model || (imageUrl ? 'google/gemini-2.5-flash' : 'minimax/minimax-01');
 
   const contentParts = [];
   if (imageUrl) {

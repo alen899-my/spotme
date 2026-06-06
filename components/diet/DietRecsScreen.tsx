@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
+import BmiSpeedometer from '../ui/BmiSpeedometer';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -34,6 +35,39 @@ const QUICK_FILTERS: { key: string; label: string; filter: Record<string, string
   { key: 'low_carb', label: 'Low Carb', filter: { max_carbs: '20' } },
 ];
 
+const getIngredientImage = (name: string): string | null => {
+  const n = (name || '').toLowerCase();
+  if (n.includes('egg')) return 'https://images.unsplash.com/photo-1582722872445-44c5f7c3c8f7?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('spinach')) return 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('feta') || n.includes('cheese')) return 'https://images.unsplash.com/photo-1627054901630-1f6cfbac75b1?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('apple')) return 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('oat')) return 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('milk')) return 'https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('peanut butter')) return 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('banana')) return 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('chicken breast') || n.includes('chicken')) return 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('brown rice') || n.includes('rice')) return 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('broccoli')) return 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('olive oil')) return 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('salmon')) return 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('quinoa')) return 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('asparagus')) return 'https://images.unsplash.com/photo-1515471204580-f7cbb77f5394?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('almond')) return 'https://images.unsplash.com/photo-1508061253366-f7da158b6d4f?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('beef') || n.includes('steak')) return 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('bell pepper') || n.includes('pepper')) return 'https://images.unsplash.com/photo-1566393028639-d108a42c46a7?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('sesame oil')) return 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('cod') || n.includes('fish')) return 'https://images.unsplash.com/photo-1534482421-64566f976cfa?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('carrot')) return 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('yogurt')) return 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('blueberry') || n.includes('berries')) return 'https://images.unsplash.com/photo-1601004890684-d8cbf643f5f2?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('hummus')) return 'https://images.unsplash.com/photo-1577906096429-f73c2c312435?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('cucumber')) return 'https://images.unsplash.com/photo-1604974244761-19a3b06efdec?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('tofu')) return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('tempeh') || n.includes('paneer')) return 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=120&h=120&q=80';
+  if (n.includes('syrup') || n.includes('honey')) return 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=120&h=120&q=80';
+  return null;
+};
+
 interface Props {
   tab: 'browse' | 'plan';
   header?: React.ReactNode;
@@ -50,6 +84,16 @@ export default function DietRecsScreen({ tab, header }: Props) {
   const [recommendationData, setRecommendationData] = useState<any>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
+  const [loadingDots, setLoadingDots] = useState('...');
+
+  useEffect(() => {
+    if (recommendationLoading) {
+      const interval = setInterval(() => {
+        setLoadingDots(d => d.length >= 3 ? '.' : d + '.');
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [recommendationLoading]);
 
   // Food browse
   const [foods, setFoods] = useState<any[]>([]);
@@ -300,7 +344,8 @@ export default function DietRecsScreen({ tab, header }: Props) {
       fiber: Math.round(food.fiber_g || 0),
       sugar: Math.round(food.sugars_g || 0),
       sodium: Math.round(food.sodium_mg || 0),
-      saturated_fat: Math.round(food.saturated_fat_g || 0)
+      saturated_fat: Math.round(food.saturated_fat_g || 0),
+      image_url: food.image_url || food.image_small_url || null
     };
 
     if (activeIngredientIdx !== null) {
@@ -311,16 +356,6 @@ export default function DietRecsScreen({ tab, header }: Props) {
 
     setShowIngredientSelector(false);
     syncRecommendedMeals(mealsCopy);
-  };
-
-  const getBmiColor = (category: string) => {
-    switch (category) {
-      case 'Underweight': return '#3B82F6';
-      case 'Normal weight': return '#10B981';
-      case 'Overweight': return '#F59E0B';
-      case 'Obesity': return '#E7B100';
-      default: return '#10B981';
-    }
   };
 
   const targets = recommendationData?.targets || { calories: 0, protein: 0, carbs: 0, fat: 0 };
@@ -416,71 +451,81 @@ export default function DietRecsScreen({ tab, header }: Props) {
     const vi = getMealIcon(meal.meal_type);
 
     return (
-      <View style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.planCard, isDark ? { backgroundColor: colors.card } : { backgroundColor: '#2596BE' }]}>
         <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.planCardHeader}>
-          <View style={[styles.planCardIcon, { backgroundColor: vi.color + '18' }]}>
-            <Ionicons name={vi.icon} size={20} color={vi.color} />
+          <View style={[styles.planCardIcon, { backgroundColor: isDark ? vi.color + '18' : 'rgba(255,255,255,0.18)' }]}>
+            <Ionicons name={vi.icon} size={20} color={isDark ? vi.color : '#FFFFFF'} />
           </View>
           <View style={styles.planCardMeta}>
-            <Text style={[styles.planCardMealType, { color: colors.text }]}>{meal.meal_type}</Text>
-            <Text style={[styles.planCardTitle, { color: colors.textMuted }]} numberOfLines={1}>{meal.title}</Text>
+            <Text style={[styles.planCardMealType, { color: isDark ? colors.text : '#FFFFFF' }]}>{meal.meal_type}</Text>
+            <Text style={[styles.planCardTitle, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.82)' }]} numberOfLines={1}>{meal.title}</Text>
           </View>
           <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
-            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+            <Ionicons name="chevron-down" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.85)'} />
           </Animated.View>
         </TouchableOpacity>
 
         <View style={styles.planCardMacros}>
-          <PlanMacro value={Math.round(meal.calories)} label="kcal" color="#E7B100" />
-          <PlanMacro value={`${Math.round(meal.protein)}g`} label="Protein" color="#10B981" />
-          <PlanMacro value={`${Math.round(meal.carbs)}g`} label="Carbs" color="#3B82F6" />
-          <PlanMacro value={`${Math.round(meal.fat)}g`} label="Fat" color="#F59E0B" />
+          <PlanMacro value={Math.round(meal.calories)} label="kcal" color={isDark ? "#E7B100" : "#FFFFFF"} />
+          <PlanMacro value={`${Math.round(meal.protein)}g`} label="Protein" color={isDark ? "#10B981" : "#FFFFFF"} />
+          <PlanMacro value={`${Math.round(meal.carbs)}g`} label="Carbs" color={isDark ? "#3B82F6" : "#FFFFFF"} />
+          <PlanMacro value={`${Math.round(meal.fat)}g`} label="Fat" color={isDark ? "#F59E0B" : "#FFFFFF"} />
         </View>
 
         {open && (
-          <View style={[styles.planCardBody, { borderTopColor: colors.border }]}>
+          <View style={[styles.planCardBody, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
             {meal.description ? (
-              <Text style={[styles.planDesc, { color: colors.textMuted }]}>{meal.description}</Text>
+              <Text style={[styles.planDesc, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.85)' }]}>{meal.description}</Text>
             ) : null}
 
             {meal.ingredients?.length > 0 && (
               <View style={styles.planIngredients}>
-                <Text style={[styles.planSectionLabel, { color: colors.text }]}>Ingredients</Text>
-                {meal.ingredients.map((ing: any, i: number) => (
-                  <View key={i} style={[styles.ingredientRow, { borderBottomColor: colors.border }]}>
-                    <View style={styles.ingredientInfo}>
-                      <Text style={[styles.ingredientName, { color: colors.text }]}>{ing.name}</Text>
-                      <Text style={[styles.ingredientQty, { color: colors.textDim }]}>{ing.quantity}</Text>
+                <Text style={[styles.planSectionLabel, { color: isDark ? colors.text : '#FFFFFF' }]}>Ingredients</Text>
+                {meal.ingredients.map((ing: any, i: number) => {
+                  const imgUrl = ing.image_url || getIngredientImage(ing.name);
+                  return (
+                    <View key={i} style={[styles.ingredientRow, { borderBottomColor: isDark ? colors.border : 'rgba(255,255,255,0.15)' }]}>
+                      {imgUrl ? (
+                        <Image source={{ uri: imgUrl }} style={styles.ingredientImg} />
+                      ) : (
+                        <View style={[styles.ingredientImgPlaceholder, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)' }]}>
+                          <Ionicons name="nutrition-outline" size={14} color={isDark ? colors.textMuted : '#FFFFFF'} />
+                        </View>
+                      )}
+                      <View style={styles.ingredientInfo}>
+                        <Text style={[styles.ingredientName, { color: isDark ? colors.text : '#FFFFFF' }]}>{ing.name}</Text>
+                        <Text style={[styles.ingredientQty, { color: isDark ? colors.textDim : 'rgba(255,255,255,0.72)' }]}>{ing.quantity}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.ingredientCals, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.85)' }]}>
+                          {ing.calories || Math.round(meal.calories / meal.ingredients.length)} kcal
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setActiveMealIdx(index);
+                            setActiveIngredientIdx(i);
+                            setSelectorSearch('');
+                            setSelectorFoods([]);
+                            setShowIngredientSelector(true);
+                            loadAlternativeFoods(ing);
+                          }}
+                          style={[styles.changeBtn, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.14)', borderColor: isDark ? colors.border : 'rgba(255,255,255,0.2)' }]}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="create-outline" size={11} color={isDark ? colors.text : '#FFFFFF'} />
+                          <Text style={[styles.changeBtnText, { color: isDark ? colors.text : '#FFFFFF' }]}>Replace</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={[styles.ingredientCals, { color: colors.textMuted }]}>
-                        {ing.calories || Math.round(meal.calories / meal.ingredients.length)} kcal
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setActiveMealIdx(index);
-                          setActiveIngredientIdx(i);
-                          setSelectorSearch('');
-                          setSelectorFoods([]);
-                          setShowIngredientSelector(true);
-                          loadAlternativeFoods(ing);
-                        }}
-                        style={[styles.changeBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="create-outline" size={11} color={colors.text} />
-                        <Text style={[styles.changeBtnText, { color: colors.text }]}>Replace</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
 
             {meal.instructions ? (
               <View style={styles.planInstructions}>
-                <Text style={[styles.planSectionLabel, { color: colors.text }]}>Instructions</Text>
-                <Text style={[styles.planInstructionsText, { color: colors.textMuted }]}>{meal.instructions}</Text>
+                <Text style={[styles.planSectionLabel, { color: isDark ? colors.text : '#FFFFFF' }]}>Instructions</Text>
+                <Text style={[styles.planInstructionsText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.82)' }]}>{meal.instructions}</Text>
               </View>
             ) : null}
           </View>
@@ -657,8 +702,8 @@ export default function DietRecsScreen({ tab, header }: Props) {
         <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 80, 100) }} showsVerticalScrollIndicator={false}>
           {header}
           <View style={styles.centerFlex}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.textDim }]}>Generating your diet plan...</Text>
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 12 }} />
+            <Text style={[styles.loadingText, { color: colors.textDim }]}>AI is crafting your personalized meal plan{loadingDots}</Text>
           </View>
         </ScrollView>
       );
@@ -710,43 +755,25 @@ export default function DietRecsScreen({ tab, header }: Props) {
     return (
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]} showsVerticalScrollIndicator={false}>
         {header}
-        {/* BMI Card */}
-        <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.summaryCardRow}>
-            <View>
-              <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>BMI</Text>
-              <Text style={[styles.summaryValue, { color: colors.text }]}>{recommendationData.bmi}</Text>
-            </View>
-            <View style={[styles.bmiBadge, { backgroundColor: getBmiColor(recommendationData.bmiCategory) + '20' }]}>
-              <Text style={[styles.bmiBadgeText, { color: getBmiColor(recommendationData.bmiCategory) }]}>
-                {recommendationData.bmiCategory}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.bmiBar, { backgroundColor: colors.inputBg }]}>
-            <View style={[styles.bmiBarFill, {
-              width: `${Math.min(100, (recommendationData.bmi / 40) * 100)}%`,
-              backgroundColor: getBmiColor(recommendationData.bmiCategory)
-            }]} />
-          </View>
-          <View style={styles.bmiLabels}>
-            {['Under', 'Normal', 'Over', 'Obesity'].map((l, i) => (
-              <Text key={l} style={[styles.bmiLabel, { color: colors.textDim }]}>{l}</Text>
-            ))}
-          </View>
-        </View>
+        {/* BMI Speedometer */}
+        <BmiSpeedometer
+          bmi={parseFloat(recommendationData.bmi) || 0}
+          bmiCategory={recommendationData.bmiCategory}
+          isDark={isDark}
+          size={260}
+        />
 
         {/* Daily Targets */}
-        <View style={[styles.targetsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Daily Targets</Text>
+        <View style={[styles.targetsCard, isDark ? { backgroundColor: colors.card } : { backgroundColor: '#2596BE' }]}>
+          <Text style={[styles.sectionTitle, { color: isDark ? colors.text : '#FFF' }]}>Daily Targets</Text>
           <View style={styles.targetsRow}>
-            <TargetBox value={`${targets.calories}`} label="kcal" sub="Calories" color="#E7B100" />
-            <TargetBox value={`${targets.protein}g`} label="Protein" sub="" color="#10B981" />
-            <TargetBox value={`${targets.carbs}g`} label="Carbs" sub="" color="#3B82F6" />
-            <TargetBox value={`${targets.fat}g`} label="Fat" sub="" color="#F59E0B" />
+            <TargetBox value={`${targets.calories}`} label="kcal" sub="Calories" color={isDark ? "#E7B100" : "#FFFFFF"} />
+            <TargetBox value={`${targets.protein}g`} label="Protein" sub="" color={isDark ? "#10B981" : "#FFFFFF"} />
+            <TargetBox value={`${targets.carbs}g`} label="Carbs" sub="" color={isDark ? "#3B82F6" : "#FFFFFF"} />
+            <TargetBox value={`${targets.fat}g`} label="Fat" sub="" color={isDark ? "#F59E0B" : "#FFFFFF"} />
           </View>
-          <View style={[styles.profileSummary, { backgroundColor: colors.inputBg }]}>
-            <Text style={[styles.profileSummaryText, { color: colors.textMuted }]}>
+          <View style={[styles.profileSummary, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)' }]}>
+            <Text style={[styles.profileSummaryText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.85)' }]}>
               {recommendationData.user?.diet_type || 'Standard'} · {recommendationData.user?.meals_per_day || 4} meals · {recommendationData.user?.fitness_goal || 'Maintain'}
             </Text>
           </View>
@@ -815,27 +842,54 @@ export default function DietRecsScreen({ tab, header }: Props) {
       </Modal>
 
       {/* ── DIET PLAN CONFIG MODAL ── */}
-      <Modal visible={showDietForm} animationType="slide" transparent statusBarTranslucent>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' }}
-        >
-          <View style={[styles.dietFormSheet, { backgroundColor: colors.card }]}>
-            <View style={[styles.dietFormHeader, { backgroundColor: colors.primary }]}>
-              <View style={styles.dietFormHeaderContent}>
-                <View style={styles.dietFormHeaderIcon}>
-                  <Ionicons name="body-outline" size={20} color="#FFF" />
-                </View>
+      <Modal
+        visible={showDietForm}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+        onRequestClose={() => setShowDietForm(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowDietForm(false)} />
+
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+            pointerEvents="box-none"
+          >
+            <View
+              style={[
+                styles.dietFormSheet,
+                {
+                  backgroundColor: isDark ? '#111' : '#FAFAFA',
+                  paddingBottom: insets.bottom + 8,
+                  flex: 1,
+                }
+              ]}
+            >
+              {/* Handle bar */}
+              <View style={styles.handleWrap}>
+                <View style={[styles.handle, { backgroundColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)' }]} />
+              </View>
+
+              {/* Header */}
+              <View style={styles.stepHeader}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.dietFormHeaderTitle}>Diet Plan Setup</Text>
-                  <Text style={styles.dietFormHeaderSub}>Set your details to generate a personalized meal plan</Text>
+                  <Text style={[styles.stepTitle, { color: isDark ? '#fff' : '#04282B' }]}>Diet Plan Setup</Text>
+                  <Text style={[styles.stepSub, { color: isDark ? 'rgba(255,255,255,0.55)' : '#607D8B', marginTop: 2 }]}>
+                    Set your details to generate a personalized meal plan
+                  </Text>
                 </View>
-                <TouchableOpacity onPress={() => setShowDietForm(false)} style={styles.dietFormClose}>
-                  <Ionicons name="close" size={18} color="#FFF" />
+                <TouchableOpacity
+                  onPress={() => setShowDietForm(false)}
+                  style={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+                  activeOpacity={0.65}
+                >
+                  <Ionicons name="close" size={20} color={isDark ? '#fff' : '#222'} />
                 </TouchableOpacity>
               </View>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingBottom: 48, gap: 2 }}>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24, gap: 2 }}>
               <Text style={[styles.dietSectionTitle, { color: colors.text }]}>Physical Profile</Text>
 
               {/* Gender */}
@@ -985,27 +1039,37 @@ export default function DietRecsScreen({ tab, header }: Props) {
                   <Ionicons name="add" size={20} color={colors.text} />
                 </TouchableOpacity>
               </View>
+            </ScrollView>
 
-              {/* Save */}
+            {/* CTA Button */}
+            <View style={[styles.ctaBar, { borderTopColor: isDark ? 'rgba(255,255,255,0.07)' : '#E2E8F0', paddingHorizontal: 20 }]}>
               <TouchableOpacity
+                style={styles.submitBtn}
                 onPress={handleSaveDietPlan}
                 disabled={savingDietForm}
-                style={[styles.saveBtn, { backgroundColor: colors.primary }]}
-                activeOpacity={0.85}
+                activeOpacity={0.72}
               >
-                {savingDietForm ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <>
-                    <Ionicons name="sparkles" size={18} color="#FFF" style={{ marginRight: 8 }} />
-                    <Text style={styles.saveBtnText}>Generate Meal Plan</Text>
-                  </>
-                )}
+                <LinearGradient
+                  colors={['#1a6e8a', '#2596BE']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.submitBtnGrad}
+                >
+                  {savingDietForm ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="sparkles" size={20} color="#FFF" />
+                      <Text style={styles.submitBtnText}>Generate AI Meal Plan ✨</Text>
+                    </>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
-            </ScrollView>
-        </View>
+            </View>
+          </View>
         </KeyboardAvoidingView>
-      </Modal>
+      </View>
+    </Modal>
 
       {/* ── INGREDIENT SELECTOR MODAL ── */}
       <Modal visible={showIngredientSelector} animationType="slide" transparent statusBarTranslucent>
@@ -1116,14 +1180,14 @@ const ExtraPill = ({ value, label, color }: { value: string; label: string; colo
 );
 
 const PlanMacro = ({ value, label, color }: { value: string | number; label: string; color: string }) => (
-  <View style={[styles.planMacroChip, { backgroundColor: color + '12' }]}>
+  <View style={[styles.planMacroChip, { backgroundColor: color === '#FFFFFF' ? 'rgba(255,255,255,0.15)' : color + '12' }]}>
     <Text style={[styles.planMacroValue, { color }]}>{value}</Text>
     <Text style={[styles.planMacroLabel, { color }]}>{label}</Text>
   </View>
 );
 
 const TargetBox = ({ value, label, sub, color }: { value: string; label: string; sub: string; color: string }) => (
-  <View style={[styles.targetBox, { backgroundColor: color + '15', borderColor: color + '30' }]}>
+  <View style={[styles.targetBox, { backgroundColor: color === '#FFFFFF' ? 'rgba(255,255,255,0.15)' : color + '15' }]}>
     <Text style={[styles.targetBoxValue, { color }]}>{value}</Text>
     <Text style={[styles.targetBoxLabel, { color }]}>{label || sub}</Text>
   </View>
@@ -1184,27 +1248,14 @@ const styles = StyleSheet.create({
 
   // Plan tab
   scrollContent: { paddingBottom: 40 },
-  summaryCard: {
-    borderRadius: 20, borderWidth: 1, padding: 16, marginHorizontal: 20, marginTop: 8, marginBottom: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
-  },
-  summaryCardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summaryLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
-  summaryValue: { fontFamily: FONTS.heading, fontSize: 28, marginTop: 2 },
-  bmiBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-  bmiBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 12 },
-  bmiBar: { height: 6, borderRadius: 3, marginTop: 14, overflow: 'hidden' },
-  bmiBarFill: { height: '100%', borderRadius: 3 },
-  bmiLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  bmiLabel: { fontFamily: FONTS.body, fontSize: 10 },
   targetsCard: {
-    borderRadius: 20, borderWidth: 1, padding: 16, marginHorizontal: 20, marginBottom: 12,
+    borderRadius: 24, padding: 16, marginHorizontal: 20, marginBottom: 12,
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   sectionTitle: { fontFamily: FONTS.heading, fontSize: 17, marginBottom: 12 },
   targetsRow: { flexDirection: 'row', gap: 8 },
   targetBox: {
-    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14, borderWidth: 1,
+    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14,
   },
   targetBoxValue: { fontFamily: FONTS.heading, fontSize: 16 },
   targetBoxLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 10, marginTop: 2 },
@@ -1226,7 +1277,7 @@ const styles = StyleSheet.create({
   mealPlanTitle: { fontFamily: FONTS.heading, fontSize: 17, marginRight: 8 },
   mealPlanCount: { fontFamily: FONTS.body, fontSize: 12 },
   planCard: {
-    borderRadius: 18, borderWidth: 1, marginBottom: 10, overflow: 'hidden',
+    borderRadius: 24, marginBottom: 10, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   planCardHeader: {
@@ -1248,6 +1299,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingVertical: 8, borderBottomWidth: 0.5,
   },
+  ingredientImg: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  ingredientImgPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
   ingredientInfo: { flex: 1, paddingRight: 8 },
   ingredientName: { fontFamily: FONTS.bodySemiBold, fontSize: 12 },
   ingredientQty: { fontFamily: FONTS.body, fontSize: 11, marginTop: 1 },
@@ -1256,7 +1321,7 @@ const styles = StyleSheet.create({
   planInstructionsText: { fontFamily: FONTS.body, fontSize: 12, lineHeight: 18 },
 
   // Modals
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
   sortSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40 },
   sortSheetTitle: { fontFamily: FONTS.heading, fontSize: 18, marginBottom: 16 },
   sortOption: {
@@ -1265,13 +1330,70 @@ const styles = StyleSheet.create({
   },
   sortOptionText: { fontFamily: FONTS.bodySemiBold, fontSize: 14 },
   // Diet form
-  dietFormSheet: { height: Math.min(SCREEN_HEIGHT * 0.8, 600), borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: 'hidden' },
-  dietFormHeader: { paddingHorizontal: 20, paddingVertical: 18 },
-  dietFormHeaderContent: { flexDirection: 'row', alignItems: 'center' },
-  dietFormHeaderIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  dietFormHeaderTitle: { fontFamily: FONTS.heading, fontSize: 18, color: '#FFF' },
-  dietFormHeaderSub: { fontFamily: FONTS.body, fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
-  dietFormClose: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  dietFormSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: 'hidden',
+    maxHeight: SCREEN_HEIGHT * 0.88,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    elevation: 24,
+  },
+  handleWrap: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+  },
+  stepHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  stepTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 22,
+    letterSpacing: -0.3,
+  },
+  stepSub: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ctaBar: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+  },
+  submitBtn: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  submitBtnGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 18,
+  },
+  submitBtnText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 16,
+    color: '#FFF',
+    letterSpacing: 0.4,
+  },
   dietSectionTitle: { fontFamily: FONTS.heading, fontSize: 16, marginBottom: 14 },
   dietFieldLabel: { fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 },
   dietSelectRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
