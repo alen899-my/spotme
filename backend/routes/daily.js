@@ -453,9 +453,9 @@ router.post(
         );
       }
 
-      // Auto-complete exercise when all target sets are logged
+      // Auto-complete/update exercise skip and completion status when set is logged
       const exerciseInfo = await pool.query(
-        'SELECT target_sets FROM daily_workout_exercises WHERE id = $1',
+        'SELECT target_sets, is_skipped, is_completed FROM daily_workout_exercises WHERE id = $1',
         [parseInt(req.params.id)]
       );
       const setCount = await pool.query(
@@ -463,13 +463,19 @@ router.post(
         [parseInt(req.params.id)]
       );
 
-      if (
-        exerciseInfo.rows.length > 0 &&
-        parseInt(setCount.rows[0].count) >= exerciseInfo.rows[0].target_sets
-      ) {
+      if (exerciseInfo.rows.length > 0) {
+        const targetSets = exerciseInfo.rows[0].target_sets;
+        const loggedSetsCount = parseInt(setCount.rows[0].count);
+        let isCompleted = loggedSetsCount >= targetSets;
+        let isSkippedUpdate = exerciseInfo.rows[0].is_skipped;
+
+        if (!is_skipped) {
+          isSkippedUpdate = false;
+        }
+
         await pool.query(
-          'UPDATE daily_workout_exercises SET is_completed = true WHERE id = $1',
-          [parseInt(req.params.id)]
+          'UPDATE daily_workout_exercises SET is_skipped = $1, is_completed = $2 WHERE id = $3',
+          [isSkippedUpdate, isCompleted, parseInt(req.params.id)]
         );
       }
 

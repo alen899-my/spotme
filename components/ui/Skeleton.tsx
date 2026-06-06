@@ -436,59 +436,98 @@ export function ViewSessionSkeleton() {
 
 export function CompleteSkeleton() {
   const { colors } = useTheme();
+  const halfW = (SCREEN_W - scale(32) - scale(12)) / 2;
+  const fullW = SCREEN_W - scale(32);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ backgroundColor: colors.inputBg, paddingVertical: 40, alignItems: "center", marginBottom: 16 }}>
-        <Skeleton width={60} height={60} borderRadius={30} style={{ marginBottom: 12 }} />
-        <Skeleton width={200} height={32} borderRadius={8} style={{ marginBottom: 8 }} />
-        <Skeleton width={160} height={16} borderRadius={6} />
-      </View>
-
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: scale(16), marginBottom: 16 }}>
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <View key={i} style={{ width: (SCREEN_W - 52) / 2, backgroundColor: colors.inputBg, borderRadius: 20, padding: 16, gap: 8 }}>
-            <Skeleton width={34} height={34} borderRadius={10} />
-            <Skeleton width={50} height={12} borderRadius={6} />
-            <Skeleton width={80} height={20} borderRadius={6} />
-            <Skeleton width={60} height={10} borderRadius={5} />
-          </View>
-        ))}
+      {/* Hero */}
+      <View style={{ backgroundColor: colors.inputBg, paddingVertical: 40, alignItems: "center", borderBottomLeftRadius: 32, borderBottomRightRadius: 32, marginBottom: 16 }}>
+        <Skeleton width={80} height={80} borderRadius={40} style={{ marginBottom: 14 }} />
+        <Skeleton width={220} height={30} borderRadius={8} style={{ marginBottom: 8 }} />
+        <Skeleton width={180} height={14} borderRadius={6} style={{ marginBottom: 8 }} />
+        <Skeleton width={100} height={24} borderRadius={12} />
       </View>
 
       <View style={{ paddingHorizontal: scale(16) }}>
-        <Skeleton width={160} height={18} borderRadius={6} style={{ marginBottom: 12 }} />
-        {[0, 1].map((i) => (
-          <View key={i} style={{ backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 10 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <Skeleton width={40} height={40} borderRadius={8} />
-              <View style={{ flex: 1, gap: 4 }}>
-                <Skeleton width={100} height={14} borderRadius={6} />
-                <Skeleton width={70} height={12} borderRadius={6} />
-              </View>
-            </View>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {[0, 1, 2, 3].map((j) => (
-                <View key={j} style={{ flex: 1, gap: 2 }}>
-                  <Skeleton width={30} height={10} borderRadius={5} />
-                  <Skeleton width={40} height={16} borderRadius={6} />
-                </View>
-              ))}
-            </View>
-          </View>
-        ))}
+        {/* Section Label */}
+        <Skeleton width={140} height={18} borderRadius={6} style={{ marginBottom: 10 }} />
 
-        <View style={{ backgroundColor: colors.card, borderRadius: 20, borderWidth: 1, borderColor: colors.border, padding: 16, marginTop: 16, gap: 8 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Skeleton width={20} height={20} borderRadius={6} />
-            <Skeleton width={80} height={14} borderRadius={6} />
+        {/* Bento Grid — mixed sizes */}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: scale(12), marginBottom: 16 }}>
+          {/* 2 half tiles */}
+          {[0, 1].map((i) => (
+            <View key={`h${i}`} style={{ width: halfW, backgroundColor: colors.inputBg, borderRadius: 20, padding: 14, gap: 8 }}>
+              <Skeleton width={34} height={34} borderRadius={10} />
+              <Skeleton width={50} height={10} borderRadius={5} />
+              <Skeleton width={70} height={22} borderRadius={6} />
+              <Skeleton width={55} height={10} borderRadius={5} />
+            </View>
+          ))}
+          {/* 1 full-width tile */}
+          <View style={{ width: fullW, backgroundColor: colors.inputBg, borderRadius: 20, padding: 14, gap: 8 }}>
+            <Skeleton width={34} height={34} borderRadius={10} />
+            <Skeleton width={60} height={10} borderRadius={5} />
+            <Skeleton width={120} height={24} borderRadius={6} />
+            <Skeleton width={80} height={10} borderRadius={5} />
           </View>
-          <Skeleton width="100%" height={40} borderRadius={10} />
+          {/* 2 more half tiles */}
+          {[0, 1].map((i) => (
+            <View key={`h2${i}`} style={{ width: halfW, backgroundColor: colors.inputBg, borderRadius: 20, padding: 14, gap: 8 }}>
+              <Skeleton width={34} height={34} borderRadius={10} />
+              <Skeleton width={50} height={10} borderRadius={5} />
+              <Skeleton width={60} height={22} borderRadius={6} />
+              <Skeleton width={50} height={10} borderRadius={5} />
+            </View>
+          ))}
+          {/* 1 full-width tile */}
+          <View style={{ width: fullW, backgroundColor: colors.inputBg, borderRadius: 20, padding: 14, gap: 8 }}>
+            <Skeleton width={34} height={34} borderRadius={10} />
+            <Skeleton width={70} height={10} borderRadius={5} />
+            <Skeleton width={90} height={24} borderRadius={6} />
+            <Skeleton width={80} height={10} borderRadius={5} />
+          </View>
         </View>
 
-        <View style={{ backgroundColor: colors.card, borderRadius: 20, borderWidth: 1, borderColor: colors.border, padding: 16, marginTop: 16, gap: 8 }}>
-          <Skeleton width={100} height={14} borderRadius={6} />
-          <Skeleton width="100%" height={40} borderRadius={10} />
+        {/* Exercises section label */}
+        <Skeleton width={100} height={18} borderRadius={6} style={{ marginBottom: 10 }} />
+
+        {/* Horizontal mini cards */}
+        <View style={{ flexDirection: "row", gap: scale(10), marginBottom: 16 }}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={{ width: scale(120), backgroundColor: colors.inputBg, borderRadius: 16, padding: 10, gap: 6 }}>
+              <Skeleton width={44} height={44} borderRadius={10} />
+              <Skeleton width={80} height={12} borderRadius={6} />
+              <Skeleton width={50} height={16} borderRadius={6} />
+            </View>
+          ))}
+        </View>
+
+        {/* Weight card */}
+        <View style={{ backgroundColor: colors.inputBg, borderRadius: 20, padding: 16, gap: 10, marginBottom: 16 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Skeleton width={38} height={38} borderRadius={12} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Skeleton width={140} height={14} borderRadius={6} />
+              <Skeleton width={180} height={10} borderRadius={5} />
+            </View>
+          </View>
+          <Skeleton width="100%" height={52} borderRadius={14} />
+        </View>
+
+        {/* Photo section */}
+        <View style={{ backgroundColor: colors.inputBg, borderRadius: 20, padding: 16, gap: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Skeleton width={38} height={38} borderRadius={12} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Skeleton width={110} height={14} borderRadius={6} />
+              <Skeleton width={130} height={10} borderRadius={5} />
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", gap: scale(8) }}>
+            <Skeleton width={90} height={120} borderRadius={14} />
+            <Skeleton width={90} height={120} borderRadius={14} />
+          </View>
         </View>
       </View>
     </View>

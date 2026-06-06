@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Image, Platform, ActivityIndicator,
-  TextInput, Dimensions, Animated,
+  TextInput, Dimensions, Animated, Easing,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,14 +17,291 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import StreakIcon from '../../components/ui/StreakIcon';
 import { CompleteSkeleton } from '../../components/ui/Skeleton';
-import WorkoutSummary from '../../components/WorkoutSummary';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ── Responsive helpers ──────────────────────────────────────────────────────
+const BASE_W = 390;
+const BASE_H = 844;
+const s = (n: number) => Math.round((SCREEN_WIDTH / BASE_W) * n);
+const vs = (n: number) => Math.round((SCREEN_HEIGHT / BASE_H) * n);
+const fs = (n: number) => Math.round((Math.min(SCREEN_WIDTH, 500) / BASE_W) * n);
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-const HERO_GRADIENT_LIGHT: [string, string] = ['#10B981', '#059669'];
-const HERO_GRADIENT_DARK: [string, string] = ['#064E3B', '#022C22'];
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function formatDuration(sec: number) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const secs = sec % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${secs}s`;
+  return `${secs}s`;
+}
 
+// ── Confetti Particle ───────────────────────────────────────────────────────
+const PARTICLE_COLORS = ['#F7CB16', '#2596BE', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+function ConfettiParticle({ delay, color, startX }: { delay: number; color: string; startX: number }) {
+  const fall = useRef(new Animated.Value(0)).current;
+  const sway = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(fall, { toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.sequence([
+          Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0, duration: 2000, useNativeDriver: true }),
+        ]),
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(sway, { toValue: 1, duration: 400 + Math.random() * 300, useNativeDriver: true }),
+            Animated.timing(sway, { toValue: -1, duration: 400 + Math.random() * 300, useNativeDriver: true }),
+          ])
+        ),
+      ]).start();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const translateY = fall.interpolate({ inputRange: [0, 1], outputRange: [-20, vs(180)] });
+  const translateX = sway.interpolate({ inputRange: [-1, 0, 1], outputRange: [-s(18), 0, s(18)] });
+  const size = s(4 + Math.random() * 4);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        top: vs(10),
+        left: startX,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color,
+        opacity,
+        transform: [{ translateY }, { translateX }],
+      }}
+    />
+  );
+}
+
+// ── Bento Tile ──────────────────────────────────────────────────────────────
+function BentoTile({
+  icon, iconColor, label, value, sub, wide, colors, isDark,
+}: {
+  icon: string; iconColor: string; label: string; value: string;
+  sub: string; wide?: boolean; colors: any; isDark: boolean;
+}) {
+  const tileWidth = wide
+    ? SCREEN_WIDTH - s(32)
+    : (SCREEN_WIDTH - s(32) - s(12)) / 2;
+
+  return (
+    <View
+      style={[
+        bentoStyles.tile,
+        {
+          width: tileWidth,
+          backgroundColor: isDark ? '#0D0D0D' : '#FFFFFF',
+          borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
+        },
+      ]}
+    >
+      <View style={[bentoStyles.tileIconBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : `${iconColor}18` }]}>
+        <Ionicons name={icon as any} size={fs(18)} color={iconColor} />
+      </View>
+      <Text style={[bentoStyles.tileLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#94A3B8' }]}>{label}</Text>
+      <Text style={[bentoStyles.tileValue, { color: isDark ? '#F1F5F9' : '#0F1923', fontSize: fs(wide ? 26 : 22) }]} numberOfLines={1}>
+        {value}
+      </Text>
+      <Text style={[bentoStyles.tileSub, { color: isDark ? 'rgba(241,245,249,0.30)' : '#94A3B8' }]}>{sub}</Text>
+    </View>
+  );
+}
+
+const CAROUSEL_CARD_W = SCREEN_WIDTH - s(64);
+const CAROUSEL_SNAP = CAROUSEL_CARD_W + s(12);
+
+function formatTime(sec: number) {
+  const m = Math.floor(sec / 60).toString().padStart(2, '0');
+  const s = (sec % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function formatRecord(metricType?: string, value?: number | string) {
+  const numeric = Number(value) || 0;
+  if (!numeric) return '0';
+  if (metricType === 'max_reps') return `${Math.round(numeric)} reps`;
+  return `${numeric.toFixed(1)} kg est. 1RM`;
+}
+
+function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; isDark: boolean }) {
+  const isSkipped = ex.is_skipped;
+  const isCardio = ex.category?.toLowerCase() === 'cardio';
+  const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
+  const totalReps = completedSets.reduce((acc: number, s: any) => acc + (parseInt(s.reps) || 0), 0);
+  const totalWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0);
+  const totalSetWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0), 0);
+  const totalTime = completedSets.reduce((acc: number, s: any) => acc + (s.duration_seconds || 0), 0);
+  const avgWeight = completedSets.length > 0 ? (totalSetWeight / completedSets.length).toFixed(1) : '0';
+  const avgTime = completedSets.length > 0 ? Math.round(totalTime / completedSets.length) : 0;
+
+  return (
+    <View
+      style={[
+        carouselStyles.card,
+        {
+          width: CAROUSEL_CARD_W,
+          backgroundColor: isDark ? '#0D0D0D' : '#FFFFFF',
+          borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
+          opacity: isSkipped ? 0.55 : 1,
+        },
+      ]}
+    >
+      {/* Header */}
+      <View style={carouselStyles.exHeader}>
+        <Image source={{ uri: ex.image_url }} style={carouselStyles.exImage} />
+        <View style={carouselStyles.exMeta}>
+          <Text style={[carouselStyles.exName, { color: isDark ? '#F1F5F9' : '#0F1923' }]} numberOfLines={2}>
+            {ex.name}
+          </Text>
+          <Text style={[carouselStyles.exSetsSub, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>
+            {isSkipped ? 'Movement skipped' : isCardio ? `${formatTime(totalTime)} logged` : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
+          </Text>
+        </View>
+        {isSkipped && (
+          <View style={carouselStyles.badgeSkipped}>
+            <Text style={carouselStyles.badgeText}>SKIPPED</Text>
+          </View>
+        )}
+        {!isSkipped && ex.is_world_record && (
+          <View style={carouselStyles.badgeWorld}>
+            <Ionicons name="earth" size={10} color="#FFF" style={{ marginRight: 3 }} />
+            <Text style={carouselStyles.badgeText}>WORLD PR</Text>
+          </View>
+        )}
+        {!isSkipped && !ex.is_world_record && ex.is_personal_record && (
+          <View style={carouselStyles.badgePR}>
+            <Ionicons name="ribbon" size={10} color="#1a1a1a" style={{ marginRight: 3 }} />
+            <Text style={[carouselStyles.badgeText, { color: '#1a1a1a' }]}>NEW PR</Text>
+          </View>
+        )}
+        {!isSkipped && !ex.is_world_record && !ex.is_personal_record && ex.rating !== null && ex.rating !== undefined && (
+          <View style={carouselStyles.badgeRating}>
+            <Ionicons name="star" size={10} color="#F59E0B" style={{ marginRight: 3 }} />
+            <Text style={carouselStyles.badgeText}>{ex.rating}/10</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Record row (non-cardio, non-skipped) */}
+      {!isSkipped && !isCardio && (
+        <View style={carouselStyles.recordRow}>
+          <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
+            <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>BEST SET</Text>
+            <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
+              {Number(ex.best_set_weight || 0).toFixed(1)}kg × {ex.best_set_reps || 0}
+            </Text>
+          </View>
+          <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
+            <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>MY PR</Text>
+            <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
+              {formatRecord(ex.record_metric_type, ex.personal_record_value)}
+            </Text>
+          </View>
+          <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
+            <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>WORLD PR</Text>
+            <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
+              {formatRecord(ex.record_metric_type, ex.world_record_value)}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Stats grid */}
+      {!isSkipped && completedSets.length > 0 && (
+        <View style={carouselStyles.exStatsGrid}>
+          {isCardio ? (
+            <>
+              <View style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
+                <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>TOTAL TIME</Text>
+                <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{formatTime(totalTime)}</Text>
+              </View>
+              <View style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
+                <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>AVG TIME</Text>
+                <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{formatTime(avgTime)}</Text>
+              </View>
+            </>
+          ) : (
+            [
+              { label: 'TOTAL WEIGHT', value: `${Math.round(totalWeight)}kg` },
+              { label: 'AVG / SET', value: `${avgWeight}kg` },
+              { label: 'TOTAL REPS', value: `${totalReps}` },
+              { label: 'AVG TIME / SET', value: formatTime(avgTime) },
+            ].map((item, idx) => (
+              <View key={idx} style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
+                <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>{item.label}</Text>
+                <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{item.value}</Text>
+              </View>
+            ))
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ── Exercise Carousel with pagination dots ──────────────────────────────────
+function ExerciseCarousel({ exercises, colors, isDark }: { exercises: any[]; colors: any; isDark: boolean }) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const onScroll = (e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / CAROUSEL_SNAP);
+    setActiveIdx(idx);
+  };
+
+  return (
+    <View>
+      <ScrollView
+        horizontal
+        pagingEnabled={false}
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={CAROUSEL_SNAP}
+        snapToAlignment="start"
+        contentContainerStyle={{ paddingLeft: s(16), paddingRight: s(16), gap: s(12) }}
+        onMomentumScrollEnd={onScroll}
+      >
+        {exercises.map((ex: any) => (
+          <ExerciseCarouselCard key={ex.id} ex={ex} colors={colors} isDark={isDark} />
+        ))}
+      </ScrollView>
+      {/* Pagination dots */}
+      {exercises.length > 1 && (
+        <View style={carouselStyles.dotRow}>
+          {exercises.map((_: any, i: number) => (
+            <View
+              key={i}
+              style={[
+                carouselStyles.dot,
+                {
+                  backgroundColor: i === activeIdx
+                    ? P.cta
+                    : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'),
+                  width: i === activeIdx ? s(20) : s(6),
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MAIN SCREEN
+// ═════════════════════════════════════════════════════════════════════════════
 export default function WorkoutCompleteScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -45,9 +322,26 @@ export default function WorkoutCompleteScreen() {
   const [newStreak, setNewStreak] = useState<number | null>(null);
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
 
+  // ── Hero animations ──
+  const heroScale = useRef(new Animated.Value(0.5)).current;
+  const heroOpacity = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
-    fetchWorkout();
+    Animated.parallel([
+      Animated.spring(heroScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
+      Animated.timing(heroOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+    ]).start();
+    // Glow pulse loop
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
   }, []);
+
+  useEffect(() => { fetchWorkout(); }, []);
 
   const fetchWorkout = async () => {
     try {
@@ -64,6 +358,7 @@ export default function WorkoutCompleteScreen() {
     }
   };
 
+  // ── Photo pickers ──
   const pickPhotos = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -71,11 +366,23 @@ export default function WorkoutCompleteScreen() {
       quality: 0.7,
     });
     if (!result.canceled) {
-      const newPhotos: string[] = [];
-      for (const asset of result.assets) {
-        newPhotos.push(asset.uri);
-      }
+      const newPhotos = result.assets.map(a => a.uri);
       setPhotos(prev => [...prev, ...newPhotos].slice(0, 10));
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      showToast('Camera permission is required to take photos', 'error');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.7,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      setPhotos(prev => [...prev, result.assets[0].uri].slice(0, 10));
     }
   };
 
@@ -158,140 +465,270 @@ export default function WorkoutCompleteScreen() {
     }
   };
 
+  // ── Computed stats ──
   const displayDuration = workout?.total_duration_seconds || duration;
   const displayVolume = workout?.total_volume || volume;
   const displayRest = workout?.total_rest_seconds || rest;
+  const caloriesBurned = Number(workout?.calories_burned) || 0;
+  const totalSets = useMemo(() => {
+    if (workout?.total_sets) return workout.total_sets;
+    return workout?.exercises?.reduce((acc: number, ex: any) =>
+      acc + (ex.sets?.filter((s: any) => !s.is_skipped).length || 0), 0) || 0;
+  }, [workout]);
+
+  const exerciseStats = useMemo(() => {
+    if (!workout?.exercises) return { total: 0, completed: 0, skipped: 0 };
+    const total = workout.exercises.length;
+    const skipped = workout.exercises.filter((e: any) => e.is_skipped).length;
+    const completed = workout.exercises.filter((e: any) => e.is_completed && !e.is_skipped).length;
+    return { total, completed, skipped };
+  }, [workout]);
+
+  const bestSet = useMemo(() => {
+    if (!workout?.exercises) return null;
+    let best: any = null;
+    for (const ex of workout.exercises) {
+      if (ex.is_skipped) continue;
+      for (const set of (ex.sets || [])) {
+        if (set.is_skipped) continue;
+        const w = parseFloat(set.weight) || 0;
+        const r = parseInt(set.reps) || 0;
+        if (!best || (w * r) > (best.w * best.r)) {
+          best = { w, r, name: ex.name };
+        }
+      }
+    }
+    return best;
+  }, [workout]);
+
+  const avgRating = useMemo(() => {
+    if (!workout?.exercises) return null;
+    const ratings = workout.exercises
+      .map((e: any) => e.rating)
+      .filter((r: any) => r !== null && r !== undefined);
+    if (ratings.length === 0) return null;
+    return (ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1);
+  }, [workout]);
+
+  // ── Confetti particles ──
+  const confettiParticles = useMemo(() =>
+    Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      delay: Math.random() * 800,
+      color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)],
+      startX: Math.random() * SCREEN_WIDTH,
+    })),
+    []
+  );
+
+  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] });
 
   if (loading) return <CompleteSkeleton />;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 150 + Math.max(insets.bottom, 12) }]}
+        contentContainerStyle={[st.scrollContent, { paddingBottom: vs(150) + Math.max(insets.bottom, 12) }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 1. Hero ── */}
-        <LinearGradient
-          colors={isDark ? HERO_GRADIENT_DARK : HERO_GRADIENT_LIGHT}
-          style={[styles.hero, isDark && { borderBottomWidth: 1, borderColor: colors.border }]}
-        >
-          {newStreak !== null && newStreak > 0 ? (
-            <View style={{ marginBottom: 20 }}>
-              <StreakIcon streak={newStreak} size={100} />
-            </View>
-          ) : (
-            <View style={[styles.heroIcon, { backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.25)' }]}>
-              <Ionicons name="trophy" size={48} color={isDark ? colors.primary : "#FFF"} />
-            </View>
-          )}
-          <Text style={[styles.heroTitle, isDark && { color: colors.text }]}>
+        {/* ═══ HERO SECTION ═══ */}
+        <View style={[st.heroWrap, { height: vs(260) }]}>
+          <LinearGradient
+            colors={isDark ? ['#064E3B', '#022C22'] : ['#10B981', '#059669']}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* Confetti */}
+          {confettiParticles.map(p => (
+            <ConfettiParticle key={p.id} delay={p.delay} color={p.color} startX={p.startX} />
+          ))}
+
+          {/* Glow ring */}
+          <Animated.View
+            style={[
+              st.glowRing,
+              {
+                opacity: glowOpacity,
+                width: s(140),
+                height: s(140),
+                borderRadius: s(70),
+                borderColor: isDark ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.3)',
+              },
+            ]}
+          />
+
+          {/* Trophy / Streak */}
+          <Animated.View style={{ transform: [{ scale: heroScale }], opacity: heroOpacity }}>
+            {newStreak !== null && newStreak > 0 ? (
+              <StreakIcon streak={newStreak} size={s(90)} />
+            ) : (
+              <View style={[st.trophyCircle, { width: s(80), height: s(80), borderRadius: s(40), backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.2)' }]}>
+                <Ionicons name="trophy" size={fs(42)} color={isDark ? '#10B981' : '#FFF'} />
+              </View>
+            )}
+          </Animated.View>
+
+          <Text style={[st.heroTitle, { fontSize: fs(30), color: isDark ? colors.text : '#FFF' }]}>
             {newStreak !== null && newStreak > 0 ? 'Perfect Workout!' : 'Workout Complete!'}
           </Text>
-          <Text style={[styles.heroSub, isDark && { color: colors.textMuted }]}>
+          <Text style={[st.heroSub, { fontSize: fs(14), color: isDark ? colors.textMuted : 'rgba(255,255,255,0.85)' }]}>
             {newStreak !== null && newStreak > 0
               ? `You kept your ${newStreak} day streak alive! 🔥`
               : 'You crushed it today 💪'}
           </Text>
-        </LinearGradient>
+          {workout?.title && (
+            <View style={[st.heroPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.2)' }]}>
+              <Text style={[st.heroPillText, { fontSize: fs(11), color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>
+                {workout.title}
+              </Text>
+            </View>
+          )}
+        </View>
 
-        <View style={styles.formContainer}>
-          {/* ── Shared Workout Summary ── */}
-          <WorkoutSummary
-            workout={workout}
-            displayDuration={displayDuration}
-            displayVolume={displayVolume}
-            displayRest={displayRest}
-            showBodyWeight={false}
-            hideEditButton
-          />
+        {/* ═══ BENTO GRID ═══ */}
+        <View style={[st.bentoContainer, { paddingHorizontal: s(16) }]}>
+          <Text style={[st.sectionLabel, { color: colors.text, fontSize: fs(18) }]}>Session Summary</Text>
+          <View style={st.bentoGrid}>
+            <BentoTile icon="time-outline" iconColor="#2596BE" label="DURATION" value={formatDuration(displayDuration)} sub="Active time" colors={colors} isDark={isDark} />
+            <BentoTile icon="flame-outline" iconColor="#EF4444" label="CALORIES" value={`${caloriesBurned}`} sub="Est. kcal burn" colors={colors} isDark={isDark} />
+            <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${Math.round(displayVolume)} kg`} sub="Weight lifted" wide colors={colors} isDark={isDark} />
+            <BentoTile icon="hourglass-outline" iconColor="#F59E0B" label="REST TIME" value={formatDuration(displayRest)} sub="Recovery" colors={colors} isDark={isDark} />
+            <BentoTile icon="layers-outline" iconColor="#8B5CF6" label="TOTAL SETS" value={`${totalSets}`} sub="Completed" colors={colors} isDark={isDark} />
+            <BentoTile
+              icon="fitness-outline" iconColor="#2596BE" label="EXERCISES"
+              value={`${exerciseStats.completed}/${exerciseStats.total}`}
+              sub={exerciseStats.skipped > 0 ? `${exerciseStats.skipped} skipped` : 'All completed'}
+              wide colors={colors} isDark={isDark}
+            />
+            {bestSet && (
+              <BentoTile icon="trophy-outline" iconColor="#FBBF24" label="BEST SET" value={`${bestSet.w}kg × ${bestSet.r}`} sub={bestSet.name} colors={colors} isDark={isDark} />
+            )}
+            {avgRating !== null && (
+              <BentoTile icon="star-outline" iconColor="#F59E0B" label="AVG RATING" value={`${avgRating}/10`} sub="Exercise quality" colors={colors} isDark={isDark} />
+            )}
+          </View>
 
-          {/* ── Body Weight — solid card ── */}
-          <View style={[styles.weightCard, isDark && { backgroundColor: '#0D0D0D', borderColor: colors.border, borderWidth: 1 }]}>
-            <View style={styles.weightCardTop}>
-              <View style={[styles.weightIconBox, isDark && { backgroundColor: 'rgba(217,119,6,0.15)' }]}>
-                <Ionicons name="scale-outline" size={22} color={isDark ? '#F59E0B' : "#78350F"} />
+          {/* ═══ EXERCISE CAROUSEL ═══ */}
+          {workout?.exercises?.length > 0 && (
+            <>
+              <Text style={[st.sectionLabel, { color: colors.text, fontSize: fs(18), marginTop: vs(8) }]}>Exercises</Text>
+            </>
+          )}
+        </View>
+
+        {/* Carousel lives outside the padded container for edge-to-edge snap */}
+        {workout?.exercises?.length > 0 && (
+          <ExerciseCarousel exercises={workout.exercises} colors={colors} isDark={isDark} />
+        )}
+
+        {/* Reopen padded container for remaining sections */}
+        <View style={{ paddingHorizontal: s(16) }}>
+
+          {/* ═══ BODY WEIGHT ═══ */}
+          <View style={[st.weightCard, { backgroundColor: isDark ? '#0D0D0D' : '#FEF3C7', borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'transparent', borderWidth: isDark ? 1 : 0 }]}>
+            <View style={st.weightCardTop}>
+              <View style={[st.weightIconBox, { backgroundColor: isDark ? 'rgba(217,119,6,0.15)' : 'rgba(120,53,15,0.15)' }]}>
+                <Ionicons name="scale-outline" size={fs(20)} color={isDark ? '#F59E0B' : '#78350F'} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.weightCardTitle, isDark && { color: colors.text }]}>Post-Workout Weight</Text>
-                <Text style={[styles.weightCardSub, isDark && { color: colors.textMuted }]}>Log your body weight to track progress over time</Text>
+                <Text style={[st.weightTitle, { color: isDark ? colors.text : '#78350F', fontSize: fs(16) }]}>Post-Workout Weight</Text>
+                <Text style={[st.weightSub, { color: isDark ? colors.textMuted : 'rgba(120,53,15,0.75)', fontSize: fs(11) }]}>Track your body weight over time</Text>
               </View>
             </View>
-            <View style={[styles.weightInputWrap, isDark && { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+            <View style={[st.weightInputWrap, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.45)', borderColor: isDark ? colors.border : 'rgba(255,255,255,0.7)' }]}>
               <TextInput
-                style={[styles.weightInput, isDark && { color: colors.text }]}
+                style={[st.weightInput, { color: isDark ? colors.text : '#78350F', fontSize: fs(24), height: vs(52) }]}
                 placeholder="e.g. 75.5"
-                placeholderTextColor={isDark ? colors.textDim : "rgba(120,53,15,0.45)"}
+                placeholderTextColor={isDark ? colors.textDim : 'rgba(120,53,15,0.45)'}
                 keyboardType="decimal-pad"
                 value={weight}
                 onChangeText={setWeight}
               />
-              <View style={[styles.weightUnit, isDark && { backgroundColor: 'rgba(217,119,6,0.12)' }]}>
-                <Text style={[styles.weightUnitText, isDark && { color: '#F59E0B' }]}>kg</Text>
+              <View style={[st.weightUnit, { backgroundColor: isDark ? 'rgba(217,119,6,0.12)' : 'rgba(120,53,15,0.12)', height: vs(52) }]}>
+                <Text style={[st.weightUnitText, { color: isDark ? '#F59E0B' : '#92400E', fontSize: fs(14) }]}>kg</Text>
               </View>
             </View>
             {!!weight && (
-              <Text style={[styles.weightHint, isDark && { color: '#F59E0B' }]}>
+              <Text style={[st.weightHint, { color: isDark ? '#F59E0B' : '#92400E', fontSize: fs(12) }]}>
                 Logged: <Text style={{ fontFamily: FONTS.bodyBold }}>{weight} kg</Text> ✓
               </Text>
             )}
           </View>
 
-          {/* ── Session Photos (local upload) ── */}
-          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: 'rgba(37,150,190,0.12)' }]}>
-                <Ionicons name="camera" size={20} color={P.cta} />
+          {/* ═══ SESSION PHOTOS ═══ */}
+          <View style={[st.photoSection, { backgroundColor: isDark ? '#0D0D0D' : colors.card, borderColor: isDark ? 'rgba(255,255,255,0.07)' : colors.border }]}>
+            <View style={st.photoHeader}>
+              <View style={[st.photoIconBox, { backgroundColor: 'rgba(37,150,190,0.12)' }]}>
+                <Ionicons name="camera" size={fs(18)} color={P.cta} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Session Photos</Text>
-                <Text style={[styles.sectionSub, { color: colors.textMuted }]}>Show off those gains! ({photos.length}/10)</Text>
+                <Text style={[st.photoTitle, { color: colors.text, fontSize: fs(16) }]}>Session Photos</Text>
+                <Text style={[st.photoSub, { color: colors.textMuted, fontSize: fs(11) }]}>Show off those gains! ({photos.length}/10)</Text>
               </View>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoList}>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.photoList}>
               {photos.map((uri, idx) => (
-                <View key={idx} style={styles.photoWrap}>
-                  <Image source={{ uri }} style={styles.photo} />
-                  <TouchableOpacity style={styles.removeBtn} onPress={() => removePhoto(idx)}>
-                    <Ionicons name="close" size={12} color="#FFF" />
+                <View key={idx} style={[st.photoWrap, { width: s(90), height: s(120) }]}>
+                  <Image source={{ uri }} style={st.photo} />
+                  <TouchableOpacity style={st.removeBtn} onPress={() => removePhoto(idx)}>
+                    <Ionicons name="close" size={fs(11)} color="#FFF" />
                   </TouchableOpacity>
                 </View>
               ))}
               {photos.length < 10 && (
-                <TouchableOpacity style={[styles.addPhotoBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]} onPress={pickPhotos}>
-                  <Ionicons name="add" size={32} color={colors.textDim} />
-                  <Text style={{ color: colors.textDim, fontFamily: FONTS.body, fontSize: 12, marginTop: 4 }}>Add</Text>
-                </TouchableOpacity>
+                <View style={{ gap: s(8), flexDirection: 'row' }}>
+                  {/* Camera button */}
+                  <TouchableOpacity
+                    style={[st.addPhotoBtn, { width: s(90), height: s(120), backgroundColor: isDark ? colors.inputBg : 'rgba(37,150,190,0.06)', borderColor: isDark ? colors.border : 'rgba(37,150,190,0.25)' }]}
+                    onPress={takePhoto}
+                  >
+                    <View style={[st.addPhotoBtnIconCircle, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(37,150,190,0.12)' }]}>
+                      <Ionicons name="camera-outline" size={fs(22)} color={P.cta} />
+                    </View>
+                    <Text style={[st.addPhotoBtnLabel, { color: isDark ? colors.textMuted : P.ctaDark, fontSize: fs(10) }]}>Camera</Text>
+                  </TouchableOpacity>
+                  {/* Gallery button */}
+                  <TouchableOpacity
+                    style={[st.addPhotoBtn, { width: s(90), height: s(120), backgroundColor: isDark ? colors.inputBg : 'rgba(139,92,246,0.06)', borderColor: isDark ? colors.border : 'rgba(139,92,246,0.25)' }]}
+                    onPress={pickPhotos}
+                  >
+                    <View style={[st.addPhotoBtnIconCircle, { backgroundColor: isDark ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.12)' }]}>
+                      <Ionicons name="images-outline" size={fs(22)} color="#8B5CF6" />
+                    </View>
+                    <Text style={[st.addPhotoBtnLabel, { color: isDark ? colors.textMuted : '#6D28D9', fontSize: fs(10) }]}>Gallery</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </ScrollView>
           </View>
         </View>
       </ScrollView>
 
-      {/* Sticky footer */}
-      <View style={[styles.footer, { backgroundColor: colors.bg, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) + 16 }]}>
-        <TouchableOpacity style={styles.saveFooterBtn} onPress={handleFinalSave} disabled={saving}>
-          <LinearGradient colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} style={styles.saveBtnGradient}>
+      {/* ═══ STICKY FOOTER ═══ */}
+      <View style={[st.footer, { backgroundColor: colors.bg, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) + vs(12) }]}>
+        <TouchableOpacity style={st.saveFooterBtn} onPress={handleFinalSave} disabled={saving}>
+          <LinearGradient colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} style={[st.saveBtnGradient, { height: vs(58) }]}>
             {saving ? <ActivityIndicator color="#FFF" /> : (
               <>
-                <Ionicons name="checkmark-done" size={22} color="#FFF" />
-                <Text style={styles.saveBtnText}>SAVE & FINISH</Text>
+                <Ionicons name="checkmark-done" size={fs(20)} color="#FFF" />
+                <Text style={[st.saveBtnText, { fontSize: fs(14) }]}>SAVE & FINISH</Text>
               </>
             )}
           </LinearGradient>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.skipLink} onPress={() => router.replace('/(tabs)/daily')} disabled={saving}>
-          <Text style={[styles.skipLinkText, { color: colors.textMuted }]}>I'll do this later</Text>
+        <TouchableOpacity style={st.skipLink} onPress={() => router.replace('/(tabs)/daily')} disabled={saving}>
+          <Text style={[st.skipLinkText, { color: colors.textMuted, fontSize: fs(13) }]}>I'll do this later</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Streak overlay */}
+      {/* ═══ STREAK OVERLAY ═══ */}
       {showStreakOverlay && (
-        <View style={styles.streakOverlay}>
+        <View style={st.streakOverlay}>
           <LinearGradient colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.95)']} style={StyleSheet.absoluteFill} />
-          <Animated.View style={styles.streakPopup}>
-            <StreakIcon streak={newStreak || 0} size={120} />
-            <Text style={styles.streakPopupTitle}>STREAK UP!</Text>
-            <Text style={styles.streakPopupSub}>Consistency is key. Keep it up!</Text>
+          <Animated.View style={st.streakPopup}>
+            <StreakIcon streak={newStreak || 0} size={s(120)} />
+            <Text style={[st.streakPopupTitle, { fontSize: fs(34) }]}>STREAK UP!</Text>
+            <Text style={[st.streakPopupSub, { fontSize: fs(15) }]}>Consistency is key. Keep it up!</Text>
           </Animated.View>
         </View>
       )}
@@ -299,54 +736,409 @@ export default function WorkoutCompleteScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  scrollContent: { flexGrow: 1, paddingBottom: 40 },
+// ═══════════════════════════════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const st = StyleSheet.create({
+  scrollContent: { flexGrow: 1 },
 
   // ── Hero ──
-  hero: { padding: 40, alignItems: 'center', borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
-  heroIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  heroTitle: { fontFamily: FONTS.heading, fontSize: 32, color: '#FFF', marginBottom: 6 },
-  heroSub: { fontFamily: FONTS.body, fontSize: 16, color: 'rgba(255,255,255,0.9)' },
+  heroWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderBottomLeftRadius: s(32),
+    borderBottomRightRadius: s(32),
+    position: 'relative',
+  },
+  glowRing: {
+    position: 'absolute',
+    borderWidth: 2,
+  },
+  trophyCircle: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: vs(12),
+  },
+  heroTitle: {
+    fontFamily: FONTS.heading,
+    marginBottom: vs(4),
+    textAlign: 'center',
+  },
+  heroSub: {
+    fontFamily: FONTS.body,
+    textAlign: 'center',
+    marginBottom: vs(8),
+  },
+  heroPill: {
+    paddingHorizontal: s(14),
+    paddingVertical: vs(4),
+    borderRadius: s(20),
+    marginTop: vs(4),
+  },
+  heroPillText: {
+    fontFamily: FONTS.bodySemiBold,
+  },
 
-  // ── Form sections ──
-  formContainer: { padding: 16, paddingTop: 12, gap: 16 },
+  // ── Bento ──
+  bentoContainer: {
+    paddingTop: vs(16),
+    gap: vs(10),
+  },
+  sectionLabel: {
+    fontFamily: FONTS.heading,
+    marginBottom: vs(6),
+  },
+  bentoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: s(12),
+  },
 
-  section: { borderRadius: 24, padding: 18, borderWidth: 1 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  sectionIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  sectionTitle: { fontFamily: FONTS.heading, fontSize: 17 },
-  sectionSub: { fontFamily: FONTS.body, fontSize: 12, marginTop: 2 },
-
-  // ── Body weight card ──
-  weightCard: { borderRadius: 24, padding: 20, backgroundColor: '#FEF3C7' },
-  weightCardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 },
-  weightIconBox: { width: 42, height: 42, borderRadius: 12, backgroundColor: 'rgba(120,53,15,0.15)', justifyContent: 'center', alignItems: 'center' },
-  weightCardTitle: { fontFamily: FONTS.heading, fontSize: 17, color: '#78350F', marginBottom: 3 },
-  weightCardSub: { fontFamily: FONTS.body, fontSize: 12, color: 'rgba(120,53,15,0.75)', lineHeight: 17 },
-  weightInputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 16, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)', overflow: 'hidden' },
-  weightInput: { flex: 1, height: 58, paddingHorizontal: 18, fontFamily: FONTS.heading, fontSize: 26, color: '#78350F' },
-  weightUnit: { width: 52, height: 58, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(120,53,15,0.12)' },
-  weightUnitText: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#92400E' },
-  weightHint: { marginTop: 10, fontFamily: FONTS.body, fontSize: 13, color: '#92400E', textAlign: 'center' },
+  // ── Weight ──
+  weightCard: {
+    borderRadius: s(20),
+    padding: s(16),
+    marginTop: vs(20),
+  },
+  weightCardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: s(12),
+    marginBottom: vs(12),
+  },
+  weightIconBox: {
+    width: s(38),
+    height: s(38),
+    borderRadius: s(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  weightTitle: {
+    fontFamily: FONTS.heading,
+    marginBottom: vs(2),
+  },
+  weightSub: {
+    fontFamily: FONTS.body,
+    lineHeight: vs(16),
+  },
+  weightInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: s(14),
+    borderWidth: 1.5,
+    overflow: 'hidden',
+  },
+  weightInput: {
+    flex: 1,
+    paddingHorizontal: s(16),
+    fontFamily: FONTS.heading,
+  },
+  weightUnit: {
+    width: s(48),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  weightUnitText: {
+    fontFamily: FONTS.bodyBold,
+  },
+  weightHint: {
+    marginTop: vs(8),
+    fontFamily: FONTS.body,
+    textAlign: 'center',
+  },
 
   // ── Photos ──
-  photoList: { gap: 12 },
-  photoWrap: { width: 100, height: 130, borderRadius: 16, overflow: 'hidden' },
-  photo: { width: '100%', height: '100%' },
-  removeBtn: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(224,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
-  addPhotoBtn: { width: 100, height: 130, borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
+  photoSection: {
+    borderRadius: s(20),
+    padding: s(16),
+    borderWidth: 1,
+    marginTop: vs(20),
+  },
+  photoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(12),
+    marginBottom: vs(14),
+  },
+  photoIconBox: {
+    width: s(38),
+    height: s(38),
+    borderRadius: s(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoTitle: {
+    fontFamily: FONTS.heading,
+  },
+  photoSub: {
+    fontFamily: FONTS.body,
+    marginTop: vs(2),
+  },
+  photoList: {
+    gap: s(10),
+    alignItems: 'center',
+  },
+  photoWrap: {
+    borderRadius: s(14),
+    overflow: 'hidden',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+  },
+  removeBtn: {
+    position: 'absolute',
+    top: s(5),
+    right: s(5),
+    width: s(20),
+    height: s(20),
+    borderRadius: s(10),
+    backgroundColor: 'rgba(224,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addPhotoBtn: {
+    borderRadius: s(14),
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: vs(6),
+  },
+  addPhotoBtnIconCircle: {
+    width: s(40),
+    height: s(40),
+    borderRadius: s(20),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addPhotoBtnLabel: {
+    fontFamily: FONTS.bodySemiBold,
+  },
 
   // ── Footer ──
-  footer: { paddingHorizontal: 20, paddingTop: 16, gap: 12, borderTopWidth: 1 },
-  saveFooterBtn: { borderRadius: 20, overflow: 'hidden' },
-  saveBtnGradient: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  saveBtnText: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF', letterSpacing: 1 },
-  skipLink: { alignItems: 'center', paddingVertical: 10 },
-  skipLinkText: { fontFamily: FONTS.body, fontSize: 14, textDecorationLine: 'underline' },
+  footer: {
+    paddingHorizontal: s(20),
+    paddingTop: vs(12),
+    gap: vs(10),
+    borderTopWidth: 1,
+  },
+  saveFooterBtn: {
+    borderRadius: s(18),
+    overflow: 'hidden',
+  },
+  saveBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: s(10),
+  },
+  saveBtnText: {
+    fontFamily: FONTS.bodyBold,
+    color: '#FFF',
+    letterSpacing: 1,
+  },
+  skipLink: {
+    alignItems: 'center',
+    paddingVertical: vs(8),
+  },
+  skipLinkText: {
+    fontFamily: FONTS.body,
+    textDecorationLine: 'underline',
+  },
 
   // ── Streak overlay ──
-  streakOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 100, justifyContent: 'center', alignItems: 'center' },
-  streakPopup: { alignItems: 'center', gap: 10 },
-  streakPopupTitle: { fontFamily: FONTS.heading, fontSize: 36, color: '#FFF', letterSpacing: 2, marginTop: 20 },
-  streakPopupSub: { fontFamily: FONTS.body, fontSize: 16, color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
+  streakOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  streakPopup: {
+    alignItems: 'center',
+    gap: vs(8),
+  },
+  streakPopupTitle: {
+    fontFamily: FONTS.heading,
+    color: '#FFF',
+    letterSpacing: 2,
+    marginTop: vs(16),
+  },
+  streakPopupSub: {
+    fontFamily: FONTS.body,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+  },
+});
+
+const bentoStyles = StyleSheet.create({
+  tile: {
+    borderRadius: s(20),
+    padding: s(14),
+    borderWidth: 1,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+  },
+  tileIconBox: {
+    width: s(34),
+    height: s(34),
+    borderRadius: s(10),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: vs(8),
+  },
+  tileLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: fs(9),
+    letterSpacing: 1.2,
+    marginBottom: vs(1),
+  },
+  tileValue: {
+    fontFamily: FONTS.heading,
+  },
+  tileSub: {
+    fontFamily: FONTS.body,
+    fontSize: fs(10),
+    marginTop: vs(2),
+  },
+});
+
+const carouselStyles = StyleSheet.create({
+  card: {
+    borderRadius: s(20),
+    padding: s(16),
+    borderWidth: 1,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+  },
+  exHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: s(12),
+    marginBottom: vs(12),
+  },
+  exImage: {
+    width: s(52),
+    height: s(52),
+    borderRadius: s(12),
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  exMeta: {
+    flex: 1,
+    paddingTop: vs(2),
+  },
+  exName: {
+    fontFamily: FONTS.heading,
+    fontSize: fs(15),
+    lineHeight: fs(20),
+    marginBottom: vs(4),
+  },
+  exSetsSub: {
+    fontFamily: FONTS.body,
+    fontSize: fs(12),
+  },
+  badgeSkipped: {
+    backgroundColor: '#374151',
+    paddingHorizontal: s(8),
+    paddingVertical: vs(4),
+    borderRadius: s(6),
+    alignSelf: 'flex-start',
+  },
+  badgeWorld: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: s(8),
+    paddingVertical: vs(4),
+    borderRadius: s(6),
+    alignSelf: 'flex-start',
+  },
+  badgePR: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FBBF24',
+    paddingHorizontal: s(8),
+    paddingVertical: vs(4),
+    borderRadius: s(6),
+    alignSelf: 'flex-start',
+  },
+  badgeRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245,158,11,0.2)',
+    paddingHorizontal: s(8),
+    paddingVertical: vs(4),
+    borderRadius: s(6),
+    alignSelf: 'flex-start',
+  },
+  badgeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: fs(9),
+    color: '#FFF',
+    letterSpacing: 0.5,
+  },
+  recordRow: {
+    flexDirection: 'row',
+    gap: s(8),
+    marginBottom: vs(12),
+    flexWrap: 'wrap',
+  },
+  recordPill: {
+    flex: 1,
+    minWidth: s(90),
+    borderRadius: s(10),
+    paddingVertical: vs(8),
+    paddingHorizontal: s(10),
+  },
+  recordPillLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: fs(9),
+    letterSpacing: 0.8,
+    marginBottom: vs(3),
+  },
+  recordPillVal: {
+    fontFamily: FONTS.heading,
+    fontSize: fs(13),
+  },
+  exStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: s(8),
+  },
+  exStatCell: {
+    width: '47%',
+    borderRadius: s(12),
+    paddingVertical: vs(10),
+    paddingHorizontal: s(12),
+  },
+  exStatLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: fs(8),
+    letterSpacing: 0.8,
+    marginBottom: vs(4),
+  },
+  exStatValue: {
+    fontFamily: FONTS.heading,
+    fontSize: fs(18),
+  },
+  dotRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: s(5),
+    marginTop: vs(12),
+    paddingBottom: vs(4),
+  },
+  dot: {
+    height: s(6),
+    borderRadius: s(3),
+  },
 });

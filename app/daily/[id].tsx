@@ -189,8 +189,17 @@ const ExerciseCard = React.memo(({
                 const isCardio = item.category?.toLowerCase() === 'cardio';
                 return (
                   <>
-                    <View style={styles.tableHeader}>
+                    <View style={[styles.tableHeader, { justifyContent: 'space-between', alignItems: 'center' }]}>
                       <Text style={styles.tableHeaderText}>SETS</Text>
+                      {workoutStatus === 'active' && (
+                        <TouchableOpacity
+                          onPress={() => openSetModal(item)}
+                          style={styles.addExtraSetBtn}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Ionicons name="add-circle-outline" size={16} color={isDark ? colors.primary : '#FFF'} />
+                        </TouchableOpacity>
+                      )}
                     </View>
                     <View style={[styles.setBlockTop, { paddingBottom: 6, marginBottom: 2, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }]}>
                       <View style={styles.setBlockLeft}>
@@ -647,7 +656,20 @@ export default function ActiveWorkoutScreen() {
       setSetTimer(0);
       setSetTimerRunning(false);
       fetchWorkout();
-      if (!isCardio) {
+      
+      // Check if all exercises are completed or skipped after this set is logged
+      let allCompleted = false;
+      if (workout?.exercises) {
+        const isCurrentExerciseCompleting = (activeExercise.sets?.length || 0) + 1 >= (activeExercise.target_sets || 3);
+        allCompleted = workout.exercises.every((ex: any) => {
+          if (ex.id === activeExercise.id) {
+            return isCurrentExerciseCompleting;
+          }
+          return ex.is_completed || ex.is_skipped;
+        });
+      }
+
+      if (!isCardio && !allCompleted) {
         const restMatch = (activeExercise.target_rest_time || '60s').match(/\d+/);
         const restSec = restMatch ? parseInt(restMatch[0]) : 60;
         startRest(restSec);
@@ -1281,7 +1303,14 @@ export default function ActiveWorkoutScreen() {
                 <FlatList style={{ flex: 1 }} data={browseCategory ? exercisesInCategory : searchResults} keyExtractor={item => item.id} showsVerticalScrollIndicator={false} onEndReached={loadMoreExtra} onEndReachedThreshold={0.5}
                   ListFooterComponent={loadingMore ? <ActivityIndicator color={P.cta} style={{ marginVertical: 20 }} /> : null}
                   renderItem={({ item }) => (
-                    <TouchableOpacity style={[styles.browserItem, { borderBottomColor: colors.border }]} onPress={() => addExtraExercise(item)}>
+                    <TouchableOpacity 
+                      style={[styles.browserItem, { borderBottomColor: colors.border }]} 
+                      onPress={() => {
+                        setGuideExercise(item);
+                        setGuideModalVisible(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
                       <Image source={{ uri: item.image_url }} style={styles.browserImg} />
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -1295,7 +1324,14 @@ export default function ActiveWorkoutScreen() {
                         </View>
                         <Text style={[styles.browserMeta, { color: colors.textMuted }]}>{item.equipment} • {item.target}</Text>
                       </View>
-                      <Ionicons name="add-circle" size={24} color={P.cta} />
+                      <TouchableOpacity 
+                        style={styles.addBtnSmall} 
+                        onPress={() => addExtraExercise(item)}
+                        activeOpacity={0.6}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Ionicons name="add-circle" size={26} color={isDark ? colors.primary : P.cta} />
+                      </TouchableOpacity>
                     </TouchableOpacity>
                   )}
                 />
@@ -1528,6 +1564,7 @@ const styles = StyleSheet.create({
   searchInput:   { flex: 1, fontFamily: FONTS.body, fontSize: 15, padding: 0 },
   avgRatingBadge:{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, marginLeft: 4 },
   avgRatingText: { fontFamily: FONTS.bodyBold, fontSize: 10 },
+  addBtnSmall:   { padding: 6, justifyContent: 'center', alignItems: 'center' },
 
   // Viewer
   viewerOverlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
@@ -1545,4 +1582,5 @@ const styles = StyleSheet.create({
 
   // Metrics modal
   finishSection: { marginBottom: 24 },
+  addExtraSetBtn: { padding: 4 },
 });

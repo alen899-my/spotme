@@ -39,7 +39,177 @@ const METRIC_COLORS: Record<string, string> = {
   'REST TIME': '#F59E0B',
   SETS: '#8B5CF6',
   'BODY WEIGHT': '#10B981',
+  EXERCISES: '#2596BE',
+  'BEST SET': '#FBBF24',
+  'AVG RATING': '#F59E0B',
 };
+
+// ── Apple-Style Exercise Carousel Card ──────────────────────────────────────
+const CAROUSEL_CARD_W = SCREEN_WIDTH - 64;
+const CAROUSEL_SNAP = CAROUSEL_CARD_W + 12;
+
+function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; isDark: boolean }) {
+  const isSkipped = ex.is_skipped;
+  const isCardio = ex.category?.toLowerCase() === 'cardio';
+  const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
+  const totalReps = completedSets.reduce((acc: number, s: any) => acc + (parseInt(s.reps) || 0), 0);
+  const totalWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0);
+  const totalSetWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0), 0);
+  const totalTime = completedSets.reduce((acc: number, s: any) => acc + (s.duration_seconds || 0), 0);
+  const avgWeight = completedSets.length > 0 ? (totalSetWeight / completedSets.length).toFixed(1) : '0';
+  const avgTime = completedSets.length > 0 ? Math.round(totalTime / completedSets.length) : 0;
+
+  return (
+    <View
+      style={[
+        styles.exCard,
+        { width: CAROUSEL_CARD_W, marginBottom: 0 },
+        isSkipped && { opacity: 0.55 },
+        isDark && {
+          backgroundColor: colors.pill,
+          borderColor: colors.border,
+          borderWidth: 1,
+        },
+      ]}
+    >
+      {/* Header */}
+      <View style={styles.exHeader}>
+        <Image source={{ uri: ex.image_url }} style={styles.exImage} />
+        <View style={styles.exMeta}>
+          <Text style={[styles.exName, isDark && { color: colors.text }]} numberOfLines={2}>{ex.name}</Text>
+          <Text style={[styles.exSetsSub, isDark && { color: colors.textMuted }]}>
+            {isSkipped ? 'Movement skipped' : isCardio ? `${formatTime(totalTime)} logged` : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
+          </Text>
+        </View>
+        {isSkipped && (
+          <View style={styles.badgeSkipped}>
+            <Text style={styles.badgeText}>SKIPPED</Text>
+          </View>
+        )}
+        {!isSkipped && ex.is_world_record && (
+          <View style={styles.badgeWorld}>
+            <Ionicons name="earth" size={10} color="#FFF" style={{ marginRight: 3 }} />
+            <Text style={styles.badgeText}>WORLD PR</Text>
+          </View>
+        )}
+        {!isSkipped && !ex.is_world_record && ex.is_personal_record && (
+          <View style={styles.badgePR}>
+            <Ionicons name="ribbon" size={10} color="#1a1a1a" style={{ marginRight: 3 }} />
+            <Text style={[styles.badgeText, { color: '#1a1a1a' }]}>NEW PR</Text>
+          </View>
+        )}
+        {!isSkipped && !ex.is_world_record && !ex.is_personal_record && ex.rating !== null && ex.rating !== undefined && (
+          <View style={styles.badgeRating}>
+            <Ionicons name="star" size={10} color="#F59E0B" style={{ marginRight: 3 }} />
+            <Text style={styles.badgeText}>{ex.rating}/10</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Record row (non-cardio, non-skipped) */}
+      {!isSkipped && !isCardio && (
+        <View style={styles.recordRow}>
+          <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
+            <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>BEST SET</Text>
+            <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
+              {Number(ex.best_set_weight || 0).toFixed(1)}kg × {ex.best_set_reps || 0}
+            </Text>
+          </View>
+          <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
+            <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>MY PR</Text>
+            <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
+              {formatRecord(ex.record_metric_type, ex.personal_record_value)}
+            </Text>
+          </View>
+          <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
+            <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>WORLD PR</Text>
+            <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
+              {formatRecord(ex.record_metric_type, ex.world_record_value)}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Stats grid */}
+      {!isSkipped && completedSets.length > 0 && (
+        <View style={styles.exStatsGrid}>
+          {isCardio ? (
+            <>
+              <View style={[styles.exStatCell, isDark && { backgroundColor: colors.inputBg }]}>
+                <Text style={[styles.exStatLabel, isDark && { color: colors.textMuted }]}>TOTAL TIME</Text>
+                <Text style={[styles.exStatValue, isDark && { color: colors.text }]}>{formatTime(totalTime)}</Text>
+              </View>
+              <View style={[styles.exStatCell, isDark && { backgroundColor: colors.inputBg }]}>
+                <Text style={[styles.exStatLabel, isDark && { color: colors.textMuted }]}>AVG TIME</Text>
+                <Text style={[styles.exStatValue, isDark && { color: colors.text }]}>{formatTime(avgTime)}</Text>
+              </View>
+            </>
+          ) : (
+            [
+              { label: 'TOTAL WEIGHT', value: `${Math.round(totalWeight)}kg` },
+              { label: 'AVG / SET', value: `${avgWeight}kg` },
+              { label: 'TOTAL REPS', value: `${totalReps}` },
+              { label: 'AVG TIME / SET', value: formatTime(avgTime) },
+            ].map((item, idx) => (
+              <View key={idx} style={[styles.exStatCell, isDark && { backgroundColor: colors.inputBg }]}>
+                <Text style={[styles.exStatLabel, isDark && { color: colors.textMuted }]}>{item.label}</Text>
+                <Text style={[styles.exStatValue, isDark && { color: colors.text }]}>{item.value}</Text>
+              </View>
+            ))
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ── Exercise Carousel with pagination dots ──────────────────────────────────
+function ExerciseCarousel({ exercises, colors, isDark }: { exercises: any[]; colors: any; isDark: boolean }) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const onScroll = (e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / CAROUSEL_SNAP);
+    setActiveIdx(idx);
+  };
+
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <ScrollView
+        horizontal
+        pagingEnabled={false}
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={CAROUSEL_SNAP}
+        snapToAlignment="start"
+        contentContainerStyle={{ paddingLeft: 20, paddingRight: 20, gap: 12 }}
+        style={{ marginLeft: -20, marginRight: -20 }}
+        onMomentumScrollEnd={onScroll}
+      >
+        {exercises.map((ex: any) => (
+          <ExerciseCarouselCard key={ex.id} ex={ex} colors={colors} isDark={isDark} />
+        ))}
+      </ScrollView>
+      {/* Pagination dots */}
+      {exercises.length > 1 && (
+        <View style={styles.dotRow}>
+          {exercises.map((_: any, i: number) => (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                {
+                  backgroundColor: i === activeIdx
+                    ? P.cta
+                    : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'),
+                  width: i === activeIdx ? 20 : 6,
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
 
 interface WorkoutSummaryProps {
   workout: any;
@@ -81,13 +251,48 @@ export default function WorkoutSummary({
     acc + (ex.sets?.filter((s: any) => !s.is_skipped).length || 0), 0) || 0;
   const totalSets = workout?.total_sets || calculatedTotalSets || 0;
 
-  const stats = [
+  const totalExercises = workout?.exercises?.length || 0;
+  const skippedExercises = workout?.exercises?.filter((e: any) => e.is_skipped).length || 0;
+  const completedExercises = workout?.exercises?.filter((e: any) => e.is_completed && !e.is_skipped).length || 0;
+
+  let bestSet: any = null;
+  if (workout?.exercises) {
+    for (const ex of workout.exercises) {
+      if (ex.is_skipped) continue;
+      for (const set of (ex.sets || [])) {
+        if (set.is_skipped) continue;
+        const w = parseFloat(set.weight) || 0;
+        const r = parseInt(set.reps) || 0;
+        if (!bestSet || (w * r) > (bestSet.w * bestSet.r)) {
+          bestSet = { w, r, name: ex.name };
+        }
+      }
+    }
+  }
+
+  const ratingsList = workout?.exercises
+    ? workout.exercises.map((e: any) => e.rating).filter((r: any) => r !== null && r !== undefined)
+    : [];
+  const avgRating = ratingsList.length > 0
+    ? (ratingsList.reduce((a: number, b: number) => a + b, 0) / ratingsList.length).toFixed(1)
+    : null;
+
+  const stats: Array<{ key: string; icon: string; value: string; sub: string; wide?: boolean }> = [
     { key: 'DURATION', icon: 'time-outline', value: formatDuration(duration), sub: 'Active time' },
     { key: 'CALORIES', icon: 'flame-outline', value: `${caloriesBurned} kcal`, sub: 'Est. burn' },
-    { key: 'VOLUME', icon: 'barbell-outline', value: `${Math.round(volume)}kg`, sub: 'Weight lifted' },
+    { key: 'VOLUME', icon: 'barbell-outline', value: `${Math.round(volume)}kg`, sub: 'Weight lifted', wide: true },
     { key: 'REST TIME', icon: 'hourglass-outline', value: formatDuration(rest), sub: 'Recovery' },
     { key: 'SETS', icon: 'layers-outline', value: `${totalSets}`, sub: 'Completed sets' },
-    ...(showBodyWeight ? [{ key: 'BODY WEIGHT' as const, icon: 'scale-outline' as const, value: `${workout?.post_workout_weight || 0}kg`, sub: 'Current mass' }] : []),
+    {
+      key: 'EXERCISES',
+      icon: 'fitness-outline',
+      value: `${completedExercises}/${totalExercises}`,
+      sub: skippedExercises > 0 ? `${skippedExercises} skipped` : 'All completed',
+      wide: true,
+    },
+    ...(bestSet ? [{ key: 'BEST SET', icon: 'trophy-outline', value: `${bestSet.w}kg × ${bestSet.r}`, sub: bestSet.name }] : []),
+    ...(avgRating !== null ? [{ key: 'AVG RATING', icon: 'star-outline', value: `${avgRating}/10`, sub: 'Exercise quality' }] : []),
+    ...(showBodyWeight ? [{ key: 'BODY WEIGHT', icon: 'scale-outline', value: `${workout?.post_workout_weight || 0}kg`, sub: 'Current mass' }] : []),
   ];
 
   function formatLocalDate(dateStr: string) {
@@ -126,14 +331,7 @@ export default function WorkoutSummary({
             )}
           </View>
         </View>
-        {!hideEditButton && onEditMetrics && (
-          <TouchableOpacity
-            onPress={onEditMetrics}
-            style={[styles.editBtn, isDark && { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }]}
-          >
-            <Ionicons name="options-outline" size={20} color={isDark ? colors.primary : "#FFF"} />
-          </TouchableOpacity>
-        )}
+
       </View>
 
       {/* ── Photos Gallery ── */}
@@ -180,6 +378,7 @@ export default function WorkoutSummary({
               key={s.key}
               style={[
                 styles.statCard,
+                { width: s.wide ? SCREEN_WIDTH - 40 : (SCREEN_WIDTH - 52) / 2 },
                 isDark && { backgroundColor: '#0D0D0D', borderColor: colors.border, borderWidth: 1 },
               ]}
             >
@@ -195,123 +394,11 @@ export default function WorkoutSummary({
       </View>
 
       {/* ── Exercise Cards ── */}
-      <Text style={[styles.sectionLabel, { color: colors.text }]}>Movement Summary</Text>
+      <Text style={[styles.sectionLabel, { color: colors.text, marginBottom: 12 }]}>Movement Summary</Text>
 
-      {workout?.exercises?.map((ex: any) => {
-        const isSkipped = ex.is_skipped;
-        const isCardio = ex.category?.toLowerCase() === 'cardio';
-        const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
-        const totalReps = completedSets.reduce((acc: number, s: any) => acc + (parseInt(s.reps) || 0), 0);
-        const totalWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0);
-        const totalSetWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0), 0);
-        const totalTime = completedSets.reduce((acc: number, s: any) => acc + (s.duration_seconds || 0), 0);
-        const avgWeight = completedSets.length > 0 ? (totalSetWeight / completedSets.length).toFixed(1) : '0';
-        const avgTime = completedSets.length > 0 ? Math.round(totalTime / completedSets.length) : 0;
-        const ratings = ex.sets?.map((s: any) => s.rating).filter(Boolean) || [];
-
-        return (
-          <View
-            key={ex.id}
-            style={[
-              styles.exCard,
-              isSkipped && { opacity: 0.55 },
-              isDark && {
-                backgroundColor: colors.pill,
-                borderColor: colors.border,
-                borderWidth: 1,
-              },
-            ]}
-          >
-            {/* Header */}
-            <View style={styles.exHeader}>
-              <Image source={{ uri: ex.image_url }} style={styles.exImage} />
-              <View style={styles.exMeta}>
-                <Text style={[styles.exName, isDark && { color: colors.text }]} numberOfLines={2}>{ex.name}</Text>
-                <Text style={[styles.exSetsSub, isDark && { color: colors.textMuted }]}>
-                  {isSkipped ? 'Movement skipped' : isCardio ? `${formatTime(totalTime)} logged` : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
-                </Text>
-              </View>
-              {isSkipped && (
-                <View style={styles.badgeSkipped}>
-                  <Text style={styles.badgeText}>SKIPPED</Text>
-                </View>
-              )}
-              {!isSkipped && ex.is_world_record && (
-                <View style={styles.badgeWorld}>
-                  <Ionicons name="earth" size={10} color="#FFF" style={{ marginRight: 3 }} />
-                  <Text style={styles.badgeText}>WORLD PR</Text>
-                </View>
-              )}
-              {!isSkipped && !ex.is_world_record && ex.is_personal_record && (
-                <View style={styles.badgePR}>
-                  <Ionicons name="ribbon" size={10} color="#1a1a1a" style={{ marginRight: 3 }} />
-                  <Text style={[styles.badgeText, { color: '#1a1a1a' }]}>NEW PR</Text>
-                </View>
-              )}
-              {!isSkipped && !ex.is_world_record && !ex.is_personal_record && ex.rating !== null && ex.rating !== undefined && (
-                <View style={styles.badgeRating}>
-                  <Ionicons name="star" size={10} color="#F59E0B" style={{ marginRight: 3 }} />
-                  <Text style={styles.badgeText}>{ex.rating}/10</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Record row (non-cardio, non-skipped) */}
-            {!isSkipped && !isCardio && (
-              <View style={styles.recordRow}>
-                <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
-                  <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>BEST SET</Text>
-                  <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
-                    {Number(ex.best_set_weight || 0).toFixed(1)}kg × {ex.best_set_reps || 0}
-                  </Text>
-                </View>
-                <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
-                  <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>MY PR</Text>
-                  <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
-                    {formatRecord(ex.record_metric_type, ex.personal_record_value)}
-                  </Text>
-                </View>
-                <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
-                  <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>WORLD PR</Text>
-                  <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
-                    {formatRecord(ex.record_metric_type, ex.world_record_value)}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Stats grid */}
-            {!isSkipped && completedSets.length > 0 && (
-              <View style={styles.exStatsGrid}>
-                {isCardio ? (
-                  <>
-                    <View style={[styles.exStatCell, isDark && { backgroundColor: colors.inputBg }]}>
-                      <Text style={[styles.exStatLabel, isDark && { color: colors.textMuted }]}>TOTAL TIME</Text>
-                      <Text style={[styles.exStatValue, isDark && { color: colors.text }]}>{formatTime(totalTime)}</Text>
-                    </View>
-                    <View style={[styles.exStatCell, isDark && { backgroundColor: colors.inputBg }]}>
-                      <Text style={[styles.exStatLabel, isDark && { color: colors.textMuted }]}>AVG TIME</Text>
-                      <Text style={[styles.exStatValue, isDark && { color: colors.text }]}>{formatTime(avgTime)}</Text>
-                    </View>
-                  </>
-                ) : (
-                  [
-                    { label: 'TOTAL WEIGHT', value: `${Math.round(totalWeight)}kg` },
-                    { label: 'AVG / SET', value: `${avgWeight}kg` },
-                    { label: 'TOTAL REPS', value: `${totalReps}` },
-                    { label: 'AVG TIME / SET', value: formatTime(avgTime) },
-                  ].map((item, idx) => (
-                    <View key={idx} style={[styles.exStatCell, isDark && { backgroundColor: colors.inputBg }]}>
-                      <Text style={[styles.exStatLabel, isDark && { color: colors.textMuted }]}>{item.label}</Text>
-                      <Text style={[styles.exStatValue, isDark && { color: colors.text }]}>{item.value}</Text>
-                    </View>
-                  ))
-                )}
-              </View>
-            )}
-          </View>
-        );
-      })}
+      {workout?.exercises?.length > 0 && (
+        <ExerciseCarousel exercises={workout.exercises} colors={colors} isDark={isDark} />
+      )}
     </View>
   );
 }
@@ -574,5 +661,17 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.heading,
     fontSize: 18,
     color: '#FFF',
+  },
+  dotRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 12,
+    paddingBottom: 4,
+  },
+  dot: {
+    height: 6,
+    borderRadius: 3,
   },
 });
