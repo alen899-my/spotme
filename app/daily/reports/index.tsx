@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity, ActivityIndicator, Animated,
+  TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -10,118 +10,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { useToast } from '../../../contexts/ToastContext';
+import ConfirmationModal from '../../../components/ui/ConfirmationModal';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
-
-const STAGES = [
-  'Analyzing your workout...',
-  'Reviewing your exercises...',
-  'Generating insights...',
-  'Building your report...',
-];
-
-function ReportSkeleton() {
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
-  const [stageIdx, setStageIdx] = React.useState(0);
-  const barAnim = React.useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      ])
-    );
-    pulse.start();
-
-    const cycle = setInterval(() => {
-      setStageIdx(prev => (prev + 1) % STAGES.length);
-    }, 2500);
-
-    const bar = Animated.loop(
-      Animated.sequence([
-        Animated.timing(barAnim, { toValue: 1, duration: 2000, useNativeDriver: false }),
-        Animated.timing(barAnim, { toValue: 0, duration: 2000, useNativeDriver: false }),
-      ])
-    );
-    bar.start();
-
-    return () => { pulse.stop(); clearInterval(cycle); bar.stop(); };
-  }, []);
-
-  const barWidth = barAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['20%', '80%'],
-  });
-
-  return (
-    <Animated.View style={{ opacity: pulseAnim }}>
-      <View style={[skeleton.card, { backgroundColor: '#1a1a2e', borderColor: 'rgba(37,150,190,0.25)' }]}>
-        <View style={skeleton.top}>
-          <View style={[skeleton.circle, { backgroundColor: 'rgba(37,150,190,0.15)' }]} />
-          <View style={{ flex: 1, gap: 6 }}>
-            <View style={[skeleton.bar, { width: '40%', backgroundColor: 'rgba(255,255,255,0.08)' }]} />
-            <View style={[skeleton.bar, { width: '80%', backgroundColor: 'rgba(255,255,255,0.05)' }]} />
-          </View>
-          <View style={[skeleton.bar, { width: 16, height: 16, backgroundColor: 'rgba(255,255,255,0.05)' }]} />
-        </View>
-        <View style={skeleton.stats}>
-          <View style={[skeleton.bar, { width: 60, backgroundColor: 'rgba(255,255,255,0.06)' }]} />
-          <View style={[skeleton.bar, { width: 80, backgroundColor: 'rgba(255,255,255,0.06)' }]} />
-        </View>
-        <View style={skeleton.badge}>
-          <View style={skeleton.spinner}>
-            <ActivityIndicator size="small" color="#F7CB16" />
-          </View>
-          <Text style={skeleton.badgeText}>{STAGES[stageIdx]}</Text>
-        </View>
-        <View style={skeleton.progressTrack}>
-          <Animated.View style={[skeleton.progressFill, { width: barWidth }]} />
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-
-const skeleton = StyleSheet.create({
-  card: {
-    borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 10,
-  },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  circle: { width: 40, height: 40, borderRadius: 12 },
-  bar: { height: 12, borderRadius: 6 },
-  stats: { flexDirection: 'row', gap: 12, marginTop: 12, paddingLeft: 52 },
-  badge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginTop: 8, paddingLeft: 52,
-  },
-  spinner: { width: 14, height: 14 },
-  badgeDot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: '#F7CB16',
-  },
-  badgeText: {
-    fontFamily: FONTS.body, fontSize: 11,
-    color: '#F7CB16', letterSpacing: 0.5,
-  },
-  progressTrack: {
-    height: 3, borderRadius: 2,
-    backgroundColor: 'rgba(247,203,22,0.12)',
-    marginTop: 10, marginLeft: 52, overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%', borderRadius: 2,
-    backgroundColor: '#F7CB16',
-  },
-});
 
 export default function ReportsListScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const [reports, setReports] = useState<any[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
 
   const fetch = useCallback(async () => {
     try {
@@ -146,7 +49,46 @@ export default function ReportsListScreen() {
 
   useFocusEffect(useCallback(() => { fetch(); }, [fetch]));
 
-  const generating = reports.filter(r => r.status === 'generating');
+  const getToken = useCallback(async () => {
+    const token = await AsyncStorage.getItem('userToken');
+    return { Authorization: `Bearer ${token}` };
+  }, []);
+
+  const handleRetry = useCallback(async (item: any) => {
+    const key = `retry-${item.id}`;
+    try {
+      setActionId(key);
+      const headers = await getToken();
+      await axios.post(
+        `${API_URL}/daily/workouts/${item.daily_workout_id}/generate-report`,
+        { force: true },
+        { headers }
+      );
+      showToast('Report retry started...', 'info');
+      await fetch();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Failed to retry report', 'error');
+    } finally {
+      setActionId(null);
+    }
+  }, [fetch, getToken, showToast]);
+
+  const handleDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    const key = `delete-${deleteTarget.id}`;
+    try {
+      setActionId(key);
+      const headers = await getToken();
+      await axios.delete(`${API_URL}/daily/reports/${deleteTarget.id}`, { headers });
+      showToast('Report deleted');
+      setDeleteTarget(null);
+      await fetch();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Failed to delete report', 'error');
+    } finally {
+      setActionId(null);
+    }
+  }, [deleteTarget, fetch, getToken, showToast]);
 
   const s = makeStyles(colors);
 
@@ -178,13 +120,6 @@ export default function ReportsListScreen() {
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={generating.length > 0 ? (
-            <View style={{ marginBottom: 4 }}>
-              {generating.map(r => (
-                <ReportSkeleton key={r.id} />
-              ))}
-            </View>
-          ) : null}
           ListFooterComponent={
             pendingCount > 0 ? (
               <TouchableOpacity
@@ -207,23 +142,32 @@ export default function ReportsListScreen() {
           }
           renderItem={({ item }) => {
             const isGenerating = item.status === 'generating';
-            if (isGenerating) return null;
+            const retrying = actionId === `retry-${item.id}`;
+            const deleting = actionId === `delete-${item.id}`;
 
             return (
               <TouchableOpacity
                 style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => router.push(`/daily/report/${item.id}`)}
+                onPress={() => {
+                  if (!isGenerating) router.push(`/daily/report/${item.id}`);
+                }}
                 activeOpacity={0.7}
               >
                 <View style={s.cardTop}>
                   <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(37,150,190,0.1)' }]}>
-                    <MaterialCommunityIcons name="clipboard-text" size={20} color={colors.primary} />
+                    {isGenerating ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <MaterialCommunityIcons name="clipboard-text" size={20} color={colors.primary} />
+                    )}
                   </View>
                   <View style={s.cardInfo}>
                     <Text style={[s.cardDate, { color: colors.textMuted }]}>{item.workout_date}</Text>
-                    <Text style={[s.cardSummary, { color: colors.text }]} numberOfLines={2}>{item.summary}</Text>
+                    <Text style={[s.cardSummary, { color: colors.text }]} numberOfLines={2}>
+                      {isGenerating ? 'Generating workout analysis...' : item.summary}
+                    </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  {!isGenerating && <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />}
                 </View>
                 <View style={s.cardStats}>
                   {item.total_duration_seconds ? (
@@ -236,6 +180,39 @@ export default function ReportsListScreen() {
                       {Math.round(Number(item.total_volume)).toLocaleString()} kg
                     </Text>
                   ) : null}
+                  {isGenerating ? (
+                    <Text style={[s.stat, { color: '#F59E0B' }]}>in progress</Text>
+                  ) : null}
+                </View>
+                <View style={s.actionsRow}>
+                  <TouchableOpacity
+                    style={[s.actionBtn, { backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(37,150,190,0.08)', borderColor: isDark ? 'rgba(37,150,190,0.25)' : 'rgba(37,150,190,0.18)' }]}
+                    onPress={() => handleRetry(item)}
+                    disabled={Boolean(actionId)}
+                    activeOpacity={0.75}
+                  >
+                    {retrying ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <Ionicons name="refresh-outline" size={16} color={colors.primary} />
+                    )}
+                    <Text style={[s.actionText, { color: colors.primary }]}>
+                      {isGenerating ? 'Retry' : 'Regenerate'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.actionBtn, { backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)', borderColor: isDark ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.18)' }]}
+                    onPress={() => setDeleteTarget(item)}
+                    disabled={Boolean(actionId)}
+                    activeOpacity={0.75}
+                  >
+                    {deleting ? (
+                      <ActivityIndicator size="small" color="#EF4444" />
+                    ) : (
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                    )}
+                    <Text style={[s.actionText, { color: '#EF4444' }]}>Delete</Text>
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             );
@@ -251,6 +228,18 @@ export default function ReportsListScreen() {
           }
         />
       )}
+
+      <ConfirmationModal
+        visible={Boolean(deleteTarget)}
+        title="Delete Report?"
+        message="This removes the workout analysis from your reports. Your original workout stays saved."
+        confirmText={actionId === `delete-${deleteTarget?.id}` ? 'DELETING...' : 'DELETE'}
+        confirmColor="#EF4444"
+        onConfirm={handleDelete}
+        onCancel={() => {
+          if (!actionId) setDeleteTarget(null);
+        }}
+      />
     </View>
   );
 }
@@ -287,6 +276,24 @@ const makeStyles = (colors: any) => StyleSheet.create({
   cardSummary: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 18 },
   cardStats: { flexDirection: 'row', gap: 12, marginTop: 8, paddingLeft: 52 },
   stat: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    paddingLeft: 52,
+  },
+  actionBtn: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  actionText: { fontFamily: FONTS.bodyBold, fontSize: 12 },
   generateCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     borderRadius: 16, borderWidth: 1, padding: 14, marginTop: 8,

@@ -1540,6 +1540,7 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
   try {
     const workoutId = parseInt(req.params.id);
     const userId = req.user.id;
+    const forceRetry = Boolean(req.body?.force);
 
     // Fetch workout with exercises and sets
     const workoutRes = await client.query(`
@@ -1556,12 +1557,32 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
 
     const w = workoutRes.rows[0];
 
+    if (forceRetry) {
+      const oldReports = await client.query(
+        'SELECT id FROM workout_reports WHERE daily_workout_id = $1 AND user_id = $2',
+        [workoutId, userId]
+      );
+      const oldReportIds = oldReports.rows.map(row => row.id);
+
+      if (oldReportIds.length > 0) {
+        await client.query(
+          'DELETE FROM notifications WHERE user_id = $1 AND type = $2 AND reference_id = ANY($3::int[])',
+          [userId, 'workout_report', oldReportIds]
+        );
+        await client.query(
+          'DELETE FROM workout_reports WHERE daily_workout_id = $1 AND user_id = $2',
+          [workoutId, userId]
+        );
+      }
+    }
+
     // Check if report already exists
     const existing = await client.query(
-      'SELECT id FROM workout_reports WHERE daily_workout_id = $1', [workoutId]
+      'SELECT id, status FROM workout_reports WHERE daily_workout_id = $1 AND user_id = $2',
+      [workoutId, userId]
     );
     if (existing.rows.length > 0) {
-      return res.json({ report_id: existing.rows[0].id });
+      return res.json({ report_id: existing.rows[0].id, status: existing.rows[0].status });
     }
 
     // Insert placeholder row with status 'generating'
@@ -1732,6 +1753,46 @@ router.get('/reports/pending-workouts', authenticateToken, async (req, res) => {
 });
 
 // ── GET /daily/reports/:id ── Get a specific report ─────────────────────────
+router.delete('/reports/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const reportId = parseInt(req.params.id);
+    if (!Number.isFinite(reportId)) {
+      return res.status(400).json({ error: 'Invalid report id' });
+    }
+
+    await client.query('BEGIN');
+
+    const existing = await client.query(
+      'SELECT id FROM workout_reports WHERE id = $1 AND user_id = $2',
+      [reportId, req.user.id]
+    );
+
+    if (existing.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    await client.query(
+      'DELETE FROM notifications WHERE user_id = $1 AND type = $2 AND reference_id = $3',
+      [req.user.id, 'workout_report', reportId]
+    );
+    await client.query(
+      'DELETE FROM workout_reports WHERE id = $1 AND user_id = $2',
+      [reportId, req.user.id]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    console.error('DELETE /daily/reports/:id error:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 router.get('/reports/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(`
