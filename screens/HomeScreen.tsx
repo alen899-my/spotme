@@ -15,6 +15,8 @@ import axios from "axios";
 import { P, scale, vs } from "../constants/homeTheme";
 import { FONTS } from "../constants/theme";
 import { useTheme } from "../contexts/ThemeContext";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 import GreetingCard       from "../components/ui/GreetingCard";
@@ -172,6 +174,63 @@ export default function HomeScreen() {
 
       {isProfileComplete && (
         <>
+          {/* ── Quick Logger Actions ────────────────────────────────────────── */}
+          <View style={styles.quickLoggerRow}>
+            {/* Log Workout Button */}
+            <TouchableOpacity
+              style={[
+                styles.quickLoggerCard,
+                {
+                  borderColor: isDark ? "rgba(37,150,190,0.25)" : "rgba(37,150,190,0.18)",
+                  backgroundColor: colors.card,
+                },
+              ]}
+              onPress={() => router.push("/daily/new")}
+              activeOpacity={0.82}
+            >
+              <LinearGradient
+                colors={isDark ? ["#111A24", "#0D0D0D"] : ["#F0F9FF", "#FFFFFF"]}
+                style={StyleSheet.absoluteFillObject}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={[styles.quickLoggerIconWrap, { backgroundColor: isDark ? "rgba(37,150,190,0.15)" : "#E0F2FE" }]}>
+                <Ionicons name="barbell" size={scale(20)} color="#2596BE" />
+              </View>
+              <View style={styles.quickLoggerTextWrap}>
+                <Text style={[styles.quickLoggerTitle, { color: colors.text }]}>Log Workout</Text>
+                <Text style={[styles.quickLoggerSubtitle, { color: colors.textMuted }]}>Record exercises</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Log Meals Button */}
+            <TouchableOpacity
+              style={[
+                styles.quickLoggerCard,
+                {
+                  borderColor: isDark ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.18)",
+                  backgroundColor: colors.card,
+                },
+              ]}
+              onPress={() => router.push("/(tabs)/meals")}
+              activeOpacity={0.82}
+            >
+              <LinearGradient
+                colors={isDark ? ["#1F1607", "#0D0D0D"] : ["#FFFBEB", "#FFFFFF"]}
+                style={StyleSheet.absoluteFillObject}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={[styles.quickLoggerIconWrap, { backgroundColor: isDark ? "rgba(245,158,11,0.15)" : "#FEF3C7" }]}>
+                <Ionicons name="restaurant" size={scale(20)} color={isDark ? "#F59E0B" : "#D97706"} />
+              </View>
+              <View style={styles.quickLoggerTextWrap}>
+                <Text style={[styles.quickLoggerTitle, { color: colors.text }]}>Log Meals</Text>
+                <Text style={[styles.quickLoggerSubtitle, { color: colors.textMuted }]}>Macros & water</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
           {/* ── XP / Level ───────────────────────────────────────────────────── */}
           <XPCard
             tier={u.league_tier || "Bronze"}
@@ -337,5 +396,51 @@ const styles = StyleSheet.create({
   bannerCTAText: {
     fontFamily: FONTS.bodyBold,
     fontSize: scale(12),
+  },
+  // ── Quick Logger ───────────────────────────────────────────────────────────
+  quickLoggerRow: {
+    flexDirection: "row",
+    gap: scale(12),
+    marginBottom: vs(20),
+  },
+  quickLoggerCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: scale(16),
+    borderWidth: 1,
+    paddingHorizontal: scale(12),
+    paddingVertical: vs(14),
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  quickLoggerIconWrap: {
+    width: scale(38),
+    height: scale(38),
+    borderRadius: scale(10),
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: scale(10),
+    zIndex: 1,
+  },
+  quickLoggerTextWrap: {
+    flex: 1,
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  quickLoggerTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(14),
+    lineHeight: scale(18),
+  },
+  quickLoggerSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: scale(10),
+    lineHeight: scale(13),
+    marginTop: 2,
   },
 });
