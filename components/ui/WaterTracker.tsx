@@ -27,7 +27,6 @@ interface Props {
 
 const HYDRATION = {
   card: '#2596BE',
-  border: 'rgba(247,203,22,0.34)',
   deepBlue: '#1A6E8A',
   navy: '#0F5A72',
   sky: '#67C7F0',
@@ -179,6 +178,20 @@ function getLogTone(amount: number) {
   };
 }
 
+function getLogIcon(amount: number): string {
+  if (amount <= 150) return 'water';
+  if (amount <= 300) return 'cafe';
+  if (amount <= 400) return 'wine';
+  return 'flask';
+}
+
+function getDrinkTypeLabel(amount: number): string {
+  if (amount <= 150) return 'Sip';
+  if (amount <= 300) return 'Cup';
+  if (amount <= 400) return 'Glass';
+  return 'Bottle';
+}
+
 function WaterBar({
   progressRatio,
   goalRatio,
@@ -224,12 +237,12 @@ function WaterBar({
       <View style={wb.legendRow}>
         <Text style={[wb.zeroLabel, isDark && { color: colors.textMuted }]}>0 ml</Text>
 
-        <View style={[wb.legendChip, { backgroundColor: isDark ? colors.inputBg : HYDRATION.deepBlue, borderWidth: isDark ? 1 : 0, borderColor: HYDRATION.deepBlue }]}>
+        <View style={[wb.legendChip, { backgroundColor: isDark ? colors.inputBg : HYDRATION.deepBlue }]}>
           <Ionicons name="water-outline" size={12} color={isDark ? HYDRATION.sky : HYDRATION.white} style={{ marginRight: 5 }} />
           <Text style={[wb.legendText, { color: isDark ? HYDRATION.sky : HYDRATION.white }]}>Goal</Text>
         </View>
 
-        <View style={[wb.legendChip, { backgroundColor: isDark ? colors.inputBg : HYDRATION.lightGreen, borderWidth: isDark ? 1 : 0, borderColor: HYDRATION.lightGreen }]}>
+        <View style={[wb.legendChip, { backgroundColor: isDark ? colors.inputBg : HYDRATION.lightGreen }]}>
           <Ionicons name="shield-checkmark-outline" size={12} color={isDark ? HYDRATION.green : HYDRATION.ink} style={{ marginRight: 5 }} />
           <Text style={[wb.legendText, { color: isDark ? HYDRATION.green : HYDRATION.ink }]}>Max Safe</Text>
         </View>
@@ -275,8 +288,6 @@ const wb = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: HYDRATION.white,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
@@ -338,7 +349,7 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   if (!lastLog) {
     return (
-      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.yellow, borderWidth: isDark ? 1 : 0, borderColor: HYDRATION.yellow }]}>
+      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.yellow }]}>
         <Ionicons name="information-circle-outline" size={18} color={isDark ? HYDRATION.yellow : HYDRATION.ink} />
         <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
           Start your hydration journey and log your first drink.
@@ -349,7 +360,7 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   if (totalWater >= waterTarget) {
     return (
-      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.lightGreen, borderWidth: isDark ? 1 : 0, borderColor: HYDRATION.green }]}>
+      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.lightGreen }]}>
         <Ionicons name="checkmark-circle" size={18} color={isDark ? HYDRATION.green : HYDRATION.ink} />
         <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
           Amazing. Daily hydration goal achieved.
@@ -363,7 +374,7 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   if (elapsedMin < interval) {
     return (
-      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.yellow, borderWidth: isDark ? 1 : 0, borderColor: HYDRATION.yellow }]}>
+      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.yellow }]}>
         <Ionicons name="time-outline" size={18} color={isDark ? HYDRATION.yellow : HYDRATION.ink} />
         <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
           Next drink in <Text style={[rb.emphasis, isDark && { color: HYDRATION.sky }]}>{nextIn} min</Text>. Stay consistent.
@@ -375,7 +386,7 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
   const urgency = elapsedMin > interval * 1.5;
   const stateColor = urgency ? HYDRATION.orange : HYDRATION.amber;
   return (
-    <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : stateColor, borderWidth: isDark ? 1 : 0, borderColor: stateColor }]}>
+    <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : stateColor }]}>
       <Ionicons name={urgency ? 'warning-outline' : 'notifications-outline'} size={18} color={isDark ? stateColor : HYDRATION.ink} />
       <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
         {urgency ? `${elapsedMin} min since your last drink. Hydrate now.` : `Time to hydrate. It has been ${elapsedMin} min.`}
@@ -413,6 +424,7 @@ export default function WaterTracker({ selectedDate }: Props) {
   const emptyGlowScale = useRef(new Animated.Value(0.96)).current;
   const fillAnim = useRef(new Animated.Value(0)).current;
   const waveAnim = useRef(new Animated.Value(0)).current;
+  const blinkAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     AsyncStorage.getItem('userData').then((d) => {
@@ -499,6 +511,31 @@ export default function WaterTracker({ selectedDate }: Props) {
     outputRange: [0, 12],
   });
 
+  useEffect(() => {
+    let loop: Animated.CompositeAnimation | null = null;
+    if (totalWater > maxSafe) {
+      blinkAnim.setValue(0.15);
+      loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(blinkAnim, {
+            toValue: 0.7,
+            duration: 600,
+            useNativeDriver: false,
+          }),
+          Animated.timing(blinkAnim, {
+            toValue: 0.15,
+            duration: 600,
+            useNativeDriver: false,
+          }),
+        ])
+      );
+      loop.start();
+    } else {
+      blinkAnim.setValue(0);
+    }
+    return () => loop?.stop();
+  }, [totalWater, maxSafe, blinkAnim]);
+
   const handleLog = async (amount: number) => {
     const exceeds = totalWater + amount > maxSafe;
     if (exceeds) showToast('Overhydration warning. Logging anyway.', 'error');
@@ -553,14 +590,14 @@ export default function WaterTracker({ selectedDate }: Props) {
 
   if (loading) {
     return (
-      <View style={[s.loadingCard, isDark && { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[s.loadingCard, isDark && { backgroundColor: colors.card }]}>
         <ActivityIndicator size="large" color={HYDRATION.yellow} />
       </View>
     );
   }
 
   return (
-    <View style={[s.card, isDark && { backgroundColor: colors.card, borderColor: colors.border, shadowColor: '#000', shadowOpacity: 0.28 }]}>
+    <View style={[s.card, isDark && { backgroundColor: colors.card, shadowColor: '#000', shadowOpacity: 0.28 }]}>
       <TouchableOpacity style={s.header} activeOpacity={0.88} onPress={() => setExpanded((prev) => !prev)}>
         <View style={s.headerLeft}>
           <View style={[s.headerIcon, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.16)' }]}>
@@ -580,15 +617,15 @@ export default function WaterTracker({ selectedDate }: Props) {
 
       {!expanded && (
         <View style={s.collapsedSummaryRow}>
-          <View style={[s.summaryChip, s.summaryChipLight, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: HYDRATION.yellow }]}>
+          <View style={[s.summaryChip, s.summaryChipLight, isDark && { backgroundColor: colors.inputBg }]}>
             <Text style={[s.summaryLabelLight, isDark && { color: colors.textMuted }]}>Consumed</Text>
             <Text style={[s.summaryValueLight, isDark && { color: colors.text }]}>{totalWater.toLocaleString()} ml</Text>
           </View>
-          <View style={[s.summaryChip, s.summaryChipBlue, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: HYDRATION.deepBlue }]}>
+          <View style={[s.summaryChip, s.summaryChipBlue, isDark && { backgroundColor: colors.inputBg }]}>
             <Text style={[s.summaryLabelLight, isDark && { color: colors.textMuted }]}>Goal</Text>
             <Text style={[s.summaryValueLight, isDark && { color: colors.text }]}>{target.toLocaleString()} ml</Text>
           </View>
-          <View style={[s.summaryChip, isOver ? s.summaryChipAlert : s.summaryChipGreen, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: isOver ? HYDRATION.amber : HYDRATION.green }]}>
+          <View style={[s.summaryChip, isOver ? s.summaryChipAlert : s.summaryChipGreen, isDark && { backgroundColor: colors.inputBg }]}>
             <Text style={[isOver ? s.summaryLabelDark : s.summaryLabelLight, isDark ? { color: colors.textMuted } : null]}>{isOver ? 'Over' : 'Remaining'}</Text>
             <Text style={[isOver ? s.summaryValueDark : s.summaryValueLight, isDark ? { color: colors.text } : null]}>{Math.abs(target - totalWater).toLocaleString()} ml</Text>
           </View>
@@ -612,7 +649,30 @@ export default function WaterTracker({ selectedDate }: Props) {
                 ]}
               />
 
-              <View style={[s.cup, { borderColor: hydrationState.primary, backgroundColor: hydrationState.cupBg }]}>
+              <View
+                style={[
+                  s.cup,
+                  {
+                    backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.07)",
+                    borderColor: totalWater > maxSafe ? '#EF4444' : (isDark ? colors.border : 'rgba(255,255,255,0.3)'),
+                    borderWidth: 3,
+                    borderTopWidth: 1,
+                  }
+                ]}
+              >
+                {totalWater > maxSafe && (
+                  <Animated.View
+                    style={[
+                      StyleSheet.absoluteFillObject,
+                      {
+                        backgroundColor: '#EF4444',
+                        opacity: blinkAnim,
+                        zIndex: 1,
+                      }
+                    ]}
+                    pointerEvents="none"
+                  />
+                )}
                 {totalWater === 0 && (
                   <Animated.View
                     pointerEvents="none"
@@ -639,7 +699,7 @@ export default function WaterTracker({ selectedDate }: Props) {
                   <View style={s.cupFillGlow} />
                 </Animated.View>
 
-                <View style={[s.goalLine, { bottom: '62.5%', borderColor: HYDRATION.deepBlue }]} />
+                <View style={[s.goalLine, { bottom: '62.5%' }]} />
                 <View style={s.cupLabel}>
                   <Text style={[s.cupNum, isDark && { color: colors.text }]}>{totalWater.toLocaleString()}</Text>
                   <Text style={[s.cupUnit, isDark && { color: colors.textMuted }]}>ml</Text>
@@ -648,7 +708,7 @@ export default function WaterTracker({ selectedDate }: Props) {
             </View>
 
             <View style={{ flex: 1, gap: 7 }}>
-              <View style={[s.statCard, s.consumedCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: HYDRATION.yellow }]}>
+              <View style={[s.statCard, s.consumedCard, isDark && { backgroundColor: colors.inputBg }]}>
                 <View style={s.statHeader}>
                   <View style={[s.statIconDark, isDark && { backgroundColor: 'rgba(247,203,22,0.15)' }]}>
                     <Ionicons name="analytics-outline" size={15} color={isDark ? HYDRATION.yellow : HYDRATION.ink} />
@@ -658,7 +718,7 @@ export default function WaterTracker({ selectedDate }: Props) {
                 <Text style={[s.statValueDark, isDark && { color: colors.text }]}>{totalWater.toLocaleString()} ml</Text>
               </View>
 
-              <View style={[s.statCard, s.goalCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: HYDRATION.deepBlue }]}>
+              <View style={[s.statCard, s.goalCard, isDark && { backgroundColor: colors.inputBg }]}>
                 <View style={s.statHeader}>
                   <View style={[s.statIconWhite, isDark && { backgroundColor: 'rgba(26,110,138,0.15)' }]}>
                     <Ionicons name="water-outline" size={15} color={isDark ? HYDRATION.deepBlue : HYDRATION.deepBlue} />
@@ -668,7 +728,7 @@ export default function WaterTracker({ selectedDate }: Props) {
                 <Text style={[s.statValueLight, isDark && { color: colors.text }]}>{target.toLocaleString()} ml</Text>
               </View>
 
-              <View style={[s.statCard, s.maxCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: HYDRATION.lightGreen }]}>
+              <View style={[s.statCard, s.maxCard, isDark && { backgroundColor: colors.inputBg }]}>
                 <View style={s.statHeader}>
                   <View style={[s.statIconSoft, isDark && { backgroundColor: 'rgba(16,185,129,0.15)' }]}>
                     <Ionicons name="shield-checkmark-outline" size={15} color={isDark ? HYDRATION.green : HYDRATION.ink} />
@@ -678,7 +738,7 @@ export default function WaterTracker({ selectedDate }: Props) {
                 <Text style={[s.statValueDark, isDark && { color: colors.text }]}>{maxSafe.toLocaleString()} ml</Text>
               </View>
 
-              <View style={[s.statCard, isOver ? s.overCard : s.remainingCard, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: isOver ? HYDRATION.amber : HYDRATION.sky }]}>
+              <View style={[s.statCard, isOver ? s.overCard : s.remainingCard, isDark && { backgroundColor: colors.inputBg }]}>
                 <View style={s.statHeader}>
                   <View style={[s.statIconWhite, isDark && { backgroundColor: isOver ? 'rgba(217,164,4,0.15)' : 'rgba(103,199,240,0.15)' }]}>
                     <Ionicons name={isOver ? 'warning-outline' : 'hourglass-outline'} size={15} color={isDark ? (isOver ? HYDRATION.amber : HYDRATION.sky) : (isOver ? HYDRATION.ink : HYDRATION.white)} />
@@ -700,20 +760,19 @@ export default function WaterTracker({ selectedDate }: Props) {
                 key={item.label}
                 style={[
                   s.presetBtn,
-                  { backgroundColor: isDark ? colors.inputBg : item.bg },
-                  isDark && { borderWidth: 1, borderColor: item.bg }
+                  { backgroundColor: item.bg }
                 ]}
                 onPress={() => handleLog(item.amount)}
                 activeOpacity={0.78}
               >
-                <Ionicons name={item.icon as any} size={18} color={isDark ? item.bg : item.text} />
-                <Text style={[s.presetAmt, { color: isDark ? colors.text : item.text }]}>+{item.amount}</Text>
-                <Text style={[s.presetLbl, { color: isDark ? colors.textMuted : item.text }]}>{item.label}</Text>
+                <Ionicons name={item.icon as any} size={18} color={item.text} />
+                <Text style={[s.presetAmt, { color: item.text }]}>+{item.amount}</Text>
+                <Text style={[s.presetLbl, { color: item.text }]}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <View style={[s.sliderSection, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+          <View style={[s.sliderSection, isDark && { backgroundColor: colors.inputBg }]}>
             <Text style={[s.sliderTitle, isDark && { color: colors.text }]}>
               Custom: <Text style={[s.sliderHighlight, { color: hydrationState.primary }]}>{sliderVal} ml</Text>
             </Text>
@@ -729,7 +788,6 @@ export default function WaterTracker({ selectedDate }: Props) {
                     {
                       left: Math.max(0, ((sliderVal - 50) / 700) * (SLIDER_W - 26)),
                       backgroundColor: HYDRATION.white,
-                      borderColor: hydrationState.primary,
                     },
                   ]}
                 >
@@ -762,30 +820,41 @@ export default function WaterTracker({ selectedDate }: Props) {
                   minute: '2-digit',
                 });
                 const tone = getLogTone(log.amount_ml);
+                const iconName = getLogIcon(log.amount_ml);
+                const label = getDrinkTypeLabel(log.amount_ml);
 
                 return (
                   <View
                     key={log.id}
                     style={[
                       s.logRow,
-                      { backgroundColor: isDark ? colors.inputBg : tone.bg },
-                      isDark && { borderWidth: 1, borderColor: tone.bg }
+                      {
+                        backgroundColor: tone.bg,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 3,
+                        elevation: 1,
+                        marginBottom: 4,
+                      }
                     ]}
                   >
-                    <View style={[s.logIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : tone.iconBg }]}>
-                      <Ionicons name="water" size={14} color={isDark ? tone.bg : tone.icon} />
+                    <View style={[s.logIcon, { backgroundColor: tone.iconBg }]}>
+                      <Ionicons name={iconName as any} size={15} color={tone.icon} />
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.logAmt, { color: isDark ? colors.text : tone.text }]}>{log.amount_ml} ml</Text>
-                      <Text style={[s.logTime, { color: isDark ? colors.textMuted : tone.subText }]}>{t}</Text>
+                      <Text style={[s.logAmt, { color: tone.text, fontFamily: FONTS.bodyBold, fontSize: 14 }]}>
+                        {label} <Text style={{ fontFamily: FONTS.body, fontSize: 12, opacity: 0.85 }}>({log.amount_ml} ml)</Text>
+                      </Text>
+                      <Text style={[s.logTime, { color: tone.subText, fontSize: 11 }]}>{t}</Text>
                     </View>
 
                     <TouchableOpacity
                       onPress={() => handleDelete(log.id, log.amount_ml)}
-                      style={[s.deleteBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : tone.deleteBg }]}
+                      style={[s.deleteBtn, { backgroundColor: tone.deleteBg }]}
                     >
-                      <Ionicons name="trash-outline" size={15} color={isDark ? '#E14B4B' : tone.deleteIcon} />
+                      <Ionicons name="trash-outline" size={15} color={tone.deleteIcon} />
                     </TouchableOpacity>
                   </View>
                 );
@@ -803,10 +872,8 @@ const s = StyleSheet.create({
     marginHorizontal: 0,
     marginBottom: 16,
     borderRadius: 24,
-    borderWidth: 1,
     padding: 18,
     backgroundColor: HYDRATION.card,
-    borderColor: HYDRATION.border,
     shadowColor: HYDRATION.deepBlue,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
@@ -817,13 +884,11 @@ const s = StyleSheet.create({
     marginHorizontal: 0,
     marginBottom: 16,
     borderRadius: 24,
-    borderWidth: 1,
     padding: 18,
     height: 180,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: HYDRATION.card,
-    borderColor: HYDRATION.border,
   },
   header: {
     flexDirection: 'row',
@@ -881,15 +946,11 @@ const s = StyleSheet.create({
     right: 4,
     bottom: 4,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(225,75,75,0.6)',
   },
   cup: {
     width: 120,
     height: 155,
     borderRadius: 20,
-    borderWidth: 3,
-    borderTopWidth: 1,
     overflow: 'hidden',
     position: 'relative',
     justifyContent: 'flex-end',
@@ -922,8 +983,6 @@ const s = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    borderTopWidth: 1.5,
-    borderStyle: 'dashed',
   },
   cupLabel: { position: 'absolute', inset: 0, justifyContent: 'center', alignItems: 'center' },
   cupNum: { fontFamily: FONTS.heading, fontSize: 26, letterSpacing: -1, color: HYDRATION.white },
@@ -977,7 +1036,6 @@ const s = StyleSheet.create({
     borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,

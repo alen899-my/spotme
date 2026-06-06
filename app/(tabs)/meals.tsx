@@ -785,8 +785,7 @@ export default function MealsScreen() {
                 ]}
                 activeOpacity={0.65}
               >
-                <Ionicons name="create-outline" size={14} color={colors.primary} style={{ marginRight: 6 }} />
-                <Text style={[styles.actionBtnText, { color: colors.primary }]} numberOfLines={1}>Edit / Retry</Text>
+                <Ionicons name="create-outline" size={16} color={colors.primary} />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -800,8 +799,7 @@ export default function MealsScreen() {
                 ]}
                 activeOpacity={0.65}
               >
-                <Ionicons name="trash-outline" size={14} color={colors.error || '#DC2626'} style={{ marginRight: 6 }} />
-                <Text style={[styles.actionBtnText, { color: colors.error || '#DC2626' }]} numberOfLines={1}>Delete</Text>
+                <Ionicons name="trash-outline" size={16} color={colors.error || '#DC2626'} />
               </TouchableOpacity>
             </View>
 
@@ -2881,20 +2879,16 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     marginBottom: 16,
   },
   actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 8,
     borderWidth: 1,
-  },
-  actionBtnText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
