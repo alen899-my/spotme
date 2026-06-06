@@ -76,10 +76,14 @@ export default function SplitSessionsScreen() {
     <TouchableOpacity 
       style={[
         styles.sessionCard, 
-        { 
-          backgroundColor: isDark ? colors.card : P.cta, 
-          borderColor: isDark ? colors.border : P.cta, 
-          borderWidth: isDark ? 1 : 0 
+        isDark ? { 
+          backgroundColor: colors.card, 
+          borderColor: colors.border, 
+          borderWidth: 1 
+        } : { 
+          backgroundColor: P.cta, 
+          borderColor: P.cta, 
+          borderWidth: 1 
         }
       ]}
       activeOpacity={0.8}
@@ -94,19 +98,38 @@ export default function SplitSessionsScreen() {
           <View style={styles.sessionOverlay} />
         </View>
         <View style={styles.titleArea}>
-          <Text style={styles.sessionName}>{item.name}</Text>
+          <Text style={[styles.sessionName, { color: isDark ? colors.text : '#FFF' }]}>{item.name}</Text>
           <Text style={[styles.sessionMeta, { color: isDark ? colors.textMuted : '#FFF' }]}>
             <Ionicons name="barbell-outline" size={12} color={isDark ? colors.textMuted : '#FFF'} /> {item.exercise_count} Exercises
           </Text>
         </View>
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)}>
-          <Ionicons name="trash-outline" size={18} color="#FFF" />
+        <TouchableOpacity 
+          style={[
+            styles.deleteBtn,
+            {
+              backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.12)',
+              borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.22)',
+              borderWidth: 1,
+            }
+          ]} 
+          onPress={() => handleDelete(item.id)}
+        >
+          <Ionicons name="trash-outline" size={18} color={isDark ? '#EF4444' : '#FFF'} />
         </TouchableOpacity>
       </View>
       
-      <View style={styles.cardFooter}>
-        <Text style={styles.actionText}>Manage Routine</Text>
-        <Ionicons name="chevron-forward" size={14} color="#FFF" />
+      <View 
+        style={[
+          styles.cardFooter,
+          {
+            backgroundColor: isDark ? colors.inputBg : 'rgba(255, 255, 255, 0.12)',
+            borderColor: isDark ? colors.border : 'rgba(255, 255, 255, 0.16)',
+            borderWidth: 1,
+          }
+        ]}
+      >
+        <Text style={[styles.actionText, { color: isDark ? colors.primary : '#FFF' }]}>Manage Routine</Text>
+        <Ionicons name="chevron-forward" size={14} color={isDark ? colors.primary : '#FFF'} />
       </View>
     </TouchableOpacity>
   );
@@ -127,9 +150,14 @@ export default function SplitSessionsScreen() {
             style={styles.addBtn}
             onPress={() => router.push({ pathname: `/splits/${id}/create-session` })}
           >
-            <View style={styles.addBtnGradient}>
+            <LinearGradient
+              colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]}
+              style={styles.addBtnGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
               <Ionicons name="add" size={24} color="#FFF" />
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -150,7 +178,14 @@ export default function SplitSessionsScreen() {
               style={styles.createNowBtn}
               onPress={() => router.push({ pathname: `/splits/${id}/create-session` })}
             >
-              <Text style={styles.createNowText}>ADD NEW SESSION</Text>
+              <LinearGradient
+                colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]}
+                style={styles.createNowBtnGrad}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.createNowText}>ADD NEW SESSION</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : (
@@ -190,7 +225,6 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: P.cta,
   },
   listContent: { paddingBottom: 40 },
 
@@ -199,13 +233,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 0,
-    backgroundColor: P.cta,
-    elevation: 4,
-    shadowColor: P.ctaDeep,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
+    borderWidth: 1,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
   },
   cardMain: {
     flexDirection: 'row',
@@ -230,13 +263,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
   titleArea: { flex: 1 },
-  sessionName: { fontFamily: FONTS.bodyBold, fontSize: 17, marginBottom: 4, color: P.cta },
-  sessionMeta: { fontFamily: FONTS.body, fontSize: 12, flexDirection: 'row', alignItems: 'center', gap: 4, color: '#FFF' },
+  sessionName: { fontFamily: FONTS.bodyBold, fontSize: 17, marginBottom: 4, flexShrink: 1 },
+  sessionMeta: { fontFamily: FONTS.body, fontSize: 12, flexDirection: 'row', alignItems: 'center', gap: 4 },
   deleteBtn: {
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 10,
@@ -250,9 +282,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 8,
     marginTop: 4,
-    backgroundColor: P.cta,
   },
-  actionText: { fontFamily: FONTS.bodyBold, fontSize: 12, color: '#FFF' },
+  actionText: { fontFamily: FONTS.bodyBold, fontSize: 12 },
 
   // States
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
@@ -260,10 +291,14 @@ const styles = StyleSheet.create({
   emptyTitle: { fontFamily: FONTS.heading, fontSize: 24, marginBottom: 8 },
   emptySub: { fontFamily: FONTS.body, fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   createNowBtn: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  createNowBtnGrad: {
     paddingHorizontal: 32,
     paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: P.cta,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   createNowText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' },
 });

@@ -26,7 +26,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmationModal from '../../../components/ui/ConfirmationModal';
-import Input from '../../../components/ui/Input';
 import ExercisePreviewModal from '../../../components/modals/ExercisePreviewModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -128,10 +127,14 @@ export default function SessionDetailScreen() {
     <TouchableOpacity 
       style={[
         styles.exerciseCard, 
-        { 
-          backgroundColor: isDark ? colors.card : P.cta, 
-          borderColor: isDark ? colors.border : P.cta, 
-          borderWidth: isDark ? 1 : 0 
+        isDark ? { 
+          backgroundColor: colors.card, 
+          borderColor: colors.border, 
+          borderWidth: 1 
+        } : { 
+          backgroundColor: P.cta, 
+          borderColor: P.cta, 
+          borderWidth: 1 
         }
       ]}
       activeOpacity={0.8}
@@ -141,7 +144,7 @@ export default function SessionDetailScreen() {
         <Image source={{ uri: item.image_url }} style={styles.exImage} />
         <View style={styles.exTextBlock}>
           <View style={styles.exTopRow}>
-            <Text style={styles.exName}>{item.name}</Text>
+            <Text style={[styles.exName, { color: isDark ? colors.text : '#FFF' }]}>{item.name}</Text>
             {item.avg_rating !== undefined && item.avg_rating !== null && (
               <View style={styles.avgRatingBadge}>
                 <Ionicons name="star" size={10} color="#F59E0B" />
@@ -185,19 +188,33 @@ export default function SessionDetailScreen() {
 
       <View style={styles.actionRow}>
         <TouchableOpacity 
-          style={styles.editStatsBtn}
+          style={[
+            styles.editStatsBtn,
+            {
+              backgroundColor: isDark ? colors.primary + '15' : 'rgba(255, 255, 255, 0.15)',
+              borderColor: isDark ? colors.primary + '30' : 'rgba(255, 255, 255, 0.3)',
+              borderWidth: 1,
+            }
+          ]}
           onPress={() => openEditModal(item)}
         >
-          <Ionicons name="create-outline" size={18} color={P.ink} />
-          <Text style={styles.editStatsText}>Edit</Text>
+          <Ionicons name="create-outline" size={18} color={isDark ? colors.primary : '#FFF'} />
+          <Text style={[styles.editStatsText, { color: isDark ? colors.primary : '#FFF' }]}>Edit</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.deleteActionBtn}
+          style={[
+            styles.deleteActionBtn,
+            {
+              backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+              borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.18)',
+              borderWidth: 1,
+            }
+          ]}
           onPress={() => handleRemoveExercise(item.id)}
         >
-          <Ionicons name="trash-outline" size={18} color="#FFF" />
-          <Text style={styles.deleteActionText}>Delete</Text>
+          <Ionicons name="trash-outline" size={18} color={isDark ? '#EF4444' : '#FFF'} />
+          <Text style={[styles.deleteActionText, { color: isDark ? '#EF4444' : '#FFF' }]}>Delete</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -244,6 +261,7 @@ export default function SessionDetailScreen() {
             {
               backgroundColor: colors.bg,
               paddingBottom: Math.max(insets.bottom, 12) + 12,
+              borderTopColor: isDark ? colors.border : 'rgba(0,0,0,0.05)',
             }
           ]}
         >
@@ -251,10 +269,15 @@ export default function SessionDetailScreen() {
             style={[styles.addExBtn]}
             onPress={() => router.push({ pathname: `/splits/session/${id}/add-exercises`, params: { sessionId: id } })}
           >
-            <View style={styles.addBtnGradient}>
+            <LinearGradient
+              colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]}
+              style={styles.addBtnGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
               <Ionicons name="add" size={24} color="#FFF" />
               <Text style={styles.addExText}>ADD EXERCISE</Text>
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -262,66 +285,92 @@ export default function SessionDetailScreen() {
         <Modal
           visible={isEditModalVisible}
           transparent
-          animationType="fade"
+          animationType="slide"
           onRequestClose={() => setIsEditModalVisible(false)}
+          statusBarTranslucent
         >
-          <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView 
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={styles.modalContentWrap}
-            >
-              <View style={[styles.modalContent, { backgroundColor: isDark ? colors.card : P.cta, borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Edit Performance</Text>
-                  <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
-                    <Ionicons name="close" size={24} color="#FFF" />
-                  </TouchableOpacity>
-                </View>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalOverlay}
+          >
+            <TouchableOpacity 
+              activeOpacity={1} 
+              style={StyleSheet.absoluteFillObject} 
+              onPress={() => setIsEditModalVisible(false)} 
+            />
+            <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 0, paddingBottom: Math.max(insets.bottom, 24) + 12 }]}>
+              <View style={styles.modalHandle} />
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Performance</Text>
+                <TouchableOpacity onPress={() => setIsEditModalVisible(false)} style={styles.modalCloseBtn}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
 
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  <Input
-                    label="SETS"
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.modalInputLabel, { color: colors.textMuted }]}>SETS</Text>
+                  <TextInput
+                    style={[styles.modalInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
                     keyboardType="numeric"
                     value={editSets}
                     onChangeText={setEditSets}
-                    tone="light"
+                    placeholder="e.g. 3"
+                    placeholderTextColor={colors.textDim}
                   />
+                </View>
 
-                  <Input
-                    label="REPS (e.g. 8-12)"
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.modalInputLabel, { color: colors.textMuted }]}>REPS (e.g. 8-12)</Text>
+                  <TextInput
+                    style={[styles.modalInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
                     value={editReps}
                     onChangeText={setEditReps}
-                    tone="light"
+                    placeholder="e.g. 8-12"
+                    placeholderTextColor={colors.textDim}
                   />
+                </View>
 
-                  <Input
-                    label="WEIGHT (kg)"
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.modalInputLabel, { color: colors.textMuted }]}>WEIGHT (kg)</Text>
+                  <TextInput
+                    style={[styles.modalInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
                     keyboardType="numeric"
                     value={editWeight}
                     onChangeText={setEditWeight}
-                    tone="light"
+                    placeholder="e.g. 0"
+                    placeholderTextColor={colors.textDim}
                   />
+                </View>
 
-                  <Input
-                    label="REST (e.g. 60s)"
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.modalInputLabel, { color: colors.textMuted }]}>REST (e.g. 60s)</Text>
+                  <TextInput
+                    style={[styles.modalInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
                     value={editRest}
                     onChangeText={setEditRest}
-                    tone="light"
+                    placeholder="e.g. 60s"
+                    placeholderTextColor={colors.textDim}
                   />
+                </View>
 
-                  <TouchableOpacity 
-                    style={styles.updateBtn}
-                    onPress={handleUpdateStats}
-                    disabled={isUpdating}
+                <TouchableOpacity 
+                  style={styles.updateBtn}
+                  onPress={handleUpdateStats}
+                  disabled={isUpdating}
+                >
+                  <LinearGradient 
+                    colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]}
+                    style={styles.updateBtnGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
                   >
-                    <View style={styles.updateBtnGradient}>
-                      {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.updateBtnText}>UPDATE STATS</Text>}
-                    </View>
-                  </TouchableOpacity>
-                </ScrollView>
-              </View>
-            </KeyboardAvoidingView>
-          </View>
+                    {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.updateBtnText}>UPDATE STATS</Text>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         <ConfirmationModal
@@ -351,22 +400,21 @@ const styles = StyleSheet.create({
   headerSub: { fontFamily: FONTS.body, fontSize: 13, marginTop: 2 },
   listContent: { padding: 20, paddingBottom: 100 },
   exerciseCard: {
-    borderRadius: 20,
-    marginBottom: 16,
-    borderWidth: 0,
+    borderRadius: 24,
+    borderWidth: 1,
+    marginBottom: 14,
     overflow: 'hidden',
-    elevation: 4,
-    shadowColor: P.ctaDeep,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 8,
-    backgroundColor: P.cta,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 3,
   },
   exInfo: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingBottom: 14 },
   exImage: { width: 56, height: 56, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)', marginRight: 14 },
   exTextBlock: { flex: 1, justifyContent: 'center' },
   exTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap', marginBottom: 4 },
-  exName: { fontFamily: FONTS.bodyBold, fontSize: 16, lineHeight: 20, color: P.sun, flexShrink: 1 },
+  exName: { fontFamily: FONTS.bodyBold, fontSize: 16, lineHeight: 20, flexShrink: 1 },
   avgRatingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -447,13 +495,11 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 42,
     borderRadius: 12,
-    backgroundColor: P.sun,
     paddingHorizontal: 14,
   },
   editStatsText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 12,
-    color: P.ink,
     letterSpacing: 0.4,
   },
   deleteActionBtn: {
@@ -464,13 +510,11 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 42,
     borderRadius: 12,
-    backgroundColor: '#EF4444',
     paddingHorizontal: 14,
   },
   deleteActionText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 12,
-    color: '#FFF',
     letterSpacing: 0.4,
   },
   bottomBar: {
@@ -490,7 +534,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 12,
-    backgroundColor: P.cta,
   },
   addExText: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF', letterSpacing: 1.2 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -500,17 +543,44 @@ const styles = StyleSheet.create({
   emptySub: { fontFamily: FONTS.body, fontSize: 14, textAlign: 'center', lineHeight: 22 },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
-  modalContentWrap: { width: '100%' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalContent: {
-    borderRadius: 28,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     padding: 24,
-    maxHeight: SCREEN_WIDTH * 1.5,
-    backgroundColor: P.cta,
+    maxHeight: '90%',
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    width: 46,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(120,120,120,0.3)',
+    marginBottom: 16,
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  modalTitle: { fontFamily: FONTS.heading, fontSize: 24, color: '#FFF' },
+  modalTitle: { fontFamily: FONTS.heading, fontSize: 24 },
+  modalCloseBtn: { padding: 4 },
+  inputGroup: {
+    marginBottom: 16,
+    width: '100%',
+  },
+  modalInputLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  modalInput: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 15,
+  },
   updateBtn: { marginTop: 12, borderRadius: 16, overflow: 'hidden' },
-  updateBtnGradient: { height: 54, justifyContent: 'center', alignItems: 'center', backgroundColor: P.sun },
-  updateBtnText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: P.ink, letterSpacing: 1 },
+  updateBtnGradient: { height: 54, justifyContent: 'center', alignItems: 'center' },
+  updateBtnText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: '#FFF', letterSpacing: 1 },
 });
