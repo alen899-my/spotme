@@ -1348,7 +1348,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 
     // ── 7. Top recommended exercises ───────────────────────────────────────────
     const topExerciseRes = await pool.query(
-      `SELECT e.id AS exercise_id, e.name AS exercise_name, e.target, e.category, e.image_url, e.equipment,
+      `SELECT e.id AS exercise_id, e.name AS exercise_name, e.target, e.category, e.image_url, e.gif_url, e.equipment,
               ROUND(AVG(dwe.rating)::numeric, 1)::float8 as rating
        FROM exercises e
        INNER JOIN daily_workout_exercises dwe ON e.id = dwe.exercise_id AND dwe.rating IS NOT NULL

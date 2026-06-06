@@ -230,6 +230,18 @@ export default function HomeScreen() {
           <HydrationCard
             waterMl={today.water_ml || 0}
             onLogWaterPress={() => router.push("/(tabs)/meals")}
+            onWaterLogged={(amount: number) => {
+              setDashboard((prev: any) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  today: {
+                    ...prev.today,
+                    water_ml: (prev.today.water_ml || 0) + amount,
+                  },
+                };
+              });
+            }}
           />
         </>
       )}
