@@ -216,7 +216,7 @@ export default function BodyStatusCard({
           Tap a muscle to see its progress
         </Text>
 
-        <View style={styles.bodyWrap}>
+        <View style={styles.bodyWrap} onStartShouldSetResponder={() => true}>
           <View style={{ transform: [{ scaleX: dynamicScaleX }, { scaleY: dynamicScaleY }] }}>
             <Body
               data={dbMuscleActivity}

@@ -479,7 +479,7 @@ export default function ExercisesScreen() {
       </View>
 
       <View style={styles.bodyExplorerCard}>
-        <View style={styles.bodyWrap}>
+        <View style={styles.bodyWrap} onStartShouldSetResponder={() => true}>
           <Body
             data={highlightedBodyParts}
             gender={bodyGender}

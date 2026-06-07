@@ -126,7 +126,7 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={s.sectionLabel}>APPEARANCE</Text>
+        {/* <Text style={s.sectionLabel}>APPEARANCE</Text>
         <View style={s.card}>
           <View style={s.settingRow}>
             <View style={s.settingLeft}>
@@ -146,7 +146,7 @@ export default function SettingsScreen() {
               ios_backgroundColor="#E0E0E0"
             />
           </View>
-        </View>
+        </View> */}
 
         <Text style={s.sectionLabel}>PRIVACY</Text>
         <View style={s.card}>
