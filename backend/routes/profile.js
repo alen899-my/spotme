@@ -67,7 +67,8 @@ router.put('/update', authenticateToken, upload.fields([
       'medical_conditions', 'medication', 'allergies',
       'diet_type', 'food_preference', 'water_intake', 'food_allergies',
       'profile_pic_url', 'front_photo_url', 'back_photo_url', 'side_photo_url',
-      'is_private'
+      'is_private',
+      'share_splits'
     ];
 
     const fieldsToUpdate = [];

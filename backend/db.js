@@ -34,6 +34,8 @@ const initDB = async () => {
       ADD COLUMN IF NOT EXISTS target_weight VARCHAR(50) DEFAULT '0';
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE;
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS share_splits BOOLEAN DEFAULT FALSE;
     `);
 
     // Create exercises table

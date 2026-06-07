@@ -23,22 +23,25 @@ export default function SettingsScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const [isPrivate, setIsPrivate] = useState(false);
+  const [shareSplits, setShareSplits] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingShare, setSavingShare] = useState(false);
 
   useEffect(() => {
-    loadPrivacySetting();
+    loadSettings();
   }, []);
 
-  const loadPrivacySetting = async () => {
+  const loadSettings = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       const res = await axios.get(`${API_URL}/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setIsPrivate(res.data.is_private || false);
+      setShareSplits(res.data.share_splits || false);
     } catch (err) {
-      console.error('Failed to load privacy setting:', err);
+      console.error('Failed to load settings:', err);
     } finally {
       setLoading(false);
     }
@@ -65,6 +68,29 @@ export default function SettingsScreen() {
       setIsPrivate(!value);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleShareSplits = async (value: boolean) => {
+    setShareSplits(value);
+    setSavingShare(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.put(`${API_URL}/profile/update`,
+        { share_splits: value },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        userData.share_splits = value;
+        await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      }
+    } catch (err) {
+      console.error('Failed to update share splits:', err);
+      setShareSplits(!value);
+    } finally {
+      setSavingShare(false);
     }
   };
 
@@ -149,6 +175,37 @@ export default function SettingsScreen() {
               thumbColor="#FFFFFF"
               ios_backgroundColor="#E0E0E0"
               disabled={saving}
+            />
+          </View>
+        </View>
+
+        <Text style={s.sectionLabel}>SHARING</Text>
+        <View style={s.card}>
+          <View style={[s.settingRow, { borderBottomWidth: 0 }]}>
+            <View style={s.settingLeft}>
+              <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,150,190,0.1)' }]}>
+                <Ionicons
+                  name={shareSplits ? "share" : "share-outline"}
+                  size={20}
+                  color={colors.primary}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.settingTitle}>Shared Splits</Text>
+                <Text style={s.settingSubtitle}>
+                  {shareSplits
+                    ? "Your programs are visible to the community"
+                    : "Only you can see your programs"}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={shareSplits}
+              onValueChange={toggleShareSplits}
+              trackColor={{ false: "#E0E0E0", true: colors.primary }}
+              thumbColor="#FFFFFF"
+              ios_backgroundColor="#E0E0E0"
+              disabled={savingShare}
             />
           </View>
         </View>

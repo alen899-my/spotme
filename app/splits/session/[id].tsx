@@ -33,10 +33,11 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function SessionDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id, shared } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  const isShared = shared === '1';
   
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,6 +187,7 @@ export default function SessionDetailScreen() {
         </View>
       </View>
 
+      {!isShared && (
       <View style={styles.actionRow}>
         <TouchableOpacity 
           style={[
@@ -217,6 +219,7 @@ export default function SessionDetailScreen() {
           <Text style={[styles.deleteActionText, { color: isDark ? '#EF4444' : '#FFF' }]}>Delete</Text>
         </TouchableOpacity>
       </View>
+      )}
     </TouchableOpacity>
   );
 
@@ -228,8 +231,8 @@ export default function SessionDetailScreen() {
             <Ionicons name="chevron-back" size={28} color={colors.text} />
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Routine Manager</Text>
-            <Text style={[styles.headerSub, { color: colors.textMuted }]}>Manage your movements</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{isShared ? 'Session Exercises' : 'Routine Manager'}</Text>
+            <Text style={[styles.headerSub, { color: colors.textMuted }]}>{isShared ? 'View program movements' : 'Manage your movements'}</Text>
           </View>
         </View>
 
@@ -255,6 +258,7 @@ export default function SessionDetailScreen() {
           />
         )}
 
+        {!isShared && (
         <View
           style={[
             styles.bottomBar,
@@ -280,6 +284,7 @@ export default function SessionDetailScreen() {
             </LinearGradient>
           </TouchableOpacity>
         </View>
+        )}
 
         {/* Edit Stats Modal */}
         <Modal
