@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Image, Dimensions,
+  TouchableOpacity, Image, Dimensions, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -74,6 +74,8 @@ export default function PublicProfileScreen() {
   const [canViewFull, setCanViewFull] = useState(true);
   const [followStatus, setFollowStatus] = useState<string | null>(null);
   const [hasPendingFromTarget, setHasPendingFromTarget] = useState(false);
+  const [isFollowingBack, setIsFollowingBack] = useState(false);
+  const [showUnfollowModal, setShowUnfollowModal] = useState(false);
   const [myId, setMyId] = useState<number | null>(null);
 
   useEffect(() => { fetchData(); }, [id]);
@@ -93,6 +95,7 @@ export default function PublicProfileScreen() {
       setCanViewFull(res.data.can_view_full !== false);
       setFollowStatus(res.data.follow_status);
       setHasPendingFromTarget(res.data.has_pending_from_target || false);
+      setIsFollowingBack(res.data.is_following_back || false);
 
       // Fetch user's shared splits
       try {
@@ -112,20 +115,66 @@ export default function PublicProfileScreen() {
   };
 
   const handleFollow = async () => {
+    if (followStatus === 'accepted') {
+      setShowUnfollowModal(true);
+      return;
+    }
+    if (followStatus === 'pending') {
+      setShowUnfollowModal(true);
+      return;
+    }
     const prevStatus = followStatus;
-    const optimistic = followStatus === 'accepted' ? null : (user?.is_private ? 'pending' : 'accepted');
-    setFollowStatus(optimistic);
+    setFollowStatus(user?.is_private ? 'pending' : 'accepted');
     try {
       const token = await AsyncStorage.getItem('userToken');
-      if (prevStatus === 'accepted') {
-        await axios.post(`${API_URL}/profile/${id}/unfollow`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } else {
-        await axios.post(`${API_URL}/profile/${id}/follow`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      }
+      await axios.post(`${API_URL}/profile/${id}/follow`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      setFollowStatus(prevStatus);
+    }
+  };
+
+  const handleUnfollowOnly = async () => {
+    setShowUnfollowModal(false);
+    const prevStatus = followStatus;
+    setFollowStatus(null);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(`${API_URL}/profile/${id}/unfollow`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      setFollowStatus(prevStatus);
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    setShowUnfollowModal(false);
+    const prevStatus = followStatus;
+    setFollowStatus(null);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(`${API_URL}/profile/${id}/unfollow`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      setFollowStatus(prevStatus);
+    }
+  };
+
+  const handleUnfollowAndRemove = async () => {
+    setShowUnfollowModal(false);
+    const prevStatus = followStatus;
+    setFollowStatus(null);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(`${API_URL}/profile/${id}/unfollow`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await axios.post(`${API_URL}/profile/${id}/remove-follower`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
     } catch (err) {
       setFollowStatus(prevStatus);
     }
@@ -182,24 +231,15 @@ export default function PublicProfileScreen() {
   const getFollowButton = () => {
     if (isOwnProfile) return null;
 
-    if (hasPendingFromTarget && followStatus !== 'accepted') {
+    if (hasPendingFromTarget) {
       return (
         <View style={styles.followActions}>
-          <TouchableOpacity
-            style={styles.acceptBtn}
-            onPress={handleAccept}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="checkmark" size={14} color="#FFF" />
-            <Text style={styles.followBtnText}>Accept</Text>
+          <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept} activeOpacity={0.8}>
+            <Ionicons name="checkmark" size={16} color="#FFF" />
+            <Text style={styles.followBtnText}>Confirm</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.rejectBtn}
-            onPress={handleDeny}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="close" size={14} color="#FFF" />
-            <Text style={styles.followBtnText}>Reject</Text>
+          <TouchableOpacity style={styles.rejectBtn} onPress={handleDeny} activeOpacity={0.8}>
+            <Text style={[styles.followBtnText, { color: '#FFF' }]}>Delete</Text>
           </TouchableOpacity>
         </View>
       );
@@ -207,37 +247,33 @@ export default function PublicProfileScreen() {
 
     if (followStatus === 'accepted') {
       return (
-        <TouchableOpacity
-          style={[styles.followBtn, { backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }]}
-          onPress={handleFollow}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="person-remove" size={16} color="#FFF" />
-          <Text style={styles.followBtnText}>Following</Text>
+        <TouchableOpacity style={styles.followingBtn} onPress={handleFollow} activeOpacity={0.8}>
+          <Ionicons name="checkmark" size={16} color={colors.text} />
+          <Text style={[styles.followBtnText, { color: colors.text }]}>Following</Text>
         </TouchableOpacity>
       );
     }
 
     if (followStatus === 'pending') {
       return (
-        <TouchableOpacity
-          style={[styles.followBtn, { backgroundColor: 'rgba(247,203,22,0.2)', borderWidth: 1, borderColor: P.sun }]}
-          onPress={handleFollow}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="time" size={16} color={P.sun} />
-          <Text style={[styles.followBtnText, { color: P.sun }]}>Requested</Text>
+        <TouchableOpacity style={styles.requestedBtn} onPress={handleFollow} activeOpacity={0.8}>
+          <Ionicons name="time-outline" size={16} color={colors.text} />
+          <Text style={[styles.followBtnText, { color: colors.text }]}>Requested</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    // Not following but they follow you → "Follow Back"
+    if (isFollowingBack) {
+      return (
+        <TouchableOpacity style={[styles.followBtn, { backgroundColor: colors.primary }]} onPress={handleFollow} activeOpacity={0.8}>
+          <Text style={styles.followBtnText}>Follow Back</Text>
         </TouchableOpacity>
       );
     }
 
     return (
-      <TouchableOpacity
-        style={[styles.followBtn, { backgroundColor: colors.primary }]}
-        onPress={handleFollow}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="person-add" size={16} color="#FFF" />
+      <TouchableOpacity style={[styles.followBtn, { backgroundColor: colors.primary }]} onPress={handleFollow} activeOpacity={0.8}>
         <Text style={styles.followBtnText}>Follow</Text>
       </TouchableOpacity>
     );
@@ -330,14 +366,14 @@ export default function PublicProfileScreen() {
 
             {/* Followers / Following */}
             <View style={styles.followerRow}>
-              <TouchableOpacity style={styles.followerItem} onPress={() => router.push({ pathname: `/profile/follow/${user.id}`, params: { type: 'followers' } })}>
+              <TouchableOpacity style={styles.followerItem} disabled={!canViewFull && !isOwnProfile} onPress={() => router.push({ pathname: `/profile/follow/${user.id}`, params: { type: 'followers' } })}>
                 <Text style={[styles.followerCount, { color: isDark ? colors.text : '#FFF' }]}>
                   {Number(user.follower_count || 0).toLocaleString()}
                 </Text>
                 <Text style={[styles.followerLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.6)' }]}>Followers</Text>
               </TouchableOpacity>
               <View style={[styles.followerDot, { backgroundColor: isDark ? colors.textDim : 'rgba(255,255,255,0.3)' }]} />
-              <TouchableOpacity style={styles.followerItem} onPress={() => router.push({ pathname: `/profile/follow/${user.id}`, params: { type: 'following' } })}>
+              <TouchableOpacity style={styles.followerItem} disabled={!canViewFull && !isOwnProfile} onPress={() => router.push({ pathname: `/profile/follow/${user.id}`, params: { type: 'following' } })}>
                 <Text style={[styles.followerCount, { color: isDark ? colors.text : '#FFF' }]}>
                   {Number(user.following_count || 0).toLocaleString()}
                 </Text>
@@ -560,6 +596,66 @@ export default function PublicProfileScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* ── Unfollow/Cancel confirmation modal ── */}
+      <Modal visible={showUnfollowModal} transparent animationType="fade" onRequestClose={() => setShowUnfollowModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowUnfollowModal(false)}>
+          <View style={[styles.unfollowSheet, { backgroundColor: colors.card }]}>
+            {followStatus === 'pending' ? (
+              <>
+                <View style={styles.modalUserRowCentered}>
+                  <View style={[styles.avatarRingSmall, { borderColor: tier.color }]}>
+                    {user.profile_pic_url ? (
+                      <Image source={{ uri: user.profile_pic_url }} style={styles.avatarImgSmall} />
+                    ) : (
+                      <View style={[styles.avatarPlaceholderSmall, { backgroundColor: colors.inputBg }]}>
+                        <Ionicons name="person" size={18} color={colors.textMuted} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.modalUserName, { color: colors.text }]} numberOfLines={1}>
+                    {user?.full_name ?? 'Athlete'}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.modalDangerOption} onPress={handleCancelRequest} activeOpacity={0.7}>
+                  <Text style={styles.modalDangerText}>Cancel Request</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalCancelOption} onPress={() => setShowUnfollowModal(false)} activeOpacity={0.7}>
+                  <Text style={[styles.modalCancelText, { color: colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={styles.modalUserRowCentered}>
+                  <View style={[styles.avatarRingSmall, { borderColor: tier.color }]}>
+                    {user.profile_pic_url ? (
+                      <Image source={{ uri: user.profile_pic_url }} style={styles.avatarImgSmall} />
+                    ) : (
+                      <View style={[styles.avatarPlaceholderSmall, { backgroundColor: colors.inputBg }]}>
+                        <Ionicons name="person" size={18} color={colors.textMuted} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.modalUserName, { color: colors.text }]} numberOfLines={1}>
+                    {user?.full_name ?? 'Athlete'}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.modalDangerOption} onPress={handleUnfollowOnly} activeOpacity={0.7}>
+                  <Text style={styles.modalDangerText}>Unfollow</Text>
+                </TouchableOpacity>
+                {isFollowingBack && (
+                  <TouchableOpacity style={styles.modalDangerOption} onPress={handleUnfollowAndRemove} activeOpacity={0.7}>
+                    <Text style={styles.modalDangerText}>Unfollow & Remove Follower</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.modalCancelOption} onPress={() => setShowUnfollowModal(false)} activeOpacity={0.7}>
+                  <Text style={[styles.modalCancelText, { color: colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -630,20 +726,39 @@ const styles = StyleSheet.create({
 
   heroFollowRow: {
     marginTop: 14,
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
   },
   followBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: '#2596BE',
+  },
+  followingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 8,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  requestedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   followBtnText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 12,
+    fontSize: 13,
     color: '#FFF',
   },
   followActions: {
@@ -651,22 +766,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   acceptBtn: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: '#2596BE',
   },
   rejectBtn: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
   },
 
   xpBarArea: { marginTop: 14 },
@@ -780,4 +897,62 @@ const styles = StyleSheet.create({
   },
   emptyCardTitle: { fontFamily: FONTS.heading, color: '#FFF', fontSize: 20 },
   emptyCardSub: { fontFamily: FONTS.body, color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center' },
+
+  // Unfollow/Cancel modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  unfollowSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 36,
+    gap: 4,
+  },
+  modalUserRowCentered: {
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  avatarRingSmall: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    overflow: 'hidden',
+  },
+  avatarImgSmall: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPlaceholderSmall: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalUserName: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 16,
+  },
+  modalDangerOption: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  modalDangerText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 15,
+    color: '#FF4B4B',
+  },
+  modalCancelOption: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  modalCancelText: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+  },
 });

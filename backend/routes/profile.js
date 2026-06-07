@@ -246,6 +246,21 @@ router.post('/:id/deny-follow', authenticateToken, async (req, res) => {
   }
 });
 
+// ── GET /profile/me — current authenticated user info ─────────────────────
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, full_name, profile_pic_url, league_tier, total_xp FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("GET /profile/me error:", error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET PUBLIC PROFILE BY ID (with privacy check)
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
@@ -286,10 +301,16 @@ router.get('/:id', authenticateToken, async (req, res) => {
         [targetId, currentUserId]
       );
       hasPendingFromTarget = targetToCurrent.rows[0]?.status === 'pending';
+    }
 
-      if (user.is_private && followStatus !== 'accepted') {
-        canViewFull = false;
-      }
+    let isFollowingBack = false;
+    if (targetId !== currentUserId) {
+      const backStatus = await getFollowStatus(targetId, currentUserId);
+      isFollowingBack = backStatus === 'accepted';
+    }
+
+    if (targetId !== currentUserId && user.is_private && followStatus !== 'accepted') {
+      canViewFull = false;
     }
 
     if (canViewFull) {
@@ -319,6 +340,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
         can_view_full: true,
         follow_status: followStatus,
         has_pending_from_target: hasPendingFromTarget,
+        is_following_back: isFollowingBack,
       });
     } else {
       // Private profile – only return basic info (hero card data)
@@ -339,6 +361,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
         can_view_full: false,
         follow_status: followStatus,
         has_pending_from_target: hasPendingFromTarget,
+        is_following_back: isFollowingBack,
       });
     }
   } catch (error) {
@@ -347,19 +370,45 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// ── POST /profile/:id/remove-follower — remove a follower ────────────────
+router.post('/:id/remove-follower', authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id);
+    const currentUserId = req.user.id;
+
+    const result = await pool.query(
+      `DELETE FROM follows
+       WHERE follower_id = $1 AND following_id = $2 AND status = 'accepted'
+       RETURNING id`,
+      [targetId, currentUserId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Follower not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("POST /profile/:id/remove-follower error:", error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // ── GET /profile/:id/followers — list of users following this user ──────────
 router.get('/:id/followers', authenticateToken, async (req, res) => {
   try {
     const targetId = parseInt(req.params.id);
+    const currentUserId = req.user.id;
     if (isNaN(targetId)) return res.status(400).json({ message: 'Invalid user ID' });
 
     const result = await pool.query(`
-      SELECT u.id, u.full_name, u.profile_pic_url, u.total_xp AS xp, u.league_tier, u.current_streak
+      SELECT u.id, u.full_name, u.profile_pic_url, u.total_xp AS xp, u.league_tier, u.current_streak,
+        EXISTS(SELECT 1 FROM follows f2 WHERE f2.follower_id = $2 AND f2.following_id = u.id AND f2.status = 'accepted') AS is_followed_by_me
       FROM follows f
       JOIN users u ON f.follower_id = u.id
       WHERE f.following_id = $1 AND f.status = 'accepted'
       ORDER BY f.created_at DESC
-    `, [targetId]);
+    `, [targetId, currentUserId]);
 
     res.json({ users: result.rows });
   } catch (error) {
@@ -372,15 +421,17 @@ router.get('/:id/followers', authenticateToken, async (req, res) => {
 router.get('/:id/following', authenticateToken, async (req, res) => {
   try {
     const targetId = parseInt(req.params.id);
+    const currentUserId = req.user.id;
     if (isNaN(targetId)) return res.status(400).json({ message: 'Invalid user ID' });
 
     const result = await pool.query(`
-      SELECT u.id, u.full_name, u.profile_pic_url, u.total_xp AS xp, u.league_tier, u.current_streak
+      SELECT u.id, u.full_name, u.profile_pic_url, u.total_xp AS xp, u.league_tier, u.current_streak,
+        EXISTS(SELECT 1 FROM follows f2 WHERE f2.follower_id = u.id AND f2.following_id = $2 AND f2.status = 'accepted') AS follows_me
       FROM follows f
       JOIN users u ON f.following_id = u.id
       WHERE f.follower_id = $1 AND f.status = 'accepted'
       ORDER BY f.created_at DESC
-    `, [targetId]);
+    `, [targetId, currentUserId]);
 
     res.json({ users: result.rows });
   } catch (error) {

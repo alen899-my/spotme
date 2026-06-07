@@ -75,6 +75,7 @@ const MENU_ITEMS = [
   { id: "details",   title: "Profile Details", subtitle: "Personal stats & data",      icon: "account-details-outline", iconType: "MaterialCommunityIcons", href: "/profile/details",  accent: false },
   { id: "weight",    title: "Weight Tracker",  subtitle: "Log & track body weight",    icon: "scale-outline",           iconType: "Ionicons",               href: "/(tabs)/weight",   accent: false },
   { id: "reports",   title: "Workout Reports", subtitle: "AI analysis & insights",    icon: "clipboard-text-outline",  iconType: "MaterialCommunityIcons", href: "/daily/reports",   accent: false },
+  { id: "followers", title: "Followers",       subtitle: "Followers & following",       icon: "account-group-outline",   iconType: "MaterialCommunityIcons", href: "/profile/follow/",  accent: false },
   { id: "calendar",  title: "Calendar",        subtitle: "Workout history heatmap",    icon: "calendar-outline",        iconType: "Ionicons",               href: "/calendar",        accent: false },
   { id: "settings",  title: "Settings",        subtitle: "Preferences & theme",        icon: "settings-outline",        iconType: "Ionicons",               href: "/profile/settings", accent: false },
 ];
@@ -216,10 +217,16 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
     }
   }, [visible]);
 
-  const handleNav = (href: string | null) => {
+  const handleNav = (item: any) => {
     onClose();
+    const href = item.href;
     if (!href) { setTimeout(() => alert("Coming soon!"), 300); return; }
-    setTimeout(() => router.push(href as any), 250);
+    if (item.id === 'followers') {
+      setTimeout(() => router.push({ pathname: `/profile/follow/${user?.id}` } as any), 250);
+    } else {
+      const resolved = href.includes(':id') ? href.replace(':id', user?.id || '') : href;
+      setTimeout(() => router.push(resolved as any), 250);
+    }
   };
 
   // ── Logout handler ─────────────────────────────────────────────────────────
@@ -371,7 +378,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
                     key={item.id}
                     item={item}
                     entranceAnim={menuAnims[currentIdx]}
-                    onPress={() => handleNav((item as any).href)}
+                    onPress={() => handleNav(item)}
                   />
                 );
               })}

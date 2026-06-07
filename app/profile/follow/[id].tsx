@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   TextInput,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -82,19 +83,26 @@ export default function FollowListScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [followerUsers, setFollowerUsers] = useState<any[]>([]);
   const [followingUsers, setFollowingUsers] = useState<any[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Action modal state
+  const [actionUser, setActionUser] = useState<any | null>(null);
+  const [actionSource, setActionSource] = useState<'followers' | 'following'>('followers');
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
       const headers = { Authorization: `Bearer ${token}` };
-      const [fRes, folRes] = await Promise.all([
+      const [fRes, folRes, meRes] = await Promise.all([
         axios.get(`${API_URL}/profile/${id}/followers`, { headers }),
         axios.get(`${API_URL}/profile/${id}/following`, { headers }),
+        axios.get(`${API_URL}/profile/me`, { headers }),
       ]);
       setFollowerUsers(fRes.data.users || []);
       setFollowingUsers(folRes.data.users || []);
+      setCurrentUserId(meRes.data?.id || null);
     } catch (err) {
       console.error('Error fetching follow lists:', err);
     } finally {
@@ -106,6 +114,8 @@ export default function FollowListScreen() {
     useCallback(() => { fetchAll(); }, [fetchAll])
   );
 
+  const isOwnList = currentUserId !== null && Number(id) === currentUserId;
+
   const currentUsers = activeTab === 'followers' ? followerUsers : followingUsers;
   const filtered = searchQuery.trim()
     ? currentUsers.filter(u =>
@@ -113,9 +123,90 @@ export default function FollowListScreen() {
       )
     : currentUsers;
 
+  const handleUnfollow = async () => {
+    if (!actionUser) return;
+    const prev = actionUser;
+    setActionUser(null);
+    // Optimistic local update
+    setFollowingUsers(prev => prev.filter(u => u.id !== actionUser.id));
+    setFollowerUsers(prev => prev.map(u => u.id === actionUser.id ? { ...u, is_followed_by_me: false } : u));
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(`${API_URL}/profile/${actionUser.id}/unfollow`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      // Revert on failure by re-fetching
+      fetchAll();
+    }
+  };
+
+  const handleRemoveFollower = async () => {
+    if (!actionUser) return;
+    const prev = actionUser;
+    setActionUser(null);
+    // Optimistic local update
+    setFollowerUsers(prev => prev.filter(u => u.id !== actionUser.id));
+    setFollowingUsers(prev => prev.map(u => u.id === actionUser.id ? { ...u, follows_me: false } : u));
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(`${API_URL}/profile/${actionUser.id}/remove-follower`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      fetchAll();
+    }
+  };
+
   const renderCard = ({ item }: { item: any }) => {
     const tier = getTier(item.league_tier);
     const cardGradient = getCardGradient(item.league_tier);
+
+    const isFollowerTab = activeTab === 'followers';
+    const isFollowingBack = item.is_followed_by_me;
+    const followsMe = item.follows_me;
+
+    const getActionButton = () => {
+      if (!isOwnList) return null;
+
+      if (isFollowerTab) {
+        // Followers tab
+        if (isFollowingBack) {
+          // I follow them back → "Following"
+          return (
+            <TouchableOpacity
+              style={[styles.actionPill, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+              onPress={() => { setActionUser(item); setActionSource('followers'); }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.actionPillText}>Following</Text>
+            </TouchableOpacity>
+          );
+        }
+        // They just follow me, I don't follow back → "Remove"
+        return (
+          <TouchableOpacity
+            style={[styles.actionPill, { backgroundColor: 'transparent', borderColor: colors.border }]}
+            onPress={() => { setActionUser(item); setActionSource('followers'); }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.actionPillText, { color: colors.textMuted }]}>Remove</Text>
+          </TouchableOpacity>
+        );
+      }
+
+      // Following tab
+      return (
+        <TouchableOpacity
+          style={[styles.actionPill, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+          onPress={() => { setActionUser(item); setActionSource('following'); }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.actionPillText}>Following</Text>
+        </TouchableOpacity>
+      );
+    };
+
     return (
       <TouchableOpacity
         activeOpacity={0.85}
@@ -162,12 +253,16 @@ export default function FollowListScreen() {
             </View>
           </View>
 
-          <View style={[styles.xpCapsule, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-            <Ionicons name="flash" size={10} color={P.sun} />
-            <Text style={styles.cardXP}>
-              {item.xp >= 1000 ? `${(item.xp / 1000).toFixed(1)}k` : item.xp}
-            </Text>
-            <Text style={styles.cardXPLabel}>XP</Text>
+          <View style={styles.cardRight}>
+            <View style={[styles.xpCapsule, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+              <Ionicons name="flash" size={10} color={P.sun} />
+              <Text style={styles.cardXP}>
+                {item.xp >= 1000 ? `${(item.xp / 1000).toFixed(1)}k` : item.xp}
+              </Text>
+              <Text style={styles.cardXPLabel}>XP</Text>
+            </View>
+
+            {getActionButton()}
           </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -263,6 +358,62 @@ export default function FollowListScreen() {
           />
         )}
       </View>
+
+      {/* ── Action Modal ── */}
+      <Modal visible={!!actionUser} transparent animationType="fade" onRequestClose={() => setActionUser(null)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setActionUser(null)}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+            {actionUser && (
+              <>
+                <View style={styles.modalUserRow}>
+                  <Avatar uri={actionUser.profile_pic_url} size={36} border={getTier(actionUser.league_tier).color} />
+                  <Text style={[styles.modalUserName, { color: colors.text }]} numberOfLines={1}>
+                    {actionUser.full_name || 'Athlete'}
+                  </Text>
+                </View>
+                <View style={styles.modalDivider} />
+
+                {/* Following tab: always show Unfollow; add Remove Follower if they follow me */}
+                {actionSource === 'following' && (
+                  <>
+                    <TouchableOpacity style={styles.modalOption} onPress={handleUnfollow} activeOpacity={0.7}>
+                      <Ionicons name="person-remove-outline" size={20} color="#FF4B4B" />
+                      <Text style={[styles.modalOptionText, { color: '#FF4B4B' }]}>Unfollow</Text>
+                    </TouchableOpacity>
+                    {actionUser.follows_me && (
+                      <TouchableOpacity style={styles.modalOption} onPress={handleRemoveFollower} activeOpacity={0.7}>
+                        <MaterialCommunityIcons name="account-remove-outline" size={20} color="#FF4B4B" />
+                        <Text style={[styles.modalOptionText, { color: '#FF4B4B' }]}>Remove Follower</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                )}
+
+                {/* Followers tab: if I follow them back show Unfollow + Remove; otherwise just Remove */}
+                {actionSource === 'followers' && (
+                  <>
+                    {actionUser.is_followed_by_me && (
+                      <TouchableOpacity style={styles.modalOption} onPress={handleUnfollow} activeOpacity={0.7}>
+                        <Ionicons name="person-remove-outline" size={20} color="#FF4B4B" />
+                        <Text style={[styles.modalOptionText, { color: '#FF4B4B' }]}>Unfollow</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={styles.modalOption} onPress={handleRemoveFollower} activeOpacity={0.7}>
+                      <MaterialCommunityIcons name="account-remove-outline" size={20} color="#FF4B4B" />
+                      <Text style={[styles.modalOptionText, { color: '#FF4B4B' }]}>Remove Follower</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                <View style={styles.modalDivider} />
+                <TouchableOpacity style={styles.modalOption} onPress={() => setActionUser(null)} activeOpacity={0.7}>
+                  <Text style={[styles.modalOptionText, { color: colors.textMuted }]}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -416,6 +567,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
+  cardRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+    marginRight: 14,
+  },
   xpCapsule: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -423,7 +579,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    marginRight: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
   },
@@ -438,5 +593,56 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: 'rgba(255, 255, 255, 0.45)',
     marginLeft: 1,
+  },
+  actionPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  actionPillText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 11,
+    color: '#FFF',
+  },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    paddingBottom: 32,
+  },
+  modalUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  modalUserName: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+    flex: 1,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginVertical: 6,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  modalOptionText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 15,
   },
 });

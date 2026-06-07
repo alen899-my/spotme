@@ -1,9 +1,9 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { FONTS } from "../../constants/theme";
-import { P, scale, vs, TIER_COLORS, getXPProgress } from "../../constants/homeTheme";
-import { useTheme } from "../../contexts/ThemeContext";
+import { P, scale, vs, getXPProgress } from "../../constants/homeTheme";
 
 interface Props {
   tier: string;
@@ -11,31 +11,25 @@ interface Props {
   totalXP: number;
 }
 
-const DARK_TIER_COLORS: Record<string, [string, string]> = {
-  Bronze:      ["#4A2B0E", "#2A1807"],
-  Silver:      ["#2E2F33", "#1A1B1D"],
-  Gold:        ["#4D3F00", "#292100"],
-  Platinum:    ["#003C3C", "#002042"],
-  Diamond:     ["#193740", "#002533"],
-  Master:      ["#3C1B4A", "#1D0A26"],
-  Grandmaster: ["#540922", "#2B020E"],
-  Elite:       ["#541A08", "#2E0D03"],
-  Champion:    ["#4A0000", "#240000"],
-  Legend:      ["#543200", "#330000"],
+const CARD_GRADIENTS: Record<string, [string, string]> = {
+  Bronze:      ["#543620", "#201108"],
+  Silver:      ["#3E4C5E", "#16202C"],
+  Gold:        ["#856006", "#2E1E00"],
+  Platinum:    ["#086F83", "#02242D"],
+  Diamond:     ["#0D6191", "#031E33"],
+  Master:      ["#6D28D9", "#2E0665"],
+  Grandmaster: ["#B91C1C", "#450616"],
+  Elite:       ["#C2410C", "#431407"],
+  Champion:    ["#991B1B", "#380202"],
+  Legend:      ["#D97706", "#4C0519"],
 };
 
 export default function XPCard({ tier, level, totalXP }: Props) {
-  const { isDark } = useTheme();
-  const baseTierColors = TIER_COLORS[tier] || TIER_COLORS.Bronze;
-  const tierColors = isDark ? (DARK_TIER_COLORS[tier] || baseTierColors) : baseTierColors;
+  const gradient = CARD_GRADIENTS[tier] || CARD_GRADIENTS.Bronze;
   const { progress, nextTier, xpToNext } = getXPProgress(tier, totalXP);
 
   return (
-    <View style={[styles.xpCard, { backgroundColor: tierColors[0] }]}>
-      <View
-        style={[StyleSheet.absoluteFill, { backgroundColor: tierColors[1], opacity: 0.45, borderRadius: scale(20) }]}
-        pointerEvents="none"
-      />
+    <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.xpCard}>
       <View style={styles.xpTop}>
         <View>
           <Text style={styles.xpTierLabel}>{tier}</Text>
@@ -53,7 +47,7 @@ export default function XPCard({ tier, level, totalXP }: Props) {
         <Text style={styles.xpSubText}>{xpToNext.toLocaleString()} XP to {nextTier}</Text>
         <Text style={styles.xpSubText}>{Math.round(progress * 100)}%</Text>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
