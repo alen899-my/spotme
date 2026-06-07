@@ -328,6 +328,23 @@ export default function PublicProfileScreen() {
               </View>
             </View>
 
+            {/* Followers / Following */}
+            <View style={styles.followerRow}>
+              <TouchableOpacity style={styles.followerItem} onPress={() => router.push({ pathname: `/profile/follow/${user.id}`, params: { type: 'followers' } })}>
+                <Text style={[styles.followerCount, { color: isDark ? colors.text : '#FFF' }]}>
+                  {Number(user.follower_count || 0).toLocaleString()}
+                </Text>
+                <Text style={[styles.followerLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.6)' }]}>Followers</Text>
+              </TouchableOpacity>
+              <View style={[styles.followerDot, { backgroundColor: isDark ? colors.textDim : 'rgba(255,255,255,0.3)' }]} />
+              <TouchableOpacity style={styles.followerItem} onPress={() => router.push({ pathname: `/profile/follow/${user.id}`, params: { type: 'following' } })}>
+                <Text style={[styles.followerCount, { color: isDark ? colors.text : '#FFF' }]}>
+                  {Number(user.following_count || 0).toLocaleString()}
+                </Text>
+                <Text style={[styles.followerLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.6)' }]}>Following</Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Follow button in hero card */}
             {!isOwnProfile && (
               <View style={styles.heroFollowRow}>
@@ -601,6 +618,15 @@ const styles = StyleSheet.create({
   heroXPBlock: { alignItems: 'center', marginLeft: 10 },
   heroXPVal: { fontFamily: FONTS.heading, fontSize: 28, lineHeight: 30 },
   heroXPLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: 1 },
+
+  followerRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    marginTop: 14, gap: 16,
+  },
+  followerItem: { alignItems: 'center', gap: 2 },
+  followerCount: { fontFamily: FONTS.heading, fontSize: 18, lineHeight: 20 },
+  followerLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase' },
+  followerDot: { width: 4, height: 4, borderRadius: 2 },
 
   heroFollowRow: {
     marginTop: 14,

@@ -259,7 +259,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const userQuery = await pool.query(`
       SELECT id, full_name, profile_pic_url, gender, age, height, weight, 
              total_xp AS xp, league_tier, current_streak, last_workout_date, 
-             fitness_goal, experience_level, is_private
+             fitness_goal, experience_level, is_private,
+        (SELECT COUNT(*) FROM follows WHERE following_id = $1 AND status = 'accepted') AS follower_count,
+        (SELECT COUNT(*) FROM follows WHERE follower_id = $1 AND status = 'accepted') AS following_count
       FROM users 
       WHERE id = $1
     `, [targetId]);
@@ -341,6 +343,48 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
   } catch (error) {
     console.error("GET /profile/:id error:", error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── GET /profile/:id/followers — list of users following this user ──────────
+router.get('/:id/followers', authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id);
+    if (isNaN(targetId)) return res.status(400).json({ message: 'Invalid user ID' });
+
+    const result = await pool.query(`
+      SELECT u.id, u.full_name, u.profile_pic_url, u.total_xp AS xp, u.league_tier, u.current_streak
+      FROM follows f
+      JOIN users u ON f.follower_id = u.id
+      WHERE f.following_id = $1 AND f.status = 'accepted'
+      ORDER BY f.created_at DESC
+    `, [targetId]);
+
+    res.json({ users: result.rows });
+  } catch (error) {
+    console.error("GET /profile/:id/followers error:", error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ── GET /profile/:id/following — list of users this user follows ──────────
+router.get('/:id/following', authenticateToken, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id);
+    if (isNaN(targetId)) return res.status(400).json({ message: 'Invalid user ID' });
+
+    const result = await pool.query(`
+      SELECT u.id, u.full_name, u.profile_pic_url, u.total_xp AS xp, u.league_tier, u.current_streak
+      FROM follows f
+      JOIN users u ON f.following_id = u.id
+      WHERE f.follower_id = $1 AND f.status = 'accepted'
+      ORDER BY f.created_at DESC
+    `, [targetId]);
+
+    res.json({ users: result.rows });
+  } catch (error) {
+    console.error("GET /profile/:id/following error:", error);
     res.status(500).json({ message: 'Server error' });
   }
 });
