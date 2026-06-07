@@ -276,8 +276,8 @@ export default function WorkoutReportScreen() {
                 <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
+            <Image source={coachAvatarSource} style={styles.coachCharacter} />
           </LinearGradient>
-          <Image source={coachAvatarSource} style={styles.coachCharacter} />
         </View>
 
         <View style={styles.statsGrid}>
@@ -335,12 +335,12 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   hero: {
-    width: '70%',
+    width: '100%',
     borderRadius: 18,
     borderWidth: 1,
     padding: 18,
     minHeight: 196,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   heroContent: {
     width: '100%',
@@ -349,10 +349,10 @@ const styles = StyleSheet.create({
   },
   coachCharacter: {
     position: 'absolute',
-    right: -12,
-    bottom: -6,
-    width: 170,
-    height: 204,
+    bottom: 10,
+    right: 10,
+    width: 120,
+    height: 150,
     resizeMode: 'contain',
     zIndex: 5,
   },

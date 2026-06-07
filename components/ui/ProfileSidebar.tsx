@@ -55,7 +55,6 @@ const MENU_ITEMS = [
   { id: "details",   title: "Profile Details", subtitle: "Personal stats & data",      icon: "account-details-outline", iconType: "MaterialCommunityIcons", href: "/profile/details",  accent: false },
   { id: "weight",    title: "Weight Tracker",  subtitle: "Log & track body weight",    icon: "scale-outline",           iconType: "Ionicons",               href: "/(tabs)/weight",   accent: false },
   { id: "reports",   title: "Workout Reports", subtitle: "AI analysis & insights",    icon: "clipboard-text-outline",  iconType: "MaterialCommunityIcons", href: "/daily/reports",   accent: false },
-  { id: "goals",     title: "Fitness Goals",   subtitle: "Adjust your targets",        icon: "target",                  iconType: "MaterialCommunityIcons", href: null,                accent: false },
   { id: "settings",  title: "Settings",        subtitle: "Preferences & theme",        icon: "settings-outline",        iconType: "Ionicons",               href: "/profile/settings", accent: false },
 ];
 
