@@ -5,16 +5,16 @@
 
 // ── League Tier Definitions (ascending by XP threshold) ───────────────────────
 const TIERS = [
-  { name: 'Bronze',      minXP: 0,      color: '#CD7F32', gradient: ['#CD7F32', '#8B4513'] },
-  { name: 'Silver',      minXP: 500,    color: '#A8A9AD', gradient: ['#A8A9AD', '#6C6C6C'] },
-  { name: 'Gold',        minXP: 1500,   color: '#FFD700', gradient: ['#FFD700', '#B8860B'] },
-  { name: 'Platinum',    minXP: 3000,   color: '#00C9C8', gradient: ['#00C9C8', '#007BFF'] },
-  { name: 'Diamond',     minXP: 6000,   color: '#B9F2FF', gradient: ['#B9F2FF', '#00BFFF'] },
-  { name: 'Master',      minXP: 10000,  color: '#9B59B6', gradient: ['#9B59B6', '#6C3483'] },
-  { name: 'Grandmaster', minXP: 15000,  color: '#E91E63', gradient: ['#E91E63', '#880E4F'] },
-  { name: 'Elite',       minXP: 20000,  color: '#FF5722', gradient: ['#FF5722', '#BF360C'] },
-  { name: 'Champion',    minXP: 30000,  color: '#E00000', gradient: ['#E00000', '#7F0000'] },
-  { name: 'Legend',      minXP: 50000,  color: '#FFD700', gradient: ['#FF9900', '#E00000'] },
+  { name: 'Bronze',      minXP: 0,       color: '#CD7F32', gradient: ['#CD7F32', '#8B4513'] },
+  { name: 'Silver',      minXP: 2000,    color: '#A8A9AD', gradient: ['#A8A9AD', '#6C6C6C'] },
+  { name: 'Gold',        minXP: 6000,    color: '#FFD700', gradient: ['#FFD700', '#B8860B'] },
+  { name: 'Platinum',    minXP: 12000,   color: '#00C9C8', gradient: ['#00C9C8', '#007BFF'] },
+  { name: 'Diamond',     minXP: 24000,   color: '#B9F2FF', gradient: ['#B9F2FF', '#00BFFF'] },
+  { name: 'Master',      minXP: 40000,   color: '#9B59B6', gradient: ['#9B59B6', '#6C3483'] },
+  { name: 'Grandmaster', minXP: 60000,   color: '#E91E63', gradient: ['#E91E63', '#880E4F'] },
+  { name: 'Elite',       minXP: 80000,   color: '#FF5722', gradient: ['#FF5722', '#BF360C'] },
+  { name: 'Champion',    minXP: 120000,  color: '#E00000', gradient: ['#E00000', '#7F0000'] },
+  { name: 'Legend',      minXP: 200000,  color: '#FFD700', gradient: ['#FF9900', '#E00000'] },
 ];
 
 /**

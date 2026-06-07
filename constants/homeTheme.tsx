@@ -38,8 +38,8 @@ export const TIER_COLORS: Record<string, [string, string]> = {
 };
 
 export const TIER_XP: Record<string, number> = {
-  Bronze: 0, Silver: 500, Gold: 1500, Platinum: 3000, Diamond: 6000,
-  Master: 10000, Grandmaster: 15000, Elite: 20000, Champion: 30000, Legend: 50000,
+  Bronze: 0, Silver: 2000, Gold: 6000, Platinum: 12000, Diamond: 24000,
+  Master: 40000, Grandmaster: 60000, Elite: 80000, Champion: 120000, Legend: 200000,
 };
 
 export const TIER_ORDER = Object.keys(TIER_XP);

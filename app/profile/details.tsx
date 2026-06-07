@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   Image,
+  TextInput,
   KeyboardAvoidingView,
   Modal,
   Dimensions,
@@ -21,7 +22,6 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
-import Input from "../../components/ui/Input";
 import axios from "axios";
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -269,34 +269,42 @@ export default function MyDetailsScreen() {
     iconType: 'Ionicons' | 'MaterialCommunityIcons' = 'Ionicons'
   ) => {
     if (isEditing) {
+      const IconComponent = iconType === 'Ionicons' ? Ionicons : MaterialCommunityIcons;
+
       if (type === 'dropdown') {
         return (
-          <TouchableOpacity activeOpacity={0.7} onPress={() => openDropdown(label, options, key)}>
-            <View pointerEvents="none">
-              <Input
-                label={label}
+          <TouchableOpacity activeOpacity={0.7} onPress={() => openDropdown(label, options, key)} style={{ marginBottom: 12 }}>
+            <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>{label}</Text>
+            <View pointerEvents="none" style={[styles.dietInputRow, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+              <IconComponent name={icon} size={18} color={colors.primary} style={{ marginRight: 10 }} />
+              <TextInput
+                style={[styles.dietInputField, { color: colors.text }]}
                 value={formData[key]?.toString() || ""}
                 placeholder={`Select ${label.toLowerCase()}`}
-                icon={iconType === 'Ionicons' ? <Ionicons name={icon} size={20} color={colors.primary} /> : <MaterialCommunityIcons name={icon} size={20} color={colors.primary} />}
-                containerStyle={styles.inputContainer}
+                placeholderTextColor={colors.textDim}
                 editable={false}
-                rightIcon={<Ionicons name="chevron-down" size={16} color="#A0A0A0" />}
               />
+              <Ionicons name="chevron-down" size={16} color="#A0A0A0" />
             </View>
           </TouchableOpacity>
         );
       }
 
       return (
-        <Input
-          label={label}
-          value={formData[key]?.toString() || ""}
-          onChangeText={(text) => setFormData({ ...formData, [key]: text })}
-          placeholder={`Enter ${label.toLowerCase()}`}
-          icon={iconType === 'Ionicons' ? <Ionicons name={icon} size={20} color={colors.primary} /> : <MaterialCommunityIcons name={icon} size={20} color={colors.primary} />}
-          containerStyle={styles.inputContainer}
-          editable={key !== 'age'} // Age is not directly editable
-        />
+        <View style={{ marginBottom: 12 }}>
+          <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>{label}</Text>
+          <View style={[styles.dietInputRow, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+            <IconComponent name={icon} size={18} color={colors.primary} style={{ marginRight: 10 }} />
+            <TextInput
+              style={[styles.dietInputField, { color: colors.text }]}
+              value={formData[key]?.toString() || ""}
+              onChangeText={(text) => setFormData({ ...formData, [key]: text })}
+              placeholder={`Enter ${label.toLowerCase()}`}
+              placeholderTextColor={colors.textDim}
+              editable={key !== 'age'}
+            />
+          </View>
+        </View>
       );
     }
 
@@ -372,15 +380,23 @@ export default function MyDetailsScreen() {
                 {renderInfoRow("Email Address", formData.email, "email", "mail-outline")}
                 {renderInfoRow("Phone Number", formData.phone_number, "phone_number", "call-outline")}
                 {renderInfoRow("Gender", formData.gender, "gender", "transgender-outline", 'dropdown', ["Male", "Female", "Other", "Prefer not to say"])}
-                <View>
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>Date of Birth</Text>
                   <TouchableOpacity activeOpacity={1} onPress={() => {
                     if (Platform.OS === "web") {
                       const d = document.getElementById("profile-web-date-picker") as any;
                       if (d && d.showPicker) d.showPicker();
                     } else { setShowDatePicker(true); }
                   }}>
-                    <View pointerEvents="none">
-                      <Input label="Date of Birth" placeholder="DD / MM / YYYY" value={formData.dob ? formatDate(formData.dob) : ""} editable={false} icon={<Ionicons name="calendar-outline" size={20} color={colors.primary} />} containerStyle={styles.inputContainer} />
+                    <View pointerEvents="none" style={[styles.dietInputRow, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                      <Ionicons name="calendar-outline" size={18} color={colors.primary} style={{ marginRight: 10 }} />
+                      <TextInput
+                        style={[styles.dietInputField, { color: colors.text }]}
+                        value={formData.dob ? formatDate(formData.dob) : ""}
+                        placeholder="DD / MM / YYYY"
+                        placeholderTextColor={colors.textDim}
+                        editable={false}
+                      />
                     </View>
                   </TouchableOpacity>
                   {Platform.OS === "web" && (<input id="profile-web-date-picker" type="date" style={{ position: "absolute", opacity: 0, width: 0, height: 0, pointerEvents: "none" }} onChange={(e) => { const v = e.target.value; if (v) setFormData({ ...formData, dob: v, age: calculateAge(v) }); }} />)}
@@ -703,10 +719,29 @@ const styles = StyleSheet.create({
   gridItem: {
     flex: 1,
   },
-  inputContainer: {
-    marginBottom: 12,
-    paddingHorizontal: 8,
+  dietFieldLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginLeft: 4,
   },
+  dietInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  dietInputField: {
+    flex: 1,
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 15,
+    padding: 0,
+  },
+
   photoScroll: {
     marginTop: 8,
   },

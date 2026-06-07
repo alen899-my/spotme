@@ -389,6 +389,23 @@ const initDB = async () => {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_food_db_category ON food_database (category);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_food_db_source ON food_database (source_file);`);
 
+    // XP Transactions table (for audit trail)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS xp_transactions (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        amount INT NOT NULL,
+        reason VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_xp_transactions_user ON xp_transactions (user_id);`);
+
+    // Water goal tracking column
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS water_goal_date DATE;
+    `);
+
     console.log("Database connected and all tables ready");
   } catch (error) {
     console.error("Database initialization failed:", error);

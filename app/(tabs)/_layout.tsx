@@ -96,6 +96,17 @@ export default function TabsLayout() {
 
   const loadUser = async () => {
     try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (token) {
+        const res = await axios.get(`${API_URL}/profile`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUser(res.data);
+        await AsyncStorage.setItem("userData", JSON.stringify(res.data));
+        return;
+      }
+    } catch {}
+    try {
       const data = await AsyncStorage.getItem("userData");
       if (data) setUser(JSON.parse(data));
     } catch {}

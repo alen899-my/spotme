@@ -315,14 +315,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
                 <Text style={[styles.userEmail, { color: colors.textMuted }]} numberOfLines={1}>
                   {user?.email || "warrior@spotme.com"}
                 </Text>
-                <TouchableOpacity
-                  style={[styles.editPill, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
-                  onPress={() => handleNav("/profile/details")}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name="pencil-outline" size={scale(10)} color={colors.primary} />
-                  <Text style={[styles.editPillText, { color: colors.text }]}>Edit Profile</Text>
-                </TouchableOpacity>
+
               </View>
             </View>
 
