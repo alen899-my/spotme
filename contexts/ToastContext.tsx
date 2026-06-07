@@ -6,7 +6,6 @@ import {
   Animated,
   Dimensions,
   Platform,
-  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -92,12 +91,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <Modal
-        transparent
-        visible={visible}
-        animationType="none"
-        pointerEvents="none"
-      >
+      {visible && (
         <View style={styles.modalOverlay} pointerEvents="box-none">
           <Animated.View
             style={[
@@ -115,7 +109,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             </View>
           </Animated.View>
         </View>
-      </Modal>
+      )}
     </ToastContext.Provider>
   );
 };
@@ -128,7 +122,7 @@ export const useToast = () => {
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
   },
   toastContainer: {
