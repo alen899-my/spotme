@@ -1949,5 +1949,188 @@ router.get('/muscle-detail/:slug', authenticateToken, async (req, res) => {
   }
 });
 
+// ── GET /daily/calendar-stats — overall + per-slug daily counts ────────────
+router.get('/calendar-stats', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    // ── 1. Overall: count of distinct workout days ────────────────────────────
+    const overallRes = await pool.query(
+      `SELECT DATE(dw.completed_at AT TIME ZONE 'UTC') AS date,
+              COUNT(DISTINCT dw.id)::int                AS count
+       FROM daily_workouts dw
+       WHERE dw.user_id = $1
+         AND dw.status  = 'completed'
+       GROUP BY 1
+       ORDER BY 1`,
+      [userId]
+    );
+
+    // ── 2. Per-slug: all exercise data → resolve slug client-side ────────────
+    const exerciseRes = await pool.query(
+      `SELECT e.target, e.body_part, e.category,
+              DATE(dw.completed_at AT TIME ZONE 'UTC') AS workout_date
+       FROM daily_workout_exercises dwe
+       JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
+       JOIN exercises e       ON dwe.exercise_id      = e.id
+       WHERE dw.user_id = $1
+         AND dw.status  = 'completed'`,
+      [userId]
+    );
+
+    // ── Exhaustive slug map (same as dashboard) ─────────────────────────────
+    const toSlug = {
+      'abductors':            'abductors',
+      'abs':                  'abs',
+      'adductors':            'adductors',
+      'biceps':               'biceps',
+      'calves':               'calves',
+      'cardiovascular system': null,
+      'delts':                'deltoids',
+      'forearms':             'forearm',
+      'glutes':               'gluteal',
+      'hamstrings':           'hamstring',
+      'lats':                 'upper-back',
+      'levator scapulae':     'trapezius',
+      'pectorals':            'chest',
+      'quads':                'quadriceps',
+      'serratus anterior':    'chest',
+      'spine':                'lower-back',
+      'traps':                'trapezius',
+      'triceps':              'triceps',
+      'upper back':           'upper-back',
+      'back':                 'upper-back',
+      'cardio':               null,
+      'chest':                'chest',
+      'lower arms':           'forearm',
+      'lower legs':           'calves',
+      'neck':                 'neck',
+      'shoulders':            'deltoids',
+      'upper arms':           'biceps',
+      'upper legs':           'quadriceps',
+      'waist':                'abs',
+      'abdominals':           'abs',
+      'ankle stabilizers':    'ankles',
+      'ankles':               'ankles',
+      'core':                 'abs',
+      'deltoids':             'deltoids',
+      'hands':                'hands',
+      'hip flexors':          'abs',
+      'latissimus dorsi':     'upper-back',
+      'lower back':           'lower-back',
+      'obliques':             'obliques',
+      'quadriceps':           'quadriceps',
+      'rhomboids':            'upper-back',
+      'rotator cuff':         'deltoids',
+      'soleus':               'calves',
+      'trapezius':            'trapezius',
+      'upper back':           'upper-back',
+      'wrist extensors':      'forearm',
+      'wrist flexors':        'forearm',
+      'wrists':               'forearm',
+    };
+
+    const SLUG_LABELS = {
+      chest:         'Chest',
+      'upper-back':  'Upper Back',
+      'lower-back':  'Lower Back',
+      deltoids:      'Shoulders',
+      biceps:        'Biceps',
+      triceps:       'Triceps',
+      forearm:       'Forearms',
+      abs:           'Abs',
+      obliques:      'Obliques',
+      gluteal:       'Glutes',
+      quadriceps:    'Quads',
+      hamstring:     'Hamstrings',
+      calves:        'Calves',
+      trapezius:     'Traps',
+      neck:          'Neck',
+      adductors:     'Adductors',
+      abductors:     'Abductors',
+      ankles:        'Ankles',
+      hands:         'Hands',
+      tibialis:      'Tibialis',
+      knees:         'Knees',
+      feet:          'Feet',
+    };
+
+    // ── Build per-slug date→count map ───────────────────────────────────────
+    const slugMap = {}; // slug -> { date: count }
+    for (const row of exerciseRes.rows) {
+      const candidates = [row.target, row.body_part, row.category];
+      let slug = null;
+      for (const raw of candidates) {
+        if (!raw) continue;
+        const key = raw.trim().toLowerCase();
+        const mapped = toSlug[key];
+        if (mapped) { slug = mapped; break; }
+      }
+      if (!slug) continue;
+
+      if (!slugMap[slug]) slugMap[slug] = {};
+      const dateStr = new Date(row.workout_date).toISOString().split('T')[0];
+      slugMap[slug][dateStr] = (slugMap[slug][dateStr] || 0) + 1;
+    }
+
+    // ── Format parts array (all body parts, trained or not) ─────────────────
+    const parts = Object.entries(SLUG_LABELS)
+      .map(([slug, label]) => ({
+        slug,
+        label,
+        history: slugMap[slug]
+          ? Object.entries(slugMap[slug])
+              .map(([date, count]) => ({ date, count }))
+              .sort((a, b) => a.date.localeCompare(b.date))
+          : [],
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    // ── Format overall ──────────────────────────────────────────────────────
+    const overall = overallRes.rows.map(r => ({
+      date: new Date(r.date).toISOString().split('T')[0],
+      count: r.count,
+    }));
+
+    res.json({ overall, parts });
+  } catch (err) {
+    console.error('GET /daily/calendar-stats error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /daily/workouts-by-date — workouts for a specific date ────────────
+router.get('/workouts-by-date', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { date } = req.query;
+  if (!date) return res.status(400).json({ error: 'date query param required' });
+
+  try {
+    const result = await pool.query(
+      `SELECT dw.*,
+        ws.name AS split_name,
+        wsess.name AS session_name,
+        (SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = dw.id) AS exercise_count,
+        (SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = dw.id AND is_completed = true) AS completed_count,
+        (SELECT COUNT(*) FROM daily_workout_sets dws 
+         JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id 
+         WHERE dwe.daily_workout_id = dw.id AND dws.is_skipped = false) AS total_sets,
+        (SELECT photo_url FROM daily_workout_photos WHERE daily_workout_id = dw.id ORDER BY created_at ASC LIMIT 1) AS cover_photo_url
+       FROM daily_workouts dw
+       LEFT JOIN workout_splits ws ON dw.split_id = ws.id
+       LEFT JOIN workout_sessions wsess ON dw.session_id = wsess.id
+       WHERE dw.user_id = $1
+         AND DATE(dw.completed_at AT TIME ZONE 'UTC') = $2::date
+       ORDER BY dw.started_at DESC`,
+      [userId, date]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('GET /daily/workouts-by-date error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
 

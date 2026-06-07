@@ -16,6 +16,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -30,6 +31,25 @@ const SIDEBAR_WIDTH = SCREEN_WIDTH;
 const BASE_W = 390;
 const scale = (n: number) => Math.round((SCREEN_WIDTH / BASE_W) * n);
 const vs = (n: number) => Math.round((SCREEN_HEIGHT / 844) * n);
+
+const TIER_GRADIENTS: Record<string, [string, string]> = {
+  Bronze: ['#CD7F32','#8B4513'], Silver: ['#C0C0C0','#808080'], Gold: ['#FFD700','#B8860B'],
+  Platinum: ['#00C9C8','#007BFF'], Diamond: ['#B9F2FF','#00BFFF'], Master: ['#9B59B6','#6C3483'],
+  Grandmaster: ['#E91E63','#880E4F'], Elite: ['#FF5722','#BF360C'], Champion: ['#E00000','#7F0000'], Legend: ['#FF9900','#E00000'],
+};
+const TIER_MC_ICONS: Record<string, string> = {
+  Bronze: 'shield', Silver: 'shield-half-full', Gold: 'trophy',
+  Platinum: 'diamond-stone', Diamond: 'diamond', Master: 'crown',
+  Grandmaster: 'crown-outline', Elite: 'sword-cross', Champion: 'fire', Legend: 'star-four-points',
+};
+const TIER_DARK_TEXT = new Set(['Silver', 'Gold', 'Diamond', 'Legend']);
+const TIER_COLORS: Record<string, string> = {
+  Bronze: '#CD7F32', Silver: '#B0B8C1', Gold: '#F7CB16',
+  Platinum: '#00C9C8', Diamond: '#7DD4F8', Master: '#9B59B6',
+  Grandmaster: '#E91E63', Elite: '#FF5722', Champion: '#E00000', Legend: '#FF9900',
+};
+function getTierColor(tier?: string) { return TIER_COLORS[tier || ''] || '#CD7F32'; }
+function getTierGradient(tier?: string): [string, string] { return TIER_GRADIENTS[tier || ''] || ['#CD7F32','#8B4513']; }
 
 const P = {
   sun:     "#F7CB16",
@@ -55,6 +75,7 @@ const MENU_ITEMS = [
   { id: "details",   title: "Profile Details", subtitle: "Personal stats & data",      icon: "account-details-outline", iconType: "MaterialCommunityIcons", href: "/profile/details",  accent: false },
   { id: "weight",    title: "Weight Tracker",  subtitle: "Log & track body weight",    icon: "scale-outline",           iconType: "Ionicons",               href: "/(tabs)/weight",   accent: false },
   { id: "reports",   title: "Workout Reports", subtitle: "AI analysis & insights",    icon: "clipboard-text-outline",  iconType: "MaterialCommunityIcons", href: "/daily/reports",   accent: false },
+  { id: "calendar",  title: "Calendar",        subtitle: "Workout history heatmap",    icon: "calendar-outline",        iconType: "Ionicons",               href: "/calendar",        accent: false },
   { id: "settings",  title: "Settings",        subtitle: "Preferences & theme",        icon: "settings-outline",        iconType: "Ionicons",               href: "/profile/settings", accent: false },
 ];
 
@@ -300,13 +321,26 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
 
             {/* ── Avatar + name ── */}
             <View style={[styles.avatarRow, { marginBottom: vs(14) }]}>
-              {user?.profile_pic_url ? (
-                <Image source={{ uri: user.profile_pic_url }} style={[styles.avatar, { borderColor: colors.border }]} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                  <Ionicons name="person" size={scale(30)} color={colors.primary} />
-                </View>
-              )}
+              <View style={styles.avatarWrap}>
+                {user?.profile_pic_url ? (
+                  <Image source={{ uri: user.profile_pic_url }} style={[styles.avatar, { borderColor: getTierColor(user?.league_tier) }]} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.inputBg, borderColor: getTierColor(user?.league_tier) }]}>
+                    <Ionicons name="person" size={scale(30)} color={colors.primary} />
+                  </View>
+                )}
+                {user?.league_tier && (
+                  <View style={styles.tierBadgeWrap}>
+                    <LinearGradient colors={getTierGradient(user.league_tier)} style={styles.tierBadge}>
+                      <MaterialCommunityIcons
+                        name={TIER_MC_ICONS[user.league_tier] as any}
+                        size={10}
+                        color={TIER_DARK_TEXT.has(user.league_tier) ? '#021518' : '#FFF'}
+                      />
+                    </LinearGradient>
+                  </View>
+                )}
+              </View>
               <View style={{ flex: 1, marginLeft: scale(14) }}>
                 <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
                   {user?.full_name || "Gym Warrior"}
@@ -314,7 +348,6 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
                 <Text style={[styles.userEmail, { color: colors.textMuted }]} numberOfLines={1}>
                   {user?.email || "warrior@spotme.com"}
                 </Text>
-
               </View>
             </View>
 
@@ -429,6 +462,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  avatarWrap: { position: 'relative' },
 
   avatar: {
     width: scale(64),
@@ -442,6 +476,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.92)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  tierBadgeWrap: {
+    position: 'absolute', bottom: -1, right: -1,
+  },
+  tierBadge: {
+    width: 22, height: 22, borderRadius: 11,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#FFF',
   },
 
   userName: {

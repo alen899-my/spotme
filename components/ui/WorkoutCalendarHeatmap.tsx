@@ -9,7 +9,7 @@
  *   <WorkoutCalendarHeatmap history={detail.history} accentColor="#FF4B4B" />
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
@@ -34,12 +34,24 @@ interface Props {
   accentColor?: string;
   /** Optional label shown above the calendar (e.g. muscle name). */
   title?: string;
+  /** External year control — syncs the heatmap's view year. */
+  controlledYear?: number;
+  /** External month control — syncs the heatmap's view month (0-indexed). */
+  controlledMonth?: number;
+  /** Called when the heatmap navigates internally. */
+  onViewChange?: (year: number, month: number) => void;
+  /** Called when a day cell is tapped. */
+  onDayPress?: (date: string, count: number) => void;
 }
 
 export default function WorkoutCalendarHeatmap({
   history,
   accentColor = "#FF4B4B",
   title,
+  controlledYear,
+  controlledMonth,
+  onViewChange,
+  onDayPress,
 }: Props) {
   const { colors, isDark } = useTheme();
 
@@ -48,6 +60,18 @@ export default function WorkoutCalendarHeatmap({
 
   const [viewYear,  setViewYear]  = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-indexed
+
+  // Sync external year/month controls
+  useEffect(() => {
+    if (controlledYear !== undefined) setViewYear(controlledYear);
+  }, [controlledYear]);
+  useEffect(() => {
+    if (controlledMonth !== undefined) setViewMonth(controlledMonth);
+  }, [controlledMonth]);
+
+  const notify = (y: number, m: number) => {
+    onViewChange?.(y, m);
+  };
 
   // ── Build O(1) lookup from history ──────────────────────────────────────────
   const dateMap: Record<string, number> = {};
@@ -58,19 +82,24 @@ export default function WorkoutCalendarHeatmap({
     viewYear === today.getFullYear() && viewMonth === today.getMonth();
 
   const goPrev = () => {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
-    else setViewMonth(m => m - 1);
+    let y = viewYear, m = viewMonth;
+    if (m === 0) { m = 11; y -= 1; } else { m -= 1; }
+    setViewYear(y); setViewMonth(m);
+    notify(y, m);
   };
 
   const goNext = () => {
-    if (isAtCurrentMonth) return; // can't go into the future
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
-    else setViewMonth(m => m + 1);
+    if (isAtCurrentMonth) return;
+    let y = viewYear, m = viewMonth;
+    if (m === 11) { m = 0; y += 1; } else { m += 1; }
+    setViewYear(y); setViewMonth(m);
+    notify(y, m);
   };
 
   const goToday = () => {
     setViewYear(today.getFullYear());
     setViewMonth(today.getMonth());
+    notify(today.getFullYear(), today.getMonth());
   };
 
   // ── Build calendar grid ──────────────────────────────────────────────────────
@@ -175,9 +204,17 @@ export default function WorkoutCalendarHeatmap({
               const futureCell  = day !== null && isFutureDay(day);
               const activeCell  = hasActivity(day);
 
+              const dateStr = day !== null ? dateString(day) : null;
+              const count   = dateStr ? (dateMap[dateStr] || 0) : 0;
+
               return (
-                <View
+                <TouchableOpacity
                   key={di}
+                  activeOpacity={day !== null && !futureCell ? 0.6 : 1}
+                  disabled={day === null || futureCell}
+                  onPress={() => {
+                    if (dateStr && onDayPress) onDayPress(dateStr, count);
+                  }}
                   style={[
                     styles.cell,
                     {
@@ -208,7 +245,7 @@ export default function WorkoutCalendarHeatmap({
                       {day}
                     </Text>
                   )}
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
