@@ -286,6 +286,7 @@ export default function LeaderboardScreen() {
   const [top3, setTop3] = useState<any[]>([]);
   const [me, setMe] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [myId, setMyId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -293,8 +294,14 @@ export default function LeaderboardScreen() {
   const searchTimer = useRef<any>(null);
   const headerAnim = useRef(new Animated.Value(0)).current;
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (selectedTab?: string) => {
+    const tier = selectedTab ?? tab;
+    const isTabChange = selectedTab !== undefined;
+    if (isTabChange) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const token = await AsyncStorage.getItem('userToken');
       const userData = await AsyncStorage.getItem('userData');
@@ -302,7 +309,7 @@ export default function LeaderboardScreen() {
       const headers = { Authorization: `Bearer ${token}` };
       const [topRes, boardRes, meRes] = await Promise.all([
         axios.get(`${API_URL}/leaderboard/top`, { headers }),
-        axios.get(`${API_URL}/leaderboard`, { params: { tier: tab, limit: 50 }, headers }),
+        axios.get(`${API_URL}/leaderboard`, { params: { tier, limit: 50 }, headers }),
         axios.get(`${API_URL}/leaderboard/me`, { headers }),
       ]);
       setTop3(topRes.data.slice(0, 3));
@@ -313,10 +320,15 @@ export default function LeaderboardScreen() {
       console.error('Leaderboard fetch error:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [tab]);
+  }, []);
 
   useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+
+  useEffect(() => {
+    if (!loading) fetchData(tab);
+  }, [tab]);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -546,6 +558,11 @@ export default function LeaderboardScreen() {
               <Text style={[styles.listHeaderPlayer, { color: colors.textMuted }]}>ATHLETE</Text>
               <Text style={[styles.listHeaderXP, { color: colors.textMuted }]}>XP</Text>
             </View>
+            {refreshing && (
+              <View style={styles.refreshBar}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            )}
             </>
             )}
           </View>
@@ -717,6 +734,7 @@ const styles = StyleSheet.create({
   listHeaderRank: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1, width: 46, textAlign: 'center' },
   listHeaderPlayer: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1, flex: 1, paddingLeft: 52 },
   listHeaderXP: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1, width: 48, textAlign: 'center' },
+  refreshBar: { alignItems: 'center', paddingVertical: 8 },
 
   // ── Game Cards ─────────────────────────────────────────────────────────────
   gameCard: {
