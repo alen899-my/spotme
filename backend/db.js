@@ -55,6 +55,8 @@ const initDB = async () => {
         target VARCHAR(100),
         image_url VARCHAR(500),
         gif_url VARCHAR(500),
+        avg_rating NUMERIC(3,1) DEFAULT 0,
+        rating_count INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -134,6 +136,10 @@ const initDB = async () => {
     `);
 
     await pool.query(`
+      ALTER TABLE exercises
+      ADD COLUMN IF NOT EXISTS avg_rating NUMERIC(3,1) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS rating_count INT DEFAULT 0;
+
       ALTER TABLE daily_workouts
       ADD COLUMN IF NOT EXISTS water_intake_liters NUMERIC(5,2) DEFAULT 0,
       ADD COLUMN IF NOT EXISTS post_workout_weight NUMERIC(6,2),
@@ -144,7 +150,6 @@ const initDB = async () => {
 
       ALTER TABLE daily_workout_exercises
       ADD COLUMN IF NOT EXISTS is_skipped BOOLEAN DEFAULT FALSE,
-      ADD COLUMN IF NOT EXISTS rating INT,
       ADD COLUMN IF NOT EXISTS best_set_weight NUMERIC(8,2) DEFAULT 0,
       ADD COLUMN IF NOT EXISTS best_set_reps INT DEFAULT 0,
       ADD COLUMN IF NOT EXISTS estimated_1rm NUMERIC(10,2) DEFAULT 0,

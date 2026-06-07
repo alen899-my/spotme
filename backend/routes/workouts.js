@@ -558,10 +558,7 @@ router.get('/sessions/:id/exercises', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT wse.*, e.name, e.category, e.image_url, e.target, e.equipment, e.instructions_en, e.instruction_steps_en,
-         (SELECT ROUND(AVG(dwe2.rating), 1)::float
-          FROM daily_workout_exercises dwe2
-          JOIN daily_workouts dw2 ON dwe2.daily_workout_id = dw2.id
-          WHERE dwe2.exercise_id = e.id AND dw2.user_id = $3 AND dwe2.rating IS NOT NULL) AS avg_rating
+              e.avg_rating::float8 AS avg_rating, e.rating_count
        FROM workout_session_exercises wse 
        JOIN exercises e ON wse.exercise_id = e.id 
        WHERE wse.session_id = $1 AND (
@@ -570,7 +567,7 @@ router.get('/sessions/:id/exercises', authenticateToken, async (req, res) => {
          $1 IN (SELECT ws.id FROM workout_sessions ws JOIN workout_splits s ON ws.split_id = s.id JOIN users u ON s.user_id = u.id WHERE u.share_splits = true AND s.is_template = false)
        )
        ORDER BY wse.sort_order ASC`,
-      [req.params.id, req.user.id, req.user.id]
+      [req.params.id, req.user.id]
     );
     res.json(result.rows);
   } catch (error) {
@@ -686,17 +683,13 @@ router.get('/exercises/search', authenticateToken, async (req, res) => {
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const queryText = `
-      SELECT e.*,
-         (SELECT ROUND(AVG(dwe2.rating), 1)::float
-          FROM daily_workout_exercises dwe2
-          JOIN daily_workouts dw2 ON dwe2.daily_workout_id = dw2.id
-          WHERE dwe2.exercise_id = e.id AND dw2.user_id = $${idx + 2} AND dwe2.rating IS NOT NULL) AS avg_rating
+      SELECT e.*
       FROM exercises e
       ${where}
       ORDER BY e.name ASC 
       LIMIT $${idx} OFFSET $${idx + 1}
     `;
-    params.push(parseInt(limit), parseInt(offset), req.user.id);
+    params.push(parseInt(limit), parseInt(offset));
 
     const result = await pool.query(queryText, params);
     res.json(result.rows);

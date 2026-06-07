@@ -351,15 +351,12 @@ router.get('/workouts/:id', authenticateToken, async (req, res) => {
 
     const exercises = await pool.query(
       `SELECT dwe.*, e.name, e.image_url, e.gif_url, e.instructions_en, e.target, e.equipment, e.category,
-         (SELECT ROUND(AVG(dwe2.rating), 1)::float
-          FROM daily_workout_exercises dwe2
-          JOIN daily_workouts dw2 ON dwe2.daily_workout_id = dw2.id
-          WHERE dwe2.exercise_id = dwe.exercise_id AND dw2.user_id = $2 AND dwe2.rating IS NOT NULL) AS avg_rating
+              e.avg_rating::float8 AS rating, e.rating_count
        FROM daily_workout_exercises dwe
        JOIN exercises e ON dwe.exercise_id = e.id
        WHERE dwe.daily_workout_id = $1
        ORDER BY dwe.sort_order ASC`,
-      [parseInt(req.params.id), req.user.id]
+      [parseInt(req.params.id)]
     );
 
     let setsRows = [];
@@ -1047,7 +1044,7 @@ router.patch('/exercises/:id/rating', authenticateToken, async (req, res) => {
   try {
     // Verify that the exercise belongs to a workout owned by the user
     const check = await pool.query(
-      `SELECT dwe.id 
+      `SELECT dwe.id, dwe.exercise_id
        FROM daily_workout_exercises dwe
        JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
        WHERE dwe.id = $1 AND dw.user_id = $2`,
@@ -1058,15 +1055,23 @@ router.patch('/exercises/:id/rating', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Workout exercise not found or unauthorized' });
     }
 
-    const result = await pool.query(
-      `UPDATE daily_workout_exercises
-       SET rating = $1
-       WHERE id = $2
-       RETURNING *`,
-      [parseInt(rating), parseInt(id)]
+    const exerciseId = check.rows[0].exercise_id;
+
+    // Update global exercise rating using a weighted average
+    await pool.query(
+      `UPDATE exercises
+       SET avg_rating = ROUND((COALESCE(avg_rating, 0) * COALESCE(rating_count, 0) + $1) / (COALESCE(rating_count, 0) + 1)::numeric, 1),
+           rating_count = rating_count + 1
+       WHERE id = $2`,
+      [parseInt(rating), exerciseId]
     );
 
-    res.json(result.rows[0]);
+    const updated = await pool.query(
+      `SELECT id, name, avg_rating::float8 AS rating FROM exercises WHERE id = $1`,
+      [exerciseId]
+    );
+
+    res.json(updated.rows[0]);
   } catch (err) {
     console.error('PATCH /daily/exercises/:id/rating error:', err);
     res.status(500).json({ error: err.message });
@@ -1120,14 +1125,12 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
       return res.json([]); // No sessions available to recommend
     }
 
-    // 2. Fetch all user ratings for exercises
+    // 2. Fetch all global exercise ratings
     const exerciseRatingsRes = await pool.query(`
-      SELECT dwe.exercise_id, AVG(dwe.rating) as avg_rating, COUNT(dwe.rating) as rating_count
-      FROM daily_workout_exercises dwe
-      JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
-      WHERE dw.user_id = $1 AND dwe.rating IS NOT NULL
-      GROUP BY dwe.exercise_id
-    `, [userId]);
+      SELECT id AS exercise_id, avg_rating::float8 AS avg_rating, rating_count
+      FROM exercises
+      WHERE rating_count > 0
+    `);
 
     // 3. Fetch all user ratings for sessions
     const sessionRatingsRes = await pool.query(`
@@ -1147,7 +1150,7 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
     // Map ratings for quick lookup
     const exerciseRatings = {};
     exerciseRatingsRes.rows.forEach(row => {
-      exerciseRatings[row.exercise_id] = parseFloat(row.avg_rating);
+      exerciseRatings[row.exercise_id] = row.avg_rating;
     });
 
     const sessionRatings = {};
@@ -1355,17 +1358,16 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     // ── 7. Top recommended exercises ───────────────────────────────────────────
     const topExerciseRes = await pool.query(
       `SELECT e.id AS exercise_id, e.name AS exercise_name, e.target, e.category, e.image_url, e.gif_url, e.equipment,
-              ROUND(AVG(dwe.rating)::numeric, 1)::float8 as rating
+              e.avg_rating::float8 AS rating
        FROM exercises e
-       INNER JOIN daily_workout_exercises dwe ON e.id = dwe.exercise_id AND dwe.rating IS NOT NULL
-       GROUP BY e.id
-       ORDER BY rating DESC
-       LIMIT 4`
+       WHERE e.rating_count > 0
+       ORDER BY e.avg_rating DESC, e.rating_count DESC
+       LIMIT 5`
     );
     
     const topRecs = topExerciseRes.rows.map(r => ({
       ...r,
-      scoreTag: r.rating >= 8.0 ? 'Highly Rated' : 'Recommended',
+      scoreTag: r.rating >= 8.0 ? 'Highly Rated' : r.rating > 0 ? 'Recommended' : 'Try This',
     }));
 
     // ── 8. Muscle Activity — decay-weighted, date-aware ──────────────────────
@@ -1603,7 +1605,7 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
         SELECT dwe.id, dwe.exercise_id, e.name, e.category, e.muscle_group, e.target,
                dwe.target_sets, dwe.target_reps, dwe.target_weight,
                dwe.is_completed, dwe.is_skipped, dwe.estimated_1rm, dwe.is_personal_record,
-               dwe.is_world_record, dwe.total_set_volume, dwe.rating
+               dwe.is_world_record, dwe.total_set_volume, e.avg_rating::float8 AS rating
         FROM daily_workout_exercises dwe
         JOIN exercises e ON dwe.exercise_id = e.id
         WHERE dwe.daily_workout_id = $1
