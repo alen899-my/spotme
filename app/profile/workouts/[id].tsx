@@ -101,7 +101,7 @@ export default function UserWorkoutsScreen() {
     const split     = w.split_name && w.split_name !== title ? w.split_name : '';
 
     return (
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: isDark ? colors.border : tier.color + '30' }]}>
+      <TouchableOpacity activeOpacity={0.7} onPress={() => router.push(`/daily/view/${w.id}?shared=1`)} style={[styles.card, { backgroundColor: colors.card, borderColor: isDark ? colors.border : tier.color + '30' }]}>
         <View style={styles.cardInner}>
           <View style={[styles.imgWrap, { borderColor: colors.border }]}>
             {hasPhoto ? (
@@ -144,7 +144,7 @@ export default function UserWorkoutsScreen() {
             </View>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 

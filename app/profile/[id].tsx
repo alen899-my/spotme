@@ -490,7 +490,7 @@ export default function PublicProfileScreen() {
 
                 return (
                   <View key={w.id} style={[styles.wCard, { borderColor: isDark ? colors.border : tier.color + '30', backgroundColor: colors.card, shadowColor: isDark ? '#000000' : tier.color + '20' }]}>
-                    <TouchableOpacity onPress={() => router.push(`/profile/workouts/${user.id}`)} activeOpacity={0.7}>
+                    <TouchableOpacity onPress={() => router.push(`/daily/view/${w.id}?shared=1`)} activeOpacity={0.7}>
                       <View style={styles.wCardGradient}>
                         <View style={styles.wCardRow}>
                           <View style={[styles.wImgWrap, { borderColor: colors.border }]}>

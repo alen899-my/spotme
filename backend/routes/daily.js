@@ -332,8 +332,25 @@ router.post(
 // ── GET /daily/workouts/:id — get workout with all exercises + sets ────────────
 router.get('/workouts/:id', authenticateToken, async (req, res) => {
   try {
+    const { shared } = req.query;
+    let whereClause = 'dw.id = $1';
+    const params = [parseInt(req.params.id)];
+
+    if (shared === '1') {
+      // Shared view — any authenticated user can view if owner's profile is public
+      whereClause += ` AND EXISTS (
+        SELECT 1 FROM users u WHERE u.id = dw.user_id AND (u.is_private = false OR u.id = $2)
+      )`;
+      params.push(req.user.id);
+    } else {
+      // Own workout — filter by user_id
+      whereClause += ' AND dw.user_id = $2';
+      params.push(req.user.id);
+    }
+
     const workout = await pool.query(
-      `SELECT dw.*, 
+      `SELECT dw.*,
+        u.full_name AS owner_name, u.profile_pic_url AS owner_pic,
         ws.name AS split_name, 
         wsess.name AS session_name,
         (SELECT COUNT(*) FROM daily_workout_sets dws 
@@ -342,10 +359,11 @@ router.get('/workouts/:id', authenticateToken, async (req, res) => {
         (SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = dw.id) AS exercise_count,
         (SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = dw.id AND is_completed = true) AS completed_count
        FROM daily_workouts dw
+       JOIN users u ON dw.user_id = u.id
        LEFT JOIN workout_splits ws ON dw.split_id = ws.id
        LEFT JOIN workout_sessions wsess ON dw.session_id = wsess.id
-       WHERE dw.id = $1 AND dw.user_id = $2`,
-      [parseInt(req.params.id), req.user.id]
+       WHERE ${whereClause}`,
+      params
     );
     if (workout.rows.length === 0) return res.status(404).json({ error: 'Workout not found' });
 

@@ -24,11 +24,12 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function WorkoutViewScreen() {
   const router = useRouter();
-  const { id: workoutId } = useLocalSearchParams();
+  const { id: workoutId, shared } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
 
+  const isShared = shared === '1';
   const [workout, setWorkout] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -152,14 +153,19 @@ export default function WorkoutViewScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={28} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>View Session</Text>
-          <TouchableOpacity
-            style={[styles.editBtn, isDark && { backgroundColor: colors.inputBg }]}
-            onPress={() => router.push(`/daily/${workoutId}?editing=true`)}
-          >
-            <Ionicons name="create-outline" size={16} color={P.cta} />
-            <Text style={[styles.editBtnText, { color: P.cta }]}>EDIT</Text>
-          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {isShared ? 'Workout Details' : 'View Session'}
+          </Text>
+          {!isShared && (
+            <TouchableOpacity
+              style={[styles.editBtn, isDark && { backgroundColor: colors.inputBg }]}
+              onPress={() => router.push(`/daily/${workoutId}?editing=true`)}
+            >
+              <Ionicons name="create-outline" size={16} color={P.cta} />
+              <Text style={[styles.editBtnText, { color: P.cta }]}>EDIT</Text>
+            </TouchableOpacity>
+          )}
+          {isShared && <View style={{ width: 40 }} />}
         </View>
 
         <FlatList
@@ -177,11 +183,11 @@ export default function WorkoutViewScreen() {
                 workout={workout}
                 uploadingPhotos={uploadingPhotos}
                 loadingPhotos={loadingPhotos}
-                onAddPhotos={handleUpdatePhotos}
-                onDeletePhoto={handleDeletePhoto}
+                onAddPhotos={isShared ? undefined : handleUpdatePhotos}
+                onDeletePhoto={isShared ? undefined : handleDeletePhoto}
                 onOpenViewer={(uri) => { setViewerUri(uri); setViewerVisible(true); }}
-                onEditMetrics={openEditMetrics}
-                showBodyWeight
+                onEditMetrics={isShared ? undefined : openEditMetrics}
+                showBodyWeight={!isShared}
               />
             </View>
           }
