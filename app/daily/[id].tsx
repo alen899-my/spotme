@@ -21,9 +21,10 @@ import { ActiveWorkoutSkeleton } from '../../components/ui/Skeleton';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { API_URL } from '../../utils/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 // ── Rating config ──
 const RATING_ICONS: string[] = [

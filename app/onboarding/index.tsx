@@ -25,9 +25,10 @@ import axios from "axios";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../contexts/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
+import { API_URL } from "../../utils/api";
 
 const { width } = Dimensions.get("window");
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
+
 const TOTAL_STEPS = 10;
 
 // ─── Gender selection images ──────────────────────────────────────────────────

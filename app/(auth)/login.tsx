@@ -20,6 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { z } from "zod";
+import { setToken, setUserData, clearAll } from "../../utils/tokenStorage";
+import { API_URL } from "../../utils/api";
 
 const C = {
   yellow:     "#F7CB16",
@@ -44,7 +46,7 @@ const F = {
   reg:   "Outfit_400Regular",
 };
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
+
 
 // ─── Validation schemas ─────────────────────────────────────────────────────
 
@@ -167,8 +169,8 @@ export default function AuthScreen() {
     try {
       if (isLogin) {
         const res = await axios.post(`${API_URL}/auth/login`, { email, password });
-        await AsyncStorage.setItem("userToken", res.data.token);
-        await AsyncStorage.setItem("userData", JSON.stringify(res.data.user));
+        await setToken(res.data.token);
+        await setUserData(res.data.user);
         if (res.data.user?.onboarding_completed) {
           router.replace("/(tabs)");
         } else {

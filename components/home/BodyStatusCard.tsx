@@ -11,8 +11,9 @@ import { FONTS } from "../../constants/theme";
 import { scale, vs, getBMIStatus } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
 import WorkoutCalendarHeatmap from "../ui/WorkoutCalendarHeatmap";
+import { API_URL } from "../../utils/api";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
+
 const { width: SCREEN_W } = Dimensions.get("window");
 
 const C = {

@@ -383,7 +383,6 @@ async function generateAIDietPlan(user, targets, mealsPerDay, pool) {
 
   } catch (parseErr) {
     console.error('[DietRAG] Parse failed, using static fallback:', parseErr.message);
-    console.error('[DietRAG] Raw AI response (first 500 chars):', aiResponse?.slice(0, 500));
     return generateDynamicMealPlan(user, caloriesTarget, proteinTarget, carbsTarget, fatTarget, mealsPerDay);
   }
 }

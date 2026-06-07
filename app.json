@@ -7,7 +7,7 @@
     "description": "Your ultimate fitness companion for tracking workouts and progress.",
     "orientation": "portrait",
     "icon": "./assets/appicn/appicon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "jsEngine": "hermes",
     "splash": {
@@ -16,7 +16,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.alen899993.spotme",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to take profile photos and workout completion photos.",
+        "NSPhotoLibraryUsageDescription": "Used to select profile photos and meal photos."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +31,13 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.alen899993.spotme"
+      "package": "com.alen899993.spotme",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -38,7 +50,8 @@
         "description": "Your ultimate fitness companion for tracking workouts and progress.",
         "start_url": "/",
         "display": "standalone",
-        "orientation": "portrait",
+    "privacyPolicyUrl": "https://spotme-smoky.vercel.app/privacy",
+    "orientation": "portrait",
         "background_color": "#000000",
         "theme_color": "#ef4444",
         "icons": [

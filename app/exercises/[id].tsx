@@ -21,8 +21,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { API_URL } from '../../utils/api';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 const formatLabel = (value?: string | null) =>
   value

@@ -14,8 +14,9 @@ import { useToast } from '../../contexts/ToastContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import WeightScale from '../../components/weight/WeightScale';
 import WeightHistoryCard from '../../components/weight/WeightHistoryCard';
+import { API_URL } from '../../utils/api';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 export default function WeightScreen() {
   const { colors, isDark } = useTheme();

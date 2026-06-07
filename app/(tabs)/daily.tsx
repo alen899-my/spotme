@@ -16,8 +16,8 @@ import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import DatePicker from '../../components/ui/DatePicker';
 import { DailySkeleton } from '../../components/ui/Skeleton';
+import { API_URL } from '../../utils/api';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // Profile gate colors
 const G = {

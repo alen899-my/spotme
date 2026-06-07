@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
+import { clearAll } from "../../utils/tokenStorage";
 import StreakIcon from "./StreakIcon";
 import { useTheme } from "../../contexts/ThemeContext";
 
@@ -236,8 +237,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
         onClose();
         // Small delay so sidebar closes cleanly before clearing storage
         setTimeout(async () => {
-          await AsyncStorage.removeItem("userToken");
-          await AsyncStorage.removeItem("userData");
+          await clearAll();
           router.replace("/login" as any);
         }, 300);
       } catch (e) {

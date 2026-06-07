@@ -13,9 +13,10 @@ import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { P, getXPProgress, TIER_COLORS } from '../../constants/homeTheme';
 import { UserProfileSkeleton } from '../../components/ui/Skeleton';
+import { API_URL } from '../../utils/api';
 
 const { width: SW } = Dimensions.get('window');
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 const TIERS = [
   { name: 'Bronze',      color: '#CD7F32', gradient: ['#CD7F32','#8B4513'] as [string,string], mcIcon: 'shield' },

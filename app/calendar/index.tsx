@@ -19,8 +19,9 @@ import axios from "axios";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
 import WorkoutCalendarHeatmap, { DayEntry } from "../../components/ui/WorkoutCalendarHeatmap";
+import { API_URL } from "../../utils/api";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
+
 
 interface PartEntry {
   slug: string;

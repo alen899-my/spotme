@@ -14,8 +14,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { NewWorkoutSkeleton } from '../../components/ui/Skeleton';
+import { API_URL } from '../../utils/api';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 export default function NewDailyWorkout() {
   const router = useRouter();

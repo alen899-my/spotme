@@ -544,7 +544,6 @@ router.patch(
     const userId = req.user.id;
 
     console.log(`[Daily] Finishing workout ${id} for user ${userId}`);
-    console.log('[Daily] Body:', req.body);
 
     try {
       const { water_intake_liters, post_workout_weight, photos, total_rest_seconds } = req.body;

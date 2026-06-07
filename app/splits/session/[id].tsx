@@ -27,9 +27,10 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmationModal from '../../../components/ui/ConfirmationModal';
 import ExercisePreviewModal from '../../../components/modals/ExercisePreviewModal';
+import { API_URL } from '../../../utils/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 export default function SessionDetailScreen() {
   const router = useRouter();

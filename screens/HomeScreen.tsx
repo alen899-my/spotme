@@ -26,8 +26,9 @@ import RecommendationCard from "../components/home/RecommendationCard";
 import { HomeSkeleton } from "../components/ui/Skeleton";
 import BodyStatusCard     from "../components/home/BodyStatusCard";
 import HydrationCard      from "../components/home/HydrationCard";
+import { API_URL } from "../utils/api";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
+
 
 export default function HomeScreen() {
   const router = useRouter();

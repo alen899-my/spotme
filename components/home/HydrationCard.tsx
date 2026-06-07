@@ -15,8 +15,9 @@ import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useToast } from "../../contexts/ToastContext";
+import { API_URL } from "../../utils/api";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
+
 
 // ── Theme Palette ────────────────────────────────────────────────────────────
 const C = {

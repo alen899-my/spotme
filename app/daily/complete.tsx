@@ -17,6 +17,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import StreakIcon from '../../components/ui/StreakIcon';
 import { CompleteSkeleton } from '../../components/ui/Skeleton';
+import { API_URL } from '../../utils/api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -27,7 +28,7 @@ const s = (n: number) => Math.round((SCREEN_WIDTH / BASE_W) * n);
 const vs = (n: number) => Math.round((SCREEN_HEIGHT / BASE_H) * n);
 const fs = (n: number) => Math.round((Math.min(SCREEN_WIDTH, 500) / BASE_W) * n);
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function formatDuration(sec: number) {

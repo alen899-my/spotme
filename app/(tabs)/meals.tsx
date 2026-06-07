@@ -19,9 +19,10 @@ import WaterTracker from '../../components/ui/WaterTracker';
 import DietRecsScreen from '../../components/diet/DietRecsScreen';
 import LogMealSheet, { LogMealPayload } from '../../components/meals/LogMealSheet';
 import MealNutrientCard from '../../components/meals/MealNutrientCard';
+import { API_URL } from '../../utils/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 export default function MealsScreen() {
   const { colors, isDark } = useTheme();

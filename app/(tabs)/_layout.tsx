@@ -9,10 +9,11 @@ import ProfileSidebar from "../../components/ui/ProfileSidebar";
 import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
 import axios from "axios";
+import { API_URL } from "../../utils/api";
 
 const BLUE = "#2596BE";
 const INK = "#04282B";
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 const TABS = [
   { name: "index",       icon: "home",          label: "Home" },

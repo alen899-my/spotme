@@ -13,9 +13,10 @@ import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import BmiSpeedometer from '../ui/BmiSpeedometer';
+import { API_URL } from '../../utils/api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 const SORT_OPTIONS = [
   { key: 'protein_g', label: 'Protein' },

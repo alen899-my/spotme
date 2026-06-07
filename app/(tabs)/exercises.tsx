@@ -25,6 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { API_URL } from '../../utils/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PADDING = 16;
@@ -32,7 +33,7 @@ const CARD_GAP = 12;
 const CARD_WIDTH = (SCREEN_WIDTH - H_PADDING * 2 - CARD_GAP) / 2;
 const CARD_HEIGHT = CARD_WIDTH * 1.2;
 const PAGE_SIZE = 20;
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 const HEADER_IMAGE = require('../../assets/home/firstscreenbg.png');
 
 type AccentTheme = {

@@ -12,9 +12,10 @@ import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
+import { API_URL } from '../../utils/api';
 
 // Remove static width calculation
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 const GOAL_LABELS: Record<string, string> = {
   muscle_building: 'Muscle Building',

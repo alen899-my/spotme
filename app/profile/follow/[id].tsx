@@ -19,8 +19,9 @@ import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { P } from '../../../constants/homeTheme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { API_URL } from '../../../utils/api';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 const TIERS = [
   { name: 'Bronze',      color: '#CD7F32', textDark: false, gradient: ['#CD7F32','#8B4513'] as [string,string],       mcIcon: 'shield'                },

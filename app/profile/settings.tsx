@@ -7,16 +7,19 @@ import {
   Switch,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { clearAll } from "../../utils/tokenStorage";
 import axios from "axios";
 import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
+import { API_URL } from "../../utils/api";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -91,6 +94,30 @@ export default function SettingsScreen() {
       setShareSplits(!value);
     } finally {
       setSavingShare(false);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "This will permanently delete your account and all your data. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: confirmDelete },
+      ]
+    );
+  };
+
+  const confirmDelete = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      await axios.post(`${API_URL}/auth/delete-account`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await clearAll();
+      router.replace('/login');
+    } catch (err) {
+      Alert.alert("Error", "Failed to delete account. Please try again.");
     }
   };
 
@@ -220,6 +247,20 @@ export default function SettingsScreen() {
               <Text style={s.settingTitle}>SpotMe v1.0.4 · Beta</Text>
             </View>
           </View>
+        </View>
+
+        <Text style={s.sectionLabel}>ACCOUNT</Text>
+        <View style={s.card}>
+          <TouchableOpacity onPress={handleDeleteAccount} activeOpacity={0.6}>
+            <View style={[s.settingRow, { borderBottomWidth: 0 }]}>
+              <View style={s.settingLeft}>
+                <View style={[s.iconCircle, { backgroundColor: '#FF000015' }]}>
+                  <Ionicons name="trash-outline" size={20} color="#FF4444" />
+                </View>
+                <Text style={[s.settingTitle, { color: '#FF4444' }]}>Delete Account</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>

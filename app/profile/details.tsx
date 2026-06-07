@@ -24,6 +24,7 @@ import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
 import axios from "axios";
 import { LinearGradient } from 'expo-linear-gradient';
+import { API_URL } from "../../utils/api";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -63,7 +64,7 @@ export default function MyDetailsScreen() {
     key: string;
   }>({ visible: false, title: "", options: [], key: "" });
 
-  const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
+
 
   useEffect(() => {
     fetchUserData();

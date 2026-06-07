@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const { pool } = require('../db');
+const authenticateToken = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -189,6 +190,21 @@ router.post('/update-profile', async (req, res) => {
   } catch (err) {
     console.error("Update profile error:", err);
     res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// DELETE ACCOUNT
+router.post('/delete-account', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ success: true, message: 'Account deleted successfully' });
+  } catch (err) {
+    console.error('Delete account error:', err);
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 
