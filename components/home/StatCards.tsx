@@ -130,6 +130,7 @@ const CARDS = {
     iconColor: "#ff6b35",
     valColor: "#ff6b35",
     lblColor: "#6b2f14",
+    lblColorDark: "#ff8c5a",
     icon: "flame" as const,
   },
   streak: {
@@ -141,6 +142,7 @@ const CARDS = {
     iconColor: "#30d158",
     valColor: "#30d158",
     lblColor: "#1a5a2a",
+    lblColorDark: "#6ee68a",
     icon: "egg" as const,
   },
   water: {
@@ -152,6 +154,7 @@ const CARDS = {
     iconColor: "#40a9ff",
     valColor: "#40a9ff",
     lblColor: "#0a3660",
+    lblColorDark: "#7fc9ff",
     waterFill: "rgba(10,132,255,0.16)",
     waterWave: "rgba(10,132,255,0.22)",
     icon: "water" as const,
@@ -165,6 +168,7 @@ const CARDS = {
     iconColor: "#ffd60a",
     valColor: "#ffd60a",
     lblColor: "#5a4200",
+    lblColorDark: "#ffe066",
     icon: "restaurant" as const,
   },
 } as const;
@@ -196,7 +200,7 @@ function FireCard({ value, label }: { value: string; label: string }) {
         <Animated.Text style={[styles.emojiIcon, fireStyle]}>🔥</Animated.Text>
       </View>
       <Text style={[styles.val, { color: cfg.valColor }]}>{value}</Text>
-      <Text style={[styles.lbl, { color: cfg.lblColor }]}>{label}</Text>
+      <Text style={[styles.lbl, { color: isDark ? cfg.lblColorDark : cfg.lblColor }]}>{label}</Text>
     </Animated.View>
   );
 }
@@ -205,6 +209,7 @@ function StreakCard({ value, label }: { value: string; label: string }) {
   const cfg = CARDS.streak;
   const eggStyle = useEggAnim();
   const glow = useGlowAnim(300);
+  const { isDark } = useTheme();
 
   return (
     <Animated.View
@@ -225,7 +230,7 @@ function StreakCard({ value, label }: { value: string; label: string }) {
         <Animated.Text style={[styles.emojiIcon, eggStyle]}>🥚</Animated.Text>
       </View>
       <Text style={[styles.val, { color: cfg.valColor }]}>{value}</Text>
-      <Text style={[styles.lbl, { color: cfg.lblColor }]}>{label}</Text>
+      <Text style={[styles.lbl, { color: isDark ? cfg.lblColorDark : cfg.lblColor }]}>{label}</Text>
     </Animated.View>
   );
 }
@@ -235,6 +240,7 @@ function WaterCard({ value, label }: { value: string; label: string }) {
   const dropStyle = useDropletAnim();
   const fillHeight = useWaterFill();
   const glow = useGlowAnim(600);
+  const { isDark } = useTheme();
 
   return (
     <Animated.View
@@ -270,7 +276,7 @@ function WaterCard({ value, label }: { value: string; label: string }) {
         <Animated.Text style={[styles.emojiIcon, dropStyle]}>💧</Animated.Text>
       </View>
       <Text style={[styles.val, { color: cfg.valColor, zIndex: 2 }]}>{value}</Text>
-      <Text style={[styles.lbl, { color: cfg.lblColor, zIndex: 2 }]}>{label}</Text>
+      <Text style={[styles.lbl, { color: isDark ? cfg.lblColorDark : cfg.lblColor, zIndex: 2 }]}>{label}</Text>
     </Animated.View>
   );
 }
@@ -279,6 +285,7 @@ function EatenCard({ value, label }: { value: string; label: string }) {
   const cfg = CARDS.eaten;
   const forkStyle = useForkAnim();
   const glow = useGlowAnim(900);
+  const { isDark } = useTheme();
 
   // Shimmer sweep
   const shimmer = useRef(new Animated.Value(-1)).current;
@@ -326,7 +333,7 @@ function EatenCard({ value, label }: { value: string; label: string }) {
         <Animated.Text style={[styles.emojiIcon, forkStyle]}>🍽️</Animated.Text>
       </View>
       <Text style={[styles.val, { color: cfg.valColor }]}>{value}</Text>
-      <Text style={[styles.lbl, { color: cfg.lblColor }]}>{label}</Text>
+      <Text style={[styles.lbl, { color: isDark ? cfg.lblColorDark : cfg.lblColor }]}>{label}</Text>
     </Animated.View>
   );
 }
