@@ -125,7 +125,7 @@ export default function UserSplitsScreen() {
               </View>
             )}
             <View>
-              <Text style={[styles.headerName, { color: colors.text }]}>@{String(name || 'user').replace(/\s/g, '')}</Text>
+              <Text style={[styles.headerName, { color: colors.text }]}>{String(name || 'Athlete')}</Text>
               <Text style={[styles.headerCount, { color: colors.textMuted }]}>{count || splits.length} program{(parseInt(String(count || splits.length), 10) || splits.length) > 1 ? 's' : ''}</Text>
             </View>
           </View>

@@ -229,10 +229,16 @@ router.get('/shared-splits', authenticateToken, async (req, res) => {
     const offset = (pageNum - 1) * limitNum;
 
     let whereExtra = '';
-    const params = [req.user.id];
-    let paramIdx = 2;
+    const viewerId = req.user.id;
+    const params = [];
+    let paramIdx = 1;
+    if (!creator_id) {
+      whereExtra += ` AND s.user_id != $${paramIdx}`;
+      params.push(viewerId);
+      paramIdx++;
+    }
     if (q && q.trim()) {
-      whereExtra = ` AND (u.username ILIKE $${paramIdx} OR u.full_name ILIKE $${paramIdx})`;
+      whereExtra += ` AND (u.username ILIKE $${paramIdx} OR u.full_name ILIKE $${paramIdx})`;
       params.push(`%${q.trim()}%`);
       paramIdx++;
     }
@@ -244,15 +250,20 @@ router.get('/shared-splits', authenticateToken, async (req, res) => {
         paramIdx++;
       }
     }
+    const commonWhere = `u.share_splits = true AND s.is_template = false${whereExtra}`;
     const countResult = await pool.query(`
       SELECT COUNT(*) AS total
       FROM workout_splits s
       JOIN users u ON s.user_id = u.id
-      WHERE u.share_splits = true AND s.is_template = false AND s.user_id != $1${whereExtra}
+      WHERE ${commonWhere}
     `, params);
     const total = parseInt(countResult.rows[0].total, 10);
     const totalPages = Math.ceil(total / limitNum);
 
+    // Add viewerId for is_already_added subquery
+    params.push(viewerId);
+    const subIdx = paramIdx;
+    paramIdx++;
     params.push(limitNum, offset);
     const result = await pool.query(`
       SELECT s.*,
@@ -270,10 +281,10 @@ router.get('/shared-splits', authenticateToken, async (req, res) => {
             LIMIT 5
           ) sub
         ) as exercise_images,
-        EXISTS (SELECT 1 FROM workout_splits WHERE user_id = $1 AND name = s.name) AS is_already_added
+        EXISTS (SELECT 1 FROM workout_splits WHERE user_id = $${subIdx} AND name = s.name) AS is_already_added
       FROM workout_splits s
       JOIN users u ON s.user_id = u.id
-      WHERE u.share_splits = true AND s.is_template = false AND s.user_id != $1${whereExtra}
+      WHERE ${commonWhere}
       ORDER BY u.username ASC, s.created_at DESC
       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
     `, params);

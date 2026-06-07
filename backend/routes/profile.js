@@ -291,6 +291,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 
     if (canViewFull) {
+      const workoutLimit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
       // Fetch user's recent workouts
       const workoutsQuery = await pool.query(`
         SELECT dw.*,
@@ -307,8 +308,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
         LEFT JOIN workout_sessions wsess ON dw.session_id = wsess.id
         WHERE dw.user_id = $1 AND dw.status = 'completed'
         ORDER BY dw.started_at DESC
-        LIMIT 10
-      `, [targetId]);
+        LIMIT $2
+      `, [targetId, workoutLimit]);
 
       res.json({
         user,

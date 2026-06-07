@@ -70,6 +70,7 @@ export default function PublicProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [workouts, setWorkouts] = useState<any[]>([]);
+  const [splits, setSplits] = useState<any[]>([]);
   const [canViewFull, setCanViewFull] = useState(true);
   const [followStatus, setFollowStatus] = useState<string | null>(null);
   const [hasPendingFromTarget, setHasPendingFromTarget] = useState(false);
@@ -92,6 +93,17 @@ export default function PublicProfileScreen() {
       setCanViewFull(res.data.can_view_full !== false);
       setFollowStatus(res.data.follow_status);
       setHasPendingFromTarget(res.data.has_pending_from_target || false);
+
+      // Fetch user's shared splits
+      try {
+        const splitsRes = await axios.get(`${API_URL}/workouts/shared-splits`, {
+          params: { creator_id: id, limit: 10 },
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setSplits(splitsRes.data.data || []);
+      } catch (e) {
+        console.error('Failed to fetch splits:', e);
+      }
     } catch (err: any) {
       console.error('Profile fetch error:', err?.response?.status, err?.message);
     } finally {
@@ -287,12 +299,6 @@ export default function PublicProfileScreen() {
                 <Text style={[styles.heroTier, { color: tier.color }]}>
                   {(user.league_tier ?? 'Bronze').toUpperCase()} LEAGUE
                 </Text>
-                {user.fitness_goal ? (
-                  <View style={[styles.goalBadge, { backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(255, 255, 255, 0.15)' }]}>
-                    <Ionicons name="flag-outline" size={10} color={isDark ? colors.primary : '#FFF'} />
-                    <Text style={[styles.goalText, { color: isDark ? colors.primary : '#FFF' }]} numberOfLines={1}>{user.fitness_goal}</Text>
-                  </View>
-                ) : null}
               </View>
 
               <View style={styles.heroXPBlock}>
@@ -333,7 +339,7 @@ export default function PublicProfileScreen() {
 
         {/* ── PRIVATE PROFILE LOCK MESSAGE ── */}
         {!canViewFull && !isOwnProfile && (
-          <View style={[styles.lockedCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
+          <View style={[styles.lockedCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : tier.color + '30' }]}>
             <Ionicons name="lock-closed" size={40} color={colors.textMuted} />
             <Text style={[styles.lockedTitle, { color: colors.text }]}>Private Profile</Text>
             <Text style={[styles.lockedSub, { color: colors.textMuted }]}>
@@ -349,7 +355,7 @@ export default function PublicProfileScreen() {
           <>
             {/* Stats Row */}
             <View style={styles.statsRow}>
-              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
+              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : tier.color + '30' }]}>
                 <View style={styles.statIconRow}>
                   <Ionicons name="flame" size={18} color="#FF9F43" />
                   <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>STREAK</Text>
@@ -364,9 +370,9 @@ export default function PublicProfileScreen() {
                 </Text>
               </View>
 
-              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)' }]}>
+              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : tier.color + '30' }]}>
                 <View style={styles.statIconRow}>
-                  <MaterialCommunityIcons name="dumbbell" size={18} color={colors.primary} />
+                  <MaterialCommunityIcons name="dumbbell" size={18} color={tier.color} />
                   <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>WORKOUTS</Text>
                 </View>
                 <Text style={[styles.statCardValue, { color: colors.text }]}>
@@ -380,10 +386,66 @@ export default function PublicProfileScreen() {
               </View>
             </View>
 
+            {/* Splits Carousel */}
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Training Splits</Text>
+                <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
+                {splits.length > 0 && (
+                  <TouchableOpacity onPress={() => router.push({
+                    pathname: `/splits/user/${user.id}`,
+                    params: { name: user.full_name || 'Athlete', pic: user.profile_pic_url || '', count: splits.length }
+                  })}>
+                    <Text style={[styles.seeAllText, { color: tier.color }]}>See all</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {splits.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.splitsScroll}>
+                  {splits.map((s) => {
+                    const images = s.exercise_images || [];
+                    return (
+                      <TouchableOpacity
+                        key={s.id}
+                        activeOpacity={0.7}
+                        onPress={() => router.push({
+                          pathname: `/splits/user/${user.id}`,
+                          params: { name: user.full_name || 'Athlete', pic: user.profile_pic_url || '', count: splits.length }
+                        })}
+                        style={[styles.splitCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : tier.color + '30' }]}
+                      >
+                        <View style={styles.splitImages}>
+                          {images.length > 0 ? (
+                            images.slice(0, 3).map((img: string, i: number) => (
+                              <Image key={i} source={{ uri: img }} style={[styles.splitImg, { borderColor: colors.border }]} />
+                            ))
+                          ) : (
+                            <View style={[styles.splitImgPlaceholder, { backgroundColor: colors.inputBg }]}>
+                              <MaterialCommunityIcons name="dumbbell" size={22} color={colors.textMuted} />
+                            </View>
+                          )}
+                        </View>
+                        <Text style={[styles.splitName, { color: colors.text }]} numberOfLines={1}>{s.name}</Text>
+                        <View style={styles.splitMeta}>
+                          <Ionicons name="layers-outline" size={12} color={colors.textMuted} />
+                          <Text style={[styles.splitMetaText, { color: colors.textMuted }]}>{s.session_count || 0} sessions</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <View style={[styles.emptySplits, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <MaterialCommunityIcons name="dumbbell" size={24} color={colors.textDim} />
+                  <Text style={[styles.emptySplitsText, { color: colors.textMuted }]}>No training splits shared yet</Text>
+                </View>
+              )}
+            </>
+
             {/* Physical Metrics */}
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Physical Metrics</Text>
-              <View style={[styles.sectionLine, { backgroundColor: colors.primary }]} />
+              <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
             </View>
 
             <View style={styles.metricsGrid}>
@@ -393,8 +455,8 @@ export default function PublicProfileScreen() {
                 { label: 'Age',    value: user.age    ? `${user.age} yrs`  : '—', icon: 'calendar-account' },
                 { label: 'Gender', value: user.gender || '—',                      icon: 'gender-male-female' },
               ].map((m) => (
-                <View key={m.label} style={[styles.metricTile, { backgroundColor: colors.card, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)', shadowColor: isDark ? '#000000' : P.ctaDeep }]}>
-                  <MaterialCommunityIcons name={m.icon as any} size={20} color={colors.primary} />
+                <View key={m.label} style={[styles.metricTile, { backgroundColor: colors.card, borderColor: tier.color + '30', shadowColor: tier.color + '20' }]}>
+                  <MaterialCommunityIcons name={m.icon as any} size={20} color={tier.color} />
                   <Text style={[styles.metricValue, { color: colors.text }]}>{m.value}</Text>
                   <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{m.label}</Text>
                 </View>
@@ -404,7 +466,10 @@ export default function PublicProfileScreen() {
             {/* Recent Workouts */}
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Workouts</Text>
-              <View style={[styles.sectionLine, { backgroundColor: colors.primary }]} />
+              <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
+              <TouchableOpacity onPress={() => router.push(`/profile/workouts/${user.id}`)}>
+                <Text style={[styles.seeAllText, { color: tier.color }]}>See all</Text>
+              </TouchableOpacity>
             </View>
 
             {workouts.length === 0 ? (
@@ -424,51 +489,53 @@ export default function PublicProfileScreen() {
                 const split     = w.split_name && w.split_name !== title ? w.split_name : '';
 
                 return (
-                  <View key={w.id} style={[styles.wCard, { borderColor: isDark ? colors.border : 'rgba(37,150,190,0.18)', backgroundColor: colors.card, shadowColor: isDark ? '#000000' : P.ctaDeep }]}>
-                    <View style={styles.wCardGradient}>
-                      <View style={styles.wCardRow}>
-                        <View style={[styles.wImgWrap, { borderColor: colors.border }]}>
-                          {hasPhoto ? (
-                            <Image source={{ uri: w.cover_photo_url || w.completion_photo_url }} style={styles.wImg} />
-                          ) : (
-                            <View style={[styles.wImgPlaceholder, { backgroundColor: colors.inputBg }]}>
-                              <MaterialCommunityIcons name="arm-flex" size={28} color={colors.primary} />
+                  <View key={w.id} style={[styles.wCard, { borderColor: isDark ? colors.border : tier.color + '30', backgroundColor: colors.card, shadowColor: isDark ? '#000000' : tier.color + '20' }]}>
+                    <TouchableOpacity onPress={() => router.push(`/profile/workouts/${user.id}`)} activeOpacity={0.7}>
+                      <View style={styles.wCardGradient}>
+                        <View style={styles.wCardRow}>
+                          <View style={[styles.wImgWrap, { borderColor: colors.border }]}>
+                            {hasPhoto ? (
+                              <Image source={{ uri: w.cover_photo_url || w.completion_photo_url }} style={styles.wImg} />
+                            ) : (
+                              <View style={[styles.wImgPlaceholder, { backgroundColor: colors.inputBg }]}>
+                                <MaterialCommunityIcons name="arm-flex" size={28} color={tier.color} />
+                              </View>
+                            )}
+                            <View style={styles.doneBadge}>
+                              <Text style={styles.doneBadgeText}>DONE</Text>
                             </View>
-                          )}
-                          <View style={styles.doneBadge}>
-                            <Text style={styles.doneBadgeText}>DONE</Text>
                           </View>
-                        </View>
 
-                        <View style={styles.wInfo}>
-                          <Text style={[styles.wDate, { color: colors.textMuted }]}>{formatShortDate(w.completed_at || w.started_at)}</Text>
-                          <Text style={[styles.wTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
-                          {!!split && <Text style={[styles.wSplit, { color: colors.primary }]}>{split}</Text>}
+                          <View style={styles.wInfo}>
+                            <Text style={[styles.wDate, { color: colors.textMuted }]}>{formatShortDate(w.completed_at || w.started_at)}</Text>
+                            <Text style={[styles.wTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+                            {!!split && <Text style={[styles.wSplit, { color: tier.color }]}>{split}</Text>}
 
-                          <View style={styles.wStatsRow}>
-                            <View style={styles.wStatItem}>
-                              <Text style={[styles.wStatVal, { color: colors.text }]}>{totalExs}</Text>
-                              <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Exs</Text>
-                            </View>
-                            <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
-                            <View style={styles.wStatItem}>
-                              <Text style={[styles.wStatVal, { color: colors.text }]}>{totalSets}</Text>
-                              <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Sets</Text>
-                            </View>
-                            <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
-                            <View style={styles.wStatItem}>
-                              <Text style={[styles.wStatVal, { color: colors.text }]}>{vol}</Text>
-                              <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>kg</Text>
-                            </View>
-                            <View style={[styles.wStatLine, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : 'rgba(37,150,190,0.15)' }]} />
-                            <View style={styles.wStatItem}>
-                              <Text style={[styles.wStatVal, { color: colors.text }]}>{dur}</Text>
-                              <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Time</Text>
+                            <View style={styles.wStatsRow}>
+                              <View style={styles.wStatItem}>
+                                <Text style={[styles.wStatVal, { color: colors.text }]}>{totalExs}</Text>
+                                <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Exs</Text>
+                              </View>
+                              <View style={[styles.wStatLine, { backgroundColor: tier.color + '30' }]} />
+                              <View style={styles.wStatItem}>
+                                <Text style={[styles.wStatVal, { color: colors.text }]}>{totalSets}</Text>
+                                <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Sets</Text>
+                              </View>
+                              <View style={[styles.wStatLine, { backgroundColor: tier.color + '30' }]} />
+                              <View style={styles.wStatItem}>
+                                <Text style={[styles.wStatVal, { color: colors.text }]}>{vol}</Text>
+                                <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>kg</Text>
+                              </View>
+                              <View style={[styles.wStatLine, { backgroundColor: tier.color + '30' }]} />
+                              <View style={styles.wStatItem}>
+                                <Text style={[styles.wStatVal, { color: colors.text }]}>{dur}</Text>
+                                <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>Time</Text>
+                              </View>
                             </View>
                           </View>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   </View>
                 );
               })
@@ -531,12 +598,6 @@ const styles = StyleSheet.create({
   heroInfo: { flex: 1, gap: 3 },
   heroName: { fontFamily: FONTS.heading, color: '#FFF', fontSize: 19, lineHeight: 22 },
   heroTier: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 1.4 },
-  goalBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4,
-    backgroundColor: 'rgba(247,203,22,0.12)',
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start',
-  },
-  goalText: { fontFamily: FONTS.bodyBold, color: P.sun, fontSize: 9, letterSpacing: 0.3 },
   heroXPBlock: { alignItems: 'center', marginLeft: 10 },
   heroXPVal: { fontFamily: FONTS.heading, fontSize: 28, lineHeight: 30 },
   heroXPLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: 1 },
@@ -617,6 +678,24 @@ const styles = StyleSheet.create({
   statCardUnit: { fontFamily: FONTS.body, fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: -2 },
   statCardDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 10 },
   statCardFooter: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  seeAllText: { fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.3 },
+  splitsScroll: { marginBottom: 20, marginTop: -4 },
+  splitCard: {
+    width: 150, borderRadius: 18, padding: 12, marginRight: 12,
+    borderWidth: 1,
+  },
+  splitImages: { flexDirection: 'row', gap: 4, marginBottom: 10 },
+  splitImg: { width: 38, height: 38, borderRadius: 8, borderWidth: 1 },
+  splitImgPlaceholder: { width: 38, height: 38, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  splitName: { fontFamily: FONTS.heading, fontSize: 14, marginBottom: 4 },
+  splitMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  splitMetaText: { fontFamily: FONTS.body, fontSize: 10 },
+  emptySplits: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 18, borderWidth: 1, padding: 14, marginBottom: 20,
+  },
+  emptySplitsText: { fontFamily: FONTS.body, fontSize: 12 },
 
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   sectionTitle: { fontFamily: FONTS.heading, fontSize: 16, letterSpacing: 0.5 },
