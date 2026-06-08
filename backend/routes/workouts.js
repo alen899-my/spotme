@@ -672,13 +672,12 @@ router.get('/exercises/by-category/:category', authenticateToken, async (req, re
 });
 
 router.get('/exercises/search', authenticateToken, async (req, res) => {
-  const { q, category, limit = 20, offset = 0 } = req.query;
+  const { q, category, body_part, equipment, target, min_rating, limit = 20, offset = 0 } = req.query;
   try {
     const conditions = [];
     const params = [];
     let idx = 1;
 
-    // Only filter by name/target if q is provided
     if (q && q.trim()) {
       conditions.push(`(name ILIKE $${idx} OR target ILIKE $${idx})`);
       params.push(`%${q.trim()}%`);
@@ -688,6 +687,30 @@ router.get('/exercises/search', authenticateToken, async (req, res) => {
     if (category && category.trim()) {
       conditions.push(`category ILIKE $${idx}`);
       params.push(category.trim());
+      idx++;
+    }
+
+    if (body_part && body_part.trim()) {
+      conditions.push(`body_part ILIKE $${idx}`);
+      params.push(body_part.trim());
+      idx++;
+    }
+
+    if (equipment && equipment.trim()) {
+      conditions.push(`equipment ILIKE $${idx}`);
+      params.push(equipment.trim());
+      idx++;
+    }
+
+    if (target && target.trim()) {
+      conditions.push(`target ILIKE $${idx}`);
+      params.push(target.trim());
+      idx++;
+    }
+
+    if (min_rating) {
+      conditions.push(`avg_rating >= $${idx}`);
+      params.push(parseFloat(min_rating));
       idx++;
     }
 

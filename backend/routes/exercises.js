@@ -82,6 +82,7 @@ router.get('/', async (req, res) => {
       target,
       muscle_group,
       q,           // search term (name)
+      min_rating,
       page  = 1,
       limit = 20,
     } = req.query;
@@ -90,12 +91,27 @@ router.get('/', async (req, res) => {
     const params     = [];
     let   idx        = 1;
 
-    if (category)     { conditions.push(`category    ILIKE $${idx++}`); params.push(category); }
-    if (body_part)    { conditions.push(`body_part   ILIKE $${idx++}`); params.push(body_part); }
-    if (equipment)    { conditions.push(`equipment   ILIKE $${idx++}`); params.push(equipment); }
-    if (target)       { conditions.push(`target      ILIKE $${idx++}`); params.push(target); }
-    if (muscle_group) { conditions.push(`muscle_group ILIKE $${idx++}`); params.push(muscle_group); }
+    function addArrayFilter(col, vals) {
+      if (!vals) return;
+      const parts = String(vals).split(',').map(s => s.trim()).filter(Boolean);
+      if (parts.length === 0) return;
+      if (parts.length === 1) {
+        conditions.push(`${col} ILIKE $${idx++}`);
+        params.push(parts[0]);
+      } else {
+        const placeholders = parts.map(() => `$${idx++}`);
+        conditions.push(`${col} IN (${placeholders.join(',')})`);
+        params.push(...parts);
+      }
+    }
+
+    addArrayFilter('category',    category);
+    addArrayFilter('body_part',   body_part);
+    addArrayFilter('equipment',   equipment);
+    addArrayFilter('target',      target);
+    addArrayFilter('muscle_group', muscle_group);
     if (q)            { conditions.push(`name        ILIKE $${idx++}`); params.push(`%${q}%`); }
+    if (min_rating)   { conditions.push(`avg_rating >= $${idx++}::float8`); params.push(Number(min_rating)); }
 
     const where   = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const offset  = (Number(page) - 1) * Number(limit);

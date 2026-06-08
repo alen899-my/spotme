@@ -21,8 +21,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../../../contexts/ThemeContext';
 import { useToast } from '../../../../contexts/ToastContext';
 import ExercisePreviewModal from '../../../../components/modals/ExercisePreviewModal';
+import ExerciseFilterModal, { ExerciseFilters } from '../../../../components/exercises/ExerciseFilterModal';
 import { API_URL } from '../../../../utils/api';
-import { getToken } from '../../../../utils/tokenStorage';
+import { getToken as getSecureToken } from '../../../../utils/tokenStorage';
 
 
 const LIMIT = 20;
@@ -42,6 +43,10 @@ export default function AddSessionExercisesScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [previewEx, setPreviewEx] = useState<any>(null);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [filters, setFilters] = useState<ExerciseFilters>({
+    categories: [], bodyParts: [], equipment: [], targets: [], minRating: 0,
+  });
 
   const pageRef = useRef(0);
   const hasMoreRef = useRef(true);
@@ -49,17 +54,15 @@ export default function AddSessionExercisesScreen() {
   const loadingMoreRef = useRef(false);
   const queryRef = useRef('');
   const categoryRef = useRef<string | null>(null);
+  const filtersRef = useRef<ExerciseFilters>(filters);
 
-  // Shared helper — avoids repeating AsyncStorage.getItem everywhere
-  const getToken = useCallback(async () => {
-    return await getToken();
-  }, []);
+  useEffect(() => { filtersRef.current = filters; }, [filters]);
 
-  // Fetch categories on mount — token required by your authMiddleware
+  // Fetch categories on mount
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const token = await getToken();
+        const token = await getSecureToken();
         const res = await axios.get(`${API_URL}/exercises/meta/filters`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -69,9 +72,15 @@ export default function AddSessionExercisesScreen() {
       }
     };
     fetchFilters();
-  }, [getToken]);
+  }, []);
 
-  // Core fetch — token added here (was missing, caused 401)
+  const activeFilterCount = (f: ExerciseFilters) => {
+    let c = f.categories.length + f.bodyParts.length + f.equipment.length + f.targets.length;
+    if (f.minRating > 0) c++;
+    return c;
+  };
+
+  // Core fetch
   const fetchExercises = useCallback(async (
     q: string,
     cat: string | null,
@@ -90,16 +99,21 @@ export default function AddSessionExercisesScreen() {
     }
 
     try {
-      const token = await getToken();
+      const token = await getSecureToken();
       const offset = p * LIMIT;
+      const f = filtersRef.current;
+      const params: any = { limit: LIMIT, offset };
+      if (q) params.q = q;
+      if (cat) params.category = cat;
+      if (f.categories.length === 1) params.category = f.categories[0];
+      if (f.bodyParts.length) params.body_part = f.bodyParts.join(',');
+      if (f.equipment.length) params.equipment = f.equipment.join(',');
+      if (f.targets.length) params.target = f.targets.join(',');
+      if (f.minRating > 0) params.min_rating = f.minRating;
+
       const res = await axios.get(`${API_URL}/workouts/exercises/search`, {
-        params: {
-          ...(q ? { q } : {}),
-          ...(cat ? { category: cat } : {}),
-          limit: LIMIT,
-          offset,
-        },
-        headers: { Authorization: `Bearer ${token}` },  // ← THE FIX
+        params,
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const newExercises: any[] = res.data ?? [];
@@ -122,7 +136,7 @@ export default function AddSessionExercisesScreen() {
       loadingRef.current = false;
       loadingMoreRef.current = false;
     }
-  }, [getToken, showToast]);
+  }, [showToast]);
 
   // Debounced search
   useEffect(() => {
@@ -147,10 +161,27 @@ export default function AddSessionExercisesScreen() {
     fetchExercises(queryRef.current, categoryRef.current, pageRef.current + 1, true);
   }, [fetchExercises]);
 
+  const handleApplyFilters = (newFilters: ExerciseFilters) => {
+    setFilters(newFilters);
+    setFilterVisible(false);
+    pageRef.current = 0;
+    fetchExercises(queryRef.current, categoryRef.current, 0, false);
+  };
+
+  const handleClearFilters = () => {
+    const cleared: ExerciseFilters = {
+      categories: [], bodyParts: [], equipment: [], targets: [], minRating: 0,
+    };
+    setFilters(cleared);
+    setFilterVisible(false);
+    pageRef.current = 0;
+    fetchExercises(queryRef.current, categoryRef.current, 0, false);
+  };
+
   const handleAdd = async (exerciseId: string) => {
     setAddingId(exerciseId);
     try {
-      const token = await getToken();
+      const token = await getSecureToken();
       await axios.post(
         `${API_URL}/workouts/sessions/${sessionId}/exercises`,
         { exercise_id: exerciseId, sets: 3, reps: '8-12', rest_time: '60s' },
@@ -230,23 +261,37 @@ export default function AddSessionExercisesScreen() {
           <View style={{ width: 28 }} />
         </View>
 
-        {/* Search */}
-        <View style={[styles.searchWrap, { backgroundColor: colors.inputBg }]}>
-          <Ionicons name="search" size={18} color={colors.textDim} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search movements..."
-            placeholderTextColor={colors.textDim}
-            value={query}
-            onChangeText={handleSearch}
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => handleSearch('')}>
-              <Ionicons name="close-circle" size={18} color={colors.textDim} />
-            </TouchableOpacity>
-          )}
+        {/* Search + Filter */}
+        <View style={styles.searchFilterRow}>
+          <View style={[styles.searchWrap, { backgroundColor: colors.inputBg, flex: 1 }]}>
+            <Ionicons name="search" size={18} color={colors.textDim} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search movements..."
+              placeholderTextColor={colors.textDim}
+              value={query}
+              onChangeText={handleSearch}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => handleSearch('')}>
+                <Ionicons name="close-circle" size={18} color={colors.textDim} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={[styles.filterBtn, { backgroundColor: activeFilterCount(filters) > 0 ? '#2596BE' : colors.inputBg }]}
+            onPress={() => setFilterVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="funnel" size={18} color={activeFilterCount(filters) > 0 ? '#FFF' : colors.text} />
+            {activeFilterCount(filters) > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount(filters)}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Category Filters */}
@@ -315,6 +360,13 @@ export default function AddSessionExercisesScreen() {
           exercise={previewEx}
           onClose={() => setPreviewEx(null)}
         />
+        <ExerciseFilterModal
+          visible={filterVisible}
+          onClose={() => setFilterVisible(false)}
+          filters={filters}
+          onApply={handleApplyFilters}
+          onClear={handleClearFilters}
+        />
       </View>
     </SafeAreaView>
   );
@@ -331,15 +383,44 @@ const styles = StyleSheet.create({
   },
   backBtn: { marginLeft: -8 },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 24 },
+  searchFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    gap: 10,
+  },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     height: 54,
     borderRadius: 16,
-    marginHorizontal: 20,
-    marginBottom: 16,
     gap: 10,
+  },
+  filterBtn: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: '#FFF',
   },
   searchInput: {
     flex: 1,

@@ -27,6 +27,7 @@ import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import ExerciseFilterModal, { ExerciseFilters } from '../../components/exercises/ExerciseFilterModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PADDING = 16;
@@ -277,6 +278,18 @@ export default function ExercisesScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [searchTotal, setSearchTotal] = useState(0);
   const [bodySide, setBodySide] = useState<'front' | 'back'>('front');
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [filters, setFilters] = useState<ExerciseFilters>({
+    categories: [], bodyParts: [], equipment: [], targets: [], minRating: 0,
+  });
+  const filtersRef = useRef(filters);
+  useEffect(() => { filtersRef.current = filters; }, [filters]);
+
+  const activeFilterCount = (f: ExerciseFilters) => {
+    let c = f.categories.length + f.bodyParts.length + f.equipment.length + f.targets.length;
+    if (f.minRating > 0) c++;
+    return c;
+  };
   const [bodyGender, setBodyGender] = useState<'male' | 'female'>('male');
   const [selectedMuscles, setSelectedMuscles] = useState<Slug[]>([]);
   const [selectedRegion, setSelectedRegion] = useState<{ slug: Slug; label: string; categories: string[] } | null>(null);
@@ -324,9 +337,14 @@ export default function ExercisesScreen() {
     else setLoadingMore(true);
 
     try {
+      const f = filtersRef.current;
       const params: any = { page: pg, limit: PAGE_SIZE };
       if (q.trim()) params.q = q.trim();
       if (cat) params.category = cat;
+      if (f.bodyParts.length) params.body_part = f.bodyParts.join(',');
+      if (f.equipment.length) params.equipment = f.equipment.join(',');
+      if (f.targets.length) params.target = f.targets.join(',');
+      if (f.minRating > 0) params.min_rating = f.minRating;
 
       const token = await getToken();
       const res = await axios.get(`${API_URL}/exercises`, {
@@ -529,24 +547,38 @@ export default function ExercisesScreen() {
         </View>
       </ImageBackground>
 
-      <View style={[styles.searchWrap, { backgroundColor: isDark ? '#1A1A1A' : P.white, borderColor: isDark ? 'rgba(255,255,255,0.08)' : P.border }]}>
-        <View style={[styles.searchIconWrap, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : P.ctaLight }]}>
-          <Ionicons name="search-outline" size={16} color={P.ctaDark} />
+      <View style={styles.searchFilterRow}>
+        <View style={[styles.searchWrap, { backgroundColor: isDark ? '#1A1A1A' : P.white, borderColor: isDark ? 'rgba(255,255,255,0.08)' : P.border, flex: 1 }]}>
+          <View style={[styles.searchIconWrap, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : P.ctaLight }]}>
+            <Ionicons name="search-outline" size={16} color={P.ctaDark} />
+          </View>
+          <TextInput
+            style={[styles.searchInput, { color: isDark ? '#F1F5F9' : P.ink }]}
+            placeholder="Search exercises..."
+            placeholderTextColor={isDark ? 'rgba(241,245,249,0.4)' : P.muted}
+            value={query}
+            onChangeText={handleQueryChange}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color={P.cta} />
+            </TouchableOpacity>
+          )}
         </View>
-        <TextInput
-          style={[styles.searchInput, { color: isDark ? '#F1F5F9' : P.ink }]}
-          placeholder="Search exercises..."
-          placeholderTextColor={isDark ? 'rgba(241,245,249,0.4)' : P.muted}
-          value={query}
-          onChangeText={handleQueryChange}
-          returnKeyType="search"
-          autoCorrect={false}
-        />
-        {query.length > 0 && (
-          <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close-circle" size={18} color={P.cta} />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={[styles.exFilterBtn, { backgroundColor: activeFilterCount(filters) > 0 ? '#2596BE' : isDark ? '#1A1A1A' : P.white, borderColor: isDark ? 'rgba(255,255,255,0.08)' : P.border }]}
+          onPress={() => setFilterVisible(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="funnel" size={18} color={activeFilterCount(filters) > 0 ? '#FFF' : isDark ? '#F1F5F9' : P.ink} />
+          {activeFilterCount(filters) > 0 && (
+            <View style={styles.exFilterBadge}>
+              <Text style={styles.exFilterBadgeText}>{activeFilterCount(filters)}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -690,6 +722,25 @@ export default function ExercisesScreen() {
           </View>
         </View>
       </Modal>
+      <ExerciseFilterModal
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
+        filters={filters}
+        onApply={(newFilters) => {
+          setFilters(newFilters);
+          setFilterVisible(false);
+          setSearchPage(1);
+          setSearchResults([]);
+          doFetchExercises('', drilldownCategory, 1, false);
+        }}
+        onClear={() => {
+          setFilters({ categories: [], bodyParts: [], equipment: [], targets: [], minRating: 0 });
+          setFilterVisible(false);
+          setSearchPage(1);
+          setSearchResults([]);
+          doFetchExercises('', drilldownCategory, 1, false);
+        }}
+      />
     </View>
   );
 }
@@ -833,12 +884,18 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
 
-  searchWrap: {
+  searchFilterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: H_PADDING,
     marginTop: -18,
     marginBottom: 4,
+    gap: 10,
+    zIndex: 3,
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 14,
     height: 52,
     borderRadius: 18,
@@ -849,7 +906,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 14,
     elevation: 6,
-    zIndex: 3,
   },
   searchIconWrap: {
     width: 28,
@@ -858,6 +914,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: P.ctaLight,
+  },
+  exFilterBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  exFilterBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  exFilterBadgeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: '#FFF',
   },
   searchInput: {
     flex: 1,
