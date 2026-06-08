@@ -5,6 +5,7 @@ const authenticateToken = require('../middleware/auth');
 const { validate, schemas } = require('../middleware/validate');
 const upload = require('../uploadConfig');
 const { awardXP } = require('../utils/xp');
+const { sendPush, sendRandomMotivation } = require('../utils/pushNotifications');
 const {
   parseWeightKg,
   calculateEstimatedOneRepMax,
@@ -716,6 +717,8 @@ router.patch(
       } catch (streakErr) {
         console.error('[XP/Streak] Failed to update metrics:', streakErr);
       }
+
+      sendRandomMotivation(userId).catch(() => {});
 
       res.json({ ...result.rows[0], photos: photos || [] });
     } catch (err) {
@@ -1695,6 +1698,11 @@ Keep it concise, energetic, and helpful — like a real coach talking to an athl
          VALUES ($1, 'workout_report', $2, 'Your workout report is ready! Tap to view insights and recommendations.')`,
         [userId, reportId]
       );
+
+      sendPush(userId, 'Workout Report Ready', 'Your workout report is ready! Tap to view insights and recommendations.', {
+        type: 'workout_report',
+        referenceId: reportId,
+      });
     } catch (bgErr) {
       console.error('Background report generation failed:', bgErr);
       // Delete the placeholder row so manual generation can retry

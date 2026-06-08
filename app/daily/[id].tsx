@@ -23,6 +23,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import * as Notifications from 'expo-notifications';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -467,6 +468,7 @@ export default function ActiveWorkoutScreen() {
   const workoutStartedAtRef = useRef<number>(Date.now());
   const setTimerStartedAtRef = useRef<number>(Date.now());
   const restTimerEndAtRef = useRef<number>(Date.now());
+  const restNotifIdRef = useRef<string | null>(null);
   const totalRestAccumulatedRef = useRef<number>(0);
   const totalRestPeriodStartRef = useRef<number | null>(null);
 
@@ -495,6 +497,33 @@ export default function ActiveWorkoutScreen() {
       router.replace(`/daily/view/${workoutId}`);
     }
   }, [workout?.status, editing]);
+
+  // Resume rest timer from AsyncStorage on mount
+  useEffect(() => {
+    (async () => {
+      const savedEndAt = await AsyncStorage.getItem('restTimerEndAt');
+      if (!savedEndAt) return;
+      const endAt = parseInt(savedEndAt);
+      const remaining = Math.max(0, Math.floor((endAt - Date.now()) / 1000));
+      if (remaining <= 0) {
+        AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
+        return;
+      }
+      restTimerEndAtRef.current = endAt;
+      setRestTimer(remaining);
+      setRestRunning(true);
+
+      restTimerRef.current = setInterval(() => {
+        const rem = Math.max(0, Math.floor((restTimerEndAtRef.current - Date.now()) / 1000));
+        setRestTimer(rem);
+        if (rem <= 0) {
+          clearInterval(restTimerRef.current);
+          setRestRunning(false);
+          AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
+        }
+      }, 1000);
+    })();
+  }, []);
 
   const restTimerPrevRef = useRef(restTimer);
   useEffect(() => {
@@ -632,7 +661,7 @@ export default function ActiveWorkoutScreen() {
     return () => subscription.remove();
   }, [workout?.status, setTimerRunning, restRunning]);
 
-  const toggleSetTimer = () => {
+  const toggleSetTimer = async () => {
     if (setTimerRunning) {
       clearInterval(setTimerRef.current);
       setSetTimerRunning(false);
@@ -640,6 +669,11 @@ export default function ActiveWorkoutScreen() {
       if (restRunning) {
         setRestRunning(false);
         if (restTimerRef.current) clearInterval(restTimerRef.current);
+        if (restNotifIdRef.current) {
+          await Notifications.cancelScheduledNotificationAsync(restNotifIdRef.current);
+          restNotifIdRef.current = null;
+        }
+        AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
       }
       setTimerStartedAtRef.current = Date.now() - (setTimer * 1000);
       setTimerRef.current = setInterval(() => {
@@ -649,17 +683,41 @@ export default function ActiveWorkoutScreen() {
     }
   };
 
-  const startRest = (seconds: number) => {
+  const startRest = async (seconds: number) => {
     if (restTimerRef.current) clearInterval(restTimerRef.current);
-    restTimerEndAtRef.current = Date.now() + (seconds * 1000);
+
+    // Cancel any previous rest notification
+    if (restNotifIdRef.current) {
+      await Notifications.cancelScheduledNotificationAsync(restNotifIdRef.current);
+      restNotifIdRef.current = null;
+    }
+
+    const endAt = Date.now() + (seconds * 1000);
+    restTimerEndAtRef.current = endAt;
     setRestTimer(seconds);
     setRestRunning(true);
+    await AsyncStorage.setItem('restTimerEndAt', String(endAt));
+
+    // Schedule local notification for when rest ends
+    const notifId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Rest Timer Complete 🔔',
+        body: "Time's up! Get ready for your next set.",
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: { type: 'timeInterval', seconds },
+    });
+    restNotifIdRef.current = notifId;
+    await AsyncStorage.setItem('restNotifId', notifId);
+
     restTimerRef.current = setInterval(() => {
       const remaining = Math.max(0, Math.floor((restTimerEndAtRef.current - Date.now()) / 1000));
       setRestTimer(remaining);
       if (remaining <= 0) {
         clearInterval(restTimerRef.current);
         setRestRunning(false);
+        AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
       }
     }, 1000);
   };
@@ -968,6 +1026,11 @@ export default function ActiveWorkoutScreen() {
     setFinishing(true);
     if (workoutTimerRef.current) { clearInterval(workoutTimerRef.current); workoutTimerRef.current = null; }
     if (restTimerRef.current) clearInterval(restTimerRef.current);
+    if (restNotifIdRef.current) {
+      await Notifications.cancelScheduledNotificationAsync(restNotifIdRef.current);
+      restNotifIdRef.current = null;
+    }
+    AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
     try {
       const token = await getToken();
       let totalVolume = 0;

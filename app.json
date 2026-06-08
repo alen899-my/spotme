@@ -21,7 +21,8 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Used to take profile photos and workout completion photos.",
-        "NSPhotoLibraryUsageDescription": "Used to select profile photos and meal photos."
+        "NSPhotoLibraryUsageDescription": "Used to select profile photos and meal photos.",
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
@@ -78,7 +79,8 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-notifications"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

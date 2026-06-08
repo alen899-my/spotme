@@ -22,6 +22,7 @@ import { getToken } from '../../utils/tokenStorage';
 const { width: W } = Dimensions.get('window');
 
 const SLIDER_W = W - 80;
+const rem = (size: number) => Math.round((size / 390) * W);
 
 interface Props {
   selectedDate: Date;
@@ -338,6 +339,73 @@ const wb = StyleSheet.create({
   },
 });
 
+function PushReminderDisplay() {
+  const { colors, isDark } = useTheme();
+  const [enabled, setEnabled] = useState(true);
+  const [interval, setIntervalVal] = useState(120);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await axios.get(`${API_URL}/water/reminder-settings`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setEnabled(res.data.water_reminder_enabled);
+        setIntervalVal(res.data.water_reminder_interval);
+      } catch {
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return null;
+
+  const label = `${interval / 60}h`;
+
+  return (
+    <View style={{ marginBottom: rem(12) }}>
+      <TouchableOpacity
+        onPress={() => {
+          try { require('expo-router').router.push('/profile/settings'); } catch {}
+        }}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: rem(10),
+          paddingHorizontal: rem(4),
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: rem(8) }}>
+          <Ionicons name="notifications-outline" size={rem(18)} color="#2596BE" />
+          <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: rem(14), color: isDark ? '#DDD' : '#333' }}>
+            Push reminders
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: rem(6) }}>
+          {enabled && (
+            <Text style={{ fontFamily: FONTS.body, fontSize: rem(11), color: isDark ? colors.textMuted : 'rgba(0,0,0,0.5)' }}>
+              Every {label}
+            </Text>
+          )}
+          <Ionicons name="chevron-forward" size={rem(14)} color={isDark ? colors.textMuted : 'rgba(0,0,0,0.4)'} />
+        </View>
+      </TouchableOpacity>
+      <Text style={{
+        fontFamily: FONTS.body, fontSize: rem(10), color: isDark ? colors.textMuted : 'rgba(0,0,0,0.45)',
+        paddingLeft: rem(30), marginTop: rem(-6), marginBottom: rem(4),
+      }}>
+        Adjust in settings
+      </Text>
+    </View>
+  );
+}
+
 function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
   const { colors, isDark } = useTheme();
   const [, setTick] = useState(0);
@@ -637,6 +705,8 @@ export default function WaterTracker({ selectedDate }: Props) {
       {expanded && (
         <>
           <ReminderBanner lastLog={lastLog} interval={interval} totalWater={totalWater} waterTarget={target} />
+
+          <PushReminderDisplay />
 
           <Animated.View style={[s.cupRow, { transform: [{ scale: pulseAnim }] }]}>
             <View style={s.cupWrap}>

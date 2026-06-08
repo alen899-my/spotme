@@ -1,8 +1,33 @@
 const express = require('express');
 const { pool } = require('../db');
 const authenticateToken = require('../middleware/auth');
+const { registerToken, removeToken } = require('../utils/pushNotifications');
 
 const router = express.Router();
+
+// POST /api/notifications/push-token – register Expo push token
+router.post('/push-token', authenticateToken, async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token required' });
+    await registerToken(req.user.id, token);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST /notifications/push-token error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/notifications/push-token – remove token on logout
+router.delete('/push-token', authenticateToken, async (req, res) => {
+  try {
+    await removeToken(req.user.id);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /notifications/push-token error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // GET /api/notifications – get current user's notifications
 router.get('/', authenticateToken, async (req, res) => {

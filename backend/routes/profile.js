@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../db');
 const upload = require('../uploadConfig');
 const authenticateToken = require('../middleware/auth');
+const { sendPush } = require('../utils/pushNotifications');
 
 const router = express.Router();
 
@@ -167,6 +168,11 @@ router.post('/:id/follow', authenticateToken, async (req, res) => {
       [targetId, isPrivate ? 'follow_request' : 'follow_accept', currentUserId, message]
     );
 
+    sendPush(targetId, isPrivate ? 'New Follow Request' : 'New Follower', message, {
+      type: isPrivate ? 'follow_request' : 'follow_accept',
+      fromUserId: currentUserId,
+    });
+
     res.json({ success: true, status });
   } catch (error) {
     console.error("POST /profile/:id/follow error:", error);
@@ -220,6 +226,11 @@ router.post('/:id/accept-follow', authenticateToken, async (req, res) => {
        VALUES ($1, 'follow_accepted', $2, $3)`,
       [targetId, currentUserId, `${name} accepted your follow request`]
     );
+
+    sendPush(targetId, 'Follow Request Accepted', `${name} accepted your follow request`, {
+      type: 'follow_accepted',
+      fromUserId: currentUserId,
+    });
 
     res.json({ success: true });
   } catch (error) {

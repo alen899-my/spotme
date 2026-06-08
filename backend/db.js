@@ -234,6 +234,28 @@ const initDB = async () => {
       console.warn('Could not add reference_id column (may already exist):', _);
     }
 
+    // ── Push Tokens ─────────────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+        token TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // ── User Notification Preferences ───────────────────────────────────────
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS water_reminder_enabled BOOLEAN DEFAULT true`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS water_reminder_interval INT DEFAULT 120`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_water_reminded_at TIMESTAMP`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS motivation_enabled BOOLEAN DEFAULT true`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_motivation_sent_at TIMESTAMP`);
+    } catch (_) {
+      console.warn('Could not add water reminder columns:', _);
+    }
+
     // ── Workout Reports ──────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS workout_reports (
