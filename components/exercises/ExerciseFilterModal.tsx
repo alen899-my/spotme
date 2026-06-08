@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +17,8 @@ import { API_URL } from '../../utils/api';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const BASE_WIDTH = 375;
+const MIN_TOUCH = 44;
 
 export interface ExerciseFilters {
   categories: string[];
@@ -47,30 +48,43 @@ interface Props {
 }
 
 const SECTIONS = [
-  { key: 'categories', label: 'Category', icon: 'grid-outline' as const },
   { key: 'bodyParts', label: 'Body Part', icon: 'body-outline' as const },
   { key: 'equipment', label: 'Equipment', icon: 'fitness-outline' as const },
   { key: 'targets', label: 'Target Muscle', icon: 'pulse-outline' as const },
   { key: 'rating', label: 'Minimum Rating', icon: 'star-outline' as const },
 ];
 
+function s(size: number, width: number) {
+  return Math.round(size * Math.min(width / BASE_WIDTH, 1.4));
+}
+
 export default function ExerciseFilterModal({ visible, onClose, filters, onApply, onClear }: Props) {
   const { colors, isDark } = useTheme();
+  const { width: winW, height: winH } = useWindowDimensions();
+  const isLandscape = winW > winH;
   const [meta, setMeta] = useState<FilterMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [local, setLocal] = useState<ExerciseFilters>(filters);
-  const [expanded, setExpanded] = useState<SectionState>({ categories: true });
+  const [expanded, setExpanded] = useState<SectionState>({ bodyParts: true });
+
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (visible) {
       setLocal(filters);
       setLoading(true);
+      setExpanded({ bodyParts: true });
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
       axios.get(`${API_URL}/exercises/meta/filters`)
         .then(res => setMeta(res.data))
         .catch(console.error)
         .finally(() => setLoading(false));
     }
   }, [visible, filters]);
+
+  useEffect(() => {
+    if (meta) setLoading(false);
+  }, [meta]);
 
   const toggleSection = (key: string) => {
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
@@ -84,189 +98,233 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
     });
   };
 
-  const setRating = (val: number) => {
-    setLocal(prev => ({ ...prev, minRating: prev.minRating === val ? 0 : val }));
-  };
-
   const activeCount = (f: ExerciseFilters) => {
-    let count = f.categories.length + f.bodyParts.length + f.equipment.length + f.targets.length;
-    if (f.minRating > 0) count++;
-    return count;
+    return f.bodyParts.length + f.equipment.length + f.targets.length + (f.minRating > 0 ? 1 : 0);
   };
 
-  const chip = (section: keyof ExerciseFilters, value: string) => {
+  const trackRef = useRef<View>(null);
+  const trackW = useRef(0);
+  const MIN_R = 1;
+  const MAX_R = 10;
+  const range = MAX_R - MIN_R;
+
+  const ratingFrac = local.minRating ? (local.minRating - MIN_R) / range : 0;
+  const thumbSize = s(28, winW);
+  const trackHeight = s(8, winW);
+
+  const valFromX = (x: number) => {
+    const f = Math.max(0, Math.min(1, x / trackW.current));
+    return Math.round(f * range) + MIN_R;
+  };
+
+  const containerHeight = winH;
+  const topPad = Platform.OS === 'ios' ? (isLandscape ? 20 : Math.max(s(50, winW), 40)) : s(36, winW);
+  const iconSize = s(16, winW);
+  const checkSize = s(14, winW);
+
+  const optionRow = (section: keyof ExerciseFilters, value: string) => {
     const selected = (local[section] as string[]).includes(value);
     return (
       <TouchableOpacity
         key={value}
-        style={[
-          styles.chip,
-          {
-            backgroundColor: selected ? '#2596BE' : (isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0'),
-            borderColor: selected ? '#2596BE' : (isDark ? 'rgba(255,255,255,0.12)' : '#E0E0E0'),
-          },
-        ]}
+        style={[st.optionRow, { minHeight: s(50, winW), backgroundColor: isDark ? '#0A0A0A' : '#FFF' }]}
         onPress={() => toggleOption(section, value)}
-        activeOpacity={0.7}
+        activeOpacity={0.6}
       >
         <Text
           style={[
-            styles.chipText,
-            { color: selected ? '#FFF' : (isDark ? '#DDD' : '#333') },
+            st.optionText,
+            { fontSize: s(15, winW), color: isDark ? '#DDD' : '#333' },
+            selected && { fontFamily: FONTS.bodySemiBold },
           ]}
           numberOfLines={1}
         >
           {value}
         </Text>
+        <View
+          style={[
+            st.checkbox,
+            {
+              width: s(24, winW), height: s(24, winW), borderRadius: s(7, winW), borderWidth: Math.max(2, s(2.5, winW)),
+              borderColor: selected ? '#2596BE' : (isDark ? 'rgba(255,255,255,0.25)' : '#CCC'),
+              backgroundColor: selected ? '#2596BE' : 'transparent',
+            },
+          ]}
+        >
+          {selected && <Ionicons name="checkmark" size={s(15, winW)} color="#FFF" />}
+        </View>
       </TouchableOpacity>
     );
   };
 
-  const ratingRow = (val: number) => {
-    const selected = local.minRating === val;
-    return (
-      <TouchableOpacity
-        key={val}
-        style={[
-          styles.ratingPill,
-          {
-            backgroundColor: selected ? '#2596BE' : (isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0'),
-            borderColor: selected ? '#2596BE' : (isDark ? 'rgba(255,255,255,0.12)' : '#E0E0E0'),
-          },
-        ]}
-        onPress={() => setRating(val)}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="star" size={14} color={selected ? '#FFF' : '#F59E0B'} />
-        <Text
-          style={[
-            styles.ratingPillText,
-            { color: selected ? '#FFF' : (isDark ? '#DDD' : '#333') },
-          ]}
-        >
-          {val}+
-        </Text>
-      </TouchableOpacity>
-    );
-  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <View style={st.overlay}>
         {Platform.OS === 'ios' && (
           <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
         )}
         <View
           style={[
-            styles.container,
-            {
-              backgroundColor: isDark ? '#0A0A0A' : '#FFF',
-              paddingTop: Platform.OS === 'ios' ? 60 : 40,
-            },
+            st.container,
+            { height: containerHeight, backgroundColor: isDark ? '#0A0A0A' : '#FFF', paddingTop: topPad },
           ]}
         >
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.headerBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="close" size={24} color={isDark ? '#FFF' : '#111'} />
+          <View style={[st.header, { paddingHorizontal: s(20, winW), paddingBottom: s(14, winW) }]}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[st.headerBtn, { width: s(MIN_TOUCH, winW), height: s(MIN_TOUCH, winW) }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close" size={s(24, winW)} color={isDark ? '#FFF' : '#111'} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: isDark ? '#FFF' : '#111' }]}>Filters</Text>
-            {activeCount(local) > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{activeCount(local)}</Text>
-              </View>
-            )}
-            <TouchableOpacity onPress={onClear} style={styles.headerBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Text style={[styles.clearText, { color: '#2596BE' }]}>Clear</Text>
+            <Text style={[st.headerTitle, { fontSize: s(22, winW), color: isDark ? '#FFF' : '#111' }]}>Filters</Text>
+            <TouchableOpacity
+              onPress={onClear}
+              style={[st.headerBtn, { width: s(MIN_TOUCH, winW), height: s(MIN_TOUCH, winW) }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={[st.clearText, { fontSize: s(14, winW), color: '#2596BE' }]}>Clear</Text>
             </TouchableOpacity>
           </View>
 
           {loading ? (
-            <View style={styles.loadingWrap}>
+            <View style={[st.loadingWrap, { paddingBottom: s(80, winW) }]}>
               <ActivityIndicator size="large" color="#2596BE" />
             </View>
           ) : (
             <ScrollView
-              style={styles.scroll}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
+              ref={scrollRef}
+              style={st.scroll}
+              contentContainerStyle={[st.scrollContent, { paddingHorizontal: s(20, winW), paddingTop: s(8, winW), paddingBottom: s(160, winW) }]}
+              showsVerticalScrollIndicator={true}
+              indicatorStyle={isDark ? 'white' : 'black'}
               keyboardShouldPersistTaps="handled"
+              contentInset={{ bottom: s(20, winW) }}
             >
               {SECTIONS.map(section => {
                 if (section.key === 'rating') {
                   return (
-                    <View key={section.key} style={styles.section}>
+                    <View key={section.key} style={[st.section, { marginBottom: s(14, winW), borderWidth: isLandscape ? 0 : 1 }]}>
                       <TouchableOpacity
-                        style={styles.sectionHeader}
+                        style={[st.sectionHeader, { paddingVertical: s(16, winW), paddingHorizontal: s(16, winW), minHeight: s(MIN_TOUCH, winW) }]}
                         onPress={() => toggleSection(section.key)}
                         activeOpacity={0.7}
                       >
-                        <View style={styles.sectionHeaderLeft}>
-                          <View style={[styles.sectionIcon, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : '#D6EEF7' }]}>
-                            <Ionicons name={section.icon} size={16} color="#2596BE" />
+                        <View style={[st.sectionHeaderLeft, { gap: s(12, winW) }]}>
+                          <View style={[st.sectionIcon, { width: s(36, winW), height: s(36, winW), borderRadius: s(10, winW), backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : '#D6EEF7' }]}>
+                            <Ionicons name={section.icon} size={iconSize} color="#2596BE" />
                           </View>
-                          <Text style={[styles.sectionLabel, { color: isDark ? '#FFF' : '#111' }]}>{section.label}</Text>
+                          <Text style={[st.sectionLabel, { fontSize: s(16, winW), color: isDark ? '#FFF' : '#111' }]}>{section.label}</Text>
                           {local.minRating > 0 && (
-                            <View style={styles.sectionBadge}>
-                              <Text style={styles.sectionBadgeText}>{local.minRating}+</Text>
+                            <View style={[st.sectionBadge, { minWidth: s(22, winW), height: s(22, winW), borderRadius: s(11, winW), paddingHorizontal: s(6, winW) }]}>
+                              <Text style={[st.sectionBadgeText, { fontSize: s(11, winW) }]}>{local.minRating}+</Text>
                             </View>
                           )}
                         </View>
                         <Ionicons
                           name={expanded[section.key] ? 'chevron-up' : 'chevron-down'}
-                          size={18}
+                          size={s(20, winW)}
                           color={isDark ? '#888' : '#999'}
                         />
                       </TouchableOpacity>
                       {expanded[section.key] && (
-                        <View style={styles.sectionBody}>
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ratingRow}>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(ratingRow)}
-                          </ScrollView>
-                          <TouchableOpacity
-                            style={[styles.clearRatingBtn, { borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#E0E0E0' }]}
-                            onPress={() => setLocal(prev => ({ ...prev, minRating: 0 }))}
+                        <View style={[st.sectionBody, { paddingHorizontal: s(16, winW), paddingBottom: s(20, winW) }]}>
+                          <View style={[st.ratingValue, { paddingTop: s(8, winW), paddingBottom: s(8, winW) }]}>
+                            <Text style={[st.ratingValueText, { fontSize: s(28, winW), color: isDark ? '#FFF' : '#111' }]}>
+                              {local.minRating || 'Any'}
+                            </Text>
+                            <Text style={[st.ratingValueLabel, { fontSize: s(14, winW), color: isDark ? '#888' : '#999' }]}>
+                              {local.minRating ? `Minimum ${local.minRating}+ stars` : 'No minimum rating'}
+                            </Text>
+                          </View>
+                          <View
+                            ref={trackRef}
+                            onLayout={e => { trackW.current = e.nativeEvent.layout.width; }}
+                            onStartShouldSetResponder={() => true}
+                            onMoveShouldSetResponder={() => true}
+                            onResponderGrant={e => {
+                              const val = valFromX(e.nativeEvent.locationX);
+                              setLocal(prev => ({ ...prev, minRating: prev.minRating === val ? 0 : val }));
+                            }}
+                            onResponderMove={e => {
+                              const val = valFromX(e.nativeEvent.locationX);
+                              setLocal(prev => ({ ...prev, minRating: val }));
+                            }}
+                            style={[st.sliderTrackWrap, { height: s(40, winW) }]}
                           >
-                            <Text style={[styles.clearRatingText, { color: isDark ? '#888' : '#999' }]}>Clear rating</Text>
-                          </TouchableOpacity>
+                            <View style={[st.sliderTrack, { height: trackHeight, borderRadius: trackHeight / 2, backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : '#E0E0E0' }]}>
+                              <View style={[st.sliderFill, { width: `${ratingFrac * 100}%`, height: trackHeight, borderRadius: trackHeight / 2, backgroundColor: '#2596BE' }]} />
+                            </View>
+                            <View
+                              style={[
+                                st.sliderThumb,
+                                {
+                                  width: thumbSize, height: thumbSize, borderRadius: thumbSize / 2,
+                                  left: ratingFrac > 0 ? `${ratingFrac * 100}%` : 0,
+                                  marginLeft: -(thumbSize / 2),
+                                  backgroundColor: '#2596BE',
+                                  borderWidth: 3,
+                                  borderColor: isDark ? '#0A0A0A' : '#FFF',
+                                  opacity: local.minRating > 0 ? 1 : 0,
+                                },
+                              ]}
+                            />
+                          </View>
+                          <View style={[st.sliderLabels, { marginTop: s(4, winW) }]}>
+                            <Text style={[st.sliderLabelText, { fontSize: s(13, winW), color: isDark ? '#777' : '#AAA' }]}>1</Text>
+                            <Text style={[st.sliderLabelText, { fontSize: s(13, winW), color: isDark ? '#777' : '#AAA' }]}>10</Text>
+                          </View>
+                          {local.minRating > 0 && (
+                            <TouchableOpacity
+                              onPress={() => setLocal(prev => ({ ...prev, minRating: 0 }))}
+                              style={[st.clearRatingBtn, { marginTop: s(16, winW), paddingVertical: s(8, winW), paddingHorizontal: s(20, winW), borderRadius: s(10, winW), borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#E0E0E0', alignSelf: 'center' }]}
+                            >
+                              <Text style={[st.clearRatingText, { fontSize: s(13, winW), color: isDark ? '#888' : '#999' }]}>
+                                Clear rating
+                              </Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       )}
                     </View>
                   );
                 }
 
-                const items = meta ? meta[section.key as keyof FilterMeta] as string[] : [];
+                const metaKey = section.key === 'bodyParts' ? 'body_parts' : section.key;
+                const items = meta ? (meta as any)[metaKey] as string[] : [];
                 const selected = local[section.key as keyof ExerciseFilters] as string[];
 
                 return (
-                  <View key={section.key} style={styles.section}>
+                  <View key={section.key} style={[st.section, { marginBottom: s(14, winW) }]}>
                     <TouchableOpacity
-                      style={styles.sectionHeader}
+                      style={[st.sectionHeader, { paddingVertical: s(16, winW), paddingHorizontal: s(16, winW), minHeight: s(MIN_TOUCH, winW) }]}
                       onPress={() => toggleSection(section.key)}
                       activeOpacity={0.7}
                     >
-                      <View style={styles.sectionHeaderLeft}>
-                        <View style={[styles.sectionIcon, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : '#D6EEF7' }]}>
-                          <Ionicons name={section.icon} size={16} color="#2596BE" />
+                      <View style={[st.sectionHeaderLeft, { gap: s(12, winW) }]}>
+                        <View style={[st.sectionIcon, { width: s(36, winW), height: s(36, winW), borderRadius: s(10, winW), backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : '#D6EEF7' }]}>
+                          <Ionicons name={section.icon} size={iconSize} color="#2596BE" />
                         </View>
-                        <Text style={[styles.sectionLabel, { color: isDark ? '#FFF' : '#111' }]}>{section.label}</Text>
+                        <Text style={[st.sectionLabel, { fontSize: s(16, winW), color: isDark ? '#FFF' : '#111' }]}>{section.label}</Text>
                         {selected.length > 0 && (
-                          <View style={styles.sectionBadge}>
-                            <Text style={styles.sectionBadgeText}>{selected.length}</Text>
+                          <View style={[st.sectionBadge, { minWidth: s(22, winW), height: s(22, winW), borderRadius: s(11, winW), paddingHorizontal: s(6, winW) }]}>
+                            <Text style={[st.sectionBadgeText, { fontSize: s(11, winW) }]}>{selected.length}</Text>
                           </View>
                         )}
                       </View>
                       <Ionicons
                         name={expanded[section.key] ? 'chevron-up' : 'chevron-down'}
-                        size={18}
+                        size={s(20, winW)}
                         color={isDark ? '#888' : '#999'}
                       />
                     </TouchableOpacity>
                     {expanded[section.key] && (
-                      <View style={styles.chipWrap}>
+                      <View style={{ paddingHorizontal: s(4, winW) }}>
                         {items.length === 0 ? (
-                          <Text style={[styles.emptyText, { color: isDark ? '#666' : '#BBB' }]}>No options</Text>
+                          <Text style={[st.emptyText, { fontSize: s(14, winW), paddingVertical: s(16, winW), paddingHorizontal: s(12, winW), color: isDark ? '#666' : '#BBB' }]}>No options</Text>
                         ) : (
-                          items.map(item => chip(section.key as keyof ExerciseFilters, item))
+                          items.map(item => optionRow(section.key as keyof ExerciseFilters, item))
                         )}
                       </View>
                     )}
@@ -274,22 +332,29 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
                 );
               })}
 
-              <View style={{ height: 100 }} />
+              <View style={{ height: s(40, winW) }} />
             </ScrollView>
           )}
 
-          <View style={[styles.bottomBar, { backgroundColor: isDark ? '#0A0A0A' : '#FFF', borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : '#E0E0E0' }]}>
+          <View style={[st.bottomBar, {
+            backgroundColor: isDark ? '#0A0A0A' : '#FFF',
+            borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : '#E0E0E0',
+            paddingHorizontal: s(20, winW),
+            paddingVertical: s(16, winW),
+            paddingBottom: Platform.OS === 'ios' ? (isLandscape ? s(14, winW) : s(38, winW)) : s(20, winW),
+            gap: s(14, winW),
+          }]}>
             <TouchableOpacity
-              style={[styles.clearBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0' }]}
+              style={[st.clearBtn, { height: s(52, winW), borderRadius: s(16, winW), backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0' }]}
               onPress={onClear}
             >
-              <Text style={[styles.clearBtnText, { color: isDark ? '#DDD' : '#333' }]}>Clear All</Text>
+              <Text style={[st.clearBtnText, { fontSize: s(16, winW), color: isDark ? '#DDD' : '#333' }]}>Clear All</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.applyBtn}
+              style={[st.applyBtn, { height: s(52, winW), borderRadius: s(16, winW), backgroundColor: '#2596BE' }]}
               onPress={() => onApply(local)}
             >
-              <Text style={styles.applyBtnText}>
+              <Text style={[st.applyBtnText, { fontSize: s(16, winW) }]}>
                 Show Results{activeCount(local) > 0 ? ` (${activeCount(local)})` : ''}
               </Text>
             </TouchableOpacity>
@@ -300,14 +365,13 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
   );
 }
 
-const styles = StyleSheet.create({
+const st = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   container: {
-    height: SCREEN_HEIGHT * 0.92,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
@@ -316,38 +380,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 14,
   },
   headerBtn: {
-    width: 40,
-    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontFamily: FONTS.heading,
-    fontSize: 22,
     letterSpacing: 0.5,
-  },
-  badge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#2596BE',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    marginLeft: 4,
-  },
-  badgeText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 12,
-    color: '#FFF',
   },
   clearText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 14,
   },
   loadingWrap: {
     flex: 1,
@@ -357,136 +400,126 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
-  },
+  scrollContent: {},
   section: {
-    marginBottom: 8,
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
+    borderRadius: 12,
   },
   sectionHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    flex: 1,
   },
   sectionIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sectionLabel: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 15,
   },
   sectionBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
     backgroundColor: '#2596BE',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 5,
   },
   sectionBadgeText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 11,
     color: '#FFF',
   },
-  sectionBody: {
-    paddingBottom: 8,
-  },
-  chipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontFamily: FONTS.body,
-    fontSize: 13,
-    textTransform: 'capitalize',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingVertical: 4,
-  },
-  ratingPill: {
+  sectionBody: {},
+  optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128,128,128,0.15)',
   },
-  ratingPillText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 13,
-  },
-  clearRatingBtn: {
-    marginTop: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
-  },
-  clearRatingText: {
+  optionText: {
+    flex: 1,
+    marginRight: 12,
+    textTransform: 'capitalize',
     fontFamily: FONTS.body,
-    fontSize: 12,
+  },
+  checkbox: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyText: {
     fontFamily: FONTS.body,
-    fontSize: 13,
-    paddingVertical: 8,
+  },
+  ratingValue: {
+    alignItems: 'center',
+  },
+  ratingValueText: {
+    fontFamily: FONTS.heading,
+  },
+  ratingValueLabel: {
+    fontFamily: FONTS.body,
+    marginTop: 2,
+  },
+  sliderTrackWrap: {
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  sliderTrack: {
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  sliderFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+  },
+  sliderThumb: {
+    position: 'absolute',
+    top: '50%',
+    transform: [{ translateY: -14 }],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  sliderLabelText: {
+    fontFamily: FONTS.body,
+  },
+  clearRatingBtn: {},
+  clearRatingText: {
+    fontFamily: FONTS.body,
   },
   bottomBar: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
     borderTopWidth: 1,
   },
   clearBtn: {
     flex: 1,
-    height: 48,
-    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   clearBtnText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 15,
   },
   applyBtn: {
     flex: 2,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#2596BE',
     justifyContent: 'center',
     alignItems: 'center',
   },
   applyBtnText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 15,
     color: '#FFF',
   },
 });
