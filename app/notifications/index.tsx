@@ -11,6 +11,7 @@ import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 
 
@@ -24,7 +25,7 @@ export default function NotificationsScreen() {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/notifications`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -40,7 +41,7 @@ export default function NotificationsScreen() {
 
   const handleRead = async (id: number) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/notifications/${id}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -54,7 +55,7 @@ export default function NotificationsScreen() {
 
   const handleReadAll = async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/notifications/read-all`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });

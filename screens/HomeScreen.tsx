@@ -27,6 +27,7 @@ import { HomeSkeleton } from "../components/ui/Skeleton";
 import BodyStatusCard     from "../components/home/BodyStatusCard";
 import HydrationCard      from "../components/home/HydrationCard";
 import { API_URL } from "../utils/api";
+import { getToken } from "../utils/tokenStorage";
 
 
 
@@ -49,7 +50,7 @@ export default function HomeScreen() {
 
   const fetchDashboard = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await getToken();
       if (!token) { router.replace("/"); return; }
       const res = await axios.get(`${API_URL}/daily/dashboard`, {
         headers: { Authorization: `Bearer ${token}` },

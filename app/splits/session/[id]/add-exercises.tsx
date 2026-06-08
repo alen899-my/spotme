@@ -22,6 +22,7 @@ import { useTheme } from '../../../../contexts/ThemeContext';
 import { useToast } from '../../../../contexts/ToastContext';
 import ExercisePreviewModal from '../../../../components/modals/ExercisePreviewModal';
 import { API_URL } from '../../../../utils/api';
+import { getToken } from '../../../../utils/tokenStorage';
 
 
 const LIMIT = 20;
@@ -51,7 +52,7 @@ export default function AddSessionExercisesScreen() {
 
   // Shared helper — avoids repeating AsyncStorage.getItem everywhere
   const getToken = useCallback(async () => {
-    return await AsyncStorage.getItem('userToken');
+    return await getToken();
   }, []);
 
   // Fetch categories on mount — token required by your authMiddleware

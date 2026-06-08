@@ -15,6 +15,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { NewWorkoutSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 
 
@@ -39,7 +40,7 @@ export default function NewDailyWorkout() {
   useEffect(() => {
     const fetchSplits = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await getToken();
         const res = await axios.get(`${API_URL}/workouts/splits`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -58,7 +59,7 @@ export default function NewDailyWorkout() {
     setSelectedSession(null);
     setLoadingSessions(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const cleanTitle = selectedSession?.name || selectedSplit?.name || 'Quick Workout';
       const res = await axios.get(`${API_URL}/workouts/splits/${split.id}/sessions`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -74,7 +75,7 @@ export default function NewDailyWorkout() {
   const handleStart = async () => {
     setStarting(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const cleanTitle = selectedSession?.name || selectedSplit?.name || 'Quick Workout';
       const title = selectedSession
         ? `${selectedSplit?.name} — ${selectedSession?.name}`

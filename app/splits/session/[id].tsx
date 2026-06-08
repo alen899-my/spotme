@@ -28,6 +28,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import ConfirmationModal from '../../../components/ui/ConfirmationModal';
 import ExercisePreviewModal from '../../../components/modals/ExercisePreviewModal';
 import { API_URL } from '../../../utils/api';
+import { getToken } from '../../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -60,7 +61,7 @@ export default function SessionDetailScreen() {
 
   const fetchData = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const exRes = await axios.get(`${API_URL}/workouts/sessions/${id}/exercises`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -80,7 +81,7 @@ export default function SessionDetailScreen() {
   const onConfirmRemove = async () => {
     if (!removeId) return;
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/workouts/exercises/${removeId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -105,7 +106,7 @@ export default function SessionDetailScreen() {
   const handleUpdateStats = async () => {
     setIsUpdating(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.put(`${API_URL}/workouts/exercises/${editingEx.id}`, {
         sets: parseInt(editSets),
         reps: editReps,

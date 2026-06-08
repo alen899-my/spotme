@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getToken } from "../utils/tokenStorage";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -39,7 +40,7 @@ export default function LandingScreen() {
     let mounted = true;
     (async () => {
       try {
-        const token = await AsyncStorage.getItem("userToken");
+        const token = await getToken();
         if (token && mounted) { router.replace("/(tabs)"); return; }
       } catch {}
       finally { if (mounted) setChecking(false); }

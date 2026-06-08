@@ -12,6 +12,7 @@ import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { API_URL } from '../../../utils/api';
+import { getToken } from '../../../utils/tokenStorage';
 
 
 const coachAvatarSource = require('../../../assets/coach/fit-cartoon-character-training.png');
@@ -154,7 +155,7 @@ export default function WorkoutReportScreen() {
   useEffect(() => {
     const fetch = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await getToken();
         const res = await axios.get(`${API_URL}/daily/reports/${id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });

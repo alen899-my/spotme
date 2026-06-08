@@ -17,6 +17,7 @@ import StreakIcon from "../../components/ui/StreakIcon";
 import XPBar from "../../components/ui/XPBar";
 import { ProfileSkeleton } from "../../components/ui/Skeleton";
 import { API_URL } from "../../utils/api";
+import { getToken } from "../../utils/tokenStorage";
 
 
 
@@ -56,7 +57,7 @@ export default function ProfileScreen() {
 
   const fetchUserData = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await getToken();
       if (!token) { router.replace("/"); return; }
       const res = await axios.get(`${API_URL}/profile`, {
         headers: { Authorization: `Bearer ${token}` }

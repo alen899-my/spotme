@@ -13,6 +13,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmationModal from '../../../components/ui/ConfirmationModal';
 import { API_URL } from '../../../utils/api';
+import { getToken } from '../../../utils/tokenStorage';
 
 
 
@@ -30,7 +31,7 @@ export default function ReportsListScreen() {
   const fetch = useCallback(async () => {
     try {
       setLoading(true);
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const [reportsRes, pendingRes] = await Promise.all([
         axios.get(`${API_URL}/daily/reports`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -51,7 +52,7 @@ export default function ReportsListScreen() {
   useFocusEffect(useCallback(() => { fetch(); }, [fetch]));
 
   const getToken = useCallback(async () => {
-    const token = await AsyncStorage.getItem('userToken');
+    const token = await getToken();
     return { Authorization: `Bearer ${token}` };
   }, []);
 

@@ -25,6 +25,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import axios from "axios";
 import { LinearGradient } from 'expo-linear-gradient';
 import { API_URL } from "../../utils/api";
+import { getToken } from "../../utils/tokenStorage";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -72,7 +73,7 @@ export default function MyDetailsScreen() {
 
   const fetchUserData = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await getToken();
       if (!token) {
         router.replace("/");
         return;
@@ -118,7 +119,7 @@ export default function MyDetailsScreen() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await getToken();
       
       const updateData = new FormData();
       

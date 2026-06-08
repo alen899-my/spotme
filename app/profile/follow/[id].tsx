@@ -20,6 +20,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { P } from '../../../constants/homeTheme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_URL } from '../../../utils/api';
+import { getToken } from '../../../utils/tokenStorage';
 
 
 
@@ -94,7 +95,7 @@ export default function FollowListScreen() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const headers = { Authorization: `Bearer ${token}` };
       const [fRes, folRes, meRes] = await Promise.all([
         axios.get(`${API_URL}/profile/${id}/followers`, { headers }),
@@ -132,7 +133,7 @@ export default function FollowListScreen() {
     setFollowingUsers(prev => prev.filter(u => u.id !== actionUser.id));
     setFollowerUsers(prev => prev.map(u => u.id === actionUser.id ? { ...u, is_followed_by_me: false } : u));
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/profile/${actionUser.id}/unfollow`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -150,7 +151,7 @@ export default function FollowListScreen() {
     setFollowerUsers(prev => prev.filter(u => u.id !== actionUser.id));
     setFollowingUsers(prev => prev.map(u => u.id === actionUser.id ? { ...u, follows_me: false } : u));
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/profile/${actionUser.id}/remove-follower`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });

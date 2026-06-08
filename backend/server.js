@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { initDB } = require('./db');
+
+const isProduction = process.env.NODE_ENV === 'production';
 const authRoutes = require('./routes/auth');
 const onboardingRoutes = require('./routes/onboarding');
 const profileRoutes = require('./routes/profile');
@@ -16,8 +18,12 @@ const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 
+const allowedOrigins = ['https://spotme-gym.vercel.app'];
+if (!isProduction) {
+  allowedOrigins.push('http://localhost:19006', 'http://localhost:8081', 'http://localhost:5173');
+}
 app.use(cors({
-  origin: ['https://spotme-gym.vercel.app', 'http://localhost:19006', 'http://localhost:8081', 'http://localhost:5173'],
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -40,15 +46,21 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/weight', weightRoutes);
 app.use('/api/notifications', notificationRoutes);
 
+// Global error-handling middleware
+app.use((err, req, res, _next) => {
+  console.error('Unhandled error:', err);
+  res.status(err.status || 500).json({
+    error: isProduction ? 'Internal server error' : err.message,
+  });
+});
+
 const PORT = process.env.PORT || 5000;
 
-if (process.env.NODE_ENV !== 'production') {
+if (!isProduction) {
   app.listen(PORT, '0.0.0.0', async () => {
     await initDB();
-    console.log(`Server running on port ${PORT}`);
   });
 } else {
-  // For Vercel/Production
   initDB().catch(err => console.error("DB Init Error:", err));
 }
 

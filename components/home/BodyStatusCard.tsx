@@ -12,6 +12,7 @@ import { scale, vs, getBMIStatus } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
 import WorkoutCalendarHeatmap from "../ui/WorkoutCalendarHeatmap";
 import { API_URL } from "../../utils/api";
+import { getToken } from "../../utils/tokenStorage";
 
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -136,7 +137,7 @@ export default function BodyStatusCard({
     setMuscleDetail(null);
     setDetailLoading(true);
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/daily/muscle-detail/${slug}`, {
         headers: { Authorization: `Bearer ${token}` },
       });

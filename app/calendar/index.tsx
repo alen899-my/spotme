@@ -20,6 +20,7 @@ import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
 import WorkoutCalendarHeatmap, { DayEntry } from "../../components/ui/WorkoutCalendarHeatmap";
 import { API_URL } from "../../utils/api";
+import { getToken } from "../../utils/tokenStorage";
 
 
 
@@ -84,7 +85,7 @@ export default function CalendarScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const token = await AsyncStorage.getItem("userToken");
+        const token = await getToken();
         const res = await axios.get(`${API_URL}/daily/calendar-stats`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -103,7 +104,7 @@ export default function CalendarScreen() {
     setModalLoading(true);
     setDayWorkouts([]);
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/daily/workouts-by-date`, {
         params: { date },
         headers: { Authorization: `Bearer ${token}` },

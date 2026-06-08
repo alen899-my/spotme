@@ -22,6 +22,7 @@ import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 
 
@@ -48,7 +49,7 @@ export default function ExerciseDetailScreen() {
   useEffect(() => {
     const fetchDetail = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await getToken();
         const res = await axios.get(`${API_URL}/exercises/${id}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });

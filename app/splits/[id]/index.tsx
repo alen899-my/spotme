@@ -21,6 +21,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { API_URL } from '../../../utils/api';
+import { getToken } from '../../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -39,7 +40,7 @@ export default function SplitSessionsScreen() {
   const isShared = shared === '1';
 
   const fetchData = useCallback(async () => {
-    const token = await AsyncStorage.getItem('userToken');
+    const token = await getToken();
     try {
       if (isShared) {
         const [sessRes, detailRes] = await Promise.all([
@@ -79,7 +80,7 @@ export default function SplitSessionsScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            const token = await AsyncStorage.getItem('userToken');
+            const token = await getToken();
             await axios.delete(`${API_URL}/workouts/sessions/${sessionId}`, {
               headers: { Authorization: `Bearer ${token}` }
             });
@@ -95,7 +96,7 @@ export default function SplitSessionsScreen() {
   const handleClone = async () => {
     setCloning(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.post(`${API_URL}/workouts/shared-splits/${id}/clone`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });

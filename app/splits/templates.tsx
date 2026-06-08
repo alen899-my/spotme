@@ -13,6 +13,7 @@ import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 // Remove static width calculation
 
@@ -51,7 +52,7 @@ export default function TemplatesScreen() {
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/workouts/templates`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -69,7 +70,7 @@ export default function TemplatesScreen() {
     setDetailLoading(true);
     setSelected({ ...template, sessions: [] });
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/workouts/templates/${template.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -85,7 +86,7 @@ export default function TemplatesScreen() {
     if (!selected) return;
     setCloning(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.post(`${API_URL}/workouts/templates/${selected.id}/clone`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });

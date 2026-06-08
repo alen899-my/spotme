@@ -516,7 +516,9 @@ function cleanFoodName(name) {
     .replace(/&gt;/g, '>')
     .replace(/&nbsp;/g, ' ')
     .replace(/&deg;/g, '°');
-  try { decoded = decodeURIComponent(escape(decoded)); } catch (e) {}
+  try { decoded = decodeURIComponent(escape(decoded)); } catch (e) {
+    console.warn('Food name decode failed:', e);
+  }
   decoded = decoded.replace(/\\"/g, '"').replace(/\\'/g, "'");
   decoded = decoded.replace(/["*]/g, '');
   decoded = decoded.replace(/^['\s,\-]+|['\s,\-]+$/g, '');

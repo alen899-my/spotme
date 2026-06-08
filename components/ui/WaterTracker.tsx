@@ -17,6 +17,7 @@ import { useToast } from '../../contexts/ToastContext';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 const { width: W } = Dimensions.get('window');
 
@@ -440,7 +441,7 @@ export default function WaterTracker({ selectedDate }: Props) {
   const fetchWaterLogs = async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const d = selectedDate.toISOString().split('T')[0];
       const res = await axios.get(`${API_URL}/water?date=${d}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -541,7 +542,7 @@ export default function WaterTracker({ selectedDate }: Props) {
     const exceeds = totalWater + amount > maxSafe;
     if (exceeds) showToast('Overhydration warning. Logging anyway.', 'error');
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.post(
         `${API_URL}/water`,
         { amount_ml: amount },
@@ -566,7 +567,7 @@ export default function WaterTracker({ selectedDate }: Props) {
 
   const handleDelete = async (id: number, amount: number) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/water/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });

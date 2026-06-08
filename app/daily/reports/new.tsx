@@ -12,6 +12,7 @@ import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { API_URL } from '../../../utils/api';
+import { getToken } from '../../../utils/tokenStorage';
 
 
 
@@ -27,7 +28,7 @@ export default function GenerateReportScreen() {
   const fetch = useCallback(async () => {
     try {
       setLoading(true);
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/daily/reports/pending-workouts`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -45,7 +46,7 @@ export default function GenerateReportScreen() {
     if (generatingIds.has(workoutId)) return;
     setGeneratingIds(prev => new Set(prev).add(workoutId));
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/daily/workouts/${workoutId}/generate-report`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });

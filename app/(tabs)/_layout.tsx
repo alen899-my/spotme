@@ -10,6 +10,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
 import axios from "axios";
 import { API_URL } from "../../utils/api";
+import { getToken } from "../../utils/tokenStorage";
 
 const BLUE = "#2596BE";
 const INK = "#04282B";
@@ -97,7 +98,7 @@ export default function TabsLayout() {
 
   const loadUser = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await getToken();
       if (token) {
         const res = await axios.get(`${API_URL}/profile`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -115,7 +116,7 @@ export default function TabsLayout() {
 
   const fetchUnreadCount = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await getToken();
       if (!token) return;
       const res = await axios.get(`${API_URL}/notifications`, {
         headers: { Authorization: `Bearer ${token}` }

@@ -22,6 +22,7 @@ import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import { SplitsSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -66,7 +67,7 @@ export default function SplitsTab() {
 
   const fetchSplits = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/workouts/splits`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -82,7 +83,7 @@ export default function SplitsTab() {
     if (append) setLoadingMore(true);
     else setSharedLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const params: any = { page: pageNum, limit: 10 };
       if (q && q.trim()) params.q = q.trim();
       const res = await axios.get(`${API_URL}/workouts/shared-splits`, {
@@ -134,7 +135,7 @@ export default function SplitsTab() {
     if (!deleteId) return;
     setIsDeleting(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/workouts/splits/${deleteId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });

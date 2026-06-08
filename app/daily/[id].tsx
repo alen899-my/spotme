@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -427,7 +428,7 @@ export default function ActiveWorkoutScreen() {
 
   const handleRateExercise = async (dailyExId: number, rating: number) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       setWorkout((prev: any) => {
         if (!prev || !prev.exercises) return prev;
         return {
@@ -528,7 +529,7 @@ export default function ActiveWorkoutScreen() {
 
   const fetchWorkout = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/daily/workouts/${workoutId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -600,7 +601,7 @@ export default function ActiveWorkoutScreen() {
     if (workout?.status !== 'active') return;
     const interval = setInterval(async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await getToken();
         await axios.patch(`${API_URL}/daily/workouts/${workoutId}/metrics`, {
           total_duration_seconds: workoutElapsed,
           total_rest_seconds: totalRestElapsed,
@@ -695,7 +696,7 @@ export default function ActiveWorkoutScreen() {
     setLoadingLogSet(true);
     if (setTimerRunning) { clearInterval(setTimerRef.current); setSetTimerRunning(false); }
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/daily/exercises/${activeExercise.id}/sets`, {
         set_number: isCardio ? 1 : activeSetNum,
         weight: isCardio ? 0 : (parseFloat(inputWeight) || 0),
@@ -741,7 +742,7 @@ export default function ActiveWorkoutScreen() {
     if (loadingEditSet || !editingSet) return;
     setLoadingEditSet(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const payload: any = {
         weight: parseFloat(inputWeight) || 0,
         reps: parseInt(inputReps) || 0,
@@ -766,7 +767,7 @@ export default function ActiveWorkoutScreen() {
     if (loadingSkip) return;
     setLoadingSkip(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/daily/exercises/${activeExercise.id}/sets`, {
         set_number: activeSetNum, weight: 0, reps: 0, duration_seconds: 0,
         rest_seconds: 0, workout_duration: workoutElapsed, is_skipped: true,
@@ -786,7 +787,7 @@ export default function ActiveWorkoutScreen() {
     if (loadingSkip) return;
     setLoadingSkip(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.patch(`${API_URL}/daily/exercises/${exerciseId}/skip`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -806,7 +807,7 @@ export default function ActiveWorkoutScreen() {
     setAddExModalVisible(true);
     setBrowseCategory(null);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/workouts/exercises/categories`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -825,7 +826,7 @@ export default function ActiveWorkoutScreen() {
   const fetchExtraExercises = async (q: string, cat: string | null, p: number = 0) => {
     if (p === 0) setLoadingExs(true); else setLoadingMore(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const offset = p * LIMIT;
       const res = await axios.get(`${API_URL}/workouts/exercises/search`, {
         params: { q, category: cat, limit: LIMIT, offset },
@@ -862,7 +863,7 @@ export default function ActiveWorkoutScreen() {
     if (loadingAddEx) return;
     setLoadingAddEx(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/daily/workouts/${workoutId}/exercises`, {
         exercise_id: ex.id, target_sets: 3, target_reps: '10-12', target_weight: 0,
       }, { headers: { Authorization: `Bearer ${token}` } });
@@ -884,7 +885,7 @@ export default function ActiveWorkoutScreen() {
   const handleSaveAndExit = async () => {
     setUpdatingMetrics(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.patch(`${API_URL}/daily/workouts/${workoutId}/metrics`, {
         total_duration_seconds: workoutElapsed,
         total_rest_seconds: totalRestElapsed,
@@ -902,7 +903,7 @@ export default function ActiveWorkoutScreen() {
   const handleConfirmDelete = async () => {
     if (!deleteId) return;
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/daily/exercises/${deleteId}`, { headers: { Authorization: `Bearer ${token}` } });
       showToast('Exercise removed');
       setShowDeleteModal(false);
@@ -918,7 +919,7 @@ export default function ActiveWorkoutScreen() {
   const handleConfirmDeleteSet = async () => {
     if (!deleteSetId) return;
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/daily/sets/${deleteSetId}`, { headers: { Authorization: `Bearer ${token}` } });
       showToast('Set removed');
       setShowDeleteSetModal(false);
@@ -948,7 +949,7 @@ export default function ActiveWorkoutScreen() {
     if (!workoutId) { showToast('Workout ID missing', 'error'); return; }
     setFinishing(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.patch(`${API_URL}/daily/workouts/${workoutId}/recalculate`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -968,7 +969,7 @@ export default function ActiveWorkoutScreen() {
     if (workoutTimerRef.current) { clearInterval(workoutTimerRef.current); workoutTimerRef.current = null; }
     if (restTimerRef.current) clearInterval(restTimerRef.current);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       let totalVolume = 0;
       if (workout?.exercises) {
         for (const ex of workout.exercises) {
@@ -1021,7 +1022,7 @@ export default function ActiveWorkoutScreen() {
       setUploadingPhotos(newUris);
       setLoadingPhotos(true);
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await getToken();
         const formData = new FormData();
         for (const [index, asset] of result.assets.entries()) {
           const uri = asset.uri;
@@ -1050,7 +1051,7 @@ export default function ActiveWorkoutScreen() {
 
   const handleDeletePhoto = async (photoId: number) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/daily/photos/${photoId}`, { headers: { Authorization: `Bearer ${token}` } });
       showToast('Photo removed');
       fetchWorkout();
@@ -1060,7 +1061,7 @@ export default function ActiveWorkoutScreen() {
   const handleUpdateMetrics = async () => {
     setUpdatingMetrics(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.patch(`${API_URL}/daily/workouts/${workoutId}/metrics`, {
         post_workout_weight: parseFloat(finishWeight) || 0,
       }, { headers: { Authorization: `Bearer ${token}` } });

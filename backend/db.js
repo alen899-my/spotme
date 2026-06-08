@@ -230,7 +230,9 @@ const initDB = async () => {
     // Add reference_id to existing notifications
     try {
       await pool.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_id INT`);
-    } catch (_) {}
+    } catch (_) {
+      console.warn('Could not add reference_id column (may already exist):', _);
+    }
 
     // ── Workout Reports ──────────────────────────────────────────────────────
     await pool.query(`
@@ -250,7 +252,9 @@ const initDB = async () => {
     // Add status column to existing workout_reports table
     try {
       await pool.query(`ALTER TABLE workout_reports ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'completed'`);
-    } catch (_) {}
+    } catch (_) {
+      console.warn('Could not add status column (may already exist):', _);
+    }
 
     // ── Water Intake Logging ─────────────────────────────────────────────────
     await pool.query(`
@@ -406,7 +410,6 @@ const initDB = async () => {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS water_goal_date DATE;
     `);
 
-    console.log("Database connected and all tables ready");
   } catch (error) {
     console.error("Database initialization failed:", error);
   }

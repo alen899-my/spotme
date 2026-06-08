@@ -21,6 +21,7 @@ import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { API_URL } from '../../../utils/api';
+import { getToken } from '../../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -34,7 +35,7 @@ export default function SplitDetailScreen() {
 
   const fetchSplitDetails = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/workouts/splits/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -54,7 +55,7 @@ export default function SplitDetailScreen() {
 
   const handleRemoveExercise = async (wseId: number) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/workouts/splits/${id}/exercises/${wseId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });

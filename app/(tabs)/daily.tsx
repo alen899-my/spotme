@@ -17,6 +17,7 @@ import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import DatePicker from '../../components/ui/DatePicker';
 import { DailySkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 
 // Profile gate colors
@@ -144,7 +145,7 @@ export default function DailyTab() {
         return;
       }
       // Otherwise hit the API for fresh data
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       if (!token) { setProfileComplete(false); return; }
       const res = await axios.get(`${API_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -160,7 +161,7 @@ export default function DailyTab() {
 
   const fetchSplits = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/workouts/splits`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -174,7 +175,7 @@ export default function DailyTab() {
 
   const fetchWorkouts = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/daily/workouts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -196,7 +197,7 @@ export default function DailyTab() {
     if (!deletingId) return;
     setIsDeleting(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/daily/workouts/${deletingId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });

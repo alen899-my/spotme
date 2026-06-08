@@ -543,8 +543,6 @@ router.patch(
     const workoutId = parseInt(id);
     const userId = req.user.id;
 
-    console.log(`[Daily] Finishing workout ${id} for user ${userId}`);
-
     try {
       const { water_intake_liters, post_workout_weight, photos, total_rest_seconds } = req.body;
       const existingWorkoutRes = await pool.query(
@@ -558,19 +556,12 @@ router.patch(
 
       const wasAlreadyCompleted = existingWorkoutRes.rows[0].status === 'completed';
       
-      console.log(`[Daily] Processing metrics for workout ${id}:`, {
-        water: water_intake_liters,
-        weight: post_workout_weight,
-        photosCount: Array.isArray(photos) ? photos.length : 0
-      });
-
       // Check if all exercises are done or skipped
       const exercisesCheck = await pool.query(
         'SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = $1 AND is_completed = false',
         [workoutId]
       );
       const remainingCount = parseInt(exercisesCheck.rows[0].count);
-      console.log(`[Daily] Remaining exercises for workout ${id}: ${remainingCount}`);
 
       // Build dynamic update query
       let updateFields = [];
@@ -605,17 +596,14 @@ router.patch(
       queryParams.push(workoutId, userId);
       const query = `UPDATE daily_workouts SET ${updateFields.join(', ')} WHERE id = $${paramIdx} AND user_id = $${paramIdx + 1} RETURNING *`;
       
-      console.log(`[Daily] Executing update query for workout ${id}`);
       const result = await pool.query(query, queryParams);
 
       if (result.rows.length === 0) {
-        console.warn(`[Daily] Workout ${id} not found or not owned by user ${userId}`);
         return res.status(404).json({ error: 'Workout not found or unauthorized' });
       }
 
       // Handle multi-photos if provided
       if (Array.isArray(photos)) {
-        console.log(`[Daily] Updating ${photos.length} photos for workout ${id}`);
         // Clear old ones first (if any)
         await pool.query('DELETE FROM daily_workout_photos WHERE daily_workout_id = $1', [workoutId]);
         for (const photoUrl of photos) {
@@ -640,8 +628,6 @@ router.patch(
       result.rows[0].calories_burned_method = analytics.calorieSummary.method;
       result.rows[0].exercise_prs = analytics.exercisePrs;
 
-      console.log(`[Daily] Workout ${id} successfully finalized. Status: ${result.rows[0].status}`);
-
       // ─── STREAK CALCULATION ───
       try {
         if (!wasAlreadyCompleted) {
@@ -663,7 +649,6 @@ router.patch(
         if (hasSkips) {
           // Rule: Skip any exercise = Streak Gone
           newStreak = 0;
-          console.log(`[Streak] Reset to 0 due to skips in workout ${id}`);
         } else {
           if (!last_workout_date) {
             newStreak = 1;
@@ -871,11 +856,8 @@ router.post('/workouts/:id/photos', authenticateToken, upload.array('photos', 10
     }
     
     if (!req.files || req.files.length === 0) {
-      console.warn(`[Daily] No photos found in request for workout ${id}`);
       return res.status(400).json({ error: 'No photos uploaded' });
     }
-
-    console.log(`[Daily] Uploaded ${req.files.length} photos to R2 for workout ${id}`);
 
     const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL.endsWith('/') 
       ? process.env.CLOUDFLARE_R2_PUBLIC_URL.slice(0, -1) 
@@ -884,7 +866,6 @@ router.post('/workouts/:id/photos', authenticateToken, upload.array('photos', 10
     const urls = req.files.map(file => `${publicUrl}/${file.key}`);
 
     for (const url of urls) {
-      console.log(`[Daily] Saving photo URL to DB: ${url}`);
       await pool.query(
         'INSERT INTO daily_workout_photos (daily_workout_id, photo_url) VALUES ($1, $2)',
         [parseInt(id), url]
@@ -1719,7 +1700,9 @@ Keep it concise, energetic, and helpful — like a real coach talking to an athl
       // Delete the placeholder row so manual generation can retry
       try {
         await client.query('DELETE FROM workout_reports WHERE id = $1', [reportId]);
-      } catch (_) {}
+      } catch (_) {
+        console.error('Failed to cleanup report placeholder:', _);
+      }
     } finally {
       client.release();
     }
@@ -1804,7 +1787,9 @@ router.delete('/reports/:id', authenticateToken, async (req, res) => {
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (err) {
-    try { await client.query('ROLLBACK'); } catch (_) {}
+    try { await client.query('ROLLBACK'); } catch (_) {
+      console.error('ROLLBACK failed:', _);
+    }
     console.error('DELETE /daily/reports/:id error:', err);
     res.status(500).json({ error: err.message });
   } finally {

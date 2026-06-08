@@ -34,7 +34,6 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
       );
       return response.data.choices[0].message.content;
     } catch (error) {
-      console.warn('[Groq Text] Failed, falling back to OpenRouter:', error.response?.data || error.message);
       // Fall through to OpenRouter logic below
     }
   }
@@ -72,7 +71,6 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
       );
       return response.data.choices[0].message.content;
     } catch (error) {
-      console.warn('Groq Vision failed, falling back to OpenRouter:', error.response?.data || error.message);
       // Fall through to OpenRouter logic below
     }
   }

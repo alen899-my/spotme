@@ -85,7 +85,6 @@ async function loadCsvRecommendations() {
     const res = await pool.query('SELECT gender, goal, bmi_category, schedule, meal_plan FROM gym_csv_recommendations');
 
     if (res.rows.length === 0) {
-      console.warn("No rows found in gym_csv_recommendations table, using fallback lookup");
       csvRecommendationsCache = fallbackRecommendations;
       return fallbackRecommendations;
     }
@@ -102,7 +101,6 @@ async function loadCsvRecommendations() {
     }
 
     csvRecommendationsCache = cache;
-    console.log(`Successfully cached ${res.rows.length} recommendations from gym_csv_recommendations table`);
     return cache;
   } catch (error) {
     console.error("Failed to query gym_csv_recommendations table:", error);

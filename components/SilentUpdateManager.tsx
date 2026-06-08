@@ -61,7 +61,7 @@ export default function SilentUpdateManager() {
       }
     } catch (error) {
       // Fail silently under the hood if offline or server is unreachable
-      console.log('[SilentUpdateManager] Check failed:', error);
+      // SilentUpdateManager check failed
     }
   };
 
@@ -85,7 +85,7 @@ export default function SilentUpdateManager() {
     try {
       await Updates.reloadAsync();
     } catch (error) {
-      console.log('[SilentUpdateManager] Reload failed:', error);
+      // SilentUpdateManager reload failed
     }
   };
 

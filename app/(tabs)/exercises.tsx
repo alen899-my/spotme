@@ -26,6 +26,7 @@ import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PADDING = 16;
@@ -303,7 +304,7 @@ export default function ExercisesScreen() {
   useEffect(() => {
     const fetchBodyProfile = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await getToken();
         if (!token) return;
         const res = await axios.get(`${API_URL}/daily/dashboard`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -327,7 +328,7 @@ export default function ExercisesScreen() {
       if (q.trim()) params.q = q.trim();
       if (cat) params.category = cat;
 
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/exercises`, {
         params,
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,

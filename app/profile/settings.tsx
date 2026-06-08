@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { clearAll } from "../../utils/tokenStorage";
+import { clearAll, getToken } from "../../utils/tokenStorage";
 import axios from "axios";
 import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
@@ -37,7 +37,7 @@ export default function SettingsScreen() {
 
   const loadSettings = async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -54,7 +54,7 @@ export default function SettingsScreen() {
     setIsPrivate(value);
     setSaving(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.put(`${API_URL}/profile/update`,
         { is_private: value },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -78,7 +78,7 @@ export default function SettingsScreen() {
     setShareSplits(value);
     setSavingShare(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.put(`${API_URL}/profile/update`,
         { share_splits: value },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -110,14 +110,20 @@ export default function SettingsScreen() {
 
   const confirmDelete = async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
+      if (!token) {
+        Alert.alert("Session Expired", "Please log in again.");
+        router.replace('/login');
+        return;
+      }
       await axios.post(`${API_URL}/auth/delete-account`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       await clearAll();
       router.replace('/login');
-    } catch (err) {
-      Alert.alert("Error", "Failed to delete account. Please try again.");
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message || "Failed to delete account. Please try again.";
+      Alert.alert("Error", msg);
     }
   };
 

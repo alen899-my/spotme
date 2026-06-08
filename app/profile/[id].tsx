@@ -14,6 +14,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { P, getXPProgress, TIER_COLORS } from '../../constants/homeTheme';
 import { UserProfileSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -84,7 +85,7 @@ export default function PublicProfileScreen() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const userData = await AsyncStorage.getItem('userData');
       if (userData) setMyId(JSON.parse(userData).id);
 
@@ -127,7 +128,7 @@ export default function PublicProfileScreen() {
     const prevStatus = followStatus;
     setFollowStatus(user?.is_private ? 'pending' : 'accepted');
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/profile/${id}/follow`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -141,7 +142,7 @@ export default function PublicProfileScreen() {
     const prevStatus = followStatus;
     setFollowStatus(null);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/profile/${id}/unfollow`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -155,7 +156,7 @@ export default function PublicProfileScreen() {
     const prevStatus = followStatus;
     setFollowStatus(null);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/profile/${id}/unfollow`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -169,7 +170,7 @@ export default function PublicProfileScreen() {
     const prevStatus = followStatus;
     setFollowStatus(null);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/profile/${id}/unfollow`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -185,7 +186,7 @@ export default function PublicProfileScreen() {
     const prevPending = hasPendingFromTarget;
     setHasPendingFromTarget(false);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/profile/${id}/accept-follow`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -198,7 +199,7 @@ export default function PublicProfileScreen() {
     const prevPending = hasPendingFromTarget;
     setHasPendingFromTarget(false);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.post(`${API_URL}/profile/${id}/deny-follow`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });

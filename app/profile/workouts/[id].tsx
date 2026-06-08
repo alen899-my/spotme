@@ -16,6 +16,7 @@ import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_URL } from '../../../utils/api';
+import { getToken } from '../../../utils/tokenStorage';
 
 
 
@@ -70,7 +71,7 @@ export default function UserWorkoutsScreen() {
   const fetchWorkouts = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/profile/${id}`, {
         params: { limit: 100 },
         headers: { Authorization: `Bearer ${token}` }

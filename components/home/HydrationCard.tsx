@@ -16,6 +16,7 @@ import { scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useToast } from "../../contexts/ToastContext";
 import { API_URL } from "../../utils/api";
+import { getToken } from "../../utils/tokenStorage";
 
 
 
@@ -125,7 +126,7 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
     ]).start();
 
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await getToken();
       const res = await axios.post(
         `${API_URL}/water`,
         { amount_ml: amount },

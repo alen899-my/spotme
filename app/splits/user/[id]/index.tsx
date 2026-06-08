@@ -16,6 +16,7 @@ import { FONTS } from '../../../../constants/theme';
 import { useTheme } from '../../../../contexts/ThemeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_URL } from '../../../../utils/api';
+import { getToken } from '../../../../utils/tokenStorage';
 
 
 
@@ -30,7 +31,7 @@ export default function UserSplitsScreen() {
   const fetchSplits = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/workouts/shared-splits`, {
         params: { creator_id: id, limit: 50 },
         headers: { Authorization: `Bearer ${token}` }

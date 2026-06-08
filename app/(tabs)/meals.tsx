@@ -20,6 +20,7 @@ import DietRecsScreen from '../../components/diet/DietRecsScreen';
 import LogMealSheet, { LogMealPayload } from '../../components/meals/LogMealSheet';
 import MealNutrientCard from '../../components/meals/MealNutrientCard';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -110,7 +111,7 @@ export default function MealsScreen() {
     setRecommendationLoading(true);
     setRecommendationError(null);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/meals/recommendation`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -138,7 +139,7 @@ export default function MealsScreen() {
     }
     setFoodSearchLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/meals/food-search`, {
         params: { q: query.trim(), limit: 30 },
         headers: { Authorization: `Bearer ${token}` }
@@ -191,7 +192,7 @@ export default function MealsScreen() {
   const loadFeaturedFoods = async () => {
     setFeaturedFoodsLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/meals/food-search`, {
         params: { q: '', limit: 80 },
         headers: { Authorization: `Bearer ${token}` }
@@ -275,7 +276,7 @@ export default function MealsScreen() {
   const handleSaveDietPlan = async () => {
     setSavingDietForm(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const payload = {
         gender: formGender,
         age: formAge ? parseInt(formAge) : null,
@@ -364,7 +365,7 @@ export default function MealsScreen() {
   const loadSelectorFoods = async (query = '') => {
     setSelectorLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/meals/food-search`, {
         params: { q: query, limit: 100 },
         headers: { Authorization: `Bearer ${token}` }
@@ -380,7 +381,7 @@ export default function MealsScreen() {
   const loadAlternativeFoods = async (ing: any) => {
     setSelectorLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/meals/food-alternatives`, {
         params: { 
           p: ing.protein || 0,
@@ -449,7 +450,7 @@ export default function MealsScreen() {
 
   const syncRecommendedMeals = async (updatedMeals: any[]) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.put(`${API_URL}/meals/recommendation/meals`, {
         recommendedMeals: updatedMeals
       }, {
@@ -471,7 +472,7 @@ export default function MealsScreen() {
 
   const handleLogRecommendedMeal = async (meal: any) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const imageUrl = getMealVisual(meal.meal_type, meal.title).image;
 
       const items = meal.ingredients.map((ing: any) => ({
@@ -523,12 +524,14 @@ export default function MealsScreen() {
     try {
       const data = await AsyncStorage.getItem('userData');
       if (data) setUserData(JSON.parse(data));
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to load user data:', e);
+    }
   };
 
   const fetchMeals = async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/meals`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -561,7 +564,7 @@ export default function MealsScreen() {
     else if (hour >= 19 && hour < 23) autoMealType = 'Dinner';
 
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
 
       if (imageUri) {
         // ── AI photo analysis path ──
@@ -656,7 +659,7 @@ export default function MealsScreen() {
 
   const deleteMeal = async (id: number) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/meals/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -1816,7 +1819,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                         <TouchableOpacity
                           onPress={async () => {
                             try {
-                              const token = await AsyncStorage.getItem('userToken');
+                              const token = await getToken();
                               const hour = new Date().getHours();
                               let mealTypeMap = 'Snack';
                               if (hour >= 5 && hour < 11) mealTypeMap = 'Breakfast';

@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../contexts/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { API_URL } from "../../utils/api";
+import { getToken } from "../../utils/tokenStorage";
 
 const { width } = Dimensions.get("window");
 
@@ -95,7 +96,7 @@ export default function OnboardingScreen() {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const token = await AsyncStorage.getItem("userToken");
+        const token = await getToken();
         if (!token) return;
         const res = await axios.get(`${API_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -181,7 +182,7 @@ export default function OnboardingScreen() {
           setStep(jumpTo);
         }
       } catch (e) {
-        console.log("Profile pre-load error (non-critical):", e);
+        // Profile pre-load error (non-critical)
       } finally {
         setHydrating(false);
       }
@@ -249,7 +250,7 @@ export default function OnboardingScreen() {
       
       const activeUserId = userId || userData?.id;
       if (!activeUserId) {
-        console.log("Step save error: No active user ID found");
+        // Step save error: No active user ID found
         return;
       }
 
@@ -306,7 +307,7 @@ export default function OnboardingScreen() {
       };
       await AsyncStorage.setItem("userData", JSON.stringify(updatedUser));
     } catch (e) {
-      console.log("Step save error (non-critical):", e);
+      // Step save error (non-critical)
     } finally {
       setSavingStep(false);
     }

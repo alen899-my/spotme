@@ -19,6 +19,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import { ViewSessionSkeleton } from '../../../components/ui/Skeleton';
 import WorkoutSummary from '../../../components/WorkoutSummary';
 import { API_URL } from '../../../utils/api';
+import { getToken } from '../../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -43,7 +44,7 @@ export default function WorkoutViewScreen() {
 
   const fetchWorkout = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/daily/workouts/${workoutId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -68,7 +69,7 @@ export default function WorkoutViewScreen() {
       setUploadingPhotos(newUris);
       setLoadingPhotos(true);
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await getToken();
         const formData = new FormData();
         for (const [index, asset] of result.assets.entries()) {
           const uri = asset.uri;
@@ -108,7 +109,7 @@ export default function WorkoutViewScreen() {
 
   const handleDeletePhoto = async (photoId: number) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/daily/photos/${photoId}`, { headers: { Authorization: `Bearer ${token}` } });
       showToast('Photo removed');
       fetchWorkout();
@@ -133,7 +134,7 @@ export default function WorkoutViewScreen() {
   const handleUpdateMetrics = async () => {
     setUpdatingMetrics(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.patch(`${API_URL}/daily/workouts/${workoutId}/metrics`, {
         post_workout_weight: parseFloat(finishWeight) || 0,
       }, { headers: { Authorization: `Bearer ${token}` } });

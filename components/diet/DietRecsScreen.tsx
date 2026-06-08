@@ -14,6 +14,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import BmiSpeedometer from '../ui/BmiSpeedometer';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -163,7 +164,9 @@ export default function DietRecsScreen({ tab, header }: Props) {
         setFormFoodPreference(parsed.food_preference || '');
         setFormMealsPerDay(parsed.meals_per_day || 4);
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to parse saved user data:', e);
+    }
   };
 
   const fetchRecommendations = async (forceRefresh = false) => {
@@ -171,7 +174,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
     setRecommendationLoading(true);
     setRecommendationError(null);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/meals/recommendation`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -190,7 +193,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
   const fetchFoods = async (query?: string, append = false) => {
     if (append) setLoadingMore(true); else { setFoodsLoading(true); setLoadingMore(false); }
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const q = query !== undefined ? query : searchQuery;
       const params: Record<string, any> = {
         q,
@@ -245,7 +248,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
   const handleSaveDietPlan = async () => {
     setSavingDietForm(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const payload = {
         gender: formGender,
         age: formAge ? parseInt(formAge) : null,
@@ -283,7 +286,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
   const loadAlternativeFoods = async (ing: any) => {
     setSelectorLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/meals/food-alternatives`, {
         params: { p: ing.protein || 0, c: ing.carbs || 0, f: ing.fat || 0, exclude_name: ing.name || '', limit: 30 },
         headers: { Authorization: `Bearer ${token}` }
@@ -309,7 +312,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
 
   const syncRecommendedMeals = async (updatedMeals: any[]) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.put(`${API_URL}/meals/recommendation/meals`, {
         recommendedMeals: updatedMeals
       }, {

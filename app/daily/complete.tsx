@@ -18,6 +18,7 @@ import { useToast } from '../../contexts/ToastContext';
 import StreakIcon from '../../components/ui/StreakIcon';
 import { CompleteSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -346,7 +347,7 @@ export default function WorkoutCompleteScreen() {
 
   const fetchWorkout = async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const response = await axios.get(`${API_URL}/daily/workouts/${workoutId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -395,7 +396,7 @@ export default function WorkoutCompleteScreen() {
     if (saving) return;
     setSaving(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
 
       if (photos.length > 0) {
         showToast(`Uploading ${photos.length} photos...`, 'info');

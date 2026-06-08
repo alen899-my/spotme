@@ -14,6 +14,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { P } from '../../constants/homeTheme';
 import { LeaderboardSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 const { width: W } = Dimensions.get('window');
 
@@ -304,7 +305,7 @@ export default function LeaderboardScreen() {
       setLoading(true);
     }
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const userData = await AsyncStorage.getItem('userData');
       if (userData) setMyId(JSON.parse(userData).id);
       const headers = { Authorization: `Bearer ${token}` };
@@ -337,7 +338,7 @@ export default function LeaderboardScreen() {
     setSearching(true);
     searchTimer.current = setTimeout(async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
+        const token = await getToken();
         const res = await axios.get(`${API_URL}/leaderboard/search`, {
           params: { q: searchQuery.trim() },
           headers: { Authorization: `Bearer ${token}` }

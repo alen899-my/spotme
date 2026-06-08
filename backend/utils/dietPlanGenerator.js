@@ -304,7 +304,6 @@ async function generateAIDietPlan(user, targets, mealsPerDay, pool) {
   const { caloriesTarget, proteinTarget, carbsTarget, fatTarget } = targets;
   const distribution = getMealDistribution(mealsPerDay);
 
-  console.log('[DietRAG] Step 1: Retrieving real foods from database...');
   let foodsPerMeal = {};
   try {
     foodsPerMeal = await retrieveFoodsForDietPlan(
@@ -313,19 +312,12 @@ async function generateAIDietPlan(user, targets, mealsPerDay, pool) {
       user.diet_type,
       user.food_preference
     );
-
-    const counts = Object.entries(foodsPerMeal)
-      .map(([k, v]) => `${k}: ${v.length}`)
-      .join(', ');
-    console.log(`[DietRAG] Foods retrieved — ${counts}`);
   } catch (err) {
     console.error('[DietRAG] Food retrieval failed, will use general AI knowledge:', err.message);
   }
 
-  console.log('[DietRAG] Step 2: Building AI prompt...');
   const prompt = buildDietPrompt(user, targets, foodsPerMeal, distribution);
 
-  console.log('[DietRAG] Step 3: Calling AI for plan generation (Groq / Llama-4 Scout)...');
   let aiResponse;
   try {
     aiResponse = await callAI(
@@ -340,7 +332,6 @@ async function generateAIDietPlan(user, targets, mealsPerDay, pool) {
   }
 
   // Parse AI response
-  console.log('[DietRAG] Step 4: Parsing AI response...');
   try {
     // Strip any markdown fences
     const fencedMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -378,7 +369,6 @@ async function generateAIDietPlan(user, targets, mealsPerDay, pool) {
         : [],
     }));
 
-    console.log(`[DietRAG] ✅ AI diet plan generated — ${sanitised.length} meals`);
     return sanitised;
 
   } catch (parseErr) {

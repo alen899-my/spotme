@@ -15,6 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import WeightScale from '../../components/weight/WeightScale';
 import WeightHistoryCard from '../../components/weight/WeightHistoryCard';
 import { API_URL } from '../../utils/api';
+import { getToken } from '../../utils/tokenStorage';
 
 
 
@@ -31,7 +32,7 @@ export default function WeightScreen() {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.get(`${API_URL}/weight`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -53,7 +54,7 @@ export default function WeightScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       const res = await axios.post(`${API_URL}/weight`, { weight: weightValue }, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -69,7 +70,7 @@ export default function WeightScreen() {
 
   const handleDelete = async (id: number) => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await getToken();
       await axios.delete(`${API_URL}/weight/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
