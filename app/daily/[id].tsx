@@ -706,7 +706,7 @@ export default function ActiveWorkoutScreen() {
         sound: true,
         priority: Notifications.AndroidNotificationPriority.HIGH,
       },
-      trigger: { type: 'timeInterval', seconds },
+      trigger: { type: 'timeInterval' as any, seconds },
     });
     restNotifIdRef.current = notifId;
     await AsyncStorage.setItem('restNotifId', notifId);
