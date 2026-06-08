@@ -504,8 +504,8 @@ export default function PublicProfileScreen() {
 
             <View style={styles.metricsGrid}>
               {[
-                { label: 'Height', value: user.height ? `${user.height} cm` : '—', icon: 'human-male-height' },
-                { label: 'Weight', value: user.weight ? `${user.weight} kg` : '—', icon: 'scale-bathroom' },
+                { label: 'Height', value: user.height || '—', icon: 'human-male-height' },
+                { label: 'Weight', value: user.weight || '—', icon: 'scale-bathroom' },
                 { label: 'Age',    value: user.age    ? `${user.age} yrs`  : '—', icon: 'calendar-account' },
                 { label: 'Gender', value: user.gender || '—',                      icon: 'gender-male-female' },
               ].map((m) => (

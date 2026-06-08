@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Image, Modal,
   ScrollView, TextInput, Platform, Vibration,
-  Dimensions, Animated,
+  Dimensions, Animated, AppState,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -463,6 +463,12 @@ export default function ActiveWorkoutScreen() {
   const [totalRestElapsed, setTotalRestElapsed] = useState(0);
   const restTimerRef = useRef<any>(null);
 
+  const workoutStartedAtRef = useRef<number>(Date.now());
+  const setTimerStartedAtRef = useRef<number>(Date.now());
+  const restTimerEndAtRef = useRef<number>(Date.now());
+  const totalRestAccumulatedRef = useRef<number>(0);
+  const totalRestPeriodStartRef = useRef<number | null>(null);
+
   const [inputWeight, setInputWeight] = useState('');
   const [inputReps, setInputReps] = useState('');
 
@@ -529,9 +535,13 @@ export default function ActiveWorkoutScreen() {
       setWorkout(res.data);
       if (res.data.total_duration_seconds > 0 && workoutElapsed === 0) {
         setWorkoutElapsed(res.data.total_duration_seconds);
+        workoutStartedAtRef.current = Date.now() - (res.data.total_duration_seconds * 1000);
+      } else if (workoutElapsed === 0) {
+        workoutStartedAtRef.current = Date.now();
       }
       if (res.data.total_rest_seconds > 0 && totalRestElapsed === 0) {
         setTotalRestElapsed(res.data.total_rest_seconds);
+        totalRestAccumulatedRef.current = res.data.total_rest_seconds;
       }
     } catch (err) {
       console.error('Error fetching workout:', err);
@@ -543,11 +553,31 @@ export default function ActiveWorkoutScreen() {
   useFocusEffect(useCallback(() => { fetchWorkout(); }, [fetchWorkout]));
 
   useEffect(() => {
-    let interval: any = null;
     if (workout?.status === 'active' && !setTimerRunning) {
-      interval = setInterval(() => { setTotalRestElapsed(prev => prev + 1); }, 1000);
+      totalRestPeriodStartRef.current = Date.now();
+      const interval = setInterval(() => {
+        if (totalRestPeriodStartRef.current !== null) {
+          const currentPeriod = Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000);
+          setTotalRestElapsed(totalRestAccumulatedRef.current + currentPeriod);
+        }
+      }, 1000);
+      return () => {
+        clearInterval(interval);
+        if (totalRestPeriodStartRef.current !== null) {
+          const elapsed = Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000);
+          totalRestAccumulatedRef.current += elapsed;
+          totalRestPeriodStartRef.current = null;
+          setTotalRestElapsed(totalRestAccumulatedRef.current);
+        }
+      };
+    } else {
+      if (totalRestPeriodStartRef.current !== null) {
+        const elapsed = Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000);
+        totalRestAccumulatedRef.current += elapsed;
+        totalRestPeriodStartRef.current = null;
+        setTotalRestElapsed(totalRestAccumulatedRef.current);
+      }
     }
-    return () => { if (interval) clearInterval(interval); };
   }, [setTimerRunning, workout?.status]);
 
   useEffect(() => {
@@ -557,7 +587,9 @@ export default function ActiveWorkoutScreen() {
       return;
     }
     if (!workoutTimerRef.current && workout?.status === 'active') {
-      workoutTimerRef.current = setInterval(() => { setWorkoutElapsed(prev => prev + 1); }, 1000);
+      workoutTimerRef.current = setInterval(() => {
+        setWorkoutElapsed(Math.floor((Date.now() - workoutStartedAtRef.current) / 1000));
+      }, 1000);
     }
     return () => {
       if (workoutTimerRef.current) { clearInterval(workoutTimerRef.current); workoutTimerRef.current = null; }
@@ -578,6 +610,27 @@ export default function ActiveWorkoutScreen() {
     return () => clearInterval(interval);
   }, [workoutId, workoutElapsed, totalRestElapsed, workout?.status]);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        setWorkoutElapsed(Math.floor((Date.now() - workoutStartedAtRef.current) / 1000));
+        if (setTimerRunning) {
+          setSetTimer(Math.floor((Date.now() - setTimerStartedAtRef.current) / 1000));
+        }
+        if (restRunning) {
+          const remaining = Math.max(0, Math.floor((restTimerEndAtRef.current - Date.now()) / 1000));
+          setRestTimer(remaining);
+          if (remaining <= 0) setRestRunning(false);
+        }
+        if (totalRestPeriodStartRef.current !== null) {
+          const currentPeriod = Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000);
+          setTotalRestElapsed(totalRestAccumulatedRef.current + currentPeriod);
+        }
+      }
+    });
+    return () => subscription.remove();
+  }, [workout?.status, setTimerRunning, restRunning]);
+
   const toggleSetTimer = () => {
     if (setTimerRunning) {
       clearInterval(setTimerRef.current);
@@ -587,25 +640,26 @@ export default function ActiveWorkoutScreen() {
         setRestRunning(false);
         if (restTimerRef.current) clearInterval(restTimerRef.current);
       }
-      setTimerRef.current = setInterval(() => setSetTimer(prev => prev + 1), 1000);
+      setTimerStartedAtRef.current = Date.now() - (setTimer * 1000);
+      setTimerRef.current = setInterval(() => {
+        setSetTimer(Math.floor((Date.now() - setTimerStartedAtRef.current) / 1000));
+      }, 1000);
       setSetTimerRunning(true);
     }
   };
 
   const startRest = (seconds: number) => {
     if (restTimerRef.current) clearInterval(restTimerRef.current);
+    restTimerEndAtRef.current = Date.now() + (seconds * 1000);
     setRestTimer(seconds);
     setRestRunning(true);
     restTimerRef.current = setInterval(() => {
-      setRestTimer(prev => {
-        if (prev <= 1) {
-          // ── 1. No toast — shake animation handled in RestShakeIcon ──
-          clearInterval(restTimerRef.current);
-          setRestRunning(false);
-          return 0;
-        }
-        return prev - 1;
-      });
+      const remaining = Math.max(0, Math.floor((restTimerEndAtRef.current - Date.now()) / 1000));
+      setRestTimer(remaining);
+      if (remaining <= 0) {
+        clearInterval(restTimerRef.current);
+        setRestRunning(false);
+      }
     }, 1000);
   };
 
@@ -935,7 +989,7 @@ export default function ActiveWorkoutScreen() {
     } catch (err: any) {
       console.error('Error finishing workout:', err);
       showToast('Failed to save workout', 'error');
-      workoutTimerRef.current = setInterval(() => setWorkoutElapsed(prev => prev + 1), 1000);
+      workoutTimerRef.current = setInterval(() => setWorkoutElapsed(Math.floor((Date.now() - workoutStartedAtRef.current) / 1000)), 1000);
       setFinishing(false);
     }
   };
@@ -1220,7 +1274,7 @@ export default function ActiveWorkoutScreen() {
                           <Ionicons name={setTimerRunning ? 'pause' : 'play'} size={28} color="#FFF" />
                         </LinearGradient>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => { setSetTimer(0); clearInterval(setTimerRef.current); setSetTimerRunning(false); }}>
+                      <TouchableOpacity onPress={() => { setSetTimer(0); setTimerStartedAtRef.current = Date.now(); clearInterval(setTimerRef.current); setSetTimerRunning(false); }}>
                         <Text style={[styles.resetText, { color: colors.textMuted }]}>Reset</Text>
                       </TouchableOpacity>
                     </View>
