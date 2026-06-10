@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { API_URL } from '../../utils/api';
 import { FONTS } from '../../constants/theme';
@@ -45,22 +46,24 @@ interface Props {
   filters: ExerciseFilters;
   onApply: (filters: ExerciseFilters) => void;
   onClear: () => void;
+  drilldownCategory?: string | null;
 }
 
 const SECTIONS = [
-  { key: 'bodyParts', label: 'Body Part', icon: 'body-outline' as const },
-  { key: 'equipment', label: 'Equipment', icon: 'fitness-outline' as const },
-  { key: 'targets', label: 'Target Muscle', icon: 'pulse-outline' as const },
-  { key: 'rating', label: 'Minimum Rating', icon: 'star-outline' as const },
+  { key: 'bodyParts', label: 'Body Part' },
+  { key: 'equipment', label: 'Equipment' },
+  { key: 'targets', label: 'Target Muscle' },
+  { key: 'rating', label: 'Minimum Rating' },
 ];
 
 function s(size: number, width: number) {
   return Math.round(size * Math.min(width / BASE_WIDTH, 1.4));
 }
 
-export default function ExerciseFilterModal({ visible, onClose, filters, onApply, onClear }: Props) {
-  const { colors, isDark } = useTheme();
+export default function ExerciseFilterModal({ visible, onClose, filters, onApply, onClear, drilldownCategory }: Props) {
+  const { isDark } = useTheme();
   const { width: winW, height: winH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isLandscape = winW > winH;
   const [meta, setMeta] = useState<FilterMeta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,16 +74,23 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
 
   useEffect(() => {
     if (visible) {
-      setLocal(filters);
+      const baseFilters = drilldownCategory
+        ? { ...filters, bodyParts: [] }
+        : filters;
+      setLocal(baseFilters);
       setLoading(true);
-      setExpanded({ bodyParts: true });
+      const firstSection = drilldownCategory ? 'equipment' : 'bodyParts';
+      setExpanded({ [firstSection]: true });
       scrollRef.current?.scrollTo({ y: 0, animated: false });
-      axios.get(`${API_URL}/exercises/meta/filters`)
+      const metaUrl = drilldownCategory
+        ? `${API_URL}/exercises/meta/filters?category=${encodeURIComponent(drilldownCategory)}`
+        : `${API_URL}/exercises/meta/filters`;
+      axios.get(metaUrl)
         .then(res => setMeta(res.data))
         .catch(console.error)
         .finally(() => setLoading(false));
     }
-  }, [visible, filters]);
+  }, [visible, filters, drilldownCategory]);
 
   useEffect(() => {
     if (meta) setLoading(false);
@@ -117,10 +127,7 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
     return Math.round(f * range) + MIN_R;
   };
 
-  const containerHeight = winH;
   const topPad = Platform.OS === 'ios' ? (isLandscape ? 20 : Math.max(s(50, winW), 40)) : s(36, winW);
-  const iconSize = s(16, winW);
-  const checkSize = s(14, winW);
 
   const optionRow = (section: keyof ExerciseFilters, value: string) => {
     const selected = (local[section] as string[]).includes(value);
@@ -167,7 +174,7 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
         <View
           style={[
             st.container,
-            { height: containerHeight, backgroundColor: isDark ? '#0A0A0A' : '#FFF', paddingTop: topPad },
+            { flex: 1, backgroundColor: isDark ? '#0A0A0A' : '#FFF', paddingTop: topPad },
           ]}
         >
           <View style={[st.header, { paddingHorizontal: s(20, winW), paddingBottom: s(14, winW) }]}>
@@ -202,7 +209,7 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
               keyboardShouldPersistTaps="handled"
               contentInset={{ bottom: s(20, winW) }}
             >
-              {SECTIONS.map(section => {
+              {SECTIONS.filter(s => !(drilldownCategory && s.key === 'bodyParts')).map(section => {
                 if (section.key === 'rating') {
                   return (
                     <View key={section.key} style={[st.section, { marginBottom: s(14, winW), borderWidth: isLandscape ? 0 : 1 }]}>
@@ -212,9 +219,6 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
                         activeOpacity={0.7}
                       >
                         <View style={[st.sectionHeaderLeft, { gap: s(12, winW) }]}>
-                          <View style={[st.sectionIcon, { width: s(36, winW), height: s(36, winW), borderRadius: s(10, winW), backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : '#D6EEF7' }]}>
-                            <Ionicons name={section.icon} size={iconSize} color="#2596BE" />
-                          </View>
                           <Text style={[st.sectionLabel, { fontSize: s(16, winW), color: isDark ? '#FFF' : '#111' }]}>{section.label}</Text>
                           {local.minRating > 0 && (
                             <View style={[st.sectionBadge, { minWidth: s(22, winW), height: s(22, winW), borderRadius: s(11, winW), paddingHorizontal: s(6, winW) }]}>
@@ -303,9 +307,6 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
                       activeOpacity={0.7}
                     >
                       <View style={[st.sectionHeaderLeft, { gap: s(12, winW) }]}>
-                        <View style={[st.sectionIcon, { width: s(36, winW), height: s(36, winW), borderRadius: s(10, winW), backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : '#D6EEF7' }]}>
-                          <Ionicons name={section.icon} size={iconSize} color="#2596BE" />
-                        </View>
                         <Text style={[st.sectionLabel, { fontSize: s(16, winW), color: isDark ? '#FFF' : '#111' }]}>{section.label}</Text>
                         {selected.length > 0 && (
                           <View style={[st.sectionBadge, { minWidth: s(22, winW), height: s(22, winW), borderRadius: s(11, winW), paddingHorizontal: s(6, winW) }]}>
@@ -340,16 +341,9 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
             backgroundColor: isDark ? '#0A0A0A' : '#FFF',
             borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : '#E0E0E0',
             paddingHorizontal: s(20, winW),
-            paddingVertical: s(16, winW),
-            paddingBottom: Platform.OS === 'ios' ? (isLandscape ? s(14, winW) : s(38, winW)) : s(20, winW),
-            gap: s(14, winW),
+            paddingTop: s(16, winW),
+            paddingBottom: Math.max(insets.bottom, s(20, winW)),
           }]}>
-            <TouchableOpacity
-              style={[st.clearBtn, { height: s(52, winW), borderRadius: s(16, winW), backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0' }]}
-              onPress={onClear}
-            >
-              <Text style={[st.clearBtnText, { fontSize: s(16, winW), color: isDark ? '#DDD' : '#333' }]}>Clear All</Text>
-            </TouchableOpacity>
             <TouchableOpacity
               style={[st.applyBtn, { height: s(52, winW), borderRadius: s(16, winW), backgroundColor: '#2596BE' }]}
               onPress={() => onApply(local)}
@@ -417,10 +411,6 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  sectionIcon: {
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   sectionLabel: {
     fontFamily: FONTS.bodySemiBold,
@@ -502,19 +492,9 @@ const st = StyleSheet.create({
     fontFamily: FONTS.body,
   },
   bottomBar: {
-    flexDirection: 'row',
     borderTopWidth: 1,
   },
-  clearBtn: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  clearBtnText: {
-    fontFamily: FONTS.bodySemiBold,
-  },
   applyBtn: {
-    flex: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },

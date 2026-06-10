@@ -25,7 +25,9 @@ const C = {
   pillYellowBr:  "rgba(247,203,22,0.28)",
   pillBlueBg:    "rgba(37,150,190,0.2)",
   pillBlueBr:    "rgba(37,150,190,0.35)",
-  metaDivider:   "rgba(255,255,255,0.07)",
+  pillPurpleBg:  "rgba(147,51,234,0.18)",
+  pillPurpleBr:  "rgba(147,51,234,0.32)",
+  tagPurpleText: "#c084fc",
   thumbBg:       "rgba(26,110,138,0.55)",
   ink:           "#04282B",
   // Empty (light)
@@ -123,49 +125,21 @@ function EmptyCard({ onBrowsePress, isDark, colors }: {
 
 
 // ── Tag pill ──────────────────────────────────────────────────────────────────
-function Tag({ label, isDark, colors }: { label: string; isDark: boolean; colors: any }) {
+function Tag({ label, isDark, colors, variant }: { label: string; isDark: boolean; colors: any; variant?: 'target' | 'equipment' }) {
+  const isTarget = variant === 'target';
   return (
     <View
       style={[
         styles.tag,
         isDark
           ? { backgroundColor: colors.inputBg, borderColor: colors.border }
-          : { backgroundColor: C.tagBg, borderColor: C.tagBorder },
+          : {
+              backgroundColor: isTarget ? C.pillYellowBg : C.pillPurpleBg,
+              borderColor: isTarget ? C.pillYellowBr : C.pillPurpleBr,
+            },
       ]}
     >
-      <Text style={[styles.tagText, { color: isDark ? colors.primary : C.tagText }]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// ── Meta stat ─────────────────────────────────────────────────────────────────
-function MetaItem({
-  value,
-  label,
-  isDark,
-  colors,
-  withBorder,
-}: {
-  value: string;
-  label: string;
-  isDark: boolean;
-  colors: any;
-  withBorder?: boolean;
-}) {
-  return (
-    <View
-      style={[
-        styles.metaItem,
-        withBorder && {
-          borderRightWidth: 1,
-          borderRightColor: isDark ? colors.border : C.metaDivider,
-        },
-      ]}
-    >
-      <Text style={[styles.metaVal, { color: isDark ? colors.text : C.white }]}>{value}</Text>
-      <Text style={[styles.metaLbl, { color: isDark ? colors.textMuted : C.lightText }]}>
+      <Text style={[styles.tagText, { color: isDark ? colors.primary : (isTarget ? C.accentYellow : C.tagPurpleText) }]}>
         {label}
       </Text>
     </View>
@@ -181,15 +155,11 @@ export default function RecommendationCard({ rec, onBrowsePress }: Props) {
   }
 
   const rating     = rec.rating ?? 4.8;
-  const difficulty = rec.difficulty ?? "Intermediate";
 
   // Collect non-trivial tags
   const tags: string[] = [];
   if (rec.target)    tags.push(rec.target);
   if (rec.equipment && rec.equipment !== "body weight") tags.push(rec.equipment);
-
-  const hasMetaRow =
-    Boolean(rec.caloriesPerHour) || Boolean(rec.duration);
 
   const displayUri = rec.gif_url || rec.image_url;
 
@@ -249,9 +219,9 @@ export default function RecommendationCard({ rec, onBrowsePress }: Props) {
             <Ionicons
               name="star"
               size={scale(11)}
-              color={isDark ? colors.primary : C.accentYellow}
+              color={C.accentYellow}
             />
-            <Text style={[styles.ratingPillText, { color: isDark ? colors.primary : C.accentYellow }]}>
+            <Text style={[styles.ratingPillText, { color: C.accentYellow }]}>
               {rating.toFixed(1)}
             </Text>
           </View>
@@ -267,14 +237,14 @@ export default function RecommendationCard({ rec, onBrowsePress }: Props) {
             >
               {rec.exercise_name}
             </Text>
-            <Text style={[styles.category, { color: isDark ? colors.textMuted : C.lightText }]}>
+            <Text style={[styles.category, { color: isDark ? colors.textMuted : C.lightText }]} numberOfLines={1}>
               {rec.category}
             </Text>
 
             {tags.length > 0 && (
               <View style={styles.tags}>
                 {tags.map((t) => (
-                  <Tag key={t} label={t} isDark={isDark} colors={colors} />
+                  <Tag key={t} label={t} isDark={isDark} colors={colors} variant={t === rec.target ? 'target' : 'equipment'} />
                 ))}
               </View>
             )}
@@ -302,37 +272,6 @@ export default function RecommendationCard({ rec, onBrowsePress }: Props) {
           </View>
         </View>
 
-        {/* ── Meta row ───────────────────────────────────────────── */}
-        {hasMetaRow && (
-          <>
-            <View
-              style={[
-                styles.divider,
-                { backgroundColor: isDark ? colors.border : C.metaDivider },
-              ]}
-            />
-            <View style={styles.metaRow}>
-              {rec.caloriesPerHour && (
-                <MetaItem
-                  value={rec.caloriesPerHour}
-                  label="kcal / hr"
-                  isDark={isDark}
-                  colors={colors}
-                  withBorder={Boolean(rec.duration)}
-                />
-              )}
-              {rec.duration && (
-                <MetaItem
-                  value={rec.duration}
-                  label="duration"
-                  isDark={isDark}
-                  colors={colors}
-                  withBorder={false}
-                />
-              )}
-            </View>
-          </>
-        )}
       </View>
     </View>
   );
@@ -347,25 +286,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: "hidden",
     position: "relative",
+    height: scale(184),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 7,
   },
   inner: {
-    padding: scale(18),
+    padding: scale(16),
+    flex: 1,
   },
 
   // ── Pill row ──
   pillRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: vs(12),
+    marginBottom: vs(10),
   },
   scorePill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: scale(5),
+    gap: scale(4),
     borderWidth: 1,
     borderRadius: 99,
-    paddingHorizontal: scale(10),
-    paddingVertical: vs(4),
+    paddingHorizontal: scale(8),
+    paddingVertical: vs(3),
   },
   scorePillText: {
     fontFamily: FONTS.bodyBold,
@@ -375,11 +321,11 @@ const styles = StyleSheet.create({
   ratingPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: scale(4),
+    gap: scale(3),
     borderWidth: 1,
     borderRadius: 99,
-    paddingHorizontal: scale(10),
-    paddingVertical: vs(4),
+    paddingHorizontal: scale(8),
+    paddingVertical: vs(3),
   },
   ratingPillText: {
     fontFamily: FONTS.bodyBold,
@@ -391,6 +337,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: scale(14),
     alignItems: "flex-start",
+    flex: 1,
   },
   bodyText: {
     flex: 1,
@@ -400,7 +347,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.heading,
     fontSize: scale(20),
     letterSpacing: -0.5,
-    lineHeight: scale(26),        // ~1.3 of fontSize — fixes tight leading
+    lineHeight: scale(26),
     marginBottom: vs(3),
   },
   category: {
@@ -415,7 +362,7 @@ const styles = StyleSheet.create({
   },
   tag: {
     borderWidth: 1,
-    borderRadius: 99,             // pill shape
+    borderRadius: 99,
     paddingHorizontal: scale(10),
     paddingVertical: vs(4),
   },
@@ -427,13 +374,13 @@ const styles = StyleSheet.create({
 
   // ── Thumbnail ──
   thumbWrap: {
-    width: scale(84),
+    width: scale(92),
     flexShrink: 0,
     position: "relative",
   },
   thumb: {
-    width: scale(84),
-    height: scale(84),
+    width: scale(92),
+    height: scale(92),
     borderRadius: scale(16),
   },
   thumbPlaceholder: {
@@ -441,32 +388,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-
-  // ── Meta row ──
-  divider: {
-    height: 1,
-    marginTop: vs(14),
-    marginBottom: vs(12),
-  },
-  metaRow: {
-    flexDirection: "row",
-  },
-  metaItem: {
-    flex: 1,
-    alignItems: "center",
-    gap: vs(2),
-  },
-  metaVal: {
-    fontFamily: FONTS.heading,
-    fontSize: scale(13),
-    letterSpacing: -0.3,
-  },
-  metaLbl: {
-    fontFamily: FONTS.body,
-    fontSize: scale(9),
-    letterSpacing: 0.3,
-    textTransform: "uppercase",
-  },
 
   // ── Empty state ──
   emptyCard: {

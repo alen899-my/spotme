@@ -54,11 +54,22 @@ router.get('/categories', async (req, res) => {
 // ─── GET /meta/filters ── must come BEFORE /:id ──────────────────────────────
 router.get('/meta/filters', async (req, res) => {
   try {
+    const { category } = req.query;
+
+    const categoryFilter = category ? ' AND category = $1' : '';
+    const filterParam = category || null;
+
     const [categories, bodyParts, equipment, targets] = await Promise.all([
       pool.query('SELECT DISTINCT category   FROM exercises WHERE category   IS NOT NULL ORDER BY category'),
-      pool.query('SELECT DISTINCT body_part  FROM exercises WHERE body_part  IS NOT NULL ORDER BY body_part'),
-      pool.query('SELECT DISTINCT equipment  FROM exercises WHERE equipment  IS NOT NULL ORDER BY equipment'),
-      pool.query('SELECT DISTINCT target     FROM exercises WHERE target     IS NOT NULL ORDER BY target'),
+      filterParam
+        ? pool.query(`SELECT DISTINCT body_part  FROM exercises WHERE body_part  IS NOT NULL${categoryFilter} ORDER BY body_part`, [filterParam])
+        : pool.query('SELECT DISTINCT body_part  FROM exercises WHERE body_part  IS NOT NULL ORDER BY body_part'),
+      filterParam
+        ? pool.query(`SELECT DISTINCT equipment  FROM exercises WHERE equipment  IS NOT NULL${categoryFilter} ORDER BY equipment`, [filterParam])
+        : pool.query('SELECT DISTINCT equipment  FROM exercises WHERE equipment  IS NOT NULL ORDER BY equipment'),
+      filterParam
+        ? pool.query(`SELECT DISTINCT target     FROM exercises WHERE target     IS NOT NULL${categoryFilter} ORDER BY target`, [filterParam])
+        : pool.query('SELECT DISTINCT target     FROM exercises WHERE target     IS NOT NULL ORDER BY target'),
     ]);
     res.json({
       categories:  categories.rows.map(r => r.category),
@@ -97,11 +108,11 @@ router.get('/', async (req, res) => {
       if (parts.length === 0) return;
       if (parts.length === 1) {
         conditions.push(`${col} ILIKE $${idx++}`);
-        params.push(parts[0]);
+        params.push(`%${parts[0]}%`);
       } else {
-        const placeholders = parts.map(() => `$${idx++}`);
-        conditions.push(`${col} IN (${placeholders.join(',')})`);
-        params.push(...parts);
+        const orClauses = parts.map(() => `${col} ILIKE $${idx++}`);
+        conditions.push(`(${orClauses.join(' OR ')})`);
+        params.push(...parts.map(p => `%${p}%`));
       }
     }
 

@@ -1404,6 +1404,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   };
 
   const filteredMeals = meals.filter(m => isSameDay(new Date(m.logged_at), selectedDate));
+  const isToday = selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
   
   const calsConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_calories || 0), 0);
   const proteinConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_protein || 0), 0);
@@ -1425,7 +1426,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     tabScrollRef.current?.scrollTo({ animated: true, x: Math.max(0, activeTab - 1) * tabW });
   }, [activeTab]);
 
-  const showLogBtn = activeTab === 0;
+  const showLogBtn = activeTab === 0 && isToday;
 
   const renderHeaderBar = () => (
     <View>

@@ -174,7 +174,7 @@ function MacroBar({ macro }: { macro: Macro }) {
 
 export default function NutritionMeter({ caloriesConsumed, caloriesTarget, protein, carbs, fat }: Props) {
   const { colors, isDark } = useTheme();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const pct = Math.min(Math.round((caloriesConsumed / (caloriesTarget || 1)) * 100), 100);
   const left = Math.max(caloriesTarget - caloriesConsumed, 0);
   const over = caloriesConsumed > caloriesTarget;
@@ -231,15 +231,15 @@ export default function NutritionMeter({ caloriesConsumed, caloriesTarget, prote
 
       {!expanded && (
         <View style={s.collapsedSummaryRow}>
-          <View style={[s.summaryChip, s.summaryChipLight, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#1A6E8A' }]}>
+          <View style={[s.summaryChip, s.summaryChipLight, isDark && { backgroundColor: colors.inputBg }]}>
             <Text style={[s.summaryLabelLight, isDark && { color: colors.textMuted }]}>Consumed</Text>
             <Text style={[s.summaryValueLight, isDark && { color: colors.text }]}>{Math.round(caloriesConsumed).toLocaleString()} kcal</Text>
           </View>
-          <View style={[s.summaryChip, s.summaryChipSuccess, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#10B981' }]}>
+          <View style={[s.summaryChip, s.summaryChipSuccess, isDark && { backgroundColor: colors.inputBg }]}>
             <Text style={[s.summaryLabelLight, isDark && { color: colors.textMuted }]}>Target</Text>
             <Text style={[s.summaryValueLight, isDark && { color: colors.text }]}>{caloriesTarget.toLocaleString()} kcal</Text>
           </View>
-          <View style={[s.summaryChip, over ? s.summaryChipAlert : s.summaryChipWarm, isDark && { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: over ? '#D88900' : '#F7CB16' }]}>
+          <View style={[s.summaryChip, over ? s.summaryChipAlert : s.summaryChipWarm, isDark && { backgroundColor: colors.inputBg }]}>
             <Text style={[s.summaryLabelDark, isDark && { color: colors.textMuted }]}>{over ? 'Over' : 'Left'}</Text>
             <Text style={[s.summaryValueDark, isDark && { color: colors.text }]}>{Math.round(over ? caloriesConsumed - caloriesTarget : left).toLocaleString()} kcal</Text>
           </View>

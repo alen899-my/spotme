@@ -22,14 +22,15 @@ import { getToken } from "../../utils/tokenStorage";
 
 // ── Theme Palette ────────────────────────────────────────────────────────────
 const C = {
-  cardBg:      "#2596BE",
-  iconBg:      "#1a6e8a",
+  cardBg:      "#0D0D0D",
+  cardBorder:  "rgba(255,255,255,0.08)",
+  iconBg:      "#1A1A1A",
   sun:         "#F7CB16",
   ink:         "#04282B",
   white:       "#FFFFFF",
-  lightText:   "#a8dff0",
-  lightBorder: "rgba(255,255,255,0.15)",
-  fillBg:      "rgba(255,255,255,0.12)",
+  lightText:   "rgba(255,255,255,0.5)",
+  lightBorder: "rgba(255,255,255,0.08)",
+  fillBg:      "rgba(255,255,255,0.04)",
   liquidBlue:  "#4DC3F7",
   liquidDeep:  "#0D4D65",
 };
@@ -188,8 +189,8 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
         styles.card,
         {
           backgroundColor: isDark ? colors.card : C.cardBg,
-          borderWidth: isDark ? 1 : 0,
-          borderColor: isDark ? colors.border : "transparent",
+          borderWidth: 1,
+          borderColor: isDark ? colors.border : C.cardBorder,
         },
       ]}
     >
@@ -223,7 +224,7 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
             styles.cupFrame, 
             { 
               borderColor: frameBorderColor,
-              backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.07)",
+              backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.04)",
             }
           ]}>
 
@@ -260,19 +261,19 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
             {PRESETS.map((p) => (
               <TouchableOpacity
                 key={p.amount}
-                style={[
-                  styles.presetRow,
-                  {
-                    backgroundColor: isDark ? colors.inputBg : "rgba(255,255,255,0.12)",
-                    borderColor: isDark ? colors.border : "rgba(255,255,255,0.18)",
-                  },
-                ]}
+                  style={[
+                    styles.presetRow,
+                    {
+                      backgroundColor: isDark ? colors.inputBg : C.fillBg,
+                      borderColor: isDark ? colors.border : "rgba(255,255,255,0.08)",
+                    },
+                  ]}
                 onPress={() => handleQuickLog(p.amount)}
                 activeOpacity={0.75}
                 disabled={loggingAmount !== null}
               >
-                <View style={[styles.presetIconWrap, { backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.1)" }]}>
-                  <Ionicons name={p.icon} size={16} color={isDark ? p.color : C.sun} />
+                <View style={[styles.presetIconWrap, { backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.06)" }]}> 
+                  <Ionicons name={p.icon} size={16} color={p.color} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.presetLabel, { color: isDark ? colors.text : C.white }]}>
@@ -294,7 +295,7 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
       </View>
 
       {/* ── Footer ───────────────────────────────────────────────────────────── */}
-      <View style={[styles.divider, { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : C.lightBorder }]} />
+      <View style={[styles.divider, { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.06)" }]} />
 
       <View style={styles.footer}>
         <Text style={[

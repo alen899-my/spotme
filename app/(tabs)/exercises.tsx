@@ -206,9 +206,9 @@ const ExerciseCard = React.memo(({ item }: { item: any }) => {
         )}
 
         {item.avg_rating !== undefined && item.avg_rating !== null && (
-          <View style={[styles.exerciseRatingPill, { backgroundColor: isDark ? colors.inputBg : P.sun, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}>
-            <Ionicons name="star" size={11} color={P.ink} />
-            <Text style={[styles.exerciseRatingPillText, { color: isDark ? colors.text : P.ink }]}>{item.avg_rating}</Text>
+          <View style={[styles.exerciseRatingPill, { backgroundColor: isDark ? colors.inputBg : P.ctaDark, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}>
+            <Ionicons name="star" size={11} color={P.sun} />
+            <Text style={[styles.exerciseRatingPillText, { color: P.sun }]}>{item.avg_rating}</Text>
           </View>
         )}
       </View>
@@ -341,6 +341,7 @@ export default function ExercisesScreen() {
       const params: any = { page: pg, limit: PAGE_SIZE };
       if (q.trim()) params.q = q.trim();
       if (cat) params.category = cat;
+      if (f.categories.length) params.category = f.categories.join(',');
       if (f.bodyParts.length) params.body_part = f.bodyParts.join(',');
       if (f.equipment.length) params.equipment = f.equipment.join(',');
       if (f.targets.length) params.target = f.targets.join(',');
@@ -547,39 +548,41 @@ export default function ExercisesScreen() {
         </View>
       </ImageBackground>
 
-      <View style={styles.searchFilterRow}>
-        <View style={[styles.searchWrap, { backgroundColor: isDark ? '#1A1A1A' : P.white, borderColor: isDark ? 'rgba(255,255,255,0.08)' : P.border, flex: 1 }]}>
-          <View style={[styles.searchIconWrap, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : P.ctaLight }]}>
-            <Ionicons name="search-outline" size={16} color={P.ctaDark} />
-          </View>
-          <TextInput
-            style={[styles.searchInput, { color: isDark ? '#F1F5F9' : P.ink }]}
-            placeholder="Search exercises..."
-            placeholderTextColor={isDark ? 'rgba(241,245,249,0.4)' : P.muted}
-            value={query}
-            onChangeText={handleQueryChange}
-            returnKeyType="search"
-            autoCorrect={false}
-          />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={18} color={P.cta} />
-            </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity
-          style={[styles.exFilterBtn, { backgroundColor: activeFilterCount(filters) > 0 ? '#2596BE' : isDark ? '#1A1A1A' : P.white, borderColor: isDark ? 'rgba(255,255,255,0.08)' : P.border }]}
-          onPress={() => setFilterVisible(true)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="funnel" size={18} color={activeFilterCount(filters) > 0 ? '#FFF' : isDark ? '#F1F5F9' : P.ink} />
-          {activeFilterCount(filters) > 0 && (
-            <View style={styles.exFilterBadge}>
-              <Text style={styles.exFilterBadgeText}>{activeFilterCount(filters)}</Text>
+      {viewMode === 'exercises' && (
+        <View style={styles.searchFilterRow}>
+          <View style={[styles.searchWrap, { backgroundColor: isDark ? '#1A1A1A' : P.white, borderColor: isDark ? 'rgba(255,255,255,0.08)' : P.border, flex: 1 }]}>
+            <View style={[styles.searchIconWrap, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : P.ctaLight }]}>
+              <Ionicons name="search-outline" size={16} color={P.ctaDark} />
             </View>
-          )}
-        </TouchableOpacity>
-      </View>
+            <TextInput
+              style={[styles.searchInput, { color: isDark ? '#F1F5F9' : P.ink }]}
+              placeholder="Search exercises..."
+              placeholderTextColor={isDark ? 'rgba(241,245,249,0.4)' : P.muted}
+              value={query}
+              onChangeText={handleQueryChange}
+              returnKeyType="search"
+              autoCorrect={false}
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={18} color={P.cta} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={[styles.exFilterBtn, { backgroundColor: activeFilterCount(filters) > 0 ? '#2596BE' : isDark ? '#1A1A1A' : P.white, borderColor: isDark ? 'rgba(255,255,255,0.08)' : P.border }]}
+            onPress={() => setFilterVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="funnel" size={18} color={activeFilterCount(filters) > 0 ? '#FFF' : isDark ? '#F1F5F9' : P.ink} />
+            {activeFilterCount(filters) > 0 && (
+              <View style={styles.exFilterBadge}>
+                <Text style={styles.exFilterBadgeText}>{activeFilterCount(filters)}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
@@ -639,7 +642,7 @@ export default function ExercisesScreen() {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       {!inSearchMode && viewMode === 'categories' && (
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}
+          contentContainerStyle={[styles.scrollContent, { flexGrow: 1, paddingBottom: Math.max(insets.bottom + 24, 64) }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -655,7 +658,7 @@ export default function ExercisesScreen() {
           renderItem={renderExercise}
           ListHeaderComponent={renderTopChrome}
           ListEmptyComponent={renderSearchEmptyState}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 24, 64) }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           onEndReached={handleLoadMore}
@@ -726,8 +729,12 @@ export default function ExercisesScreen() {
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
         filters={filters}
+        drilldownCategory={drilldownCategory}
         onApply={(newFilters) => {
-          setFilters(newFilters);
+          const updated = drilldownCategory
+            ? { ...newFilters, bodyParts: [] }
+            : newFilters;
+          setFilters(updated);
           setFilterVisible(false);
           setSearchPage(1);
           setSearchResults([]);

@@ -100,8 +100,8 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
         )}
         {!isSkipped && !ex.is_world_record && !ex.is_personal_record && ex.rating !== null && ex.rating !== undefined && (
           <View style={styles.badgeRating}>
-            <Ionicons name="star" size={10} color="#F59E0B" style={{ marginRight: 3 }} />
-            <Text style={styles.badgeText}>{ex.rating}/10</Text>
+            <Ionicons name="star" size={10} color={P.sun} style={{ marginRight: 3 }} />
+            <Text style={[styles.badgeText, { color: P.sun }]}>{ex.rating}/10</Text>
           </View>
         )}
       </View>
@@ -325,7 +325,7 @@ export default function WorkoutSummary({
             </Text>
             {workout?.rating !== null && workout?.rating !== undefined && (
               <View style={styles.ratingBadge}>
-                <Ionicons name="star" size={12} color="#F59E0B" />
+                <Ionicons name="star" size={12} color={P.sun} />
                 <Text style={styles.ratingBadgeText}>{workout.rating}/10</Text>
               </View>
             )}
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   ratingBadgeText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 11,
-    color: '#F59E0B',
+    color: P.sun,
   },
   editBtn: {
     width: 44,

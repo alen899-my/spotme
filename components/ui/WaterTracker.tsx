@@ -136,48 +136,48 @@ function getHydrationState(totalWater: number, target: number, maxSafe: number) 
 function getLogTone(amount: number) {
   if (amount >= 500) {
     return {
-      bg: HYDRATION.navy,
-      text: HYDRATION.white,
-      subText: 'rgba(255,255,255,0.78)',
-      iconBg: 'rgba(255,255,255,0.16)',
-      icon: HYDRATION.white,
-      deleteBg: 'rgba(255,255,255,0.14)',
-      deleteIcon: HYDRATION.white,
+      bg: '#0D0D0D',
+      text: '#FFFFFF',
+      subText: 'rgba(255,255,255,0.5)',
+      iconBg: 'rgba(77,208,225,0.15)',
+      icon: '#4DD0E1',
+      deleteBg: 'rgba(255,255,255,0.08)',
+      deleteIcon: '#888',
     };
   }
 
   if (amount >= 350) {
     return {
-      bg: HYDRATION.deepBlue,
-      text: HYDRATION.white,
-      subText: 'rgba(255,255,255,0.78)',
-      iconBg: 'rgba(255,255,255,0.16)',
-      icon: HYDRATION.white,
-      deleteBg: 'rgba(255,255,255,0.14)',
-      deleteIcon: HYDRATION.white,
+      bg: '#0D0D0D',
+      text: '#FFFFFF',
+      subText: 'rgba(255,255,255,0.5)',
+      iconBg: 'rgba(79,195,247,0.15)',
+      icon: '#4FC3F7',
+      deleteBg: 'rgba(255,255,255,0.08)',
+      deleteIcon: '#888',
     };
   }
 
   if (amount >= 200) {
     return {
-      bg: HYDRATION.sky,
-      text: HYDRATION.ink,
-      subText: 'rgba(4,40,43,0.72)',
-      iconBg: 'rgba(4,40,43,0.10)',
-      icon: HYDRATION.ink,
-      deleteBg: 'rgba(4,40,43,0.10)',
-      deleteIcon: HYDRATION.ink,
+      bg: '#0D0D0D',
+      text: '#FFFFFF',
+      subText: 'rgba(255,255,255,0.5)',
+      iconBg: 'rgba(100,181,246,0.15)',
+      icon: '#64B5F6',
+      deleteBg: 'rgba(255,255,255,0.08)',
+      deleteIcon: '#888',
     };
   }
 
   return {
-    bg: HYDRATION.yellow,
-    text: HYDRATION.ink,
-    subText: 'rgba(4,40,43,0.72)',
-    iconBg: 'rgba(4,40,43,0.10)',
-    icon: HYDRATION.ink,
-    deleteBg: 'rgba(4,40,43,0.10)',
-    deleteIcon: HYDRATION.ink,
+    bg: '#0D0D0D',
+    text: '#FFFFFF',
+    subText: 'rgba(255,255,255,0.5)',
+    iconBg: 'rgba(247,203,22,0.15)',
+    icon: '#F7CB16',
+    deleteBg: 'rgba(255,255,255,0.08)',
+    deleteIcon: '#888',
   };
 }
 
@@ -195,149 +195,7 @@ function getDrinkTypeLabel(amount: number): string {
   return 'Bottle';
 }
 
-function WaterBar({
-  progressRatio,
-  goalRatio,
-  fillColor,
-}: {
-  progressRatio: number;
-  goalRatio: number;
-  fillColor: string;
-}) {
-  const { colors, isDark } = useTheme();
-  const fillAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    Animated.spring(fillAnim, {
-      toValue: Math.max(0, Math.min(progressRatio, 1)),
-      useNativeDriver: false,
-      friction: 7,
-      tension: 35,
-    }).start();
-  }, [progressRatio, fillAnim]);
-
-  const fillW = fillAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
-  const safeGoalRatio = Math.max(0, Math.min(goalRatio, 1));
-
-  return (
-    <View style={wb.wrap}>
-      <View style={[wb.track, isDark && { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
-        <View style={wb.trackGlow} />
-        <Animated.View style={[wb.fill, { width: fillW, backgroundColor: fillColor }]}>
-          <View style={wb.fillShine} />
-          <View style={[wb.knob, { backgroundColor: fillColor, opacity: progressRatio > 0 ? 1 : 0 }]} />
-        </Animated.View>
-
-        <View style={[wb.marker, { left: `${safeGoalRatio * 100}%` }]}>
-          <View style={[wb.markerLine, { backgroundColor: HYDRATION.deepBlue }]} />
-        </View>
-
-        <View style={[wb.marker, wb.maxMarker]}>
-          <View style={[wb.markerLine, { backgroundColor: HYDRATION.lightGreen }]} />
-        </View>
-      </View>
-
-      <View style={wb.legendRow}>
-        <Text style={[wb.zeroLabel, isDark && { color: colors.textMuted }]}>0 ml</Text>
-
-        <View style={[wb.legendChip, { backgroundColor: isDark ? colors.inputBg : HYDRATION.deepBlue }]}>
-          <Ionicons name="water-outline" size={12} color={isDark ? HYDRATION.sky : HYDRATION.white} style={{ marginRight: 5 }} />
-          <Text style={[wb.legendText, { color: isDark ? HYDRATION.sky : HYDRATION.white }]}>Goal</Text>
-        </View>
-
-        <View style={[wb.legendChip, { backgroundColor: isDark ? colors.inputBg : HYDRATION.lightGreen }]}>
-          <Ionicons name="shield-checkmark-outline" size={12} color={isDark ? HYDRATION.green : HYDRATION.ink} style={{ marginRight: 5 }} />
-          <Text style={[wb.legendText, { color: isDark ? HYDRATION.green : HYDRATION.ink }]}>Max Safe</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-const wb = StyleSheet.create({
-  wrap: { marginBottom: 16 },
-  track: {
-    height: 18,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    overflow: 'visible',
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  trackGlow: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  fill: {
-    height: '100%',
-    borderRadius: 999,
-    position: 'relative',
-    overflow: 'visible',
-  },
-  fillShine: {
-    position: 'absolute',
-    top: 2,
-    left: 8,
-    right: 8,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  knob: {
-    position: 'absolute',
-    right: -6,
-    top: -4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  marker: {
-    position: 'absolute',
-    top: -8,
-    width: 2,
-    height: 34,
-    marginLeft: -1,
-    alignItems: 'center',
-  },
-  maxMarker: {
-    right: 2,
-    left: undefined,
-  },
-  markerLine: {
-    width: 2,
-    flex: 1,
-    borderRadius: 2,
-  },
-  legendRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 8,
-  },
-  zeroLabel: {
-    color: 'rgba(255,255,255,0.78)',
-    fontFamily: FONTS.body,
-    fontSize: 10,
-  },
-  legendChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  legendText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 10,
-  },
-});
 
 function PushReminderDisplay() {
   const { colors, isDark } = useTheme();
@@ -407,7 +265,6 @@ function PushReminderDisplay() {
 }
 
 function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
-  const { colors, isDark } = useTheme();
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -419,9 +276,9 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   if (!lastLog) {
     return (
-      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.yellow }]}>
-        <Ionicons name="information-circle-outline" size={18} color={isDark ? HYDRATION.yellow : HYDRATION.ink} />
-        <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
+      <View style={[rb.banner, { backgroundColor: HYDRATION.yellow }]}>
+        <Ionicons name="information-circle-outline" size={18} color={HYDRATION.ink} />
+        <Text style={[rb.text, { color: HYDRATION.ink }]}>
           Start your hydration journey and log your first drink.
         </Text>
       </View>
@@ -430,36 +287,38 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   if (totalWater >= waterTarget) {
     return (
-      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.lightGreen }]}>
-        <Ionicons name="checkmark-circle" size={18} color={isDark ? HYDRATION.green : HYDRATION.ink} />
-        <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
+      <View style={[rb.banner, { backgroundColor: HYDRATION.lightGreen }]}>
+        <Ionicons name="checkmark-circle" size={18} color={HYDRATION.ink} />
+        <Text style={[rb.text, { color: HYDRATION.ink }]}>
           Amazing. Daily hydration goal achieved.
         </Text>
       </View>
     );
   }
 
-  const elapsedMin = Math.round((nowMs - new Date(lastLog.logged_at).getTime()) / 60_000);
+  const elapsedMin = Math.round((nowMs - (lastLog._clientLoggedAt || new Date(lastLog.logged_at).getTime())) / 60_000);
   const nextIn = Math.max(0, interval - elapsedMin);
 
   if (elapsedMin < interval) {
     return (
-      <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : HYDRATION.yellow }]}>
-        <Ionicons name="time-outline" size={18} color={isDark ? HYDRATION.yellow : HYDRATION.ink} />
-        <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
-          Next drink in <Text style={[rb.emphasis, isDark && { color: HYDRATION.sky }]}>{nextIn} min</Text>. Stay consistent.
+      <View style={[rb.banner, { backgroundColor: HYDRATION.green }]}>
+        <Ionicons name="checkmark-circle-outline" size={18} color={HYDRATION.white} />
+        <Text style={[rb.text, { color: HYDRATION.white }]}>
+          Next drink in <Text style={[rb.emphasis, { color: HYDRATION.white }]}>{nextIn} min</Text>. Stay consistent.
         </Text>
       </View>
     );
   }
 
   const urgency = elapsedMin > interval * 1.5;
-  const stateColor = urgency ? HYDRATION.orange : HYDRATION.amber;
+  const stateColor = urgency ? HYDRATION.red : HYDRATION.yellow;
+  const iconColor = urgency ? HYDRATION.white : HYDRATION.ink;
+  const textColor = urgency ? HYDRATION.white : HYDRATION.ink;
   return (
-    <View style={[rb.banner, { backgroundColor: isDark ? colors.inputBg : stateColor }]}>
-      <Ionicons name={urgency ? 'warning-outline' : 'notifications-outline'} size={18} color={isDark ? stateColor : HYDRATION.ink} />
-      <Text style={[rb.text, { color: isDark ? colors.text : HYDRATION.ink }]}>
-        {urgency ? `${elapsedMin} min since your last drink. Hydrate now.` : `Time to hydrate. It has been ${elapsedMin} min.`}
+    <View style={[rb.banner, { backgroundColor: stateColor }]}>
+      <Ionicons name={urgency ? 'warning-outline' : 'time-outline'} size={18} color={iconColor} />
+      <Text style={[rb.text, { color: textColor }]}>
+        {urgency ? `${elapsedMin} min since your last drink. Hydrate now!` : `Time to hydrate. It has been ${elapsedMin} min.`}
       </Text>
     </View>
   );
@@ -482,7 +341,7 @@ export default function WaterTracker({ selectedDate }: Props) {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
 
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [totalWater, setTotalWater] = useState(0);
   const [waterLogs, setWaterLogs] = useState<any[]>([]);
@@ -529,6 +388,7 @@ export default function WaterTracker({ selectedDate }: Props) {
   const pct = target > 0 ? Math.min((totalWater / target) * 100, 100) : 0;
   const isOver = totalWater > maxSafe;
   const isGoal = totalWater >= target;
+  const isToday = selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
   const hydrationState = getHydrationState(totalWater, target, maxSafe);
   const progressRatio = maxSafe > 0 ? totalWater / maxSafe : 0;
   const goalRatio = maxSafe > 0 ? target / maxSafe : 0.625;
@@ -619,7 +479,7 @@ export default function WaterTracker({ selectedDate }: Props) {
 
       if (!exceeds) showToast(`+${amount} ml logged!`);
       setTotalWater((p) => p + amount);
-      setWaterLogs((p) => [res.data, ...p]);
+      setWaterLogs((p) => [{ ...res.data, _clientLoggedAt: Date.now() }, ...p]);
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.05, duration: 180, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
@@ -687,17 +547,17 @@ export default function WaterTracker({ selectedDate }: Props) {
 
       {!expanded && (
         <View style={s.collapsedSummaryRow}>
-          <View style={[s.summaryChip, s.summaryChipLight, isDark && { backgroundColor: colors.inputBg }]}>
+          <View style={[s.summaryChip, isDark ? { backgroundColor: colors.inputBg } : s.summaryChipLight]}>
             <Text style={[s.summaryLabelLight, isDark && { color: colors.textMuted }]}>Consumed</Text>
             <Text style={[s.summaryValueLight, isDark && { color: colors.text }]}>{totalWater.toLocaleString()} ml</Text>
           </View>
-          <View style={[s.summaryChip, s.summaryChipBlue, isDark && { backgroundColor: colors.inputBg }]}>
+          <View style={[s.summaryChip, isDark ? { backgroundColor: colors.inputBg } : s.summaryChipGreen]}>
             <Text style={[s.summaryLabelLight, isDark && { color: colors.textMuted }]}>Goal</Text>
             <Text style={[s.summaryValueLight, isDark && { color: colors.text }]}>{target.toLocaleString()} ml</Text>
           </View>
-          <View style={[s.summaryChip, isOver ? s.summaryChipAlert : s.summaryChipGreen, isDark && { backgroundColor: colors.inputBg }]}>
-            <Text style={[isOver ? s.summaryLabelDark : s.summaryLabelLight, isDark ? { color: colors.textMuted } : null]}>{isOver ? 'Over' : 'Remaining'}</Text>
-            <Text style={[isOver ? s.summaryValueDark : s.summaryValueLight, isDark ? { color: colors.text } : null]}>{Math.abs(target - totalWater).toLocaleString()} ml</Text>
+          <View style={[s.summaryChip, isDark ? { backgroundColor: colors.inputBg } : s.summaryChipRed]}>
+            <Text style={[s.summaryLabelLight, isDark && { color: colors.textMuted }]}>{isOver ? 'Over' : 'Remaining'}</Text>
+            <Text style={[s.summaryValueLight, isDark && { color: colors.text }]}>{Math.abs(target - totalWater).toLocaleString()} ml</Text>
           </View>
         </View>
       )}
@@ -771,7 +631,16 @@ export default function WaterTracker({ selectedDate }: Props) {
                   <View style={s.cupFillGlow} />
                 </Animated.View>
 
-                <View style={[s.goalLine, { bottom: '62.5%' }]} />
+                <View style={[s.goalLine, { bottom: '62.5%' }]}>
+                  <View style={s.lineLabel}>
+                    <Text style={s.lineLabelText}>Goal</Text>
+                  </View>
+                </View>
+                <View style={[s.maxLine, { top: 14 }]}>
+                  <View style={[s.lineLabel, { top: -10 }]}>
+                    <Text style={s.lineLabelText}>Max Safe</Text>
+                  </View>
+                </View>
                 <View style={s.cupLabel}>
                   <Text style={[s.cupNum, isDark && { color: colors.text }]}>{totalWater.toLocaleString()}</Text>
                   <Text style={[s.cupUnit, isDark && { color: colors.textMuted }]}>ml</Text>
@@ -824,64 +693,71 @@ export default function WaterTracker({ selectedDate }: Props) {
             </View>
           </Animated.View>
 
-          <WaterBar progressRatio={progressRatio} goalRatio={goalRatio} fillColor={hydrationState.primary} />
-
-          <View style={s.presets}>
-            {PRESETS.map((item) => (
-              <TouchableOpacity
-                key={item.label}
-                style={[
-                  s.presetBtn,
-                  { backgroundColor: item.bg }
-                ]}
-                onPress={() => handleLog(item.amount)}
-                activeOpacity={0.78}
-              >
-                <Ionicons name={item.icon as any} size={18} color={item.text} />
-                <Text style={[s.presetAmt, { color: item.text }]}>+{item.amount}</Text>
-                <Text style={[s.presetLbl, { color: item.text }]}>{item.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={[s.sliderSection, isDark && { backgroundColor: colors.inputBg }]}>
-            <Text style={[s.sliderTitle, isDark && { color: colors.text }]}>
-              Custom: <Text style={[s.sliderHighlight, { color: hydrationState.primary }]}>{sliderVal} ml</Text>
-            </Text>
-
-            <View style={{ height: 36, justifyContent: 'center', marginBottom: 4 }}>
-              <View style={[s.sliderTrack, { width: SLIDER_W }, isDark && { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
-                <View style={s.sliderTrackGlow} />
-                <View style={[s.sliderFill, { width: ((sliderVal - 50) / 700) * SLIDER_W, backgroundColor: hydrationState.primary }]} />
-                <View
-                  {...sliderPan.panHandlers}
-                  style={[
-                    s.sliderThumb,
-                    {
-                      left: Math.max(0, ((sliderVal - 50) / 700) * (SLIDER_W - 26)),
-                      backgroundColor: HYDRATION.white,
-                    },
-                  ]}
-                >
-                  <Ionicons name="water" size={13} color={hydrationState.primary} />
-                </View>
+          {isToday ? (
+            <>
+              <View style={s.presets}>
+                {PRESETS.map((item) => (
+                  <TouchableOpacity
+                    key={item.label}
+                    style={[
+                      s.presetBtn,
+                      { backgroundColor: item.bg }
+                    ]}
+                    onPress={() => handleLog(item.amount)}
+                    activeOpacity={0.78}
+                  >
+                    <Ionicons name={item.icon as any} size={18} color={item.text} />
+                    <Text style={[s.presetAmt, { color: item.text }]}>+{item.amount}</Text>
+                    <Text style={[s.presetLbl, { color: item.text }]}>{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            </View>
 
-            <View style={[s.sliderLabels, { width: SLIDER_W }]}>
-              <Text style={[s.sliderEdge, isDark && { color: colors.textMuted }]}>50 ml</Text>
-              <Text style={[s.sliderEdge, isDark && { color: colors.textMuted }]}>750 ml</Text>
-            </View>
+              <View style={[s.sliderSection, isDark && { backgroundColor: colors.inputBg }]}>
+                <Text style={[s.sliderTitle, isDark && { color: colors.text }]}>
+                  Custom: <Text style={[s.sliderHighlight, { color: hydrationState.primary }]}>{sliderVal} ml</Text>
+                </Text>
 
-            <TouchableOpacity
-              style={[s.logBtn, { backgroundColor: hydrationState.primary }]}
-              onPress={() => handleLog(sliderVal)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="add-circle-outline" size={18} color={HYDRATION.white} />
-              <Text style={s.logBtnText}>LOG {sliderVal} ML</Text>
-            </TouchableOpacity>
-          </View>
+                <View style={{ height: 36, justifyContent: 'center', marginBottom: 4 }}>
+                  <View style={[s.sliderTrack, { width: SLIDER_W }, isDark && { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
+                    <View style={s.sliderTrackGlow} />
+                    <View style={[s.sliderFill, { width: ((sliderVal - 50) / 700) * SLIDER_W, backgroundColor: hydrationState.primary }]} />
+                    <View
+                      {...sliderPan.panHandlers}
+                      style={[
+                        s.sliderThumb,
+                        {
+                          left: Math.max(0, ((sliderVal - 50) / 700) * (SLIDER_W - 26)),
+                          backgroundColor: HYDRATION.white,
+                        },
+                      ]}
+                    >
+                      <Ionicons name="water" size={13} color={hydrationState.primary} />
+                    </View>
+                  </View>
+                </View>
+
+                <View style={[s.sliderLabels, { width: SLIDER_W }]}>
+                  <Text style={[s.sliderEdge, isDark && { color: colors.textMuted }]}>50 ml</Text>
+                  <Text style={[s.sliderEdge, isDark && { color: colors.textMuted }]}>750 ml</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[s.logBtn, { backgroundColor: hydrationState.primary }]}
+                  onPress={() => handleLog(sliderVal)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="add-circle-outline" size={18} color={HYDRATION.white} />
+                  <Text style={s.logBtnText}>LOG {sliderVal} ML</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <View style={[s.pastDateNotice, isDark && { backgroundColor: colors.inputBg }]}>
+              <Ionicons name="lock-closed-outline" size={18} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.6)'} />
+              <Text style={[s.pastDateText, isDark && { color: colors.textMuted }]}>Can only log water for today</Text>
+            </View>
+          )}
 
           {waterLogs.length > 0 && (
             <View style={s.logList}>
@@ -902,11 +778,8 @@ export default function WaterTracker({ selectedDate }: Props) {
                       s.logRow,
                       {
                         backgroundColor: tone.bg,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 3,
-                        elevation: 1,
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.06)',
                         marginBottom: 4,
                       }
                     ]}
@@ -995,19 +868,20 @@ const s = StyleSheet.create({
   collapsedSummaryRow: { flexDirection: 'row', gap: 8, marginBottom: 2 },
   summaryChip: { flex: 1, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 10 },
   summaryChipLight: { backgroundColor: HYDRATION.yellow },
-  summaryChipBlue: { backgroundColor: HYDRATION.deepBlue },
   summaryChipGreen: { backgroundColor: HYDRATION.green },
-  summaryChipAlert: { backgroundColor: HYDRATION.amber },
+  summaryChipRed: { backgroundColor: HYDRATION.red },
   summaryLabelLight: { fontFamily: FONTS.bodyBold, fontSize: 10, color: 'rgba(255,255,255,0.82)', marginBottom: 2 },
   summaryValueLight: { fontFamily: FONTS.heading, fontSize: 12, color: HYDRATION.white },
   summaryLabelDark: { fontFamily: FONTS.bodyBold, fontSize: 10, color: 'rgba(4,40,43,0.72)', marginBottom: 2 },
   summaryValueDark: { fontFamily: FONTS.heading, fontSize: 12, color: HYDRATION.ink },
-  cupRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
-  cupWrap: { width: 122, height: 160, justifyContent: 'center', alignItems: 'center' },
+  cupRow: { flexDirection: 'row', alignItems: 'stretch', gap: 14, marginBottom: 16 },
+  cupWrap: { width: 122, justifyContent: 'flex-start', alignItems: 'center' },
   emptyGlow: {
     position: 'absolute',
-    width: 120,
-    height: 155,
+    top: 2,
+    left: 1,
+    right: 1,
+    bottom: 2,
     borderRadius: 20,
     backgroundColor: 'rgba(225,75,75,0.45)',
   },
@@ -1021,7 +895,7 @@ const s = StyleSheet.create({
   },
   cup: {
     width: 120,
-    height: 155,
+    flex: 1,
     borderRadius: 20,
     overflow: 'hidden',
     position: 'relative',
@@ -1053,8 +927,36 @@ const s = StyleSheet.create({
   },
   goalLine: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    left: 12,
+    right: 12,
+    height: 3,
+    backgroundColor: '#F7CB16',
+    zIndex: 5,
+    borderRadius: 2,
+  },
+  maxLine: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    height: 3,
+    backgroundColor: '#10B981',
+    zIndex: 5,
+    borderRadius: 2,
+  },
+  lineLabel: {
+    position: 'absolute',
+    right: 4,
+    top: -9,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: '#0D0D0D',
+  },
+  lineLabelText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 8,
+    color: 'rgba(255,255,255,0.85)',
+    letterSpacing: 0.3,
   },
   cupLabel: { position: 'absolute', inset: 0, justifyContent: 'center', alignItems: 'center' },
   cupNum: { fontFamily: FONTS.heading, fontSize: 26, letterSpacing: -1, color: HYDRATION.white },
@@ -1145,5 +1047,20 @@ const s = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  pastDateNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 16,
+  },
+  pastDateText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
   },
 });

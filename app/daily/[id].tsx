@@ -265,10 +265,10 @@ const ExerciseCard = React.memo(({
                 onPress={() => setRatingOpen(v => !v)}
                 activeOpacity={0.85}
               >
-                <Ionicons name="star" size={15} color={isDark ? P.sun : '#92610A'} />
-                <Text style={[styles.ratingBannerTitle, { color: isDark ? colors.text : '#92610A' }]}>RATE THIS EXERCISE</Text>
+                <Ionicons name="star" size={15} color={P.sun} />
+                <Text style={[styles.ratingBannerTitle, { color: P.sun }]}>RATE THIS EXERCISE</Text>
                 {localRating ? (
-                  <View style={[styles.ratingBannerBadge, { backgroundColor: isDark ? P.sun : '#F59E0B' }]}>
+                  <View style={[styles.ratingBannerBadge, { backgroundColor: P.sun }]}>
                     <Text style={[styles.ratingBannerBadgeText, { color: isDark ? '#000' : '#FFF' }]}>{localRating}/10</Text>
                   </View>
                 ) : null}
@@ -1436,8 +1436,8 @@ export default function ActiveWorkoutScreen() {
                           <Text style={[styles.browserName, { color: colors.text }]}>{item.name}</Text>
                           {item.avg_rating !== undefined && item.avg_rating !== null && (
                             <View style={[styles.avgRatingBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                              <Ionicons name="star" size={10} color="#F59E0B" />
-                              <Text style={[styles.avgRatingText, { color: colors.text }]}>{item.avg_rating}</Text>
+                              <Ionicons name="star" size={10} color={P.sun} />
+                              <Text style={[styles.avgRatingText, { color: P.sun }]}>{item.avg_rating}</Text>
                             </View>
                           )}
                         </View>

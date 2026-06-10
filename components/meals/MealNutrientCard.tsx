@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -132,40 +131,65 @@ export default function MealNutrientCard({ meal }: Props) {
           {meal.items.map((item: any, idx: number) => {
             const accent = ITEM_ACCENT_COLORS[idx % ITEM_ACCENT_COLORS.length];
             const itemCals = Math.round(item.calories || 0);
+            const itemMacros = [
+              { key: 'protein', val: Math.round(item.protein || 0), unit: 'g', color: '#34EEB0', label: 'Protein' },
+              { key: 'carbs',   val: Math.round(item.carbs || 0),   unit: 'g', color: '#60A5FA', label: 'Carbs' },
+              { key: 'fat',     val: Math.round(item.fat || 0),     unit: 'g', color: '#FBBF24', label: 'Fat' },
+              { key: 'fiber',   val: Math.round(item.fiber || 0),   unit: 'g', color: '#A78BFA', label: 'Fiber' },
+              { key: 'sugar',   val: Math.round(item.sugar || 0),   unit: 'g', color: '#F472B6', label: 'Sugar' },
+              { key: 'sodium',  val: Math.round(item.sodium || 0),  unit: 'mg', color: '#FB923C', label: 'Sodium' },
+            ].filter(m => m.val > 0);
+
             return (
               <View
                 key={`item-${idx}`}
                 style={[
-                  styles.itemRow,
+                  styles.itemOuter,
                   {
                     backgroundColor: isDark ? surface : 'rgba(0,0,0,0.025)',
                     borderColor:     isDark ? surfaceBorder : 'rgba(0,0,0,0.055)',
                   },
                 ]}
               >
-                {/* Thumb */}
-                <View style={[styles.itemThumb, { backgroundColor: `${accent}15` }]}>
-                  {meal.image_url ? (
-                    <Image source={{ uri: meal.image_url }} style={styles.itemThumbImage} />
-                  ) : (
+                {/* Top row: thumb + name + calorie badge */}
+                <View style={styles.itemRow}>
+                  <View style={[styles.itemThumb, { backgroundColor: `${accent}15` }]}>
                     <Ionicons
                       name={idx % 2 === 0 ? 'restaurant' : 'nutrition'}
                       size={17}
                       color={accent}
                     />
-                  )}
+                  </View>
+
+                  <View style={styles.itemTextBlock}>
+                    <Text style={[styles.itemName, { color: textPrimary }]} numberOfLines={1}>
+                      {item.item_name}
+                    </Text>
+                    <Text style={[styles.itemQty, { color: textMuted }]}>
+                      {item.quantity || 'Estimated serving'}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.itemCalBadge, { backgroundColor: `${accent}15`, borderColor: `${accent}30` }]}>
+                    <Text style={[styles.itemCalBadgeVal, { color: accent }]}>{itemCals}</Text>
+                    <Text style={[styles.itemCalBadgeUnit, { color: isDark ? `${accent}90` : `${accent}bb` }]}>kcal</Text>
+                  </View>
                 </View>
 
-                {/* Text */}
-                <View style={styles.itemTextBlock}>
-                  <Text style={[styles.itemName, { color: textPrimary }]} numberOfLines={1}>
-                    {item.item_name}
-                  </Text>
-                  <Text style={[styles.itemQty, { color: textMuted }]}>
-                    {item.quantity || 'Estimated serving'}
-                  </Text>
-                </View>
-
+                {/* Macro chips */}
+                {itemMacros.length > 0 && (
+                  <View style={styles.itemMacroGrid}>
+                    {itemMacros.map(m => (
+                      <View key={m.key} style={[styles.itemMacroChip, { backgroundColor: `${m.color}12`, borderColor: `${m.color}22` }]}>
+                        <Text style={[styles.itemMacroChipText, { color: m.color }]}>
+                          {m.val}
+                          <Text style={[styles.itemMacroChipUnit, { color: isDark ? `${m.color}90` : `${m.color}bb` }]}>{m.unit}</Text>
+                        </Text>
+                        <Text style={[styles.itemMacroChipLabel, { color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)' }]}>{m.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             );
           })}
@@ -334,13 +358,10 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
     paddingVertical: 11,
     paddingRight: 12,
     paddingLeft: 12,
     gap: 12,
-    overflow: 'hidden',
   },
   itemThumb: {
     width: 38,
@@ -349,10 +370,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-  },
-  itemThumbImage: {
-    width: '100%',
-    height: '100%',
   },
   itemTextBlock: {
     flex: 1,
@@ -368,7 +385,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.1,
   },
-  calBadge: {
+  /* ── Per-Item Macro Display ── */
+  itemOuter: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  itemCalBadge: {
     borderRadius: 10,
     borderWidth: 1,
     paddingHorizontal: 9,
@@ -376,15 +399,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minWidth: 52,
   },
-  calBadgeValue: {
+  itemCalBadgeVal: {
     fontFamily: FONTS.heading,
     fontSize: 16,
     letterSpacing: -0.4,
     lineHeight: 18,
   },
-  calBadgeUnit: {
+  itemCalBadgeUnit: {
     fontFamily: FONTS.body,
     fontSize: 9,
     letterSpacing: 0.3,
+  },
+  itemMacroGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 11,
+  },
+  itemMacroChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  itemMacroChipText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+    letterSpacing: -0.1,
+  },
+  itemMacroChipUnit: {
+    fontSize: 9,
+  },
+  itemMacroChipLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 9,
+    letterSpacing: 0.2,
   },
 });

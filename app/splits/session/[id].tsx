@@ -150,7 +150,7 @@ export default function SessionDetailScreen() {
             <Text style={[styles.exName, { color: isDark ? colors.text : '#FFF' }]}>{item.name}</Text>
             {item.avg_rating !== undefined && item.avg_rating !== null && (
               <View style={styles.avgRatingBadge}>
-                <Ionicons name="star" size={10} color="#F59E0B" />
+                <Ionicons name="star" size={10} color={P.sun} />
                 <Text style={styles.avgRatingText}>{item.avg_rating}</Text>
               </View>
             )}
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   avgRatingText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 10,
-    color: '#FFF',
+    color: P.sun,
   },
   exMeta: {
     fontFamily: FONTS.bodyBold,

@@ -108,6 +108,7 @@ export default function DailyTab() {
   const [loading, setLoading] = useState(true);
   const [loadingSplits, setLoadingSplits] = useState(true);
   const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
   
   // Deletion
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -133,7 +134,9 @@ export default function DailyTab() {
       const d = new Date(w.started_at.replace(' ', 'T'));
       return !isSameDay(d, selectedDate);
     })
-    .slice(0, 3);
+    .slice(0, 2);
+
+  const isToday = isSameDay(selectedDate, new Date());
 
   const checkProfileCompletion = useCallback(async () => {
     try {
@@ -142,6 +145,7 @@ export default function DailyTab() {
       // Fast-path: trust cache if already completed
       if (cached?.onboarding_completed) {
         setProfileComplete(true);
+        setUserId(cached.id);
         return;
       }
       // Otherwise hit the API for fresh data
@@ -154,6 +158,7 @@ export default function DailyTab() {
       setProfileComplete(completed);
       // Update local cache
       await AsyncStorage.setItem('userData', JSON.stringify(res.data));
+      setUserId(res.data.id);
     } catch {
       setProfileComplete(false);
     }
@@ -329,14 +334,16 @@ export default function DailyTab() {
                 <Text style={[styles.headerTitle, { color: colors.text }]}>Daily Log</Text>
                 <Text style={[styles.headerSub, { color: colors.textMuted }]}>Your workout history</Text>
               </View>
-              <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/daily/new')}>
-                <LinearGradient 
-                  colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} 
-                  style={styles.newBtnGradient}
-                >
-                  <Ionicons name="add" size={24} color="#FFF" />
-                </LinearGradient>
-              </TouchableOpacity>
+              {isToday && (
+                <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/daily/new')}>
+                  <LinearGradient 
+                    colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} 
+                    style={styles.newBtnGradient}
+                  >
+                    <Ionicons name="add" size={24} color="#FFF" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={styles.splitsSection}>
@@ -446,6 +453,11 @@ export default function DailyTab() {
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Past Workouts</Text>
                 <Text style={[styles.sectionSub, { color: colors.textMuted }]}>Recent sessions from other days</Text>
               </View>
+              {userId && (
+                <TouchableOpacity onPress={() => router.push(`/profile/workouts/${userId}`)}>
+                  <Text style={{ color: colors.primary, fontFamily: FONTS.bodyBold, fontSize: 13 }}>View All</Text>
+                </TouchableOpacity>
+              )}
             </View>
             {pastWorkouts.map((item: any) => (
               <View key={item.id}>{renderWorkout({ item })}</View>
@@ -460,20 +472,36 @@ export default function DailyTab() {
               <Text style={[styles.emptySub, { color: colors.textMuted }]}>
                 Start your first workout session and track your progress daily.
               </Text>
-              <TouchableOpacity style={styles.startBtn} onPress={() => router.push('/daily/new')}>
-                <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.startBtnGradient}>
-                  <Ionicons name="play" size={18} color="#FFF" />
-                  <Text style={styles.startBtnText}>START TODAY'S WORKOUT</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+              {isToday ? (
+                <TouchableOpacity style={styles.startBtn} onPress={() => router.push('/daily/new')}>
+                  <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.startBtnGradient}>
+                    <Ionicons name="play" size={18} color="#FFF" />
+                    <Text style={styles.startBtnText}>START TODAY'S WORKOUT</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 }}>
+                  <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
+                  <Text style={[styles.emptySub, { color: colors.textMuted }]}>Can only log workouts for today</Text>
+                </View>
+              )}
             </View>
           ) : (
             <View style={[styles.centered, { paddingVertical: 32 }]}>
               <Ionicons name="calendar-outline" size={48} color={colors.border} />
               <Text style={[styles.emptyTitle, { color: colors.text, fontSize: 20 }]}>No Workouts This Day</Text>
-              <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-                Pick another date or log a new session.
-              </Text>
+              {isToday ? (
+                <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+                  Pick another date or log a new session.
+                </Text>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  
+                  <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+                    Can only log workouts for Past
+                  </Text>
+                </View>
+              )}
             </View>
           )
         )}
@@ -686,6 +714,8 @@ const styles = StyleSheet.create({
   historyHeader: {
     marginBottom: 16,
     marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
 
