@@ -195,16 +195,37 @@ router.post('/update-profile', async (req, res) => {
 
 // DELETE ACCOUNT
 router.post('/delete-account', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
   try {
     const userId = req.user.id;
-    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
+
+    await client.query('BEGIN');
+
+    // Manually clean up records that could cause FK conflicts in cascade chain
+    // global_exercise_prs: nullify references before cascading deletes
+    await client.query(
+      'UPDATE global_exercise_prs SET user_id = NULL, daily_workout_id = NULL, daily_exercise_id = NULL WHERE user_id = $1',
+      [userId]
+    );
+    // user_exercise_prs: delete instead of relying on cascade + set null overlap
+    await client.query('DELETE FROM user_exercise_prs WHERE user_id = $1', [userId]);
+    // Delete user's workouts explicitly to control cascade order
+    await client.query('DELETE FROM daily_workouts WHERE user_id = $1', [userId]);
+
+    const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'User not found' });
     }
+
+    await client.query('COMMIT');
     res.json({ success: true, message: 'Account deleted successfully' });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Delete account error:', err);
     res.status(500).json({ error: 'Failed to delete account' });
+  } finally {
+    client.release();
   }
 });
 

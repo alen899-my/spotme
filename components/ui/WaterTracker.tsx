@@ -223,7 +223,14 @@ function PushReminderDisplay() {
 
   if (loading) return null;
 
-  const label = `${interval / 60}h`;
+  const fmtInterval = (m: number) => {
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    if (h === 0) return `${min}m`;
+    if (min === 0) return `${h}h`;
+    return `${h}h ${min}m`;
+  };
+  const label = fmtInterval(interval);
 
   return (
     <View style={{ marginBottom: rem(12) }}>

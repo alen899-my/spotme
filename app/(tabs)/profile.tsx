@@ -12,6 +12,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useWorkoutTimer } from "../../contexts/WorkoutTimerContext";
 import axios from "axios";
 import StreakIcon from "../../components/ui/StreakIcon";
 import XPBar from "../../components/ui/XPBar";
@@ -48,6 +49,7 @@ const Badge = ({ value, colors }: { value: any; colors: any }) => (
 export default function ProfileScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { endWorkoutSession } = useWorkoutTimer();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -72,6 +74,7 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
+      endWorkoutSession();
       await AsyncStorage.removeItem("userToken");
       await AsyncStorage.removeItem("userData");
       router.replace("/login");

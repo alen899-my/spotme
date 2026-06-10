@@ -360,6 +360,7 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingShare, setSavingShare] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -428,14 +429,7 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      "Delete Account",
-      "This will permanently delete your account and all your data. This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: confirmDelete },
-      ]
-    );
+    setShowDeleteModal(true);
   };
 
   const confirmDelete = async () => {
@@ -602,6 +596,78 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal visible={showDeleteModal} transparent animationType="fade" onRequestClose={() => setShowDeleteModal(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}
+          activeOpacity={1}
+          onPress={() => setShowDeleteModal(false)}
+        >
+          <View
+            style={{
+              backgroundColor: isDark ? colors.card : '#FFF',
+              borderRadius: 24,
+              padding: 28,
+              marginHorizontal: 28,
+              width: '85%',
+              maxWidth: 360,
+              alignItems: 'center',
+            }}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={{
+              width: 56, height: 56, borderRadius: 28,
+              backgroundColor: '#FF000015', justifyContent: 'center', alignItems: 'center',
+              marginBottom: 16,
+            }}>
+              <Ionicons name="trash-outline" size={28} color="#FF4444" />
+            </View>
+
+            <Text style={{
+              fontFamily: FONTS.heading, fontSize: 20, color: isDark ? colors.text : '#1A1A1A',
+              textAlign: 'center', marginBottom: 8,
+            }}>
+              Delete Account
+            </Text>
+
+            <Text style={{
+              fontFamily: FONTS.body, fontSize: 14, color: isDark ? colors.textMuted : '#666',
+              textAlign: 'center', lineHeight: 20, marginBottom: 24,
+            }}>
+              This will permanently delete your account and all your data. This action cannot be undone.
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <TouchableOpacity
+                onPress={() => { setShowDeleteModal(false); }}
+                style={{
+                  flex: 1, borderRadius: 16, paddingVertical: 14,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0',
+                  alignItems: 'center',
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: isDark ? colors.text : '#333' }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => { setShowDeleteModal(false); confirmDelete(); }}
+                style={{
+                  flex: 1, borderRadius: 16, paddingVertical: 14,
+                  backgroundColor: '#FF4444', alignItems: 'center',
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 15, color: '#FFF' }}>
+                  Delete
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

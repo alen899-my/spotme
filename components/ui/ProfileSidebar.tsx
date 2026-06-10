@@ -24,6 +24,7 @@ import { FONTS } from "../../constants/theme";
 import { clearAll } from "../../utils/tokenStorage";
 import StreakIcon from "./StreakIcon";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useWorkoutTimer } from "../../contexts/WorkoutTimerContext";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const SIDEBAR_WIDTH = SCREEN_WIDTH;
@@ -192,6 +193,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { endWorkoutSession } = useWorkoutTimer();
 
   const slideAnim   = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
@@ -234,6 +236,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
   const handleLogout = () => {
     const doLogout = async () => {
       try {
+        endWorkoutSession();
         onClose();
         // Small delay so sidebar closes cleanly before clearing storage
         setTimeout(async () => {
