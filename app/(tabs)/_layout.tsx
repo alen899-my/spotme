@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppHeader from "../../components/ui/AppHeader";
 import ProfileSidebar from "../../components/ui/ProfileSidebar";
+import FloatingTimerBar from "../../components/ui/FloatingTimerBar";
 import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
 import axios from "axios";
@@ -157,6 +158,7 @@ export default function TabsLayout() {
         </Tabs>
       </View>
       <BottomTabBar />
+      <FloatingTimerBar />
       <ProfileSidebar
         visible={sidebarOpen}
         user={user}

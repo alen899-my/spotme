@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FONTS } from '../constants/theme';
 import { P } from '../constants/homeTheme';
 import { useTheme } from '../contexts/ThemeContext';
-import { formatDurationFull as formatDuration } from '../utils/datetime';
+import { formatDurationFull as formatDuration, formatDateTime } from '../utils/datetime';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -287,21 +287,6 @@ export default function WorkoutSummary({
     ...(showBodyWeight ? [{ key: 'BODY WEIGHT', icon: 'scale-outline', value: `${workout?.post_workout_weight || 0}kg`, sub: 'Current mass' }] : []),
   ];
 
-  function formatLocalDate(dateStr: string) {
-    if (!dateStr) return '';
-    try {
-      const normalized = dateStr.replace(' ', 'T');
-      const utcStr = (normalized.endsWith('Z') || normalized.includes('+')) ? normalized : `${normalized}Z`;
-      const date = new Date(utcStr);
-      if (isNaN(date.getTime())) return dateStr;
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const h = date.getHours(), m = date.getMinutes();
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`;
-    } catch { return dateStr; }
-  }
-
   return (
     <View>
       {/* ── Header ── */}
@@ -313,7 +298,7 @@ export default function WorkoutSummary({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
             <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
             <Text style={[styles.summaryDate, { color: colors.textMuted }]}>
-              {formatLocalDate(workout?.started_at || workout?.created_at)}
+              {formatDateTime(workout?.started_at || workout?.created_at)}
             </Text>
             {workout?.rating !== null && workout?.rating !== undefined && (
               <View style={styles.ratingBadge}>

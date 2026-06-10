@@ -13,12 +13,13 @@ import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useWorkoutTimer } from '../../contexts/WorkoutTimerContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import DatePicker from '../../components/ui/DatePicker';
 import { DailySkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
-import { formatDuration, formatDateTime, isSameDay, isToday } from '../../utils/datetime';
+import { formatDuration, formatDateTime, isSameDay, isToday, parseUTC } from '../../utils/datetime';
 
 
 // Profile gate colors
@@ -87,19 +88,24 @@ export default function DailyTab() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const { activeWorkoutId, endWorkoutSession } = useWorkoutTimer();
+
   // Date filter
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const filteredWorkouts = workouts.filter(w => {
     if (!w.started_at) return false;
-    const d = new Date(w.started_at.replace(' ', 'T'));
+    const d = parseUTC(w.started_at);
+    if (!d) return false;
     return isSameDay(d, selectedDate);
   });
 
   const pastWorkouts = workouts
     .filter(w => {
+      if (w.status === 'active') return false;
       if (!w.started_at) return false;
-      const d = new Date(w.started_at.replace(' ', 'T'));
+      const d = parseUTC(w.started_at);
+      if (!d) return false;
       return !isSameDay(d, selectedDate);
     })
     .slice(0, 2);
@@ -174,6 +180,9 @@ export default function DailyTab() {
       await axios.delete(`${API_URL}/daily/workouts/${deletingId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (activeWorkoutId === String(deletingId)) {
+        endWorkoutSession();
+      }
       showToast('Workout deleted successfully');
       setWorkouts(prev => prev.filter(w => w.id !== deletingId));
     } catch (err) {

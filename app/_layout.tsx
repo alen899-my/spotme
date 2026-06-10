@@ -15,6 +15,7 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { ToastProvider } from "../contexts/ToastContext";
+import { WorkoutTimerProvider } from "../contexts/WorkoutTimerContext";
 import SilentUpdateManager from "../components/SilentUpdateManager";
 import AnimatedSplash from "../components/ui/AnimatedSplash";
 import { API_URL } from "../utils/api";
@@ -124,14 +125,16 @@ export default function RootLayout() {
     <ThemeProvider>
       <SafeAreaProvider>
         <ToastProvider>
-          {!splashFinished ? (
-            <AnimatedSplash onFinish={() => setSplashFinished(true)} fontsLoaded={loaded} />
-          ) : (
-            <>
-              <Stack screenOptions={{ headerShown: false }} />
-              <SilentUpdateManager />
-            </>
-          )}
+          <WorkoutTimerProvider>
+            {!splashFinished ? (
+              <AnimatedSplash onFinish={() => setSplashFinished(true)} fontsLoaded={loaded} />
+            ) : (
+              <>
+                <Stack screenOptions={{ headerShown: false }} />
+                <SilentUpdateManager />
+              </>
+            )}
+          </WorkoutTimerProvider>
         </ToastProvider>
       </SafeAreaProvider>
     </ThemeProvider>

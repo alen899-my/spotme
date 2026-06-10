@@ -51,12 +51,9 @@ export function formatDateTime(dateStr: string): string {
 
 export function formatDateLabel(dateStr: string): string {
   if (!dateStr) return '';
-  try {
-    const d = new Date(dateStr + 'T00:00:00');
-    return `${DAYS_SHORT[d.getDay()]}, ${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-  } catch {
-    return dateStr;
-  }
+  const d = parseUTC(dateStr);
+  if (!d) return dateStr;
+  return `${DAYS_SHORT[d.getDay()]}, ${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
 export function formatDateShort(dateStr: string): string {

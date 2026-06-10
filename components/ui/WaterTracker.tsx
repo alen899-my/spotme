@@ -18,7 +18,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
-import { isToday } from '../../utils/datetime';
+import { isToday, parseUTC } from '../../utils/datetime';
 
 const { width: W } = Dimensions.get('window');
 
@@ -297,7 +297,7 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
     );
   }
 
-  const elapsedMin = Math.round((nowMs - (lastLog._clientLoggedAt || new Date(lastLog.logged_at).getTime())) / 60_000);
+  const elapsedMin = Math.round((nowMs - (lastLog._clientLoggedAt || (parseUTC(lastLog.logged_at)?.getTime() ?? nowMs))) / 60_000);
   const nextIn = Math.max(0, interval - elapsedMin);
 
   if (elapsedMin < interval) {
@@ -764,10 +764,11 @@ export default function WaterTracker({ selectedDate }: Props) {
             <View style={s.logList}>
               <Text style={[s.logListTitle, isDark && { color: colors.text }]}>Today's Log</Text>
               {waterLogs.map((log) => {
-                const t = new Date(log.logged_at).toLocaleTimeString([], {
+                const logDate = parseUTC(log.logged_at);
+                const t = logDate ? logDate.toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit',
-                });
+                }) : '';
                 const tone = getLogTone(log.amount_ml);
                 const iconName = getLogIcon(log.amount_ml);
                 const label = getDrinkTypeLabel(log.amount_ml);
