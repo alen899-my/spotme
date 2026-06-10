@@ -302,7 +302,7 @@ router.post(
     try {
       const result = await pool.query(
         `INSERT INTO daily_workouts (user_id, title, split_id, session_id, started_at, status)
-         VALUES ($1, $2, $3, $4, NOW() AT TIME ZONE 'UTC', 'active') RETURNING *`,
+         VALUES ($1, $2, $3, $4, NOW(), 'active') RETURNING *`,
         [req.user.id, title || null, split_id || null, session_id || null]
       );
 
@@ -1249,8 +1249,8 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
 router.get('/dashboard', authenticateToken, async (req, res) => {
   const userId = req.user.id;
   const now = new Date();
-  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
-  const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  const todayEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
 
   try {
     // ── 1. User stats ─────────────────────────────────────────────────────────
@@ -1318,14 +1318,14 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     // ── 5. Weekly workout stats (last 7 days) ─────────────────────────────────
     const weeklyRes = await pool.query(
       `SELECT
-         DATE(completed_at AT TIME ZONE 'UTC') AS day,
+         DATE(completed_at) AS day,
          COUNT(*) AS workouts,
          COALESCE(SUM(total_duration_seconds), 0) AS total_seconds,
          COALESCE(SUM(total_volume), 0) AS total_volume
        FROM daily_workouts
        WHERE user_id = $1 AND status = 'completed'
          AND completed_at >= NOW() - INTERVAL '7 days'
-       GROUP BY DATE(completed_at AT TIME ZONE 'UTC')
+       GROUP BY DATE(completed_at)
        ORDER BY day ASC`,
       [userId]
     );
@@ -1378,14 +1378,14 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       `SELECT e.target,
               e.body_part,
               e.category,
-              DATE(dw.completed_at AT TIME ZONE 'UTC') AS workout_date,
+              DATE(dw.completed_at) AS workout_date,
               COUNT(*)::int                             AS count
        FROM daily_workout_exercises dwe
        JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
        JOIN exercises e       ON dwe.exercise_id      = e.id
        WHERE dw.user_id = $1 AND dw.status = 'completed'
        GROUP BY e.target, e.body_part, e.category,
-                DATE(dw.completed_at AT TIME ZONE 'UTC')`,
+                DATE(dw.completed_at)`,
       [userId]
     );
 
@@ -1862,7 +1862,7 @@ router.get('/muscle-detail/:slug', authenticateToken, async (req, res) => {
   try {
     // All workout dates + exercise counts for this muscle
     const detailRes = await pool.query(
-      `SELECT DATE(dw.completed_at AT TIME ZONE 'UTC') AS workout_date,
+      `SELECT DATE(dw.completed_at) AS workout_date,
               COUNT(*)::int                             AS count
        FROM daily_workout_exercises dwe
        JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
@@ -1874,7 +1874,7 @@ router.get('/muscle-detail/:slug', authenticateToken, async (req, res) => {
            OR LOWER(COALESCE(e.body_part,'')) = ANY($2::text[])
            OR LOWER(COALESCE(e.category,  '')) = ANY($2::text[])
          )
-       GROUP BY DATE(dw.completed_at AT TIME ZONE 'UTC')
+       GROUP BY DATE(dw.completed_at)
        ORDER BY workout_date DESC`,
       [userId, targets]
     );
@@ -1904,7 +1904,7 @@ router.get('/muscle-detail/:slug', authenticateToken, async (req, res) => {
     // Monthly totals (last 12 months) for a bar-style chart
     const monthlyRes = await pool.query(
       `SELECT TO_CHAR(DATE_TRUNC('month', dw.completed_at), 'YYYY-MM') AS month,
-              COUNT(DISTINCT DATE(dw.completed_at AT TIME ZONE 'UTC'))::int AS days
+              COUNT(DISTINCT DATE(dw.completed_at))::int AS days
        FROM daily_workout_exercises dwe
        JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
        JOIN exercises e       ON dwe.exercise_id      = e.id
@@ -1948,7 +1948,7 @@ router.get('/calendar-stats', authenticateToken, async (req, res) => {
   try {
     // ── 1. Overall: count of distinct workout days ────────────────────────────
     const overallRes = await pool.query(
-      `SELECT DATE(dw.completed_at AT TIME ZONE 'UTC') AS date,
+      `SELECT DATE(dw.completed_at) AS date,
               COUNT(DISTINCT dw.id)::int                AS count
        FROM daily_workouts dw
        WHERE dw.user_id = $1
@@ -1961,7 +1961,7 @@ router.get('/calendar-stats', authenticateToken, async (req, res) => {
     // ── 2. Per-slug: all exercise data → resolve slug client-side ────────────
     const exerciseRes = await pool.query(
       `SELECT e.target, e.body_part, e.category,
-              DATE(dw.completed_at AT TIME ZONE 'UTC') AS workout_date
+              DATE(dw.completed_at) AS workout_date
        FROM daily_workout_exercises dwe
        JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
        JOIN exercises e       ON dwe.exercise_id      = e.id
@@ -2112,7 +2112,7 @@ router.get('/workouts-by-date', authenticateToken, async (req, res) => {
        LEFT JOIN workout_splits ws ON dw.split_id = ws.id
        LEFT JOIN workout_sessions wsess ON dw.session_id = wsess.id
        WHERE dw.user_id = $1
-         AND DATE(dw.completed_at AT TIME ZONE 'UTC') = $2::date
+         AND DATE(dw.completed_at) = $2::date
        ORDER BY dw.started_at DESC`,
       [userId, date]
     );

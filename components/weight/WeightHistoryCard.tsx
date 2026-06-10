@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FONTS } from '../../constants/theme';
 import { P, scale, vs } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { isToday } from '../../utils/datetime';
 
 interface WeightEntry {
   id: number;
@@ -29,16 +30,6 @@ function formatDate(dateStr: string) {
     date: `${months[d.getMonth()]} ${d.getDate()}`,
     time: `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`,
   };
-}
-
-function isToday(dateStr: string) {
-  const d = new Date(dateStr);
-  const now = new Date();
-  return (
-    d.getDate() === now.getDate() &&
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear()
-  );
 }
 
 // BMI-like zone color hint (just for visual indicator, no health claims)

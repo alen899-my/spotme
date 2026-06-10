@@ -21,6 +21,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import WorkoutCalendarHeatmap, { DayEntry } from "../../components/ui/WorkoutCalendarHeatmap";
 import { API_URL } from "../../utils/api";
 import { getToken } from "../../utils/tokenStorage";
+import { formatDuration, formatDateLabel } from "../../utils/datetime";
 
 
 
@@ -30,24 +31,9 @@ interface PartEntry {
   history: DayEntry[];
 }
 
-function formatDuration(sec: number) {
-  if (!sec) return "0m";
-  const m = Math.floor(sec / 60);
-  const h = Math.floor(m / 60);
-  return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
-}
 function formatVolume(vol: number) {
   const n = Number(vol || 0);
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
-}
-function formatDateLabel(dateStr: string) {
-  if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr + "T00:00:00");
-    const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-  } catch { return dateStr; }
 }
 
 const TIERS = [

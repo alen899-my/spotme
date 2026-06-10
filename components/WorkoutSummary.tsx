@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FONTS } from '../constants/theme';
 import { P } from '../constants/homeTheme';
 import { useTheme } from '../contexts/ThemeContext';
+import { formatDurationFull as formatDuration } from '../utils/datetime';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -14,15 +15,6 @@ function formatTime(sec: number) {
   const m = Math.floor(sec / 60).toString().padStart(2, '0');
   const s = (sec % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
-}
-
-function formatDuration(sec: number) {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  if (h > 0) return `${h}h ${m}m ${s}s`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
 }
 
 function formatRecord(metricType?: string, value?: number | string) {

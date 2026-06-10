@@ -15,6 +15,7 @@ import { P, getXPProgress, TIER_COLORS } from '../../constants/homeTheme';
 import { UserProfileSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import { formatDuration, formatDateShort, formatDateTime } from '../../utils/datetime';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -33,35 +34,9 @@ const TIERS = [
 ];
 function getTier(name: string) { return TIERS.find(t => t.name === name) ?? TIERS[0]; }
 
-function formatDuration(sec: number) {
-  if (!sec) return '0m';
-  const m = Math.floor(sec / 60);
-  const h = Math.floor(m / 60);
-  return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
-}
 function formatVolume(vol: number) {
   const n = Number(vol || 0);
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
-}
-function formatDate(dateStr: string) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-function formatShortDate(dateStr: string) {
-  if (!dateStr) return '—';
-  try {
-    const normalized = dateStr.replace(' ', 'T');
-    const utcStr = (normalized.endsWith('Z') || normalized.includes('+')) ? normalized : `${normalized}Z`;
-    const d = new Date(utcStr);
-    if (isNaN(d.getTime())) return '—';
-    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const h = d.getHours(), m = d.getMinutes();
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${h % 12 || 12}:${m.toString().padStart(2,'0')} ${ampm}`;
-  } catch { return '—'; }
 }
 
 export default function PublicProfileScreen() {
@@ -421,7 +396,7 @@ export default function PublicProfileScreen() {
                 <Text style={[styles.statCardUnit, { color: colors.textDim }]}>days</Text>
                 <View style={[styles.statCardDivider, { backgroundColor: colors.border }]} />
                 <Text style={[styles.statCardFooter, { color: colors.textMuted }]}>
-                  Last active: {formatDate(user.last_workout_date)}
+                  Last active: {formatDateShort(user.last_workout_date)}
                 </Text>
               </View>
 
@@ -562,7 +537,7 @@ export default function PublicProfileScreen() {
                           </View>
 
                           <View style={styles.wInfo}>
-                            <Text style={[styles.wDate, { color: colors.textMuted }]}>{formatShortDate(w.completed_at || w.started_at)}</Text>
+                            <Text style={[styles.wDate, { color: colors.textMuted }]}>{formatDateTime(w.completed_at || w.started_at)}</Text>
                             <Text style={[styles.wTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
                             {!!split && <Text style={[styles.wSplit, { color: tier.color }]}>{split}</Text>}
 

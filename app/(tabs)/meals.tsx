@@ -21,6 +21,7 @@ import LogMealSheet, { LogMealPayload } from '../../components/meals/LogMealShee
 import MealNutrientCard from '../../components/meals/MealNutrientCard';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import { isSameDay, isToday } from '../../utils/datetime';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -1397,14 +1398,8 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     );
   };
 
-  const isSameDay = (d1: Date, d2: Date) => {
-    return d1.getDate() === d2.getDate() &&
-           d1.getMonth() === d2.getMonth() &&
-           d1.getFullYear() === d2.getFullYear();
-  };
-
   const filteredMeals = meals.filter(m => isSameDay(new Date(m.logged_at), selectedDate));
-  const isToday = selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+  const isSelectedToday = isToday(selectedDate);
   
   const calsConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_calories || 0), 0);
   const proteinConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_protein || 0), 0);
@@ -1426,7 +1421,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     tabScrollRef.current?.scrollTo({ animated: true, x: Math.max(0, activeTab - 1) * tabW });
   }, [activeTab]);
 
-  const showLogBtn = activeTab === 0 && isToday;
+  const showLogBtn = activeTab === 0 && isSelectedToday;
 
   const renderHeaderBar = () => (
     <View>

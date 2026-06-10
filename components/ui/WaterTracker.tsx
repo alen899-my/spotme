@@ -18,6 +18,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import { isToday } from '../../utils/datetime';
 
 const { width: W } = Dimensions.get('window');
 
@@ -388,7 +389,7 @@ export default function WaterTracker({ selectedDate }: Props) {
   const pct = target > 0 ? Math.min((totalWater / target) * 100, 100) : 0;
   const isOver = totalWater > maxSafe;
   const isGoal = totalWater >= target;
-  const isToday = selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+  const isSelectedToday = isToday(selectedDate);
   const hydrationState = getHydrationState(totalWater, target, maxSafe);
   const progressRatio = maxSafe > 0 ? totalWater / maxSafe : 0;
   const goalRatio = maxSafe > 0 ? target / maxSafe : 0.625;
@@ -693,7 +694,7 @@ export default function WaterTracker({ selectedDate }: Props) {
             </View>
           </Animated.View>
 
-          {isToday ? (
+          {isSelectedToday ? (
             <>
               <View style={s.presets}>
                 {PRESETS.map((item) => (

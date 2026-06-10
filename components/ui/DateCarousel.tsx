@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { isSameDay } from '../../utils/datetime';
 
 interface DateCarouselProps {
   selectedDate: Date;
@@ -31,12 +32,6 @@ export default function DateCarousel({ selectedDate, onSelectDate, daysBack = 14
       scrollViewRef.current?.scrollToEnd({ animated: false });
     }, 100);
   }, []);
-
-  const isSameDay = (d1: Date, d2: Date) => {
-    return d1.getDate() === d2.getDate() &&
-           d1.getMonth() === d2.getMonth() &&
-           d1.getFullYear() === d2.getFullYear();
-  };
 
   return (
     <View style={styles.container}>

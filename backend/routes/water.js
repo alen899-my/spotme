@@ -110,8 +110,8 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const { date } = req.query;
     const targetDate = date ? new Date(date) : new Date();
-    const start = new Date(targetDate); start.setHours(0, 0, 0, 0);
-    const end   = new Date(targetDate); end.setHours(23, 59, 59, 999);
+    const start = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 0, 0, 0, 0));
+    const end   = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 23, 59, 59, 999));
 
     const result = await pool.query(
       `SELECT * FROM water_logs WHERE user_id = $1 AND logged_at BETWEEN $2 AND $3 ORDER BY logged_at DESC`,
@@ -134,8 +134,8 @@ router.delete('/reset', authenticateToken, async (req, res) => {
   try {
     const { date } = req.query;
     const targetDate = date ? new Date(date) : new Date();
-    const start = new Date(targetDate); start.setHours(0, 0, 0, 0);
-    const end   = new Date(targetDate); end.setHours(23, 59, 59, 999);
+    const start = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 0, 0, 0, 0));
+    const end   = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 23, 59, 59, 999));
 
     await pool.query(
       `DELETE FROM water_logs WHERE user_id = $1 AND logged_at BETWEEN $2 AND $3`,

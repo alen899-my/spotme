@@ -8,6 +8,8 @@ const pool = new Pool({
 // Initialize database table
 const initDB = async () => {
   try {
+    // Ensure session timezone is UTC for consistent TIMESTAMPTZ handling
+    await pool.query(`SET timezone TO 'UTC'`);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -17,7 +19,7 @@ const initDB = async () => {
         phone_number VARCHAR(50),
         dob DATE,
         gender VARCHAR(50),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -57,7 +59,7 @@ const initDB = async () => {
         gif_url VARCHAR(500),
         avg_rating NUMERIC(3,1) DEFAULT 0,
         rating_count INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -68,7 +70,7 @@ const initDB = async () => {
         user_id INT REFERENCES users(id) ON DELETE CASCADE,
         name VARCHAR(255) NOT NULL,
         description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS workout_sessions (
@@ -76,7 +78,7 @@ const initDB = async () => {
         split_id INT REFERENCES workout_splits(id) ON DELETE CASCADE,
         name VARCHAR(255) NOT NULL,
         sort_order INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS workout_session_exercises (
@@ -88,7 +90,7 @@ const initDB = async () => {
         rest_time VARCHAR(50) DEFAULT '60s',
         weight VARCHAR(50) DEFAULT '0',
         sort_order INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -101,8 +103,8 @@ const initDB = async () => {
         title VARCHAR(255),
         split_id INT REFERENCES workout_splits(id) ON DELETE SET NULL,
         session_id INT REFERENCES workout_sessions(id) ON DELETE SET NULL,
-        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        completed_at TIMESTAMP,
+        started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMPTZ,
         total_duration_seconds INT DEFAULT 0,
         total_volume NUMERIC(10,2) DEFAULT 0,
         notes TEXT,
@@ -131,7 +133,7 @@ const initDB = async () => {
         reps INT DEFAULT 0,
         duration_seconds INT DEFAULT 0,
         rest_seconds INT DEFAULT 0,
-        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        completed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -173,8 +175,8 @@ const initDB = async () => {
         source_volume NUMERIC(10,2) DEFAULT 0,
         daily_workout_id INT REFERENCES daily_workouts(id) ON DELETE SET NULL,
         daily_exercise_id INT REFERENCES daily_workout_exercises(id) ON DELETE SET NULL,
-        achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        achieved_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (user_id, exercise_id, metric_type)
       );
 
@@ -188,8 +190,8 @@ const initDB = async () => {
         user_id INT REFERENCES users(id) ON DELETE SET NULL,
         daily_workout_id INT REFERENCES daily_workouts(id) ON DELETE SET NULL,
         daily_exercise_id INT REFERENCES daily_workout_exercises(id) ON DELETE SET NULL,
-        achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        achieved_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (exercise_id, metric_type)
       );
     `);
@@ -211,7 +213,7 @@ const initDB = async () => {
         follower_id INT REFERENCES users(id) ON DELETE CASCADE,
         following_id INT REFERENCES users(id) ON DELETE CASCADE,
         status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(follower_id, following_id)
       );
 
@@ -223,7 +225,7 @@ const initDB = async () => {
         reference_id INT,
         message TEXT,
         is_read BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -240,8 +242,8 @@ const initDB = async () => {
         id SERIAL PRIMARY KEY,
         user_id INT REFERENCES users(id) ON DELETE CASCADE UNIQUE,
         token TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -249,9 +251,9 @@ const initDB = async () => {
     try {
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS water_reminder_enabled BOOLEAN DEFAULT true`);
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS water_reminder_interval INT DEFAULT 120`);
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_water_reminded_at TIMESTAMP`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_water_reminded_at TIMESTAMPTZ`);
       await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS motivation_enabled BOOLEAN DEFAULT true`);
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_motivation_sent_at TIMESTAMP`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_motivation_sent_at TIMESTAMPTZ`);
     } catch (_) {
       console.warn('Could not add water reminder columns:', _);
     }
@@ -267,7 +269,7 @@ const initDB = async () => {
         areas_to_improve TEXT NOT NULL,
         recommendations TEXT NOT NULL,
         status VARCHAR(20) DEFAULT 'completed',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -284,7 +286,7 @@ const initDB = async () => {
         id SERIAL PRIMARY KEY,
         user_id INT REFERENCES users(id) ON DELETE CASCADE,
         amount_ml INT NOT NULL,
-        logged_at TIMESTAMP DEFAULT NOW()
+        logged_at TIMESTAMPTZ DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS weight_logs (
@@ -292,7 +294,7 @@ const initDB = async () => {
         user_id INT REFERENCES users(id) ON DELETE CASCADE,
         weight NUMERIC(6,2) NOT NULL,
         notes VARCHAR(255),
-        logged_at TIMESTAMP DEFAULT NOW()
+        logged_at TIMESTAMPTZ DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS meal_recommendations (
@@ -405,7 +407,7 @@ const initDB = async () => {
         -- Quality score
         nutrition_density  NUMERIC,
 
-        created_at         TIMESTAMP DEFAULT NOW()
+        created_at         TIMESTAMPTZ DEFAULT NOW()
       );
     `);
 
@@ -422,7 +424,7 @@ const initDB = async () => {
         user_id INT REFERENCES users(id) ON DELETE CASCADE,
         amount INT NOT NULL,
         reason VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_xp_transactions_user ON xp_transactions (user_id);`);

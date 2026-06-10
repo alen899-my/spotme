@@ -13,6 +13,7 @@ import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
+import { formatDateWithWeekday as formatDate } from '../../../utils/datetime';
 
 
 const coachAvatarSource = require('../../../assets/coach/fit-cartoon-character-training.png');
@@ -56,18 +57,6 @@ const splitAdvice = (value?: string) => {
     .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
     .map(item => item.trim())
     .filter(Boolean);
-};
-
-const formatDate = (value?: string) => {
-  if (!value) return 'Workout session';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
 };
 
 function StatTile({

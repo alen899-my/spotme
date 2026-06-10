@@ -17,6 +17,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
+import { formatDuration, formatDateTime } from '../../../utils/datetime';
 
 
 
@@ -34,29 +35,9 @@ const TIERS = [
 ];
 function getTier(name: string) { return TIERS.find(t => t.name === name) ?? TIERS[0]; }
 
-function formatDuration(sec: number) {
-  if (!sec) return '0m';
-  const m = Math.floor(sec / 60);
-  const h = Math.floor(m / 60);
-  return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
-}
 function formatVolume(vol: number) {
   const n = Number(vol || 0);
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
-}
-function formatShortDate(dateStr: string) {
-  if (!dateStr) return '—';
-  try {
-    const normalized = dateStr.replace(' ', 'T');
-    const utcStr = (normalized.endsWith('Z') || normalized.includes('+')) ? normalized : `${normalized}Z`;
-    const d = new Date(utcStr);
-    if (isNaN(d.getTime())) return '—';
-    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const h = d.getHours(), m = d.getMinutes();
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${h % 12 || 12}:${m.toString().padStart(2,'0')} ${ampm}`;
-  } catch { return '—'; }
 }
 
 export default function UserWorkoutsScreen() {
@@ -119,7 +100,7 @@ export default function UserWorkoutsScreen() {
           </View>
 
           <View style={styles.info}>
-            <Text style={[styles.date, { color: colors.textMuted }]}>{formatShortDate(w.completed_at || w.started_at)}</Text>
+            <Text style={[styles.date, { color: colors.textMuted }]}>{formatDateTime(w.completed_at || w.started_at)}</Text>
             <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{title}</Text>
             {!!split && <Text style={[styles.split, { color: tier.color }]}>{split}</Text>}
 

@@ -19,6 +19,7 @@ import StreakIcon from '../../components/ui/StreakIcon';
 import { CompleteSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import { formatDurationShort as formatDuration } from '../../utils/datetime';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -30,16 +31,6 @@ const vs = (n: number) => Math.round((SCREEN_HEIGHT / BASE_H) * n);
 const fs = (n: number) => Math.round((Math.min(SCREEN_WIDTH, 500) / BASE_W) * n);
 
 
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-function formatDuration(sec: number) {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const secs = sec % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${secs}s`;
-  return `${secs}s`;
-}
 
 // ── Confetti Particle ───────────────────────────────────────────────────────
 const PARTICLE_COLORS = ['#F7CB16', '#2596BE', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];

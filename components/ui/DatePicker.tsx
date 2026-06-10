@@ -6,6 +6,7 @@ import {
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import { isSameDay } from '../../utils/datetime';
 
 interface DatePickerProps {
   selectedDate: Date;
@@ -19,11 +20,6 @@ const MONTHS = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
 ];
-
-const isSameDay = (d1: Date, d2: Date) =>
-  d1.getDate() === d2.getDate() &&
-  d1.getMonth() === d2.getMonth() &&
-  d1.getFullYear() === d2.getFullYear();
 
 const today = () => {
   const d = new Date();

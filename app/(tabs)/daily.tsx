@@ -18,6 +18,7 @@ import DatePicker from '../../components/ui/DatePicker';
 import { DailySkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import { formatDuration, formatDateTime, isSameDay, isToday } from '../../utils/datetime';
 
 
 // Profile gate colors
@@ -31,34 +32,6 @@ const G = {
   soft:    'rgba(255,255,255,0.28)',
   border:  'rgba(37,150,190,0.28)',
 };
-
-function formatDuration(seconds: number) {
-  if (!seconds) return '0m';
-  const m = Math.floor(seconds / 60);
-  const h = Math.floor(m / 60);
-  if (h > 0) return `${h}h ${m % 60}m`;
-  return `${m}m`;
-}
-
-function formatDate(dateStr: string) {
-  if (!dateStr) return '';
-  try {
-    // Backend now stores UTC — append Z so browser treats it as UTC, then getHours() gives local time
-    const normalized = dateStr.replace(' ', 'T');
-    const utcStr = (normalized.endsWith('Z') || normalized.includes('+')) ? normalized : `${normalized}Z`;
-    const date = new Date(utcStr);
-    if (isNaN(date.getTime())) return dateStr;
-
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const h = date.getHours();
-    const m = date.getMinutes();
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`;
-  } catch (e) {
-    return dateStr;
-  }
-}
 
 function getSplitPreviewImage(split: any) {
   if (typeof split?.cover_image_url === 'string' && split.cover_image_url.trim().length > 0) {
@@ -117,11 +90,6 @@ export default function DailyTab() {
   // Date filter
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const isSameDay = (d1: Date, d2: Date) =>
-    d1.getDate() === d2.getDate() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getFullYear() === d2.getFullYear();
-
   const filteredWorkouts = workouts.filter(w => {
     if (!w.started_at) return false;
     const d = new Date(w.started_at.replace(' ', 'T'));
@@ -136,7 +104,7 @@ export default function DailyTab() {
     })
     .slice(0, 2);
 
-  const isToday = isSameDay(selectedDate, new Date());
+  const isSelectedToday = isToday(selectedDate);
 
   const checkProfileCompletion = useCallback(async () => {
     try {
@@ -259,7 +227,7 @@ export default function DailyTab() {
 
             <View style={styles.cardInfo}>
               <View style={styles.cardHeader}>
-                <Text style={[styles.dateText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>{formatDate(item.started_at)}</Text>
+                <Text style={[styles.dateText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>{formatDateTime(item.started_at)}</Text>
                 <View style={styles.cardHeaderActions}>
                   {item.rating !== null && item.rating !== undefined && (
                     <View style={styles.ratingWrap}>
@@ -334,7 +302,7 @@ export default function DailyTab() {
                 <Text style={[styles.headerTitle, { color: colors.text }]}>Daily Log</Text>
                 <Text style={[styles.headerSub, { color: colors.textMuted }]}>Your workout history</Text>
               </View>
-              {isToday && (
+              {isSelectedToday && (
                 <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/daily/new')}>
                   <LinearGradient 
                     colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} 
@@ -472,7 +440,7 @@ export default function DailyTab() {
               <Text style={[styles.emptySub, { color: colors.textMuted }]}>
                 Start your first workout session and track your progress daily.
               </Text>
-              {isToday ? (
+              {isSelectedToday ? (
                 <TouchableOpacity style={styles.startBtn} onPress={() => router.push('/daily/new')}>
                   <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.startBtnGradient}>
                     <Ionicons name="play" size={18} color="#FFF" />
@@ -490,7 +458,7 @@ export default function DailyTab() {
             <View style={[styles.centered, { paddingVertical: 32 }]}>
               <Ionicons name="calendar-outline" size={48} color={colors.border} />
               <Text style={[styles.emptyTitle, { color: colors.text, fontSize: 20 }]}>No Workouts This Day</Text>
-              {isToday ? (
+              {isSelectedToday ? (
                 <Text style={[styles.emptySub, { color: colors.textMuted }]}>
                   Pick another date or log a new session.
                 </Text>

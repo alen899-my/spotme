@@ -114,7 +114,7 @@ router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => 
         total_fiber, total_sugar, total_sodium, total_saturated_fat, total_cholesterol,
         logged_at
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW() AT TIME ZONE 'UTC') RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW()) RETURNING *`,
       [
         req.user.id, image_url, meal_type,
         total_calories, total_protein, total_carbs, total_fat,
