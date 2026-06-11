@@ -7,6 +7,7 @@ import {
   ScrollView,
   Platform,
   useWindowDimensions,
+  ImageBackground,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -16,7 +17,6 @@ import { P, scale, vs } from "../constants/homeTheme";
 import { FONTS } from "../constants/theme";
 import { useTheme } from "../contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 import GreetingCard       from "../components/ui/GreetingCard";
@@ -28,6 +28,9 @@ import BodyStatusCard     from "../components/home/BodyStatusCard";
 import HydrationCard      from "../components/home/HydrationCard";
 import { API_URL } from "../utils/api";
 import { getToken } from "../utils/tokenStorage";
+
+const workoutBg = require("../assets/coach/workoutlog.jpg");
+const foodBg    = require("../assets/coach/foodlog.jpg");
 
 
 
@@ -190,12 +193,8 @@ export default function HomeScreen() {
               onPress={() => router.push("/daily/new")}
               activeOpacity={0.82}
             >
-              <LinearGradient
-                colors={isDark ? ["#111A24", "#0D0D0D"] : ["#F0F9FF", "#FFFFFF"]}
-                style={StyleSheet.absoluteFillObject}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
+              <ImageBackground source={workoutBg} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+              <View style={[StyleSheet.absoluteFillObject, styles.loggerOverlay]} />
               <View style={[styles.quickLoggerIconWrap, { backgroundColor: isDark ? "rgba(37,150,190,0.15)" : "#E0F2FE" }]}>
                 <Ionicons name="barbell" size={scale(20)} color="#2596BE" />
               </View>
@@ -217,12 +216,8 @@ export default function HomeScreen() {
               onPress={() => router.push("/(tabs)/meals")}
               activeOpacity={0.82}
             >
-              <LinearGradient
-                colors={isDark ? ["#1F1607", "#0D0D0D"] : ["#FFFBEB", "#FFFFFF"]}
-                style={StyleSheet.absoluteFillObject}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
+              <ImageBackground source={foodBg} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+              <View style={[StyleSheet.absoluteFillObject, styles.loggerOverlay]} />
               <View style={[styles.quickLoggerIconWrap, { backgroundColor: isDark ? "rgba(245,158,11,0.15)" : "#FEF3C7" }]}>
                 <Ionicons name="restaurant" size={scale(20)} color={isDark ? "#F59E0B" : "#D97706"} />
               </View>
@@ -444,5 +439,10 @@ const styles = StyleSheet.create({
     fontSize: scale(10),
     lineHeight: scale(13),
     marginTop: 2,
+  },
+
+  loggerOverlay: {
+    backgroundColor: "rgba(0,0,0,0.7)",
+    zIndex: 0,
   },
 });

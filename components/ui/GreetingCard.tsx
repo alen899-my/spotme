@@ -41,6 +41,7 @@ interface SlotConfig {
   slot: TimeSlot;
   greeting: string;
   sub: string;
+  bgColor: string;           // card background shade
   accentColor: string;       // greeting label + time text + arc stroke
   greetLabelColor: string;   // small-caps greeting
   arcColor: string;          // large circle arc behind coach
@@ -51,6 +52,7 @@ const SLOTS: SlotConfig[] = [
     slot: "dawn",
     greeting: "Rise & Shine",
     sub: "The world starts fresh — so do you.",
+    bgColor: "#1a0f2e",
     accentColor: "#F4845F",
     greetLabelColor: "#F4845F",
     arcColor: "#F4845F",
@@ -59,6 +61,7 @@ const SLOTS: SlotConfig[] = [
     slot: "morning",
     greeting: "Good Morning",
     sub: "Fuel up and crush it today.",
+    bgColor: "#0d1b2a",
     accentColor: "#F7CB16",
     greetLabelColor: "#F7CB16",
     arcColor: "#2596BE",
@@ -67,6 +70,7 @@ const SLOTS: SlotConfig[] = [
     slot: "afternoon",
     greeting: "Good Afternoon",
     sub: "Every rep. Every choice.\nYou're building a stronger you.",
+    bgColor: "#0f1923",
     accentColor: "#2596BE",
     greetLabelColor: "#2596BE",
     arcColor: "#2596BE",
@@ -75,6 +79,7 @@ const SLOTS: SlotConfig[] = [
     slot: "dusk",
     greeting: "Good Evening",
     sub: "How did your session go today?",
+    bgColor: "#1a0f0a",
     accentColor: "#E87D3E",
     greetLabelColor: "#E87D3E",
     arcColor: "#E87D3E",
@@ -83,6 +88,7 @@ const SLOTS: SlotConfig[] = [
     slot: "evening",
     greeting: "Good Evening",
     sub: "Wind down and recover well.",
+    bgColor: "#0a1628",
     accentColor: "#2596BE",
     greetLabelColor: "#2596BE",
     arcColor: "#2596BE",
@@ -91,6 +97,7 @@ const SLOTS: SlotConfig[] = [
     slot: "night",
     greeting: "Good Night",
     sub: "Rest hard — muscles grow while you sleep.",
+    bgColor: "#050a14",
     accentColor: "#F7CB16",
     greetLabelColor: "#F7CB16",
     arcColor: "#3a5a8a",
@@ -129,6 +136,25 @@ function DotPattern({ width, height }: { width: number; height: number }) {
         </Pattern>
       </Defs>
       <Rect width={width} height={height} fill="url(#dots)" />
+    </Svg>
+  );
+}
+
+// ─── Star field overlay for night time ───────────────────────────────────────
+
+function StarField({ width, height }: { width: number; height: number }) {
+  const stars = useMemo(() =>
+    Array.from({ length: 30 }, (_, i) => ({
+      cx: ((i * 137 + 53) % 100),
+      cy: ((i * 71 + 13) % 90),
+      r: ((i * 17 + 5) % 3) * 0.4 + 0.6,
+      opacity: ((i * 31 + 7) % 5) * 0.12 + 0.3,
+    })), []);
+  return (
+    <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
+      {stars.map((s, i) => (
+        <Circle key={i} cx={`${s.cx}%`} cy={`${s.cy}%`} r={s.r} fill="#FFFFFF" opacity={s.opacity} />
+      ))}
     </Svg>
   );
 }
@@ -276,11 +302,15 @@ export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardPro
         },
       ]}
     >
-      {/* ── Dark solid base matching theme ── */}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "#000000" : "#0c1c35", borderRadius: scale(22) }]} />
+      {/* ── Card background — tinted by time slot ── */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: config.bgColor, borderRadius: scale(22) }]} />
 
-      {/* ── Dot pattern overlay ── */}
-      <DotPattern width={cardWidth} height={CARD_HEIGHT} />
+      {/* ── Dot pattern / Star field overlay ── */}
+      {config.slot === "night" || config.slot === "evening" ? (
+        <StarField width={cardWidth} height={CARD_HEIGHT} />
+      ) : (
+        <DotPattern width={cardWidth} height={CARD_HEIGHT} />
+      )}
 
       {/* ── Right side: Arc halo + Coach image ── */}
       <Animated.View
