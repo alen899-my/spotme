@@ -1,7 +1,8 @@
 /**
  * GreetingCard.tsx
- * Time-aware animated greeting card — fully solid coloured card.
- * Icon sits bottom-right so it never overlaps the time pill.
+ * Redesigned to match the SpotMe UI — dark navy card, coach image bleeding
+ * top-right, circular arc halo behind coach, dot pattern bg, coach badge pill.
+ * Time-aware greeting label & colour accent still change by slot.
  */
 
 import React, { useEffect, useRef, useMemo } from "react";
@@ -12,23 +13,27 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Image,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import Svg, {
   Circle,
-  Path,
   Defs,
-  RadialGradient,
-  Stop,
-  Line,
+  Pattern,
+  Rect,
+  G,
 } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
+
+const coachImage = require("../../assets/coach/fit-cartoon-character-training.png");
 
 const { width: SW, height: SH } = Dimensions.get("window");
 const BASE_W = 390;
 const scale = (n: number) => Math.round((SW / BASE_W) * n);
 const vs = (n: number) => Math.round((SH / 844) * n);
+
+// ─── Card is always dark navy — only the accent colour changes by time ────────
 
 export type TimeSlot = "dawn" | "morning" | "afternoon" | "dusk" | "evening" | "night";
 
@@ -36,17 +41,9 @@ interface SlotConfig {
   slot: TimeSlot;
   greeting: string;
   sub: string;
-  cardBg: string;
-  cardBgDark: string;
-  skyGradient: [string, string];
-  skyGradientDark: [string, string];
-  border: string;
-  nameColor: string;
-  greetColor: string;
-  subColor: string;
-  pillBg: string;
-  pillBorder: string;
-  pillText: string;
+  accentColor: string;       // greeting label + time text + arc stroke
+  greetLabelColor: string;   // small-caps greeting
+  arcColor: string;          // large circle arc behind coach
 }
 
 const SLOTS: SlotConfig[] = [
@@ -54,67 +51,49 @@ const SLOTS: SlotConfig[] = [
     slot: "dawn",
     greeting: "Rise & Shine",
     sub: "The world starts fresh — so do you.",
-    cardBg: "#3D1F6E", cardBgDark: "#1E0F37",
-    skyGradient: ["#1a0533", "#F4845F"],
-    skyGradientDark: ["#0d0219", "#7a3f2e"],
-    border: "#F4845F60",
-    nameColor: "#FFFFFF", greetColor: "#F4845F", subColor: "rgba(255,255,255,0.65)",
-    pillBg: "rgba(244,132,95,0.22)", pillBorder: "rgba(244,132,95,0.45)", pillText: "#F4845F",
+    accentColor: "#F4845F",
+    greetLabelColor: "#F4845F",
+    arcColor: "#F4845F",
   },
   {
     slot: "morning",
     greeting: "Good Morning",
     sub: "Fuel up and crush it today.",
-    cardBg: "#2596BE", cardBgDark: "#134B5F",
-    skyGradient: ["#2596BE", "#87CEEB"],
-    skyGradientDark: ["#134B5F", "#1a3a4f"],
-    border: "#F7CB1650",
-    nameColor: "#FFFFFF", greetColor: "#F7CB16", subColor: "rgba(255,255,255,0.72)",
-    pillBg: "rgba(247,203,22,0.18)", pillBorder: "rgba(247,203,22,0.50)", pillText: "#F7CB16",
+    accentColor: "#F7CB16",
+    greetLabelColor: "#F7CB16",
+    arcColor: "#2596BE",
   },
   {
     slot: "afternoon",
     greeting: "Good Afternoon",
-    sub: "Keep the momentum going strong.",
-    cardBg: "#1a6e8a", cardBgDark: "#0D3745",
-    skyGradient: ["#1a6e8a", "#4A90D9"],
-    skyGradientDark: ["#0D3745", "#1a2e4a"],
-    border: "#2596BE80",
-    nameColor: "#FFFFFF", greetColor: "#F7CB16", subColor: "rgba(255,255,255,0.68)",
-    pillBg: "rgba(255,255,255,0.15)", pillBorder: "rgba(255,255,255,0.30)", pillText: "#FFFFFF",
+    sub: "Every rep. Every choice.\nYou're building a stronger you.",
+    accentColor: "#2596BE",
+    greetLabelColor: "#2596BE",
+    arcColor: "#2596BE",
   },
   {
     slot: "dusk",
     greeting: "Good Evening",
     sub: "How did your session go today?",
-    cardBg: "#0d4d65", cardBgDark: "#062632",
-    skyGradient: ["#E87D3E", "#3D1F6E"],
-    skyGradientDark: ["#7a3f1e", "#1E0F37"],
-    border: "#E87D3E55",
-    nameColor: "#FFFFFF", greetColor: "#E87D3E", subColor: "rgba(255,255,255,0.65)",
-    pillBg: "rgba(232,125,62,0.20)", pillBorder: "rgba(232,125,62,0.45)", pillText: "#E87D3E",
+    accentColor: "#E87D3E",
+    greetLabelColor: "#E87D3E",
+    arcColor: "#E87D3E",
   },
   {
     slot: "evening",
     greeting: "Good Evening",
     sub: "Wind down and recover well.",
-    cardBg: "#0d2e45", cardBgDark: "#061724",
-    skyGradient: ["#0d2e45", "#1a1a3e"],
-    skyGradientDark: ["#061724", "#0d0d1a"],
-    border: "#2596BE40",
-    nameColor: "#FFFFFF", greetColor: "#2596BE", subColor: "rgba(255,255,255,0.60)",
-    pillBg: "rgba(37,150,190,0.20)", pillBorder: "rgba(37,150,190,0.45)", pillText: "#2596BE",
+    accentColor: "#2596BE",
+    greetLabelColor: "#2596BE",
+    arcColor: "#2596BE",
   },
   {
     slot: "night",
     greeting: "Good Night",
     sub: "Rest hard — muscles grow while you sleep.",
-    cardBg: "#04282B", cardBgDark: "#021415",
-    skyGradient: ["#04282B", "#0a0a1a"],
-    skyGradientDark: ["#021415", "#050510"],
-    border: "#F7CB1625",
-    nameColor: "#FFFFFF", greetColor: "#F7CB16", subColor: "rgba(255,255,255,0.55)",
-    pillBg: "rgba(247,203,22,0.12)", pillBorder: "rgba(247,203,22,0.35)", pillText: "#F7CB16",
+    accentColor: "#F7CB16",
+    greetLabelColor: "#F7CB16",
+    arcColor: "#3a5a8a",
   },
 ];
 
@@ -127,320 +106,384 @@ function getSlot(hour: number): SlotConfig {
   return SLOTS[5];
 }
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
+// ─── Dot grid background overlay ─────────────────────────────────────────────
 
-function SunIcon({ size = 44, rayColor = "#F7CB16" }: { size?: number; rayColor?: string }) {
-  const spin = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(spin, { toValue: 1, duration: 14000, easing: Easing.linear, useNativeDriver: true })
-    ).start();
-  }, []);
-  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+function DotPattern({ width, height }: { width: number; height: number }) {
   return (
-    <Animated.View style={{ transform: [{ rotate }] }}>
-      <Svg width={size} height={size} viewBox="0 0 44 44">
-        <Defs>
-          <RadialGradient id="sg" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#FFF9C4" />
-            <Stop offset="100%" stopColor={rayColor} />
-          </RadialGradient>
-        </Defs>
-        {[0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => {
-          const r = (deg * Math.PI) / 180;
-          return (
-            <Line key={i}
-              x1={22 + 11 * Math.cos(r)} y1={22 + 11 * Math.sin(r)}
-              x2={22 + 20 * Math.cos(r)} y2={22 + 20 * Math.sin(r)}
-              stroke={rayColor} strokeWidth="2.5" strokeLinecap="round"
-            />
-          );
-        })}
-        <Circle cx="22" cy="22" r="9" fill="url(#sg)" />
-      </Svg>
-    </Animated.View>
-  );
-}
-
-function MoonIcon({ size = 42 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 42 42">
+    <Svg
+      width={width}
+      height={height}
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+    >
       <Defs>
-        <RadialGradient id="mg" cx="40%" cy="35%" r="60%">
-          <Stop offset="0%" stopColor="#FFF9E0" />
-          <Stop offset="100%" stopColor="#F7CB16" />
-        </RadialGradient>
+        <Pattern
+          id="dots"
+          x="0"
+          y="0"
+          width="18"
+          height="18"
+          patternUnits="userSpaceOnUse"
+        >
+          <Circle cx="1.5" cy="1.5" r="1.5" fill="rgba(255,255,255,0.07)" />
+        </Pattern>
       </Defs>
-      <Path d="M28 7 A15 15 0 1 0 28 35 A11 11 0 1 1 28 7Z" fill="url(#mg)" />
-      <Circle cx="18" cy="15" r="1.6" fill="rgba(231,177,0,0.4)" />
-      <Circle cx="24" cy="25" r="2.2" fill="rgba(231,177,0,0.3)" />
-      <Circle cx="15" cy="24" r="1.1" fill="rgba(231,177,0,0.4)" />
+      <Rect width={width} height={height} fill="url(#dots)" />
     </Svg>
   );
 }
 
-function DawnIcon({ size = 44 }: { size?: number }) {
+// ─── Arc halo behind coach ────────────────────────────────────────────────────
+
+function CoachArc({
+  size,
+  color,
+  opacity = 0.35,
+}: {
+  size: number;
+  color: string;
+  opacity?: number;
+}) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 44 44">
-      <Path d="M4 32 Q22 12 40 32" fill="none" stroke="#F4845F" strokeWidth="2.5" strokeLinecap="round" />
-      <Path d="M12 32 A10 10 0 0 1 32 32Z" fill="#F7CB16" />
-      {[-50, -28, -8, 8, 28, 50].map((deg, i) => {
-        const r = (deg * Math.PI) / 180;
-        return (
-          <Line key={i}
-            x1={22 + 11 * Math.sin(r)} y1={32 - 11 * Math.cos(r)}
-            x2={22 + 18 * Math.sin(r)} y2={32 - 18 * Math.cos(r)}
-            stroke="#F7CB16" strokeWidth="2.2" strokeLinecap="round"
-          />
-        );
-      })}
+    <Svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+    >
+      {/* Outer glow ring */}
+      <Circle
+        cx={size}
+        cy={size * 0.5}
+        r={size * 0.72}
+        fill="none"
+        stroke={color}
+        strokeWidth={size * 0.13}
+        strokeOpacity={opacity * 0.45}
+      />
+      {/* Inner ring */}
+      <Circle
+        cx={size}
+        cy={size * 0.5}
+        r={size * 0.52}
+        fill="none"
+        stroke={color}
+        strokeWidth={size * 0.07}
+        strokeOpacity={opacity * 0.65}
+      />
+      {/* Filled centre glow */}
+      <Circle
+        cx={size}
+        cy={size * 0.5}
+        r={size * 0.38}
+        fill={color}
+        fillOpacity={opacity * 0.18}
+      />
     </Svg>
   );
 }
 
-function DuskIcon({ size = 44 }: { size?: number }) {
+// ─── Coach badge pill ─────────────────────────────────────────────────────────
+
+function CoachBadge({ accentColor }: { accentColor: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 44 44">
-      <Path d="M4 30 Q22 10 40 30" fill="none" stroke="#E87D3E" strokeWidth="2.5" strokeLinecap="round" />
-      <Path d="M11 30 A11 11 0 0 1 33 30Z" fill="#E87D3E" />
-      {[-55, -32, -10, 10, 32, 55].map((deg, i) => {
-        const r = (deg * Math.PI) / 180;
-        return (
-          <Line key={i}
-            x1={22 + 12 * Math.sin(r)} y1={30 - 12 * Math.cos(r)}
-            x2={22 + 19 * Math.sin(r)} y2={30 - 19 * Math.cos(r)}
-            stroke="#F7CB16" strokeWidth="2.2" strokeLinecap="round"
-          />
-        );
-      })}
-    </Svg>
+    <View style={[styles.coachBadge, { borderColor: `${accentColor}45` }]}>
+      <View style={[styles.coachBadgeIcon, { backgroundColor: `${accentColor}30` }]}>
+        <Ionicons name="star" size={scale(10)} color={accentColor} />
+      </View>
+      <View>
+        <Text style={[styles.coachBadgeTitle, { color: accentColor }]}>
+          Your Coach
+        </Text>
+        <Text style={styles.coachBadgeSub}>Here for your journey</Text>
+      </View>
+    </View>
   );
 }
 
-function StarField({ count = 20 }: { count?: number }) {
-  const twinkle = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(twinkle, { toValue: 1, duration: 2000, useNativeDriver: true }),
-        Animated.timing(twinkle, { toValue: 0.25, duration: 2000, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-  const opacity = twinkle.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.9] });
-
-  const stars = useMemo(() =>
-    Array.from({ length: count }, (_, i) => ({
-      x: ((i * 79 + 11) % 100),
-      y: ((i * 53 + 7) % 85),
-      r: ((i * 11 + 3) % 3) * 0.6 + 0.7,
-    })), [count]);
-
-  return (
-    <Animated.View style={[StyleSheet.absoluteFill, { opacity }]} pointerEvents="none">
-      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-        {stars.map((s, i) => (
-          <Circle key={i} cx={`${s.x}%`} cy={`${s.y}%`} r={s.r} fill="#FFFFFF" />
-        ))}
-      </Svg>
-    </Animated.View>
-  );
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 interface GreetingCardProps {
   firstName: string;
   fitnessGoal?: string;
 }
 
+const CARD_HEIGHT = vs(220);
+
 export default function GreetingCard({ firstName, fitnessGoal }: GreetingCardProps) {
   const { colors, isDark } = useTheme();
   const hour = new Date().getHours();
   const config = useMemo(() => getSlot(hour), [hour]);
 
+  // Entrance animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(vs(18))).current;
-  const iconOpacity = useRef(new Animated.Value(0)).current;
-  const iconScale = useRef(new Animated.Value(0.5)).current;
+  const slideAnim = useRef(new Animated.Value(vs(20))).current;
+  const coachSlide = useRef(new Animated.Value(scale(30))).current;
+  const coachOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 550, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 550, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
     ]).start();
+
+    // Coach slides in from right with a slight delay
     Animated.sequence([
-      Animated.delay(220),
+      Animated.delay(200),
       Animated.parallel([
-        Animated.spring(iconScale, { toValue: 1, tension: 80, friction: 8, useNativeDriver: true }),
-        Animated.timing(iconOpacity, { toValue: 1, duration: 380, useNativeDriver: true }),
+        Animated.timing(coachSlide, {
+          toValue: 0,
+          duration: 480,
+          easing: Easing.out(Easing.back(1.2)),
+          useNativeDriver: true,
+        }),
+        Animated.timing(coachOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
       ]),
     ]).start();
   }, []);
 
-  const isNight = config.slot === "night" || config.slot === "evening" || isDark;
+  const timeString = new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  // Card width for sizing the arc
+  const cardWidth = SW - scale(32); // assuming 16px margin each side
 
   return (
     <Animated.View
       style={[
         styles.card,
         {
-          borderColor: isDark ? colors.border : config.border,
-          borderWidth: isDark ? 1 : 1.5,
+          height: CARD_HEIGHT,
           opacity: fadeAnim,
           transform: [{ translateY: slideAnim }],
         },
       ]}
     >
-      {/* Sky gradient background */}
-      <LinearGradient
-        colors={isDark ? config.skyGradientDark : config.skyGradient}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      {/* ── Dark solid base matching theme ── */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "#000000" : "#0c1c35", borderRadius: scale(22) }]} />
 
-      {/* Stars for night/evening/dark mode — behind content but above gradient */}
-      {isNight && <StarField count={24} />}
+      {/* ── Dot pattern overlay ── */}
+      <DotPattern width={cardWidth} height={CARD_HEIGHT} />
 
-      {/* ── Content (full width, no right padding eaten by icon) ── */}
-      <View style={styles.content}>
+      {/* ── Right side: Arc halo + Coach image ── */}
+      <Animated.View
+        style={[
+          styles.coachSide,
+          {
+            opacity: coachOpacity,
+            transform: [{ translateX: coachSlide }],
+          },
+        ]}
+        pointerEvents="none"
+      >
+        {/* Arc glow rings behind coach */}
+        <CoachArc
+          size={CARD_HEIGHT * 1.05}
+          color={config.arcColor}
+          opacity={0.45}
+        />
+        {/* Coach image — bleeds to top & right edges */}
+        <Image
+          source={coachImage}
+          style={[styles.coachImage, { height: CARD_HEIGHT * 1.08 }]}
+          resizeMode="contain"
+        />
+      
+      </Animated.View>
 
-        {/* Row 1: GREETING label (left)  +  time pill (right) */}
-        <View style={styles.topRow}>
-          <Text style={[styles.greetLabel, { color: isDark ? colors.primary : config.greetColor }]}>
-            {config.greeting.toUpperCase()}
-          </Text>
-          <View style={[styles.timePill, { backgroundColor: isDark ? colors.inputBg : config.pillBg, borderColor: isDark ? colors.border : config.pillBorder }]}>
-            <Text style={[styles.timePillText, { color: isDark ? colors.primary : config.pillText }]}>
-              {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </Text>
-          </View>
-        </View>
+      {/* ── Left side: text content ── */}
+      <View style={styles.contentLeft}>
+        {/* Greeting label — small caps, accent colour */}
+        <Text
+          style={[
+            styles.greetLabel,
+            { color: isDark ? colors.primary : config.greetLabelColor },
+          ]}
+        >
+          {config.greeting.toUpperCase()}
+        </Text>
 
-        {/* Row 2: Name (left, flex) + Icon (right, fixed size, aligned to name row) */}
-        <View style={styles.nameRow}>
-          <Text style={[styles.name, { color: isDark ? colors.text : config.nameColor, flex: 1 }]} numberOfLines={1}>
-            {firstName} 👋
-          </Text>
+        {/* Name — massive white bold */}
+        <Text
+          style={[
+            styles.name,
+            { color: isDark ? colors.text : "#FFFFFF" },
+          ]}
+          numberOfLines={1}
+        >
+          {firstName} 👋
+        </Text>
 
-          {/* Icon lives here — inline with name, right-aligned, never overlaps text */}
-          <Animated.View
-            style={[styles.iconInline, { opacity: iconOpacity, transform: [{ scale: iconScale }] }]}
-            pointerEvents="none"
-          >
-            {config.slot === "morning" && <SunIcon size={scale(48)} rayColor="#F7CB16" />}
-            {config.slot === "afternoon" && <SunIcon size={scale(44)} rayColor="rgba(255,255,255,0.9)" />}
-            {config.slot === "dawn" && <DawnIcon size={scale(48)} />}
-            {config.slot === "dusk" && <DuskIcon size={scale(48)} />}
-            {config.slot === "evening" && <MoonIcon size={scale(42)} />}
-            {config.slot === "night" && <MoonIcon size={scale(46)} />}
-          </Animated.View>
-        </View>
-
-        {/* Sub message */}
-        <Text style={[styles.sub, { color: isDark ? colors.textMuted : config.subColor }]}>
+        {/* Sub text */}
+        <Text
+          style={[
+            styles.sub,
+            { color: isDark ? colors.textMuted : "rgba(255,255,255,0.68)" },
+          ]}
+        >
           {config.sub}
         </Text>
 
+        {/* Spacer pushes time to bottom */}
+        <View style={{ flex: 1 }} />
 
+        {/* Time — clock icon + time string, accent colour */}
+        <View style={styles.timeRow}>
+          <Ionicons
+            name="time-outline"
+            size={scale(13)}
+            color={isDark ? colors.primary : config.accentColor}
+            style={{ marginRight: scale(4) }}
+          />
+          <Text
+            style={[
+              styles.timeText,
+              { color: isDark ? colors.primary : config.accentColor },
+            ]}
+          >
+            {timeString}
+          </Text>
+        </View>
       </View>
     </Animated.View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   card: {
     borderRadius: scale(22),
-    borderWidth: 1.5,
     marginBottom: vs(20),
-    position: "relative",
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-
-  content: {
-    paddingHorizontal: scale(20),
-    paddingTop: vs(18),
-    paddingBottom: vs(18),
-    gap: vs(4),
-    zIndex: 3,
-  },
-
-  // Row 1 — greeting label + time pill, full width
-  topRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    // Border: very subtle blue-ish rim matching the dark navy card
+    borderWidth: 1,
+    borderColor: "rgba(37,150,190,0.22)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+
+  // ── Left text column ──────────────────────────────────────────────────────
+  contentLeft: {
+    flex: 1,
+    paddingLeft: scale(20),
+    paddingRight: scale(140),
+    paddingTop: vs(18),
+    paddingBottom: vs(16),
+    zIndex: 3,
   },
 
   greetLabel: {
     fontFamily: FONTS.bodyBold,
     fontSize: scale(11),
-    letterSpacing: 2.2,
-  },
-
-  timePill: {
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: scale(10),
-    paddingVertical: vs(4),
-  },
-
-  timePillText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: scale(12),
-    letterSpacing: 0.3,
-  },
-
-  // Row 2 — name (flex) + icon (fixed right)
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: vs(2),
+    letterSpacing: 2.4,
+    marginBottom: vs(2),
   },
 
   name: {
     fontFamily: FONTS.heading,
-    fontSize: scale(30),
-    letterSpacing: -0.6,
-    lineHeight: scale(36),
-  },
-
-  // Icon sits inline to the right of the name, never absolute
-  iconInline: {
-    marginLeft: scale(8),
-    // slight opacity disc behind icon for legibility on any bg
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 999,
-    padding: scale(4),
+    fontSize: scale(34),
+    fontWeight: "800",
+    letterSpacing: -0.8,
+    lineHeight: scale(40),
+    marginBottom: vs(6),
   },
 
   sub: {
     fontFamily: FONTS.body,
     fontSize: scale(13),
-    lineHeight: scale(20),
-    marginTop: vs(2),
+    lineHeight: scale(19),
   },
 
-  goalPill: {
+  timeRow: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: scale(12),
-    paddingVertical: vs(5),
-    marginTop: vs(6),
   },
 
-  goalPillText: {
+  timeText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: scale(12),
+    fontSize: scale(13),
+    letterSpacing: 0.2,
+  },
+
+  // ── Right coach column ────────────────────────────────────────────────────
+  coachSide: {
+    width: scale(220),
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    zIndex: 2,
+    overflow: "hidden",
+  },
+
+  coachImage: {
+    position: "absolute",
+    right: scale(-20),
+    bottom: vs(-50),
+    width: scale(220),
+    height: vs(320),
+    resizeMode: "contain",
+    zIndex: 1,
+  },
+
+  // ── Coach badge pill ──────────────────────────────────────────────────────
+  coachBadge: {
+    position: "absolute",
+    bottom: vs(12),
+    right: scale(10),
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(6),
+    backgroundColor: "rgba(0,0,0,0.82)",
+    borderRadius: scale(20),
+    borderWidth: 1,
+    paddingHorizontal: scale(10),
+    paddingVertical: vs(5),
+    zIndex: 5,
+  },
+
+  coachBadgeIcon: {
+    width: scale(20),
+    height: scale(20),
+    borderRadius: scale(10),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  coachBadgeTitle: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: scale(11),
+    lineHeight: scale(14),
+  },
+
+  coachBadgeSub: {
+    fontFamily: FONTS.body,
+    fontSize: scale(10),
+    color: "rgba(255,255,255,0.55)",
+    lineHeight: scale(13),
   },
 });
