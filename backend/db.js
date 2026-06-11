@@ -148,7 +148,8 @@ const initDB = async () => {
       ADD COLUMN IF NOT EXISTS rating INT,
       ADD COLUMN IF NOT EXISTS calories_burned INT DEFAULT 0,
       ADD COLUMN IF NOT EXISTS calories_burned_method VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS workout_met NUMERIC(4,2) DEFAULT 0;
+      ADD COLUMN IF NOT EXISTS workout_met NUMERIC(4,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS streak_at_completion INT DEFAULT 0;
 
       ALTER TABLE daily_workout_exercises
       ADD COLUMN IF NOT EXISTS is_skipped BOOLEAN DEFAULT FALSE,

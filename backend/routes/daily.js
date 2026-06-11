@@ -710,9 +710,12 @@ router.patch(
         }
 
         result.rows[0].new_streak = newStreak;
+        await pool.query('UPDATE daily_workouts SET streak_at_completion = $1 WHERE id = $2', [newStreak, workoutId]);
         } else {
           const streakRes = await pool.query('SELECT current_streak FROM users WHERE id = $1', [userId]);
-          result.rows[0].new_streak = parseInt(streakRes.rows[0]?.current_streak) || 0;
+          const currentStreak = parseInt(streakRes.rows[0]?.current_streak) || 0;
+          result.rows[0].new_streak = currentStreak;
+          await pool.query('UPDATE daily_workouts SET streak_at_completion = $1 WHERE id = $2', [currentStreak, workoutId]);
         }
       } catch (streakErr) {
         console.error('[XP/Streak] Failed to update metrics:', streakErr);
@@ -1631,45 +1634,80 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
       const durationMin = Math.round((w.total_duration_seconds || 0) / 60);
       const skippedCount = exercises.filter(e => e.is_skipped).length;
 
-      const exerciseLines = exercises.map(e => {
+      // Per-set detail lines
+      const exerciseDetails = exercises.map(e => {
         const exSets = sets.filter(s => s.exercise_id === e.exercise_id);
         const avgWeight = exSets.length ? (exSets.reduce((a, s) => a + Number(s.weight || 0), 0) / exSets.length).toFixed(1) : '-';
         const totalRepsEx = exSets.reduce((a, s) => a + (s.reps || 0), 0);
         const pr = e.is_personal_record ? ' [PR]' : '';
         const wr = e.is_world_record ? ' [WR]' : '';
         const skipped = e.is_skipped ? ' [SKIPPED]' : '';
-        return `${e.name} (${e.target || e.muscle_group || ''}): ${exSets.length}/${e.target_sets} sets × ${avgWeight}kg, ${totalRepsEx} reps${pr}${wr}${skipped}`;
-      }).join('\n');
+        const setLines = exSets.length > 0
+          ? exSets.map(s => `    Set ${s.set_number}: ${Number(s.weight || 0).toFixed(1)}kg × ${s.reps} reps, ${Math.round((s.duration_seconds || 0) / 60)}min rest`).join('\n')
+          : '    (no sets logged)';
+        return `${e.name} (${e.target || e.muscle_group || ''}): ${exSets.length}/${e.target_sets} sets, avg ${avgWeight}kg, ${totalRepsEx} total reps${pr}${wr}${skipped}\n${setLines}`;
+      }).join('\n\n');
 
-      const prompt = `You are an expert personal trainer. Analyze this workout and write a neat, motivating report organized into clear sections.
+      // Fetch recent workout history for context
+      let recentHistoryLines = '(no recent workouts)';
+      let recentRes;
+      try {
+        recentRes = await client.query(`
+          SELECT total_volume, total_duration_seconds, completed_at, streak_at_completion
+          FROM daily_workouts
+          WHERE user_id = $1 AND status = 'completed' AND id != $2
+          ORDER BY completed_at DESC
+          LIMIT 5
+        `, [userId, workoutId]);
+        if (recentRes.rows.length > 0) {
+          recentHistoryLines = recentRes.rows.map((r, i) =>
+            `  Workout ${i + 1}: ${Math.round(r.total_volume || 0)}kg volume, ${Math.round((r.total_duration_seconds || 0) / 60)}min, streak: ${r.streak_at_completion || 0}`
+          ).join('\n');
+        }
+      } catch (_) {}
 
-WORKOUT DATA:
+      // Calculate volume trend
+      const avgVolumeLast5 = recentRes?.rows?.length > 0
+        ? Math.round(recentRes.rows.reduce((a, r) => a + Number(r.total_volume || 0), 0) / recentRes.rows.length)
+        : 'N/A';
+
+      const prompt = `You are an expert personal trainer and honest coach. Analyze this workout thoroughly and write a candid, insightful report.
+
+ABOUT THE ATHLETE:
 - Goal: ${w.fitness_goal || 'General fitness'}
 - Level: ${w.experience_level || 'Intermediate'}
+- Age: ${w.age || 'Not provided'} | Gender: ${w.gender || 'Not provided'}
+- Height: ${w.height || 'Not provided'} cm | Body Weight: ${w.user_weight || 'Not provided'} kg
+
+WORKOUT DATA:
 - Duration: ${durationMin} min
 - Volume: ${Math.round(totalVolume)} kg (${totalSets} sets, ${totalReps} reps)
 - Skipped: ${skippedCount} exercises
-- Rest: ${Math.round((w.total_rest_seconds || 0) / 60)} min
-- Calories: ${w.calories_burned || 'N/A'}
+- Rest Taken: ${Math.round((w.total_rest_seconds || 0) / 60)} min
+- Calories: ${w.calories_burned || 'N/A'} kcal
+- Avg Volume Last 5 Workouts: ${avgVolumeLast5} kg
 
-EXERCISES LOGGED:
-${exerciseLines}
+RECENT WORKOUT HISTORY:
+${recentHistoryLines}
+
+EXERCISES & SETS LOGGED (detailed):
+${exerciseDetails}
 
 Write a clean report with these 4 sections. Use the exact markers shown below so I can parse it:
 
 ===SUMMARY===
-Write 2-3 sentences giving an overall assessment of this session. Mention the goal alignment, intensity level, and overall effectiveness.
+Write 2-3 sentences giving an overall assessment of this session. Compare against their goal and note whether this was an effective session. Be honest — if it was subpar, say so.
 
 ===GOOD THINGS===
-List 3-4 things that went well. Use bullet points (•). Be specific — mention exercises, effort, consistency, PRs, form, etc.
+List 2-4 things that went well. Use bullet points (•). Be specific — mention exercises, effort, PRs, consistency, form, intensity. If nothing stands out as good, say "The session was completed." (be honest).
 
 ===AREAS TO IMPROVE===
-List 2-3 areas that could be better. Use bullet points (•). Be constructive — suggest what to focus on next time, form cues, volume adjustments, etc.
+List 2-4 areas that could be better. Use bullet points (•). Be constructive. Point out if volume was too low, intensity lacking, too much rest, exercises skipped, or if form might suffer. Be direct — a real coach doesn't sugarcoat.
 
 ===RECOMMENDATIONS===
-Give 2-3 specific, actionable tips for the next workout. Use bullet points (•). Include exercise substitutions, rep/weight progression advice, rest period changes, or warm-up/cool-down suggestions.
+Give 2-4 specific, actionable tips for the next workout. Use bullet points (•). Include exercise substitutions, rep/weight progression, rest period adjustments, warm-up/cool-down suggestions, or changes to address weaknesses spotted.
 
-Keep it concise, energetic, and helpful — like a real coach talking to an athlete.`;
+Keep it concise, direct, and helpful — like an honest coach who wants you to improve. If the workout was weak, say it. If great, celebrate it. Always reference the actual data provided.`;
 
       const aiRaw = await callAI(prompt);
 

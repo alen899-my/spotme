@@ -133,6 +133,7 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
   const isSkipped = ex.is_skipped;
   const isCardio = ex.category?.toLowerCase() === 'cardio';
   const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
+  const hasCompletedData = completedSets.length > 0;
   const totalReps = completedSets.reduce((acc: number, s: any) => acc + (parseInt(s.reps) || 0), 0);
   const totalWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0);
   const totalSetWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0), 0);
@@ -148,7 +149,7 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
           width: CAROUSEL_CARD_W,
           backgroundColor: isDark ? '#0D0D0D' : '#FFFFFF',
           borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
-          opacity: isSkipped ? 0.55 : 1,
+          opacity: isSkipped && !hasCompletedData ? 0.55 : 1,
         },
       ]}
     >
@@ -160,7 +161,7 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
             {ex.name}
           </Text>
           <Text style={[carouselStyles.exSetsSub, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>
-            {isSkipped ? 'Movement skipped' : isCardio ? `${formatTime(totalTime)} logged` : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
+            {isSkipped && !hasCompletedData ? 'Movement skipped' : isSkipped && hasCompletedData ? `Partially completed — ${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} logged, then skipped` : isCardio ? `${formatTime(totalTime)} logged` : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
           </Text>
         </View>
         {isSkipped && (
@@ -188,8 +189,8 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
         )}
       </View>
 
-      {/* Record row (non-cardio, non-skipped) */}
-      {!isSkipped && !isCardio && (
+      {/* Record row (non-cardio, has completed data) */}
+      {!isCardio && (hasCompletedData || !isSkipped) && (
         <View style={carouselStyles.recordRow}>
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>BEST SET</Text>
@@ -212,8 +213,8 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
         </View>
       )}
 
-      {/* Stats grid */}
-      {!isSkipped && completedSets.length > 0 && (
+      {/* Stats grid — show for non-skipped OR skipped with completed data */}
+      {(!isSkipped || hasCompletedData) && completedSets.length > 0 && (
         <View style={carouselStyles.exStatsGrid}>
           {isCardio ? (
             <>
@@ -344,6 +345,9 @@ export default function WorkoutCompleteScreen() {
       });
       setWorkout(response.data);
       if (response.data.post_workout_weight) setWeight(String(response.data.post_workout_weight));
+      if (response.data.streak_at_completion > 0) {
+        setNewStreak(response.data.streak_at_completion);
+      }
     } catch (err) {
       console.error('Error fetching workout summary:', err);
     } finally {
@@ -629,14 +633,14 @@ export default function WorkoutCompleteScreen() {
             </View>
             <View style={[st.weightInputWrap, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.45)', borderColor: isDark ? colors.border : 'rgba(255,255,255,0.7)' }]}>
               <TextInput
-                style={[st.weightInput, { color: isDark ? colors.text : '#78350F', fontSize: fs(24), height: vs(52) }]}
+                style={[st.weightInput, { color: isDark ? colors.text : '#78350F', fontSize: fs(24), height: vs(56), paddingVertical: 0, textAlignVertical: 'center' }]}
                 placeholder="e.g. 75.5"
                 placeholderTextColor={isDark ? colors.textDim : 'rgba(120,53,15,0.45)'}
                 keyboardType="decimal-pad"
                 value={weight}
                 onChangeText={setWeight}
               />
-              <View style={[st.weightUnit, { backgroundColor: isDark ? 'rgba(217,119,6,0.12)' : 'rgba(120,53,15,0.12)', height: vs(52) }]}>
+              <View style={[st.weightUnit, { backgroundColor: isDark ? 'rgba(217,119,6,0.12)' : 'rgba(120,53,15,0.12)', height: vs(56) }]}>
                 <Text style={[st.weightUnitText, { color: isDark ? '#F59E0B' : '#92400E', fontSize: fs(14) }]}>kg</Text>
               </View>
             </View>

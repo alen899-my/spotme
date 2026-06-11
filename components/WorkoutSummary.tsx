@@ -44,6 +44,7 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
   const isSkipped = ex.is_skipped;
   const isCardio = ex.category?.toLowerCase() === 'cardio';
   const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
+  const hasCompletedData = completedSets.length > 0;
   const totalReps = completedSets.reduce((acc: number, s: any) => acc + (parseInt(s.reps) || 0), 0);
   const totalWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0);
   const totalSetWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0), 0);
@@ -56,7 +57,7 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
       style={[
         styles.exCard,
         { width: CAROUSEL_CARD_W, marginBottom: 0 },
-        isSkipped && { opacity: 0.55 },
+        isSkipped && !hasCompletedData && { opacity: 0.55 },
         isDark && {
           backgroundColor: colors.pill,
           borderColor: colors.border,
@@ -70,7 +71,7 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
         <View style={styles.exMeta}>
           <Text style={[styles.exName, isDark && { color: colors.text }]} numberOfLines={2}>{ex.name}</Text>
           <Text style={[styles.exSetsSub, isDark && { color: colors.textMuted }]}>
-            {isSkipped ? 'Movement skipped' : isCardio ? `${formatTime(totalTime)} logged` : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
+            {isSkipped && !hasCompletedData ? 'Movement skipped' : isSkipped && hasCompletedData ? `Partially completed — ${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} logged, then skipped` : isCardio ? `${formatTime(totalTime)} logged` : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
           </Text>
         </View>
         {isSkipped && (
@@ -98,8 +99,8 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
         )}
       </View>
 
-      {/* Record row (non-cardio, non-skipped) */}
-      {!isSkipped && !isCardio && (
+      {/* Record row (non-cardio, has completed data) */}
+      {!isCardio && (hasCompletedData || !isSkipped) && (
         <View style={styles.recordRow}>
           <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
             <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>BEST SET</Text>
@@ -122,8 +123,8 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
         </View>
       )}
 
-      {/* Stats grid */}
-      {!isSkipped && completedSets.length > 0 && (
+      {/* Stats grid — show for non-skipped OR skipped with completed data */}
+      {(!isSkipped || hasCompletedData) && completedSets.length > 0 && (
         <View style={styles.exStatsGrid}>
           {isCardio ? (
             <>

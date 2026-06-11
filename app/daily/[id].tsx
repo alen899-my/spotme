@@ -17,6 +17,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useWorkoutTimer } from '../../contexts/WorkoutTimerContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import ExercisePreviewModal from '../../components/modals/ExercisePreviewModal';
+import ExerciseFilterModal, { ExerciseFilters } from '../../components/exercises/ExerciseFilterModal';
 import { ActiveWorkoutSkeleton } from '../../components/ui/Skeleton';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -76,11 +77,16 @@ const ExerciseCard = React.memo(({
   const { isDark } = useTheme();
   const [localRating, setLocalRating] = useState<number | null>(item.rating || null);
   // ── 2. Accordion state ──
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(!item.is_completed && !item.is_skipped);
   // ── 6. Rating accordion ──
   const [ratingOpen, setRatingOpen] = useState(false);
 
   useEffect(() => { setLocalRating(item.rating || null); }, [item.rating]);
+
+  // Auto-open when this exercise becomes active
+  useEffect(() => {
+    if (activeExerciseId === item.id) setExpanded(true);
+  }, [activeExerciseId]);
 
   const completedSets = item.sets?.length || 0;
   const targetSets = item.target_sets || 3;
@@ -462,6 +468,7 @@ export default function ActiveWorkoutScreen() {
   } = useWorkoutTimer();
 
   const [activeExercise, setActiveExercise] = useState<any>(null);
+  const [derivedActiveId, setDerivedActiveId] = useState<number | null>(null);
   const [activeSetNum, setActiveSetNum] = useState(1);
   const [setModalVisible, setSetModalVisible] = useState(false);
 
@@ -520,6 +527,10 @@ export default function ActiveWorkoutScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const LIMIT = 20;
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [exerciseFilters, setExerciseFilters] = useState<ExerciseFilters>({
+    categories: [], bodyParts: [], equipment: [], targets: [], minRating: 0,
+  });
 
   const [finishWeight, setFinishWeight] = useState('');
   const [uploadingPhotos, setUploadingPhotos] = useState<string[]>([]);
@@ -550,6 +561,19 @@ export default function ActiveWorkoutScreen() {
   }, [workoutId]);
 
   useFocusEffect(useCallback(() => { fetchWorkout(); }, [fetchWorkout]));
+
+  // Derive active exercise from workout data when no explicit active exercise is set
+  useEffect(() => {
+    if (!workout?.exercises || activeExercise) return;
+    const withProgress = workout.exercises.find(
+      (ex: any) => !ex.is_completed && !ex.is_skipped && (ex.sets?.length || 0) > 0
+    );
+    if (withProgress) { setDerivedActiveId(withProgress.id); return; }
+    const firstIncomplete = workout.exercises.find(
+      (ex: any) => !ex.is_completed && !ex.is_skipped
+    );
+    setDerivedActiveId(firstIncomplete?.id || null);
+  }, [workout, activeExercise]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -736,6 +760,7 @@ export default function ActiveWorkoutScreen() {
     setSearchQuery('');
     setPage(0);
     setHasMore(true);
+    setExerciseFilters({ categories: [], bodyParts: [], equipment: [], targets: [], minRating: 0 });
     fetchExtraExercises('', cat, 0);
   };
 
@@ -744,8 +769,13 @@ export default function ActiveWorkoutScreen() {
     try {
       const token = await getToken();
       const offset = p * LIMIT;
+      const params: any = { q, category: cat, limit: LIMIT, offset };
+      if (exerciseFilters.bodyParts.length > 0) params.body_part = exerciseFilters.bodyParts.join(',');
+      if (exerciseFilters.equipment.length > 0) params.equipment = exerciseFilters.equipment.join(',');
+      if (exerciseFilters.targets.length > 0) params.target = exerciseFilters.targets.join(',');
+      if (exerciseFilters.minRating > 0) params.min_rating = exerciseFilters.minRating;
       const res = await axios.get(`${API_URL}/workouts/exercises/search`, {
-        params: { q, category: cat, limit: LIMIT, offset },
+        params,
         headers: { Authorization: `Bearer ${token}` },
       });
       const newExs = res.data;
@@ -991,11 +1021,13 @@ export default function ActiveWorkoutScreen() {
     setShowEditMetricsModal(true);
   };
 
+  const activeExerciseId = activeExercise?.id || derivedActiveId;
+
   const completedCount = workout?.exercises?.filter((e: any) => e.is_completed).length || 0;
   const totalCount = workout?.exercises?.length || 0;
   const sortedExercises = [...(workout?.exercises || [])].sort((a: any, b: any) => {
-    const aActive = activeExercise?.id === a.id ? 1 : 0;
-    const bActive = activeExercise?.id === b.id ? 1 : 0;
+    const aActive = activeExerciseId === a.id ? 1 : 0;
+    const bActive = activeExerciseId === b.id ? 1 : 0;
     const aDone = a.is_completed ? 1 : 0;
     const bDone = b.is_completed ? 1 : 0;
     const aSkipped = a.is_skipped ? 1 : 0;
@@ -1010,13 +1042,13 @@ export default function ActiveWorkoutScreen() {
   const renderExercise = useCallback(({ item }: { item: any }) => (
     <ExerciseCard
       item={item} colors={colors} workoutStatus={displayStatus}
-      activeExerciseId={activeExercise?.id} setTimer={setTimer} setTimerRunning={setTimerRunning}
+      activeExerciseId={activeExerciseId} setTimer={setTimer} setTimerRunning={setTimerRunning}
       openGuide={openGuide} removeExercise={removeExercise} removeSet={removeSet}
       handleSkipExercise={handleSkipExercise} openSetModal={openSetModal}
       openEditSet={openEditSet}
       handleRateExercise={handleRateExercise} loadingSkip={loadingSkip} loadingLogSet={loadingLogSet}
     />
-  ), [colors, displayStatus, activeExercise?.id, setTimer, setTimerRunning, openGuide,
+  ), [colors, displayStatus, activeExerciseId, setTimer, setTimerRunning, openGuide,
     removeExercise, removeSet, handleSkipExercise, openSetModal, openEditSet, handleRateExercise, loadingSkip, loadingLogSet]);
 
   if (loading) return <ActiveWorkoutSkeleton />;
@@ -1259,9 +1291,16 @@ export default function ActiveWorkoutScreen() {
                 <Text style={[styles.modalTitle, { color: colors.text }]}>{browseCategory ? browseCategory : (searchQuery ? 'Search Results' : 'Add Exercise')}</Text>
                 <Text style={[styles.modalSub, { color: colors.textMuted }]}>{browseCategory || searchQuery ? 'Select an exercise' : 'Choose category or search'}</Text>
               </View>
-              <TouchableOpacity onPress={() => { if (browseCategory) setBrowseCategory(null); else if (searchQuery) { setSearchQuery(''); setIsSearching(false); } else setAddExModalVisible(false); }}>
-                <Ionicons name={(browseCategory || searchQuery) ? 'arrow-back' : 'close'} size={24} color={colors.text} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {(browseCategory || isSearching) && (
+                  <TouchableOpacity onPress={() => setFilterVisible(true)} style={{ padding: 4 }}>
+                    <Ionicons name="options-outline" size={22} color={P.cta} />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => { if (browseCategory) setBrowseCategory(null); else if (searchQuery) { setSearchQuery(''); setIsSearching(false); } else setAddExModalVisible(false); }}>
+                  <Ionicons name={(browseCategory || searchQuery) ? 'arrow-back' : 'close'} size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
             </View>
             <View style={[styles.searchWrap, { backgroundColor: colors.inputBg }]}>
               <Ionicons name="search" size={18} color={colors.textDim} />
@@ -1321,6 +1360,31 @@ export default function ActiveWorkoutScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Exercise Filter Modal */}
+      <ExerciseFilterModal
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
+        filters={exerciseFilters}
+        drilldownCategory={browseCategory}
+        onApply={(newFilters) => {
+          const updated = browseCategory
+            ? { ...newFilters, bodyParts: [] }
+            : newFilters;
+          setExerciseFilters(updated);
+          setFilterVisible(false);
+          setPage(0);
+          setHasMore(true);
+          fetchExtraExercises(searchQuery, browseCategory, 0);
+        }}
+        onClear={() => {
+          setExerciseFilters({ categories: [], bodyParts: [], equipment: [], targets: [], minRating: 0 });
+          setFilterVisible(false);
+          setPage(0);
+          setHasMore(true);
+          fetchExtraExercises(searchQuery, browseCategory, 0);
+        }}
+      />
 
       {/* Photo Viewer Modal */}
       <Modal visible={viewerVisible} transparent animationType="fade" onRequestClose={() => setViewerVisible(false)}>

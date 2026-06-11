@@ -140,6 +140,7 @@ export default function WorkoutReportScreen() {
   const insets = useSafeAreaInsets();
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     const fetch = async () => {
@@ -280,6 +281,43 @@ export default function WorkoutReportScreen() {
         {sections.map(section => (
           <AdviceSection key={section.title} section={section} colors={colors} isDark={isDark} />
         ))}
+
+        {/* Regenerate button */}
+        <TouchableOpacity
+          style={[styles.regenerateBtn, { opacity: regenerating ? 0.6 : 1, borderColor: colors.border, backgroundColor: colors.card }]}
+          onPress={async () => {
+            if (regenerating) return;
+            setRegenerating(true);
+            try {
+              const token = await getToken();
+              await axios.post(`${API_URL}/daily/workouts/${report.daily_workout_id}/generate-report`, { force: true }, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              // Re-fetch after a short delay
+              setTimeout(async () => {
+                try {
+                  const token2 = await getToken();
+                  const res = await axios.get(`${API_URL}/daily/reports/${id}`, {
+                    headers: { Authorization: `Bearer ${token2}` },
+                  });
+                  setReport(res.data);
+                } catch (_) {}
+                setRegenerating(false);
+              }, 3000);
+            } catch (err) {
+              console.error('Failed to regenerate report:', err);
+              setRegenerating(false);
+            }
+          }}
+          disabled={regenerating}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="refresh" size={18} color={colors.primary} />
+          <Text style={[styles.regenerateBtnText, { color: colors.primary }]}>
+            {regenerating ? 'REGENERATING...' : 'REGENERATE REPORT'}
+          </Text>
+          {regenerating && <ActivityIndicator size="small" color={colors.primary} />}
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -461,5 +499,21 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: 13,
     lineHeight: 20,
+  },
+  regenerateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  regenerateBtnText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 13,
+    letterSpacing: 0.5,
   },
 });

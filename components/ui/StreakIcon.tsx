@@ -31,15 +31,29 @@ const StreakIcon: React.FC<StreakIconProps> = ({ streak, size = 80 }) => {
       ? ['#FDE68A', '#F59E0B'] // Bronze/Amber
       : ['#FCD34D', '#D97706']) as [string, string]; // Golden/Epic
 
+  const displayStreak = streak > 99 ? '99+' : String(streak);
+
   return (
     <Animated.View style={[styles.container, { width: size, height: size * 1.25, transform: [{ scale: animatedScale }] }]}>
       <LinearGradient
         colors={eggColors}
-        style={[styles.egg, { borderRadius: size }]}
+        style={[
+          styles.egg,
+          {
+            borderTopLeftRadius: size * 0.5,
+            borderTopRightRadius: size * 0.5,
+            borderBottomLeftRadius: size * 0.4,
+            borderBottomRightRadius: size * 0.4,
+          },
+        ]}
       >
         <View style={styles.content}>
-          <Text style={[styles.streakNumber, { fontSize: size * 0.4 }]}>{streak}</Text>
-          <Text style={[styles.streakLabel, { fontSize: size * 0.12 }]}>DAY STREAK</Text>
+          <Text style={[styles.streakNumber, { fontSize: size * 0.38 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            {displayStreak}
+          </Text>
+          <Text style={[styles.streakLabel, { fontSize: size * 0.1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+            DAY STREAK
+          </Text>
         </View>
         
         {/* Shine effect */}
@@ -60,10 +74,6 @@ const styles = StyleSheet.create({
   egg: {
     width: '100%',
     height: '100%',
-    borderTopLeftRadius: 1000,
-    borderTopRightRadius: 1000,
-    borderBottomLeftRadius: 800,
-    borderBottomRightRadius: 800,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 10,
