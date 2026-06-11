@@ -1,43 +1,17 @@
 import React from "react";
 import {
-  View, Text, Image, TouchableOpacity, StyleSheet,
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
 
-// ── Palette ──────────────────────────────────────────────────────────────────
-const C = {
-  // Card (light)
-  cardBg:        "#0d3d52",
-  cardBorder:    "rgba(37,150,190,0.3)",
-  accentBlue:    "#2596BE",
-  accentYellow:  "#F7CB16",
-  accentDeep:    "#E7B100",
-  white:         "#FFFFFF",
-  lightText:     "rgba(168,223,240,0.7)",
-  tagBg:         "rgba(37,150,190,0.18)",
-  tagBorder:     "rgba(37,150,190,0.32)",
-  tagText:       "#a8dff0",
-  pillYellowBg:  "rgba(247,203,22,0.16)",
-  pillYellowBr:  "rgba(247,203,22,0.28)",
-  pillBlueBg:    "rgba(37,150,190,0.2)",
-  pillBlueBr:    "rgba(37,150,190,0.35)",
-  pillPurpleBg:  "rgba(147,51,234,0.18)",
-  pillPurpleBr:  "rgba(147,51,234,0.32)",
-  tagPurpleText: "#c084fc",
-  thumbBg:       "rgba(26,110,138,0.55)",
-  ink:           "#04282B",
-  // Empty (light)
-  emptyBg:       "#F7CB16",
-  emptyIconBg:   "#E7B100",
-  emptyInk:      "#04282B",
-  emptyMuted:    "#5a4200",
-} as const;
-
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface Recommendation {
   exercise_name: string;
   category: string;
@@ -54,389 +28,273 @@ interface Recommendation {
 
 interface Props {
   rec: Recommendation | null;
+  onPress?: () => void;
   onBrowsePress: () => void;
 }
 
-// ── Empty state ──────────────────────────────────────────────────────────────
-function EmptyCard({ onBrowsePress, isDark, colors }: {
+// ── Empty state ───────────────────────────────────────────────────────────────
+function EmptyCard({
+  onBrowsePress,
+  isDark,
+}: {
   onBrowsePress: () => void;
   isDark: boolean;
-  colors: any;
 }) {
   return (
     <TouchableOpacity
-      style={[
-        styles.emptyCard,
-        isDark
-          ? { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }
-          : { backgroundColor: C.emptyBg },
-      ]}
+      style={[styles.card, { backgroundColor: isDark ? "#141414" : "#1a1a2e" }]}
       onPress={onBrowsePress}
-      activeOpacity={0.88}
+      activeOpacity={0.85}
     >
-      {/* Decorative circle */}
-      <View
-        style={[
-          styles.emptyDecorCircle,
-          { backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "rgba(4,40,43,0.06)" },
-        ]}
-        pointerEvents="none"
-      />
-
-      <View
-        style={[
-          styles.emptyIconWrap,
-          { backgroundColor: isDark ? colors.inputBg : C.emptyIconBg },
-        ]}
-      >
-        <Ionicons
-          name="barbell-outline"
-          size={scale(28)}
-          color={isDark ? colors.primary : C.emptyInk}
-        />
-      </View>
-
-      <Text style={[styles.emptyTitle, { color: isDark ? colors.text : C.emptyInk }]}>
-        Browse exercises
-      </Text>
-      <Text style={[styles.emptySub, { color: isDark ? colors.textMuted : C.emptyMuted }]}>
-        Find exercises to build your routine
-      </Text>
-
-      <View
-        style={[
-          styles.emptyBtn,
-          { backgroundColor: isDark ? colors.primary : C.ink },
-        ]}
-      >
-        <Ionicons
-          name="search-outline"
-          size={scale(14)}
-          color={isDark ? "#FFF" : C.accentYellow}
-        />
-        <Text style={[styles.emptyBtnText, { color: isDark ? "#FFF" : C.accentYellow }]}>
-          Explore library
-        </Text>
+      <View style={styles.emptyInner}>
+        <View style={styles.emptyIconWrap}>
+          <Ionicons name="barbell-outline" size={scale(32)} color="#F7CB16" />
+        </View>
+        <Text style={styles.emptyTitle}>No recommendation yet</Text>
+        <Text style={styles.emptySub}>Tap to browse exercises</Text>
+        <View style={styles.arrowBtn}>
+          <Ionicons name="arrow-forward" size={scale(18)} color="#fff" />
+        </View>
       </View>
     </TouchableOpacity>
   );
 }
 
-
-
-// ── Tag pill ──────────────────────────────────────────────────────────────────
-function Tag({ label, isDark, colors, variant }: { label: string; isDark: boolean; colors: any; variant?: 'target' | 'equipment' }) {
-  const isTarget = variant === 'target';
-  return (
-    <View
-      style={[
-        styles.tag,
-        isDark
-          ? { backgroundColor: colors.inputBg, borderColor: colors.border }
-          : {
-              backgroundColor: isTarget ? C.pillYellowBg : C.pillPurpleBg,
-              borderColor: isTarget ? C.pillYellowBr : C.pillPurpleBr,
-            },
-      ]}
-    >
-      <Text style={[styles.tagText, { color: isDark ? colors.primary : (isTarget ? C.accentYellow : C.tagPurpleText) }]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
-export default function RecommendationCard({ rec, onBrowsePress }: Props) {
-  const { colors, isDark } = useTheme();
+// ── Main card ─────────────────────────────────────────────────────────────────
+export default function RecommendationCard({ rec, onPress, onBrowsePress }: Props) {
+  const { isDark } = useTheme();
 
   if (!rec) {
-    return <EmptyCard onBrowsePress={onBrowsePress} isDark={isDark} colors={colors} />;
+    return <EmptyCard onBrowsePress={onBrowsePress} isDark={isDark} />;
   }
-
-  const rating     = rec.rating ?? 4.8;
-
-  // Collect non-trivial tags
-  const tags: string[] = [];
-  if (rec.target)    tags.push(rec.target);
-  if (rec.equipment && rec.equipment !== "body weight") tags.push(rec.equipment);
 
   const displayUri = rec.gif_url || rec.image_url;
 
   return (
-    <View
-      style={[
-        styles.card,
-        isDark
-          ? { backgroundColor: colors.card, borderColor: colors.border }
-          : { backgroundColor: C.cardBg, borderColor: C.cardBorder },
-      ]}
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onPress}
+      activeOpacity={0.9}
     >
-      {/* Gradient overlay (light mode only) */}
-      {!isDark && (
-        <LinearGradient
-          colors={["#1a5570", "#0d3d52"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+      {/* ── Dark base ── */}
+      <View style={[StyleSheet.absoluteFill, styles.cardBg]} />
+
+      {/* ── 3D stacked GIF — top-right corner ── */}
+      {displayUri ? (
+        <View style={styles.gifStack}>
+          <Image
+            source={{ uri: displayUri }}
+            style={styles.gifImage}
+            resizeMode="contain"
+          />
+        </View>
+      ) : (
+        <View style={[styles.gifStack, styles.gifEmpty]}>
+          <MaterialCommunityIcons
+            name="dumbbell"
+            size={scale(28)}
+            color="rgba(255,255,255,0.2)"
+          />
+        </View>
       )}
 
-      <View style={styles.inner}>
-        {/* ── Pill row ───────────────────────────────────────────── */}
-        <View style={styles.pillRow}>
-          {/* Score tag */}
-          <View
-            style={[
-              styles.scorePill,
-              isDark
-                ? { backgroundColor: colors.inputBg, borderColor: colors.border }
-                : { backgroundColor: C.pillBlueBg, borderColor: C.pillBlueBr },
-            ]}
-          >
-            <Ionicons
-              name="sparkles"
-              size={scale(11)}
-              color={isDark ? colors.primary : C.accentYellow}
-            />
-            <Text style={[styles.scorePillText, { color: isDark ? colors.primary : C.accentYellow }]}>
-              {rec.scoreTag || "Top pick"}
-            </Text>
-          </View>
+      {/* ── Content — bottom-left ── */}
+      <View style={styles.content}>
+        <View style={{ flex: 1 }} />
 
-          {/* Spacer */}
-          <View style={{ flex: 1 }} />
+        <Text style={styles.category} numberOfLines={1}>
+          {rec.category?.toUpperCase()}
+        </Text>
 
-          {/* Rating */}
-          <View
-            style={[
-              styles.ratingPill,
-              isDark
-                ? { backgroundColor: colors.inputBg, borderColor: colors.border }
-                : { backgroundColor: C.pillYellowBg, borderColor: C.pillYellowBr },
-            ]}
-          >
-            <Ionicons
-              name="star"
-              size={scale(11)}
-              color={C.accentYellow}
-            />
-            <Text style={[styles.ratingPillText, { color: C.accentYellow }]}>
-              {rating.toFixed(1)}
-            </Text>
+        <Text style={styles.name} numberOfLines={2}>
+          {rec.exercise_name?.toUpperCase()}
+        </Text>
+
+        {rec.rating ? (
+          <View style={styles.ratingBadge}>
+            <Ionicons name="star" size={scale(11)} color="#F7CB16" />
+            <Text style={styles.ratingText}>{rec.rating}/10</Text>
           </View>
+        ) : null}
+
+        <View style={styles.tagsRow}>
+          {rec.target ? (
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{rec.target}</Text>
+            </View>
+          ) : null}
+          {rec.difficulty ? (
+            <View style={[styles.tag, styles.tagBlue]}>
+              <Text style={[styles.tagText, styles.tagTextBlue]}>
+                {rec.difficulty}
+              </Text>
+            </View>
+          ) : null}
         </View>
-
-        {/* ── Body ───────────────────────────────────────────────── */}
-        <View style={styles.body}>
-          {/* Text column */}
-          <View style={styles.bodyText}>
-            <Text
-              style={[styles.name, { color: isDark ? colors.text : C.white }]}
-              numberOfLines={2}
-            >
-              {rec.exercise_name}
-            </Text>
-            <Text style={[styles.category, { color: isDark ? colors.textMuted : C.lightText }]} numberOfLines={1}>
-              {rec.category}
-            </Text>
-
-            {tags.length > 0 && (
-              <View style={styles.tags}>
-                {tags.map((t) => (
-                  <Tag key={t} label={t} isDark={isDark} colors={colors} variant={t === rec.target ? 'target' : 'equipment'} />
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* Thumbnail */}
-          <View style={[styles.thumbWrap, isDark && { borderColor: colors.border }]}>
-            {displayUri ? (
-              <Image source={{ uri: displayUri }} style={styles.thumb} />
-            ) : (
-              <View
-                style={[
-                  styles.thumb,
-                  styles.thumbPlaceholder,
-                  { backgroundColor: isDark ? colors.inputBg : C.thumbBg },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="dumbbell"
-                  size={scale(30)}
-                  color={isDark ? colors.primary : C.accentYellow}
-                />
-              </View>
-            )}
-          </View>
-        </View>
-
       </View>
-    </View>
+
+      {/* ── Arrow CTA button (bottom-right) ── */}
+      <TouchableOpacity
+        style={styles.arrowBtn}
+        onPress={onPress}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Ionicons name="arrow-forward" size={scale(18)} color="#fff" />
+      </TouchableOpacity>
+    </TouchableOpacity>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-
-  // ── Card shell ──
   card: {
-    borderRadius: scale(24),
-    borderWidth: 1,
+    borderRadius: scale(20),
     overflow: "hidden",
+    height: vs(160),
     position: "relative",
-    height: scale(184),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    elevation: 7,
-  },
-  inner: {
-    padding: scale(16),
-    flex: 1,
   },
 
-  // ── Pill row ──
-  pillRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: vs(10),
+  cardBg: {
+    backgroundColor: "#161616",
+    borderRadius: scale(20),
   },
-  scorePill: {
+
+  // ── 3D stacked GIF (polaroid-style, top-right) ──
+  gifStack: {
+    position: "absolute",
+    top: scale(12),
+    right: scale(12),
+    width: scale(88),
+    height: scale(88),
+    borderRadius: scale(6),
+    backgroundColor: "rgba(255,255,255,0.95)",
+    padding: scale(4),
+    transform: [{ rotate: "4deg" }],
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 5,
+  },
+  gifImage: {
+    flex: 1,
+    borderRadius: scale(3),
+  },
+  gifEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+
+  // ── Rating row (no badge) ──
+  ratingBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: scale(4),
-    borderWidth: 1,
-    borderRadius: 99,
-    paddingHorizontal: scale(8),
-    paddingVertical: vs(3),
+    marginBottom: vs(1),
   },
-  scorePillText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: scale(10),
-    letterSpacing: 0.4,
-  },
-  ratingPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(3),
-    borderWidth: 1,
-    borderRadius: 99,
-    paddingHorizontal: scale(8),
-    paddingVertical: vs(3),
-  },
-  ratingPillText: {
+  ratingText: {
     fontFamily: FONTS.bodyBold,
     fontSize: scale(11),
+    color: "#F7CB16",
   },
 
-  // ── Body ──
-  body: {
-    flexDirection: "row",
-    gap: scale(14),
-    alignItems: "flex-start",
-    flex: 1,
+  // ── Text content — bottom-left  ──
+  content: {
+    position: "absolute",
+    left: scale(18),
+    right: scale(120),
+    top: vs(14),
+    bottom: vs(14),
   },
-  bodyText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  name: {
-    fontFamily: FONTS.heading,
-    fontSize: scale(20),
-    letterSpacing: -0.5,
-    lineHeight: scale(26),
-    marginBottom: vs(3),
-  },
+
   category: {
     fontFamily: FONTS.body,
-    fontSize: scale(12),
-    marginBottom: vs(10),
+    fontSize: scale(9),
+    color: "rgba(200,200,200,0.55)",
+    letterSpacing: 1.2,
+    marginBottom: vs(1),
   },
-  tags: {
+
+  name: {
+    fontFamily: FONTS.heading,
+    fontSize: scale(17),
+    color: "#FFFFFF",
+    letterSpacing: -0.3,
+    lineHeight: scale(21),
+    marginBottom: vs(2),
+  },
+
+  tagsRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: scale(6),
+    marginTop: vs(2),
   },
   tag: {
+    backgroundColor: "rgba(247,203,22,0.15)",
     borderWidth: 1,
+    borderColor: "rgba(247,203,22,0.3)",
     borderRadius: 99,
-    paddingHorizontal: scale(10),
-    paddingVertical: vs(4),
+    paddingHorizontal: scale(9),
+    paddingVertical: vs(3),
   },
   tagText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: scale(10),
+    fontSize: scale(9),
+    color: "#F7CB16",
     letterSpacing: 0.3,
   },
+  tagBlue: {
+    backgroundColor: "rgba(37,150,190,0.15)",
+    borderColor: "rgba(37,150,190,0.3)",
+  },
+  tagTextBlue: {
+    color: "#2596BE",
+  },
 
-  // ── Thumbnail ──
-  thumbWrap: {
-    width: scale(92),
-    flexShrink: 0,
-    position: "relative",
-  },
-  thumb: {
-    width: scale(92),
-    height: scale(92),
-    borderRadius: scale(16),
-  },
-  thumbPlaceholder: {
+  // ── Arrow button — bottom-right ──
+  arrowBtn: {
+    position: "absolute",
+    bottom: scale(10),
+    right: scale(14),
+    width: scale(34),
+    height: scale(34),
+    borderRadius: scale(17),
+    backgroundColor: "#2596BE",
     alignItems: "center",
     justifyContent: "center",
   },
 
-
   // ── Empty state ──
-  emptyCard: {
-    borderRadius: scale(24),
-    padding: scale(28),
+  emptyInner: {
+    flex: 1,
     alignItems: "center",
-    position: "relative",
-    overflow: "hidden",
-  },
-  emptyDecorCircle: {
-    position: "absolute",
-    width: scale(160),
-    height: scale(160),
-    borderRadius: scale(80),
-    top: -scale(40),
-    right: -scale(40),
+    justifyContent: "center",
+    gap: vs(8),
+    padding: scale(24),
   },
   emptyIconWrap: {
     width: scale(60),
     height: scale(60),
     borderRadius: scale(18),
+    backgroundColor: "rgba(247,203,22,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(247,203,22,0.22)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: vs(14),
+    marginBottom: vs(4),
   },
   emptyTitle: {
     fontFamily: FONTS.heading,
-    fontSize: scale(17),
-    marginBottom: vs(6),
+    fontSize: scale(16),
+    color: "#FFFFFF",
     textAlign: "center",
   },
   emptySub: {
     fontFamily: FONTS.body,
     fontSize: scale(12),
+    color: "rgba(255,255,255,0.4)",
     textAlign: "center",
-    lineHeight: scale(18),
-    maxWidth: scale(200),
-    marginBottom: vs(18),
-  },
-  emptyBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(6),
-    borderRadius: scale(14),
-    paddingHorizontal: scale(22),
-    paddingVertical: vs(11),
-  },
-  emptyBtnText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: scale(13),
   },
 });
