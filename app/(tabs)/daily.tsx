@@ -278,6 +278,16 @@ export default function DailyTab() {
                   <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>Time</Text>
                 </View>
               </View>
+              {/* {item.report_id && (
+                <TouchableOpacity
+                  style={[styles.reportLink, { borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.15)', borderTopWidth: 1, marginTop: 8 }]}
+                  onPress={() => router.push(`/daily/report/${item.report_id}`)}
+                >
+                  <Ionicons name="document-text-outline" size={14} color="#10B981" />
+                  <Text style={{ color: '#10B981', fontFamily: FONTS.bodyBold, fontSize: 12 }}>View AI Report</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#10B981" />
+                </TouchableOpacity>
+              )} */}
             </View>
           </View>
         </LinearGradient>
@@ -549,6 +559,7 @@ const styles = StyleSheet.create({
   statVal: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' },
   statLbl: { fontFamily: FONTS.body, fontSize: 10, marginTop: 1, color: 'rgba(255,255,255,0.74)' },
   statLine: { width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.18)' },
+  reportLink: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 10, justifyContent: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingVertical: 48 },
   emptyTitle: { fontFamily: FONTS.heading, fontSize: 26, marginTop: 20, marginBottom: 8 },
   emptySub: { fontFamily: FONTS.body, fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },

@@ -558,7 +558,7 @@ export default function ActiveWorkoutScreen() {
     } finally {
       setLoading(false);
     }
-  }, [workoutId]);
+  }, [workoutId, startWorkoutSession]);
 
   useFocusEffect(useCallback(() => { fetchWorkout(); }, [fetchWorkout]));
 
@@ -589,9 +589,7 @@ export default function ActiveWorkoutScreen() {
       clearInterval(setTimerRef.current);
       setSetTimerRunning(false);
     } else {
-      if (restRunning) {
-        stopRestTimer();
-      }
+      stopRestTimer();
       setTimerStartedAtRef.current = Date.now() - (setTimer * 1000);
       setTimerRef.current = setInterval(() => {
         setSetTimer(Math.floor((Date.now() - setTimerStartedAtRef.current) / 1000));
@@ -1486,6 +1484,7 @@ const styles = StyleSheet.create({
   dashLabel:       { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5, color: 'rgba(255,255,255,0.72)' },
   dashText:        { fontFamily: FONTS.heading, fontSize: 14, letterSpacing: 0.3, color: '#FFF' },
   dashDivider:     { width: 1, height: 24, marginHorizontal: 10, backgroundColor: 'rgba(255,255,255,0.16)' },
+  skipRestBtn:     { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
   // List
   listContent:     { paddingHorizontal: 20, paddingBottom: 40 },

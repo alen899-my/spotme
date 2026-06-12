@@ -271,7 +271,7 @@ export default function WorkoutSummary({
     : null;
 
   const stats: Array<{ key: string; icon: string; value: string; sub: string; wide?: boolean }> = [
-    { key: 'DURATION', icon: 'time-outline', value: formatDuration(duration), sub: 'Active time' },
+    { key: 'DURATION', icon: 'time-outline', value: formatDuration(duration), sub: 'Total session' },
     { key: 'CALORIES', icon: 'flame-outline', value: `${caloriesBurned} kcal`, sub: 'Est. burn' },
     { key: 'VOLUME', icon: 'barbell-outline', value: `${Math.round(volume)}kg`, sub: 'Weight lifted', wide: true },
     { key: 'REST TIME', icon: 'hourglass-outline', value: formatDuration(rest), sub: 'Recovery' },

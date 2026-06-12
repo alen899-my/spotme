@@ -471,6 +471,20 @@ router.get('/splits', authenticateToken, async (req, res) => {
   }
 });
 
+// Get single split detail
+router.get('/splits/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, user_id, name, description, is_template, created_at FROM workout_splits WHERE id = $1 AND (user_id = $2 OR is_template = true)',
+      [req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Split not found' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create new split (Group)
 router.post('/splits', authenticateToken, async (req, res) => {
   const { name, description } = req.body;
@@ -480,6 +494,22 @@ router.post('/splits', authenticateToken, async (req, res) => {
       [req.user.id, name, description]
     );
     res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete split (users cannot delete templates)
+// Update split name/description
+router.put('/splits/:id', authenticateToken, async (req, res) => {
+  const { name, description } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE workout_splits SET name = COALESCE($1, name), description = COALESCE($2, description) WHERE id = $3 AND user_id = $4 RETURNING *',
+      [name, description, req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Split not found' });
+    res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -543,6 +573,46 @@ router.post('/splits/:id/sessions', authenticateToken, async (req, res) => {
       [req.params.id, name, sort_order || 0]
     );
     res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update session name/sort_order
+router.put('/sessions/:id', authenticateToken, async (req, res) => {
+  const { name, sort_order } = req.body;
+  try {
+    const session = await pool.query(
+      'SELECT ws.id FROM workout_sessions ws JOIN workout_splits sp ON ws.split_id = sp.id WHERE ws.id = $1 AND sp.user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    if (session.rows.length === 0) return res.status(403).json({ error: 'Unauthorized' });
+    const result = await pool.query(
+      'UPDATE workout_sessions SET name = COALESCE($1, name), sort_order = COALESCE($2, sort_order) WHERE id = $3 RETURNING *',
+      [name, sort_order, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single session detail
+router.get('/sessions/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ws.*, s.name AS split_name, s.user_id AS split_owner_id
+       FROM workout_sessions ws
+       JOIN workout_splits s ON ws.split_id = s.id
+       WHERE ws.id = $1 AND (
+         s.user_id = $2
+         OR
+         (s.is_template = false AND EXISTS (SELECT 1 FROM users WHERE id = s.user_id AND share_splits = true))
+       )`,
+      [req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Session not found' });
+    res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

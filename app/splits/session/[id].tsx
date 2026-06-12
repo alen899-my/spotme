@@ -43,6 +43,9 @@ export default function SessionDetailScreen() {
   
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<any>(null);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameName, setRenameName] = useState('');
 
   // Edit Modal State
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -62,10 +65,16 @@ export default function SessionDetailScreen() {
   const fetchData = useCallback(async () => {
     try {
       const token = await getToken();
-      const exRes = await axios.get(`${API_URL}/workouts/sessions/${id}/exercises`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const [exRes, sessRes] = await Promise.all([
+        axios.get(`${API_URL}/workouts/sessions/${id}/exercises`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API_URL}/workouts/sessions/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
       setExercises(exRes.data);
+      setSession(sessRes.data);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching session data:', err);
@@ -73,6 +82,21 @@ export default function SessionDetailScreen() {
   }, [id]);
 
   useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+
+  const handleRenameSession = async () => {
+    if (!renameName.trim()) return;
+    try {
+      const token = await getToken();
+      await axios.put(`${API_URL}/workouts/sessions/${id}`, { name: renameName.trim() }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSession((prev: any) => ({ ...prev, name: renameName.trim() }));
+      showToast('Session renamed!');
+      setShowRenameModal(false);
+    } catch (err) {
+      showToast('Failed to rename', 'error');
+    }
+  };
 
   const handleRemoveExercise = (wseId: number) => {
     setRemoveId(wseId);
@@ -233,8 +257,24 @@ export default function SessionDetailScreen() {
             <Ionicons name="chevron-back" size={28} color={colors.text} />
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>{isShared ? 'Session Exercises' : 'Routine Manager'}</Text>
-            <Text style={[styles.headerSub, { color: colors.textMuted }]}>{isShared ? 'View program movements' : 'Manage your movements'}</Text>
+            {isShared ? (
+              <>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{session?.name || 'Session Exercises'}</Text>
+                <Text style={[styles.headerSub, { color: colors.textMuted }]}>View program movements</Text>
+              </>
+            ) : (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>
+                    {session?.name || 'Routine'}
+                  </Text>
+                  <TouchableOpacity onPress={() => { setRenameName(session?.name || ''); setShowRenameModal(true); }}>
+                    <Ionicons name="create-outline" size={18} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.headerSub, { color: colors.textMuted }]}>{exercises.length} exercise{exercises.length !== 1 ? 's' : ''}</Text>
+              </>
+            )}
           </View>
         </View>
 
@@ -394,6 +434,35 @@ export default function SessionDetailScreen() {
           exercise={previewEx}
           onClose={() => setPreviewEx(null)}
         />
+
+        {/* Session Rename Modal */}
+        <Modal visible={showRenameModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFillObject} onPress={() => setShowRenameModal(false)} />
+            <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Rename Session</Text>
+              <TextInput
+                style={[styles.modalInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, marginTop: 16 }]}
+                value={renameName}
+                onChangeText={setRenameName}
+                placeholder="Session name"
+                placeholderTextColor={colors.textDim}
+                autoFocus
+              />
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+                <TouchableOpacity style={[styles.deleteActionBtn, { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }]} onPress={() => setShowRenameModal(false)}>
+                  <Text style={[styles.deleteActionText, { color: colors.textMuted }]}>CANCEL</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={{ flex: 2, borderRadius: 12, overflow: 'hidden' }} onPress={handleRenameSession}>
+                  <LinearGradient colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]} style={{ height: 42, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 13 }}>SAVE</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );

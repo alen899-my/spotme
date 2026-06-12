@@ -41,14 +41,21 @@ export default function WorkoutViewScreen() {
   const [finishWeight, setFinishWeight] = useState('');
   const [uploadingPhotos, setUploadingPhotos] = useState<string[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [existingReport, setExistingReport] = useState<any>(null);
 
   const fetchWorkout = useCallback(async () => {
     try {
       const token = await getToken();
-      const res = await axios.get(`${API_URL}/daily/workouts/${workoutId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setWorkout(res.data);
+      const [workoutRes, reportRes] = await Promise.all([
+        axios.get(`${API_URL}/daily/workouts/${workoutId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_URL}/daily/workouts/${workoutId}/report`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => ({ data: null }))
+      ]);
+      setWorkout(workoutRes.data);
+      setExistingReport(reportRes.data);
     } catch (err) {
       console.error('Error fetching workout:', err);
     } finally {
@@ -152,22 +159,39 @@ export default function WorkoutViewScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={28} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {isShared ? 'Workout Details' : 'View Session'}
-          </Text>
-          {!isShared && (
-            <TouchableOpacity
-              style={[styles.editBtn, isDark && { backgroundColor: colors.inputBg }]}
-              onPress={() => router.push(`/daily/${workoutId}?editing=true`)}
-            >
-              <Ionicons name="create-outline" size={16} color={P.cta} />
-              <Text style={[styles.editBtnText, { color: P.cta }]}>EDIT</Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Ionicons name="chevron-back" size={28} color={colors.text} />
             </TouchableOpacity>
-          )}
-          {isShared && <View style={{ width: 40 }} />}
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              {isShared ? 'Workout Details' : 'View Session'}
+            </Text>
+            <View style={{ flex: 1 }} />
+            {!isShared && (
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {existingReport && existingReport.status === 'completed' && (
+                  <TouchableOpacity
+                    style={styles.reportBtn}
+                    onPress={() => router.push(`/daily/report/${existingReport.id}`)}
+                    activeOpacity={0.85}
+                  >
+                  <LinearGradient colors={['#10B981', '#059669']} style={styles.iconBtnGrad}>
+                    <Ionicons name="document-text-outline" size={16} color="#FFF" />
+                  </LinearGradient>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.editSolidBtn}
+                  onPress={() => router.push(`/daily/${workoutId}?editing=true`)}
+                  activeOpacity={0.85}
+                >
+                <LinearGradient colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]} style={styles.iconBtnGrad}>
+                  <Ionicons name="create-outline" size={16} color="#FFF" />
+                </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </View>
 
         <FlatList
@@ -244,11 +268,13 @@ export default function WorkoutViewScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 8 },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontFamily: FONTS.heading, fontSize: 20 },
-  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: 'rgba(37,149,190,0.12)' },
-  editBtnText: { fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.5 },
+  header: { paddingHorizontal: 20, paddingBottom: 4 },
+  headerRow: { flexDirection: 'row', alignItems: 'center' },
+  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginLeft: -10 },
+  headerTitle: { fontFamily: FONTS.heading, fontSize: 20, marginLeft: -2 },
+  reportBtn: { borderRadius: 10, overflow: 'hidden' },
+  editSolidBtn: { borderRadius: 10, overflow: 'hidden' },
+  iconBtnGrad: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingBottom: 40 },
   listHeader: { marginBottom: 20, paddingHorizontal: 20 },
 

@@ -28,6 +28,8 @@ import BodyStatusCard     from "../components/home/BodyStatusCard";
 import HydrationCard      from "../components/home/HydrationCard";
 import { API_URL } from "../utils/api";
 import { getToken } from "../utils/tokenStorage";
+import { useWorkoutTimer } from "../contexts/WorkoutTimerContext";
+import { formatDurationFull as formatDuration } from "../utils/datetime";
 
 const workoutBg = require("../assets/coach/workoutlog.jpg");
 const foodBg    = require("../assets/coach/foodlog.jpg");
@@ -77,6 +79,25 @@ export default function HomeScreen() {
   };
 
   useFocusEffect(useCallback(() => { fetchDashboard(); }, []));
+
+  const { isWorkoutActive, activeWorkoutId, workoutElapsed } = useWorkoutTimer();
+  const [apiActiveWorkout, setApiActiveWorkout] = useState<any>(null);
+  const resumeWorkout = isWorkoutActive || apiActiveWorkout;
+
+  // Also check API for active workouts (handles app restart where context is lost)
+  useEffect(() => {
+    if (isWorkoutActive) return;
+    (async () => {
+      try {
+        const token = await getToken();
+        const res = await axios.get(`${API_URL}/daily/workouts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const active = res.data.find((w: any) => w.status === 'active');
+        setApiActiveWorkout(active || null);
+      } catch {}
+    })();
+  }, [isWorkoutActive]);
 
   if (loading) {
     return <HomeSkeleton />;
@@ -227,6 +248,26 @@ export default function HomeScreen() {
               </View>
             </TouchableOpacity>
           </View>
+
+          {/* ── Resume Workout Banner ───────────────────────────────────────── */}
+          {resumeWorkout && (
+            <TouchableOpacity
+              style={[styles.resumeBanner, { backgroundColor: isDark ? '#0A2A2E' : '#E0F2FE', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(37,150,190,0.25)', borderWidth: 1 }]}
+              onPress={() => router.push(`/daily/${activeWorkoutId || apiActiveWorkout?.id}`)}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.resumeDot, { backgroundColor: '#10B981' }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.resumeTitle, { color: colors.text }]}>Workout in Progress</Text>
+                <Text style={[styles.resumeSub, { color: colors.textMuted }]}>
+                  Tap to resume • {formatDuration(workoutElapsed || apiActiveWorkout?.total_duration_seconds || 0)}
+                </Text>
+              </View>
+              <View style={[styles.resumeArrowWrap, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : '#2596BE' }]}>
+                <Ionicons name="play" size={16} color="#FFF" />
+              </View>
+            </TouchableOpacity>
+          )}
 
           {/* ── XP / Level ───────────────────────────────────────────────────── */}
           <XPCard
@@ -444,5 +485,36 @@ const styles = StyleSheet.create({
   loggerOverlay: {
     backgroundColor: "rgba(0,0,0,0.7)",
     zIndex: 0,
+  },
+
+  // ── Resume Workout ──────────────────────────────────────────────────────────
+  resumeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: scale(16),
+    padding: scale(14),
+    marginBottom: vs(16),
+    gap: scale(12),
+  },
+  resumeDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  resumeTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(15),
+    marginBottom: 2,
+  },
+  resumeSub: {
+    fontFamily: FONTS.body,
+    fontSize: scale(12),
+  },
+  resumeArrowWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -12,8 +12,8 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
   // ── Groq path: image vision OR explicit text-only Groq request ─────────────
   const groqKey = process.env.GROQ_API_KEY;
 
-  // Text-only Groq call (no image, but caller passed model='groq')
-  if (!imageUrl && groqKey && (model === 'groq' || model === 'groq-text')) {
+  // Text-only Groq call (default when no image and groq key exists)
+  if (!imageUrl && groqKey && (!model || model === 'groq' || model === 'groq-text')) {
     try {
       const messages = [{ role: 'user', content: prompt }];
       const response = await axios.post(
@@ -29,7 +29,8 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
           headers: {
             'Authorization': `Bearer ${groqKey}`,
             'Content-Type': 'application/json'
-          }
+          },
+          timeout: 60000
         }
       );
       return response.data.choices[0].message.content;
@@ -66,7 +67,8 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
           headers: {
             'Authorization': `Bearer ${groqKey}`,
             'Content-Type': 'application/json'
-          }
+          },
+          timeout: 60000
         }
       );
       return response.data.choices[0].message.content;
@@ -109,7 +111,8 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
           'HTTP-Referer': 'https://spotme.app',
           'X-Title': 'SpotMe AI',
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 60000
       }
     );
 

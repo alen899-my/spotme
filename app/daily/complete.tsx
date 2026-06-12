@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Image, Platform, ActivityIndicator,
-  TextInput, Dimensions, Animated, Easing,
+  TextInput, Dimensions, Animated, Easing, ImageBackground,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -427,6 +427,7 @@ export default function WorkoutCompleteScreen() {
 
       const payload: any = {
         total_duration_seconds: duration,
+        total_rest_seconds: rest,
         total_volume: volume,
       };
       if (weight.trim()) {
@@ -446,10 +447,12 @@ export default function WorkoutCompleteScreen() {
 
       showToast('Workout finalized! Great job! 🏆');
 
-      // Silently trigger AI report generation in background
+      // Trigger AI report generation in background
       axios.post(`${API_URL}/daily/workouts/${workoutId}/generate-report`, {}, {
         headers: { Authorization: `Bearer ${token}` }
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error('Auto AI report generation failed:', err.response?.data || err.message);
+      });
 
       setTimeout(() => {
         router.replace('/(tabs)/daily');
@@ -530,10 +533,13 @@ export default function WorkoutCompleteScreen() {
       >
         {/* ═══ HERO SECTION ═══ */}
         <View style={[st.heroWrap, { height: vs(260) }]}>
-          <LinearGradient
-            colors={isDark ? ['#064E3B', '#022C22'] : ['#10B981', '#059669']}
+          <ImageBackground
+            source={require('../../assets/coach/fit-cartoon-character-training.png')}
             style={StyleSheet.absoluteFill}
+            resizeMode="cover"
           />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
+
           {/* Confetti */}
           {confettiParticles.map(p => (
             <ConfettiParticle key={p.id} delay={p.delay} color={p.color} startX={p.startX} />
@@ -548,33 +554,27 @@ export default function WorkoutCompleteScreen() {
                 width: s(140),
                 height: s(140),
                 borderRadius: s(70),
-                borderColor: isDark ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.3)',
+                borderColor: 'rgba(255,255,255,0.3)',
               },
             ]}
           />
 
-          {/* Trophy / Streak */}
+          {/* Trophy (always show trophy, streak only in overlay after save) */}
           <Animated.View style={{ transform: [{ scale: heroScale }], opacity: heroOpacity }}>
-            {newStreak !== null && newStreak > 0 ? (
-              <StreakIcon streak={newStreak} size={s(90)} />
-            ) : (
-              <View style={[st.trophyCircle, { width: s(80), height: s(80), borderRadius: s(40), backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.2)' }]}>
-                <Ionicons name="trophy" size={fs(42)} color={isDark ? '#10B981' : '#FFF'} />
-              </View>
-            )}
+            <View style={[st.trophyCircle, { width: s(80), height: s(80), borderRadius: s(40), backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Ionicons name="trophy" size={fs(42)} color="#FFF" />
+            </View>
           </Animated.View>
 
-          <Text style={[st.heroTitle, { fontSize: fs(30), color: isDark ? colors.text : '#FFF' }]}>
-            {newStreak !== null && newStreak > 0 ? 'Perfect Workout!' : 'Workout Complete!'}
+          <Text style={[st.heroTitle, { fontSize: fs(30), color: '#FFF' }]}>
+            Workout Complete!
           </Text>
-          <Text style={[st.heroSub, { fontSize: fs(14), color: isDark ? colors.textMuted : 'rgba(255,255,255,0.85)' }]}>
-            {newStreak !== null && newStreak > 0
-              ? `You kept your ${newStreak} day streak alive! 🔥`
-              : 'You crushed it today 💪'}
+          <Text style={[st.heroSub, { fontSize: fs(14), color: 'rgba(255,255,255,0.85)' }]}>
+            You crushed it today 💪
           </Text>
           {workout?.title && (
-            <View style={[st.heroPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.2)' }]}>
-              <Text style={[st.heroPillText, { fontSize: fs(11), color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>
+            <View style={[st.heroPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Text style={[st.heroPillText, { fontSize: fs(11), color: 'rgba(255,255,255,0.9)' }]}>
                 {workout.title}
               </Text>
             </View>
@@ -585,7 +585,7 @@ export default function WorkoutCompleteScreen() {
         <View style={[st.bentoContainer, { paddingHorizontal: s(16) }]}>
           <Text style={[st.sectionLabel, { color: colors.text, fontSize: fs(18) }]}>Session Summary</Text>
           <View style={st.bentoGrid}>
-            <BentoTile icon="time-outline" iconColor="#2596BE" label="DURATION" value={formatDuration(displayDuration)} sub="Active time" colors={colors} isDark={isDark} />
+            <BentoTile icon="time-outline" iconColor="#2596BE" label="DURATION" value={formatDuration(displayDuration)} sub="Total session" colors={colors} isDark={isDark} />
             <BentoTile icon="flame-outline" iconColor="#EF4444" label="CALORIES" value={`${caloriesBurned}`} sub="Est. kcal burn" colors={colors} isDark={isDark} />
             <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${Math.round(displayVolume)} kg`} sub="Weight lifted" wide colors={colors} isDark={isDark} />
             <BentoTile icon="hourglass-outline" iconColor="#F59E0B" label="REST TIME" value={formatDuration(displayRest)} sub="Recovery" colors={colors} isDark={isDark} />

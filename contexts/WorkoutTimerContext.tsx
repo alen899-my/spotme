@@ -84,7 +84,8 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
         setTotalRestElapsed(0);
         totalRestAccumulatedRef.current = 0;
       }
-      totalRestPeriodStartRef.current = Date.now();
+      // Don't start rest tracking here — wait for first actual rest period
+      totalRestPeriodStartRef.current = null;
     }
     startWorkoutTimer();
   }, [activeWorkoutId, startWorkoutTimer]);
@@ -115,13 +116,23 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
       clearInterval(restTimerRef.current);
       restTimerRef.current = null;
     }
+    // Accumulate rest time when rest period ends
+    if (totalRestPeriodStartRef.current !== null) {
+      const elapsed = Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000);
+      totalRestAccumulatedRef.current += elapsed;
+      totalRestPeriodStartRef.current = null;
+    }
     setRestRunning(false);
     setRestTimer(0);
+    setTotalRestElapsed(totalRestAccumulatedRef.current);
     AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
   }, []);
 
   const startRestTimer = useCallback(async (seconds: number) => {
     stopRestTimer();
+
+    // Start tracking rest period
+    totalRestPeriodStartRef.current = Date.now();
 
     const endAt = Date.now() + (seconds * 1000);
     restTimerEndAtRef.current = endAt;
@@ -137,6 +148,8 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
           clearInterval(restTimerRef.current);
           restTimerRef.current = null;
         }
+        // Just stop the visual countdown — keep accumulating rest time
+        // until the user explicitly starts the per-set timer (stopRestTimer)
         setRestRunning(false);
         AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
       }
@@ -157,6 +170,10 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
       restTimerEndAtRef.current = endAt;
       setRestTimer(remaining);
       setRestRunning(true);
+      // Resume rest tracking too
+      if (totalRestPeriodStartRef.current === null) {
+        totalRestPeriodStartRef.current = Date.now();
+      }
       restTimerRef.current = setInterval(() => {
         const rem = Math.max(0, Math.floor((restTimerEndAtRef.current - Date.now()) / 1000));
         setRestTimer(rem);
@@ -199,11 +216,12 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
     const interval = setInterval(async () => {
       try {
         const token = await getToken();
+        const totalRest = totalRestPeriodStartRef.current !== null
+          ? totalRestAccumulatedRef.current + Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000)
+          : totalRestAccumulatedRef.current;
         await axios.patch(`${API_URL}/daily/workouts/${activeWorkoutId}/metrics`, {
           total_duration_seconds: Math.floor((Date.now() - workoutStartedAtRef.current) / 1000),
-          total_rest_seconds: totalRestPeriodStartRef.current !== null
-            ? totalRestAccumulatedRef.current + Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000)
-            : totalRestAccumulatedRef.current,
+          total_rest_seconds: totalRest,
         }, { headers: { Authorization: `Bearer ${token}` } });
       } catch {}
     }, 15000);

@@ -277,7 +277,8 @@ router.get('/workouts', authenticateToken, async (req, res) => {
         (SELECT COUNT(*) FROM daily_workout_sets dws 
          JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id 
          WHERE dwe.daily_workout_id = dw.id AND dws.is_skipped = false) AS total_sets,
-        (SELECT photo_url FROM daily_workout_photos WHERE daily_workout_id = dw.id ORDER BY created_at ASC LIMIT 1) AS cover_photo_url
+        (SELECT photo_url FROM daily_workout_photos WHERE daily_workout_id = dw.id ORDER BY created_at ASC LIMIT 1) AS cover_photo_url,
+        (SELECT id FROM workout_reports WHERE daily_workout_id = dw.id AND user_id = $1 AND status = 'completed' LIMIT 1) AS report_id
        FROM daily_workouts dw
        LEFT JOIN workout_splits ws ON dw.split_id = ws.id
        LEFT JOIN workout_sessions wsess ON dw.session_id = wsess.id
@@ -1671,9 +1672,9 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
         ? Math.round(recentRes.rows.reduce((a, r) => a + Number(r.total_volume || 0), 0) / recentRes.rows.length)
         : 'N/A';
 
-      const prompt = `You are an expert personal trainer and honest coach. Analyze this workout thoroughly and write a candid, insightful report.
+      const prompt = `You are an expert personal trainer and honest coach. Analyze this workout thoroughly and write a candid, insightful report. Address the user directly using "you" and "your" throughout — never refer to them as "the athlete" or in third person.
 
-ABOUT THE ATHLETE:
+ABOUT YOU:
 - Goal: ${w.fitness_goal || 'General fitness'}
 - Level: ${w.experience_level || 'Intermediate'}
 - Age: ${w.age || 'Not provided'} | Gender: ${w.gender || 'Not provided'}
@@ -1696,7 +1697,7 @@ ${exerciseDetails}
 Write a clean report with these 4 sections. Use the exact markers shown below so I can parse it:
 
 ===SUMMARY===
-Write 2-3 sentences giving an overall assessment of this session. Compare against their goal and note whether this was an effective session. Be honest — if it was subpar, say so.
+Write 2-3 sentences giving an overall assessment of this session. Compare against your goal and note whether this was an effective session. Be honest — if it was subpar, say so.
 
 ===GOOD THINGS===
 List 2-4 things that went well. Use bullet points (•). Be specific — mention exercises, effort, PRs, consistency, form, intensity. If nothing stands out as good, say "The session was completed." (be honest).
@@ -1707,7 +1708,7 @@ List 2-4 areas that could be better. Use bullet points (•). Be constructive. P
 ===RECOMMENDATIONS===
 Give 2-4 specific, actionable tips for the next workout. Use bullet points (•). Include exercise substitutions, rep/weight progression, rest period adjustments, warm-up/cool-down suggestions, or changes to address weaknesses spotted.
 
-Keep it concise, direct, and helpful — like an honest coach who wants you to improve. If the workout was weak, say it. If great, celebrate it. Always reference the actual data provided.`;
+Keep it concise, direct, and helpful — like an honest coach talking directly to you. If the workout was weak, say it. If great, celebrate it. Always reference the actual data provided.`;
 
       const aiRaw = await callAI(prompt);
 
@@ -1862,6 +1863,21 @@ router.get('/reports/:id', authenticateToken, async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('GET /daily/reports/:id error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Check if report exists for a specific workout
+router.get('/workouts/:id/report', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, status FROM workout_reports WHERE daily_workout_id = $1 AND user_id = $2 LIMIT 1',
+      [req.params.id, req.user.id]
+    );
+    if (result.rows.length === 0) return res.json(null);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('GET /daily/workouts/:id/report error:', err);
     res.status(500).json({ error: err.message });
   }
 });

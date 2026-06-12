@@ -51,7 +51,7 @@ export default function ReportsListScreen() {
 
   useFocusEffect(useCallback(() => { fetch(); }, [fetch]));
 
-  const getToken = useCallback(async () => {
+  const getAuthHeaders = useCallback(async () => {
     const token = await getToken();
     return { Authorization: `Bearer ${token}` };
   }, []);
@@ -60,7 +60,7 @@ export default function ReportsListScreen() {
     const key = `retry-${item.id}`;
     try {
       setActionId(key);
-      const headers = await getToken();
+      const headers = await getAuthHeaders();
       await axios.post(
         `${API_URL}/daily/workouts/${item.daily_workout_id}/generate-report`,
         { force: true },
@@ -73,14 +73,14 @@ export default function ReportsListScreen() {
     } finally {
       setActionId(null);
     }
-  }, [fetch, getToken, showToast]);
+  }, [fetch, getAuthHeaders, showToast]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
     const key = `delete-${deleteTarget.id}`;
     try {
       setActionId(key);
-      const headers = await getToken();
+      const headers = await getAuthHeaders();
       await axios.delete(`${API_URL}/daily/reports/${deleteTarget.id}`, { headers });
       showToast('Report deleted');
       setDeleteTarget(null);
@@ -90,7 +90,7 @@ export default function ReportsListScreen() {
     } finally {
       setActionId(null);
     }
-  }, [deleteTarget, fetch, getToken, showToast]);
+  }, [deleteTarget, fetch, getAuthHeaders, showToast]);
 
   const s = makeStyles(colors);
 

@@ -9,6 +9,8 @@ import {
   Dimensions,
   Alert,
   Image,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -25,10 +27,62 @@ import { getToken } from '../../../utils/tokenStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+function RenameModal({ visible, title, currentName, onSave, onClose, colors, isDark }: any) {
+  const [name, setName] = useState(currentName);
+  const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => { setName(currentName); }, [currentName]);
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    await onSave(name.trim());
+    setSaving(false);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={rStyles.overlay}>
+        <View style={[rStyles.modal, { backgroundColor: colors.card }]}>
+          <Text style={[rStyles.title, { color: colors.text }]}>{title}</Text>
+          <TextInput
+            style={[rStyles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+            value={name}
+            onChangeText={setName}
+            placeholder="Enter name"
+            placeholderTextColor={colors.textDim}
+            autoFocus
+          />
+          <View style={rStyles.actions}>
+            <TouchableOpacity style={[rStyles.cancelBtn, isDark && { backgroundColor: colors.inputBg }]} onPress={onClose}>
+              <Text style={{ color: colors.textMuted, fontFamily: FONTS.bodyBold }}>CANCEL</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={rStyles.saveBtn} onPress={handleSave} disabled={saving || !name.trim()}>
+              <LinearGradient colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]} style={rStyles.saveGrad}>
+                {saving ? <ActivityIndicator color="#FFF" /> : <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold }}>SAVE</Text>}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const rStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 40 },
+  modal: { width: '100%', borderRadius: 24, padding: 24 },
+  title: { fontFamily: FONTS.heading, fontSize: 22, marginBottom: 20 },
+  input: { height: 52, borderRadius: 14, borderWidth: 1, paddingHorizontal: 16, fontFamily: FONTS.bodyBold, fontSize: 16, marginBottom: 24 },
+  actions: { flexDirection: 'row', gap: 12 },
+  cancelBtn: { flex: 1, height: 50, justifyContent: 'center', alignItems: 'center', borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.1)' },
+  saveBtn: { flex: 2, borderRadius: 14, overflow: 'hidden' },
+  saveGrad: { height: 50, justifyContent: 'center', alignItems: 'center' },
+});
 
 export default function SplitSessionsScreen() {
   const router = useRouter();
-  const { id, shared, creatorName, creatorPic, splitName } = useLocalSearchParams();
+  const { id, shared, creatorName, creatorPic, splitName: initialSplitName } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
@@ -36,6 +90,9 @@ export default function SplitSessionsScreen() {
   const [loading, setLoading] = useState(true);
   const [cloning, setCloning] = useState(false);
   const [alreadyAdded, setAlreadyAdded] = useState(false);
+  const [splitDetail, setSplitDetail] = useState<any>(null);
+  const [showSplitRename, setShowSplitRename] = useState(false);
+  const [renameSession, setRenameSession] = useState<any>(null);
 
   const isShared = shared === '1';
 
@@ -53,11 +110,18 @@ export default function SplitSessionsScreen() {
         ]);
         setSessions(sessRes.data);
         setAlreadyAdded(detailRes.data.is_already_added || false);
+        setSplitDetail(detailRes.data);
       } else {
-        const res = await axios.get(`${API_URL}/workouts/splits/${id}/sessions`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setSessions(res.data);
+        const [sessRes, splitRes] = await Promise.all([
+          axios.get(`${API_URL}/workouts/splits/${id}/sessions`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axios.get(`${API_URL}/workouts/splits/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        ]);
+        setSessions(sessRes.data);
+        setSplitDetail(splitRes.data);
       }
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -91,6 +155,34 @@ export default function SplitSessionsScreen() {
         }
       }
     ]);
+  };
+
+  const handleRenameSplit = async (newName: string) => {
+    try {
+      const token = await getToken();
+      await axios.put(`${API_URL}/workouts/splits/${id}`, { name: newName }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSplitDetail((prev: any) => ({ ...prev, name: newName }));
+      showToast('Program renamed!');
+      setShowSplitRename(false);
+    } catch (err) {
+      showToast('Failed to rename', 'error');
+    }
+  };
+
+  const handleRenameSession = async (sessionId: number, newName: string) => {
+    try {
+      const token = await getToken();
+      await axios.put(`${API_URL}/workouts/sessions/${sessionId}`, { name: newName }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSessions((prev: any[]) => prev.map(s => s.id === sessionId ? { ...s, name: newName } : s));
+      showToast('Session renamed!');
+      setRenameSession(null);
+    } catch (err) {
+      showToast('Failed to rename', 'error');
+    }
   };
 
   const handleClone = async () => {
@@ -145,19 +237,20 @@ export default function SplitSessionsScreen() {
           </Text>
         </View>
         {!isShared && (
-          <TouchableOpacity
-            style={[
-              styles.deleteBtn,
-              {
-                backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.12)',
-                borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.22)',
-                borderWidth: 1,
-              }
-            ]}
-            onPress={() => handleDelete(item.id)}
-          >
-            <Ionicons name="trash-outline" size={18} color={isDark ? '#EF4444' : '#FFF'} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            <TouchableOpacity
+              style={[styles.editIconBtn, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(255,255,255,0.12)', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(255,255,255,0.22)', borderWidth: 1 }]}
+              onPress={() => setRenameSession(item)}
+            >
+              <Ionicons name="create-outline" size={16} color={isDark ? '#2596BE' : '#FFF'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.deleteBtn, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.12)', borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.22)', borderWidth: 1 }]}
+              onPress={() => handleDelete(item.id)}
+            >
+              <Ionicons name="trash-outline" size={18} color={isDark ? '#EF4444' : '#FFF'} />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -191,7 +284,7 @@ export default function SplitSessionsScreen() {
             {isShared ? (
               <>
                 <Text style={[styles.headerTitle, { color: colors.text }]}>
-                  {splitName || 'Program'}
+                  {initialSplitName || splitDetail?.name || 'Program'}
                 </Text>
                 <Text style={[styles.headerSub, { color: colors.textMuted, fontSize: 12, marginTop: 1 }]}>
                   @{creatorName || 'user'}
@@ -199,8 +292,15 @@ export default function SplitSessionsScreen() {
               </>
             ) : (
               <>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Split Sessions</Text>
-                <Text style={[styles.headerSub, { color: colors.textMuted }]}>Manage individual training days</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>
+                    {splitDetail?.name || 'Program'}
+                  </Text>
+                  <TouchableOpacity onPress={() => setShowSplitRename(true)}>
+                    <Ionicons name="create-outline" size={18} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.headerSub, { color: colors.textMuted }]}>{sessions.length} session{sessions.length !== 1 ? 's' : ''}</Text>
               </>
             )}
           </View>
@@ -291,6 +391,28 @@ export default function SplitSessionsScreen() {
           </View>
         )}
       </View>
+
+      {/* Split Rename Modal */}
+      <RenameModal
+        visible={showSplitRename}
+        title="Rename Program"
+        currentName={splitDetail?.name || ''}
+        onSave={handleRenameSplit}
+        onClose={() => setShowSplitRename(false)}
+        colors={colors}
+        isDark={isDark}
+      />
+
+      {/* Session Rename Modal */}
+      <RenameModal
+        visible={!!renameSession}
+        title="Rename Session"
+        currentName={renameSession?.name || ''}
+        onSave={(name: string) => handleRenameSession(renameSession.id, name)}
+        onClose={() => setRenameSession(null)}
+        colors={colors}
+        isDark={isDark}
+      />
     </SafeAreaView>
   );
 }
@@ -401,7 +523,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 10,
+  },
+  editIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   cardFooter: {
