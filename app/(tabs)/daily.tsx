@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Image,
-  ScrollView,
+  ScrollView, Animated, Easing, Dimensions,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,6 +20,12 @@ import { DailySkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import { formatDuration, formatDateTime, isSameDay, isToday, parseUTC } from '../../utils/datetime';
+
+const SCREEN_W = Dimensions.get('window').width;
+const SCREEN_H = Dimensions.get('window').height;
+const s = (n: number) => Math.round((SCREEN_W / 390) * n);
+const vs = (n: number) => Math.round((SCREEN_H / 844) * n);
+const fs = (n: number) => Math.round((Math.min(SCREEN_W, 500) / 390) * n);
 
 
 // Profile gate colors
@@ -89,6 +95,28 @@ export default function DailyTab() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { activeWorkoutId, endWorkoutSession } = useWorkoutTimer();
+
+  // ── XP Celebration Modal ──
+  const [xpModal, setXpModal] = useState<{ earned_xp: number; new_level: number | null; leveled_up: boolean } | null>(null);
+  const xpModalFade = useRef(new Animated.Value(0)).current;
+  const xpModalScale = useRef(new Animated.Value(0.8)).current;
+
+  useEffect(() => {
+    (async () => {
+      const raw = await AsyncStorage.getItem('pendingXPModal');
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.earned_xp > 0) {
+          setXpModal(data);
+          Animated.parallel([
+            Animated.timing(xpModalFade, { toValue: 1, duration: 300, useNativeDriver: true }),
+            Animated.spring(xpModalScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+          ]).start();
+        }
+        AsyncStorage.removeItem('pendingXPModal').catch(() => {});
+      }
+    })();
+  }, []);
 
   // Date filter
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -325,9 +353,10 @@ export default function DailyTab() {
                 <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/daily/new')}>
                   <LinearGradient 
                     colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} 
-                    style={styles.newBtnGradient}
+                    style={[styles.newBtnGradient]}
                   >
-                    <Ionicons name="add" size={24} color="#FFF" />
+                    <Ionicons name="add" size={s(20)} color="#FFF" />
+                    <Text style={[styles.newBtnText]}>New Workout</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
@@ -503,6 +532,40 @@ export default function DailyTab() {
         onConfirm={handleDeleteWorkout}
         onCancel={() => setDeletingId(null)}
       />
+
+      {/* ═══ XP CELEBRATION MODAL ═══ */}
+      {xpModal && (
+        <Animated.View style={[xpStyles.overlay, { opacity: xpModalFade }]}>
+          <Animated.View style={[xpStyles.card, { transform: [{ scale: xpModalScale }] }]}>
+            <LinearGradient colors={['#065F46', '#059669']} style={xpStyles.cardBg}>
+              <View style={xpStyles.iconRow}>
+                <View style={xpStyles.bigIconBox}>
+                  <Ionicons name="flash" size={36} color="#FBBF24" />
+                </View>
+                <Text style={xpStyles.badgeText}>XP EARNED</Text>
+              </View>
+              <Text style={xpStyles.xpAmount}>+{xpModal.earned_xp.toLocaleString()}</Text>
+              {xpModal.leveled_up && (
+                <View style={xpStyles.levelUpRow}>
+                  <Text style={xpStyles.levelUpLabel}>LEVEL UP!</Text>
+                  <Text style={xpStyles.levelUpNum}>LV.{xpModal.new_level}</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={xpStyles.dismissBtn}
+                onPress={() => {
+                  Animated.parallel([
+                    Animated.timing(xpModalFade, { toValue: 0, duration: 200, useNativeDriver: true }),
+                    Animated.timing(xpModalScale, { toValue: 0.8, duration: 200, useNativeDriver: true }),
+                  ]).start(() => setXpModal(null));
+                }}
+              >
+                <Text style={xpStyles.dismissText}>AWESOME!</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </Animated.View>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -512,7 +575,8 @@ const styles = StyleSheet.create({
   headerTitle: { fontFamily: FONTS.heading, fontSize: 32 },
   headerSub: { fontFamily: FONTS.body, fontSize: 14, marginTop: 2 },
   newBtn: { borderRadius: 14, overflow: 'hidden' },
-  newBtnGradient: { width: 50, height: 50, justifyContent: 'center', alignItems: 'center' },
+  newBtnGradient: { flexDirection: 'row', height: vs(46), justifyContent: 'center', alignItems: 'center', gap: s(6), paddingHorizontal: s(16), borderRadius: s(14) },
+  newBtnText: { fontFamily: FONTS.bodyBold, fontSize: fs(13), color: '#FFF', letterSpacing: 0.5 },
   listContent: { paddingHorizontal: 20, paddingBottom: 100, flexGrow: 1 },
   card: {
     borderRadius: 24,
@@ -835,5 +899,92 @@ const gateStyles = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: 13,
     color: G.soft,
+  },
+});
+
+const xpStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  card: {
+    width: SCREEN_W * 0.82,
+    borderRadius: 28,
+    overflow: 'hidden',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+  },
+  cardBg: {
+    padding: 32,
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  bigIconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: 'rgba(251,191,36,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.75)',
+    letterSpacing: 1.5,
+  },
+  xpAmount: {
+    fontFamily: FONTS.heading,
+    fontSize: 48,
+    color: '#FBBF24',
+    marginVertical: 8,
+  },
+  levelUpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(251,191,36,0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.3)',
+    marginBottom: 8,
+  },
+  levelUpLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 14,
+    color: '#FBBF24',
+    letterSpacing: 0.5,
+  },
+  levelUpNum: {
+    fontFamily: FONTS.heading,
+    fontSize: 20,
+    color: '#FBBF24',
+  },
+  dismissBtn: {
+    marginTop: 16,
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  dismissText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+    color: '#FFF',
+    letterSpacing: 1.5,
   },
 });

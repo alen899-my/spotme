@@ -164,7 +164,7 @@ export default function WorkoutViewScreen() {
               <Ionicons name="chevron-back" size={28} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-              {isShared ? 'Workout Details' : 'View Session'}
+              {workout?.title || 'Session'}
             </Text>
             <View style={{ flex: 1 }} />
             {!isShared && (

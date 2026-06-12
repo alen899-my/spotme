@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Image, Platform, ActivityIndicator,
-  TextInput, Dimensions, Animated, Easing, ImageBackground,
+  TextInput, Dimensions, Animated, Easing,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import StreakIcon from '../../components/ui/StreakIcon';
@@ -315,11 +315,16 @@ export default function WorkoutCompleteScreen() {
   const [loading, setLoading] = useState(true);
   const [newStreak, setNewStreak] = useState<number | null>(null);
   const [showStreakOverlay, setShowStreakOverlay] = useState(false);
+  const [earnedXP, setEarnedXP] = useState(0);
+  const [newLevel, setNewLevel] = useState<number | null>(null);
+  const [leveledUp, setLeveledUp] = useState(false);
+  const [displayedXP, setDisplayedXP] = useState(0);
 
   // ── Hero animations ──
   const heroScale = useRef(new Animated.Value(0.5)).current;
   const heroOpacity = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+  const xpFadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -334,6 +339,23 @@ export default function WorkoutCompleteScreen() {
       ])
     ).start();
   }, []);
+
+  // ── XP counter animation ──
+  useEffect(() => {
+    if (earnedXP <= 0) return;
+    const duration = 1200;
+    const startTime = Date.now();
+    let raf: number;
+    const tick = () => {
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+      setDisplayedXP(Math.round(eased * earnedXP));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [earnedXP]);
 
   useEffect(() => { fetchWorkout(); }, []);
 
@@ -440,6 +462,25 @@ export default function WorkoutCompleteScreen() {
       });
       setWorkout(completeRes.data);
 
+      // ─── XP counter animation ───
+      const xpAmount = completeRes.data.earned_xp || 0;
+      setEarnedXP(xpAmount);
+      setNewLevel(completeRes.data.new_level || null);
+      setLeveledUp(!!completeRes.data.leveled_up);
+
+      if (xpAmount > 0) {
+        Animated.timing(xpFadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: false,
+        }).start();
+        AsyncStorage.setItem('pendingXPModal', JSON.stringify({
+          earned_xp: xpAmount,
+          new_level: completeRes.data.new_level,
+          leveled_up: !!completeRes.data.leveled_up,
+        })).catch(() => {});
+      }
+
       if (completeRes.data.new_streak !== undefined) {
         setNewStreak(completeRes.data.new_streak);
         if (completeRes.data.new_streak > 0) setShowStreakOverlay(true);
@@ -526,19 +567,20 @@ export default function WorkoutCompleteScreen() {
   if (loading) return <CompleteSkeleton />;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
         contentContainerStyle={[st.scrollContent, { paddingBottom: vs(150) + Math.max(insets.bottom, 12) }]}
         showsVerticalScrollIndicator={false}
       >
         {/* ═══ HERO SECTION ═══ */}
-        <View style={[st.heroWrap, { height: vs(260) }]}>
-          <ImageBackground
-            source={require('../../assets/coach/fit-cartoon-character-training.png')}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
-          />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
+        <View style={[st.heroWrap, { height: vs(260) + insets.top }]}>
+          <LinearGradient colors={['#065F46', '#059669']} style={StyleSheet.absoluteFill} />
+
+            <Image
+              source={require('../../assets/coach/fit-cartoon-character-training.png')}
+              style={[st.heroImage, { width: s(200), height: vs(280), bottom: vs(-30) }]}
+              resizeMode="contain"
+            />
 
           {/* Confetti */}
           {confettiParticles.map(p => (
@@ -559,27 +601,64 @@ export default function WorkoutCompleteScreen() {
             ]}
           />
 
-          {/* Trophy (always show trophy, streak only in overlay after save) */}
-          <Animated.View style={{ transform: [{ scale: heroScale }], opacity: heroOpacity }}>
-            <View style={[st.trophyCircle, { width: s(80), height: s(80), borderRadius: s(40), backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <Ionicons name="trophy" size={fs(42)} color="#FFF" />
-            </View>
-          </Animated.View>
+          {/* Left content */}
+          <View style={[st.heroContent, { paddingTop: insets.top + vs(20) }]}>
+            <Animated.View style={{ transform: [{ scale: heroScale }], opacity: heroOpacity }}>
+              <View style={[st.trophyCircle]}>
+                <Ionicons name="trophy" size={fs(48)} color="#FBBF24" />
+              </View>
+            </Animated.View>
 
-          <Text style={[st.heroTitle, { fontSize: fs(30), color: '#FFF' }]}>
-            Workout Complete!
-          </Text>
-          <Text style={[st.heroSub, { fontSize: fs(14), color: 'rgba(255,255,255,0.85)' }]}>
-            You crushed it today 💪
-          </Text>
-          {workout?.title && (
-            <View style={[st.heroPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <Text style={[st.heroPillText, { fontSize: fs(11), color: 'rgba(255,255,255,0.9)' }]}>
-                {workout.title}
-              </Text>
-            </View>
-          )}
+            <Text style={[st.heroTitle, { fontSize: fs(30), color: '#FFF' }]}>
+              Workout Complete!
+            </Text>
+            <Text style={[st.heroSub, { fontSize: fs(14), color: 'rgba(255,255,255,0.85)' }]}>
+              You crushed it today 💪
+            </Text>
+            {workout?.title && (
+              <View style={[st.heroPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <Text style={[st.heroPillText, { fontSize: fs(11), color: 'rgba(255,255,255,0.9)' }]}>
+                  {workout.title}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
+
+        {/* ═══ XP COUNTER ═══ */}
+        {earnedXP > 0 && (
+          <Animated.View style={[st.xpContainer, { opacity: xpFadeAnim, transform: [{ scale: xpFadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }] }]}>
+            <LinearGradient colors={['#047857', '#059669']} style={st.xpGradient}>
+              <View style={st.xpRow}>
+                <View style={st.xpIconBox}>
+                  <Ionicons name="flash" size={fs(22)} color="#FBBF24" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={st.xpLabel}>XP EARNED</Text>
+                  <Text style={st.xpValue}>+{displayedXP.toLocaleString()}</Text>
+                </View>
+                {leveledUp && (
+                  <View style={st.levelUpBadge}>
+                    <Text style={st.levelUpText}>LV.{newLevel} ↑</Text>
+                  </View>
+                )}
+              </View>
+              <View style={st.xpBarBg}>
+                <Animated.View
+                  style={[
+                    st.xpBarFill,
+                    {
+                      width: xpFadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0%', '100%'],
+                      }),
+                    },
+                  ]}
+                />
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        )}
 
         {/* ═══ BENTO GRID ═══ */}
         <View style={[st.bentoContainer, { paddingHorizontal: s(16) }]}>
@@ -729,7 +808,7 @@ export default function WorkoutCompleteScreen() {
           </Animated.View>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -742,30 +821,41 @@ const st = StyleSheet.create({
 
   // ── Hero ──
   heroWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderBottomLeftRadius: s(32),
-    borderBottomRightRadius: s(32),
     position: 'relative',
+  },
+  heroImage: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  heroContent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    paddingLeft: s(20),
+    zIndex: 3,
   },
   glowRing: {
     position: 'absolute',
     borderWidth: 2,
+    zIndex: 2,
   },
   trophyCircle: {
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: vs(12),
+    alignSelf: 'flex-start',
   },
   heroTitle: {
     fontFamily: FONTS.heading,
     marginBottom: vs(4),
-    textAlign: 'center',
   },
   heroSub: {
     fontFamily: FONTS.body,
-    textAlign: 'center',
     marginBottom: vs(8),
   },
   heroPill: {
@@ -773,9 +863,72 @@ const st = StyleSheet.create({
     paddingVertical: vs(4),
     borderRadius: s(20),
     marginTop: vs(4),
+    alignSelf: 'flex-start',
   },
   heroPillText: {
     fontFamily: FONTS.bodySemiBold,
+  },
+
+  // ── XP Counter ──
+  xpContainer: {
+    paddingHorizontal: s(16),
+    marginTop: vs(16),
+    marginBottom: vs(4),
+  },
+  xpGradient: {
+    borderRadius: s(18),
+    padding: s(16),
+    overflow: 'hidden',
+  },
+  xpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(14),
+  },
+  xpIconBox: {
+    width: s(44),
+    height: s(44),
+    borderRadius: s(12),
+    backgroundColor: 'rgba(251,191,36,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  xpLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: fs(10),
+    color: 'rgba(255,255,255,0.7)',
+    letterSpacing: 1.2,
+    marginBottom: vs(2),
+  },
+  xpValue: {
+    fontFamily: FONTS.heading,
+    fontSize: fs(28),
+    color: '#FBBF24',
+  },
+  levelUpBadge: {
+    backgroundColor: 'rgba(251,191,36,0.2)',
+    paddingHorizontal: s(12),
+    paddingVertical: vs(6),
+    borderRadius: s(10),
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.4)',
+  },
+  levelUpText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: fs(12),
+    color: '#FBBF24',
+  },
+  xpBarBg: {
+    height: vs(4),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: s(2),
+    marginTop: vs(12),
+    overflow: 'hidden',
+  },
+  xpBarFill: {
+    height: '100%',
+    backgroundColor: '#FBBF24',
+    borderRadius: s(2),
   },
 
   // ── Bento ──

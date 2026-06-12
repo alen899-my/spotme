@@ -293,10 +293,7 @@ export default function WorkoutSummary({
       {/* ── Header ── */}
       <View style={styles.summaryHeader}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.summaryTitle, { color: colors.text }]}>
-            {workout?.title || workout?.session_name || 'Workout Summary'}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
             <Text style={[styles.summaryDate, { color: colors.textMuted }]}>
               {formatDateTime(workout?.started_at || workout?.created_at)}
@@ -387,10 +384,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-  },
-  summaryTitle: {
-    fontFamily: FONTS.heading,
-    fontSize: 24,
   },
   summaryDate: {
     fontFamily: FONTS.body,
