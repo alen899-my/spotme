@@ -36,11 +36,13 @@ const METRIC_COLORS: Record<string, string> = {
   'AVG RATING': '#F59E0B',
 };
 
+const CARD_COLORS = ['#2596BE', '#EF4444', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#3B82F6', '#F97316', '#14B8A6', '#A855F7'];
+
 // ── Apple-Style Exercise Carousel Card ──────────────────────────────────────
 const CAROUSEL_CARD_W = SCREEN_WIDTH - 64;
 const CAROUSEL_SNAP = CAROUSEL_CARD_W + 12;
 
-function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; isDark: boolean }) {
+function ExerciseCarouselCard({ ex, colors, isDark, cardColor }: { ex: any; colors: any; isDark: boolean; cardColor: string }) {
   const isSkipped = ex.is_skipped;
   const isCardio = ex.category?.toLowerCase() === 'cardio';
   const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
@@ -56,21 +58,16 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
     <View
       style={[
         styles.exCard,
-        { width: CAROUSEL_CARD_W, marginBottom: 0 },
+        { width: CAROUSEL_CARD_W, marginBottom: 0, backgroundColor: isDark ? `${cardColor}35` : cardColor, borderColor: isDark ? `${cardColor}50` : `${cardColor}CC` },
         isSkipped && !hasCompletedData && { opacity: 0.55 },
-        isDark && {
-          backgroundColor: colors.pill,
-          borderColor: colors.border,
-          borderWidth: 1,
-        },
       ]}
     >
       {/* Header */}
       <View style={styles.exHeader}>
         <Image source={{ uri: ex.image_url }} style={styles.exImage} />
         <View style={styles.exMeta}>
-          <Text style={[styles.exName, isDark && { color: colors.text }]} numberOfLines={2}>{ex.name}</Text>
-          <Text style={[styles.exSetsSub, isDark && { color: colors.textMuted }]}>
+          <Text style={[styles.exName, { color: '#FFF' }]} numberOfLines={2}>{ex.name}</Text>
+          <Text style={[styles.exSetsSub, { color: 'rgba(255,255,255,0.85)' }]}>
             {isSkipped && !hasCompletedData ? 'Movement skipped' : isSkipped && hasCompletedData ? `Partially completed — ${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} logged, then skipped` : isCardio ? `${formatTime(totalTime)} logged` : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
           </Text>
         </View>
@@ -102,21 +99,21 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
       {/* Record row (non-cardio, has completed data) */}
       {!isCardio && (hasCompletedData || !isSkipped) && (
         <View style={styles.recordRow}>
-          <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
-            <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>BEST SET</Text>
-            <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
+          <View style={[styles.recordPill, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+            <Text style={[styles.recordPillLabel, { color: 'rgba(255,255,255,0.7)' }]}>BEST SET</Text>
+            <Text style={[styles.recordPillVal, { color: '#FFF' }]}>
               {Number(ex.best_set_weight || 0).toFixed(1)}kg × {ex.best_set_reps || 0}
             </Text>
           </View>
-          <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
-            <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>MY PR</Text>
-            <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
+          <View style={[styles.recordPill, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+            <Text style={[styles.recordPillLabel, { color: 'rgba(255,255,255,0.7)' }]}>MY PR</Text>
+            <Text style={[styles.recordPillVal, { color: '#FFF' }]}>
               {formatRecord(ex.record_metric_type, ex.personal_record_value)}
             </Text>
           </View>
-          <View style={[styles.recordPill, isDark && { backgroundColor: colors.inputBg }]}>
-            <Text style={[styles.recordPillLabel, isDark && { color: colors.textMuted }]}>WORLD PR</Text>
-            <Text style={[styles.recordPillVal, isDark && { color: colors.text }]}>
+          <View style={[styles.recordPill, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+            <Text style={[styles.recordPillLabel, { color: 'rgba(255,255,255,0.7)' }]}>WORLD PR</Text>
+            <Text style={[styles.recordPillVal, { color: '#FFF' }]}>
               {formatRecord(ex.record_metric_type, ex.world_record_value)}
             </Text>
           </View>
@@ -128,13 +125,13 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
         <View style={styles.exStatsGrid}>
           {isCardio ? (
             <>
-              <View style={[styles.exStatCell, isDark && { backgroundColor: colors.inputBg }]}>
-                <Text style={[styles.exStatLabel, isDark && { color: colors.textMuted }]}>TOTAL TIME</Text>
-                <Text style={[styles.exStatValue, isDark && { color: colors.text }]}>{formatTime(totalTime)}</Text>
+              <View style={[styles.exStatCell, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+                <Text style={[styles.exStatLabel, { color: 'rgba(255,255,255,0.7)' }]}>TOTAL TIME</Text>
+                <Text style={[styles.exStatValue, { color: '#FFF' }]}>{formatTime(totalTime)}</Text>
               </View>
-              <View style={[styles.exStatCell, isDark && { backgroundColor: colors.inputBg }]}>
-                <Text style={[styles.exStatLabel, isDark && { color: colors.textMuted }]}>AVG TIME</Text>
-                <Text style={[styles.exStatValue, isDark && { color: colors.text }]}>{formatTime(avgTime)}</Text>
+              <View style={[styles.exStatCell, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+                <Text style={[styles.exStatLabel, { color: 'rgba(255,255,255,0.7)' }]}>AVG TIME</Text>
+                <Text style={[styles.exStatValue, { color: '#FFF' }]}>{formatTime(avgTime)}</Text>
               </View>
             </>
           ) : (
@@ -144,9 +141,9 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
               { label: 'TOTAL REPS', value: `${totalReps}` },
               { label: 'AVG TIME / SET', value: formatTime(avgTime) },
             ].map((item, idx) => (
-              <View key={idx} style={[styles.exStatCell, isDark && { backgroundColor: colors.inputBg }]}>
-                <Text style={[styles.exStatLabel, isDark && { color: colors.textMuted }]}>{item.label}</Text>
-                <Text style={[styles.exStatValue, isDark && { color: colors.text }]}>{item.value}</Text>
+              <View key={idx} style={[styles.exStatCell, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+                <Text style={[styles.exStatLabel, { color: 'rgba(255,255,255,0.7)' }]}>{item.label}</Text>
+                <Text style={[styles.exStatValue, { color: '#FFF' }]}>{item.value}</Text>
               </View>
             ))
           )}
@@ -177,8 +174,8 @@ function ExerciseCarousel({ exercises, colors, isDark }: { exercises: any[]; col
         style={{ marginLeft: -20, marginRight: -20 }}
         onMomentumScrollEnd={onScroll}
       >
-        {exercises.map((ex: any) => (
-          <ExerciseCarouselCard key={ex.id} ex={ex} colors={colors} isDark={isDark} />
+        {exercises.map((ex: any, idx: number) => (
+          <ExerciseCarouselCard key={ex.id} ex={ex} colors={colors} isDark={isDark} cardColor={CARD_COLORS[idx % CARD_COLORS.length]} />
         ))}
       </ScrollView>
       {/* Pagination dots */}
@@ -311,7 +308,7 @@ export default function WorkoutSummary({
 
       {/* ── Photos Gallery ── */}
       {(workout?.photos?.length > 0 || uploadingPhotos.length > 0 || onAddPhotos) && (
-        <View style={styles.photoSection}>
+        <View style={[styles.photoSection, { backgroundColor: isDark ? '#181818' : '#F7F7F7', borderColor: isDark ? '#282828' : '#EEEEEE' }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
             {workout?.photos?.map((p: any) => (
               <TouchableOpacity key={p.id} style={styles.photoThumbWrap} onPress={() => onOpenViewer?.(p.photo_url)}>
@@ -333,11 +330,11 @@ export default function WorkoutSummary({
             ))}
             {onAddPhotos && (
               <TouchableOpacity
-                style={[styles.photoAddBtn, isDark && { backgroundColor: colors.inputBg, borderColor: colors.border }]}
+                style={[styles.photoAddBtn, { borderColor: isDark ? '#383838' : '#D0D0D0', backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF' }]}
                 onPress={onAddPhotos}
                 disabled={loadingPhotos}
               >
-                {loadingPhotos ? <ActivityIndicator size="small" color={colors.textDim} /> : <Ionicons name="add" size={24} color={colors.textDim} />}
+                {loadingPhotos ? <ActivityIndicator size="small" color={isDark ? '#888' : '#999'} /> : <Ionicons name="add" size={24} color={isDark ? '#888' : '#999'} />}
               </TouchableOpacity>
             )}
           </ScrollView>
@@ -348,23 +345,39 @@ export default function WorkoutSummary({
       <View style={styles.statsGrid}>
         {stats.map((s, i) => {
           const color = METRIC_COLORS[s.key] || P.cta;
-          return (
+          const isBodyWeight = s.key === 'BODY WEIGHT';
+          const card = (
             <View
-              key={s.key}
               style={[
                 styles.statCard,
-                { width: s.wide ? SCREEN_WIDTH - 40 : (SCREEN_WIDTH - 52) / 2 },
-                isDark && { backgroundColor: '#0D0D0D', borderColor: colors.border, borderWidth: 1 },
+                { width: s.wide ? SCREEN_WIDTH - 40 : (SCREEN_WIDTH - 50) / 2 },
+                { backgroundColor: isDark ? `${color}30` : `${color}12`, borderColor: isDark ? `${color}40` : `${color}20` },
+                isBodyWeight && onEditMetrics && { borderColor: color, borderWidth: 1.5 },
               ]}
             >
-              <View style={[styles.statIconBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : `${color}20` }]}>
-                <Ionicons name={s.icon as any} size={18} color={color} />
+              <View style={styles.statHeader}>
+                <View style={[styles.statIconBox, { backgroundColor: isDark ? `${color}25` : `${color}15` }]}>
+                  <Ionicons name={s.icon as any} size={14} color={color} />
+                </View>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>{s.key}</Text>
               </View>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{s.key}</Text>
               <Text style={[styles.statValue, { color: colors.text }]}>{s.value}</Text>
               <Text style={[styles.statSub, { color: colors.textDim }]}>{s.sub}</Text>
+              {isBodyWeight && onEditMetrics && (
+                <View style={styles.weightEditBadge}>
+                  <Ionicons name="create-outline" size={12} color="#FFF" />
+                </View>
+              )}
             </View>
           );
+          if (isBodyWeight && onEditMetrics) {
+            return (
+              <TouchableOpacity key={s.key} onPress={onEditMetrics} activeOpacity={0.7}>
+                {card}
+              </TouchableOpacity>
+            );
+          }
+          return card;
         })}
       </View>
 
@@ -416,6 +429,9 @@ const styles = StyleSheet.create({
   // ── Photos ──
   photoSection: {
     marginBottom: 24,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
   },
   photoThumbWrap: {
     width: 100,
@@ -445,51 +461,57 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(37,150,190,0.9)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // ── Stats Grid — Black solid cards ──
+  // ── Stats Grid — Premium fitness cards ──
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
     marginBottom: 28,
   },
   statCard: {
-    width: (SCREEN_WIDTH - 52) / 2,
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    elevation: 2,
+    width: (SCREEN_WIDTH - 50) / 2,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  statHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
   },
   statIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
   },
   statLabel: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 9,
-    letterSpacing: 1.2,
-    marginBottom: 2,
+    fontSize: 10,
+    letterSpacing: 0.8,
   },
   statValue: {
     fontFamily: FONTS.heading,
-    fontSize: 20,
+    fontSize: 22,
+    lineHeight: 26,
+    marginBottom: 1,
   },
   statSub: {
     fontFamily: FONTS.body,
     fontSize: 10,
-    marginTop: 2,
+    opacity: 0.6,
   },
 
   // ── Section Label ──
@@ -501,11 +523,9 @@ const styles = StyleSheet.create({
 
   // ── Exercise Cards ──
   exCard: {
-    backgroundColor: P.cta,
-    borderRadius: 20,
+    borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: P.ctaDark,
     overflow: 'hidden',
     marginBottom: 14,
   },
@@ -590,7 +610,6 @@ const styles = StyleSheet.create({
   recordPill: {
     flex: 1,
     minWidth: 90,
-    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 10,
@@ -598,14 +617,12 @@ const styles = StyleSheet.create({
   recordPillLabel: {
     fontFamily: FONTS.bodyBold,
     fontSize: 9,
-    color: 'rgba(255,255,255,0.72)',
     letterSpacing: 0.8,
     marginBottom: 3,
   },
   recordPillVal: {
     fontFamily: FONTS.heading,
     fontSize: 13,
-    color: '#FFF',
   },
 
   // 2×2 stat grid
@@ -616,22 +633,19 @@ const styles = StyleSheet.create({
   },
   exStatCell: {
     width: '47%',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 12,
+    borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
   exStatLabel: {
     fontFamily: FONTS.bodyBold,
     fontSize: 8,
-    color: 'rgba(255,255,255,0.72)',
     letterSpacing: 0.8,
     marginBottom: 4,
   },
   exStatValue: {
     fontFamily: FONTS.heading,
     fontSize: 18,
-    color: '#FFF',
   },
   dotRow: {
     flexDirection: 'row',
@@ -642,7 +656,19 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   dot: {
+    width: 6,
     height: 6,
     borderRadius: 3,
+  },
+  weightEditBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: P.cta,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

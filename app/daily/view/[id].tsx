@@ -10,7 +10,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
-import * as Sharing from 'expo-sharing';
 import { FONTS } from '../../../constants/theme';
 import { P } from '../../../constants/homeTheme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,6 +41,8 @@ export default function WorkoutViewScreen() {
   const [uploadingPhotos, setUploadingPhotos] = useState<string[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [existingReport, setExistingReport] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const fetchWorkout = useCallback(async () => {
     try {
@@ -123,16 +124,6 @@ export default function WorkoutViewScreen() {
     } catch { showToast('Failed to remove photo', 'error'); }
   };
 
-  const handleDownload = async (uri: string) => {
-    if (Platform.OS === 'web') {
-      const link = document.createElement('a');
-      link.href = uri; link.download = `spotme-${Date.now()}.jpg`; link.click();
-    } else {
-      const ok = await Sharing.isAvailableAsync();
-      if (ok) await Sharing.shareAsync(uri);
-    }
-  };
-
   const openEditMetrics = () => {
     setFinishWeight(String(workout?.post_workout_weight || ''));
     setShowEditMetricsModal(true);
@@ -150,6 +141,18 @@ export default function WorkoutViewScreen() {
       fetchWorkout();
     } catch { showToast('Failed to update metrics', 'error'); }
     finally { setUpdatingMetrics(false); }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      showToast('Changes saved!');
+      setIsEditing(false);
+    } catch {
+      showToast('Failed to save changes', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <ViewSessionSkeleton />;
@@ -182,11 +185,16 @@ export default function WorkoutViewScreen() {
                 )}
                 <TouchableOpacity
                   style={styles.editSolidBtn}
-                  onPress={() => router.push(`/daily/${workoutId}?editing=true`)}
+                  onPress={() => isEditing ? handleSave() : setIsEditing(true)}
                   activeOpacity={0.85}
+                  disabled={saving}
                 >
-                <LinearGradient colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]} style={styles.iconBtnGrad}>
-                  <Ionicons name="create-outline" size={16} color="#FFF" />
+                <LinearGradient colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]} style={styles.editBtnGrad}>
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={[styles.editBtnText, { color: '#FFF' }]}>{isEditing ? 'SAVE' : 'EDIT'}</Text>
+                  )}
                 </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -209,10 +217,10 @@ export default function WorkoutViewScreen() {
                 workout={workout}
                 uploadingPhotos={uploadingPhotos}
                 loadingPhotos={loadingPhotos}
-                onAddPhotos={isShared ? undefined : handleUpdatePhotos}
-                onDeletePhoto={isShared ? undefined : handleDeletePhoto}
+                onAddPhotos={isEditing && !isShared ? handleUpdatePhotos : undefined}
+                onDeletePhoto={isEditing && !isShared ? handleDeletePhoto : undefined}
                 onOpenViewer={(uri) => { setViewerUri(uri); setViewerVisible(true); }}
-                onEditMetrics={isShared ? undefined : openEditMetrics}
+                onEditMetrics={isEditing && !isShared ? openEditMetrics : undefined}
                 showBodyWeight={!isShared}
               />
             </View>
@@ -223,16 +231,11 @@ export default function WorkoutViewScreen() {
       {/* Photo Viewer */}
       <Modal visible={viewerVisible} transparent animationType="fade">
         <View style={styles.viewerOverlay}>
+          <Image source={{ uri: viewerUri || '' }} style={styles.viewerImage} resizeMode="contain" />
           <TouchableOpacity style={styles.viewerClose} onPress={() => setViewerVisible(false)}>
             <Ionicons name="close" size={32} color="#FFF" />
           </TouchableOpacity>
-          <Image source={{ uri: viewerUri || '' }} style={styles.viewerImage} resizeMode="contain" />
-          <TouchableOpacity style={styles.downloadBtn} onPress={() => handleDownload(viewerUri || '')}>
-            <LinearGradient colors={[P.cta, P.ctaDark]} style={styles.downloadBtnGrad}>
-              <Ionicons name="download-outline" size={20} color="#FFF" />
-              <Text style={{ color: '#FFF', fontFamily: FONTS.bodyBold, marginLeft: 8 }}>SAVE / SHARE</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+
         </View>
       </Modal>
 
@@ -275,6 +278,8 @@ const styles = StyleSheet.create({
   reportBtn: { borderRadius: 10, overflow: 'hidden' },
   editSolidBtn: { borderRadius: 10, overflow: 'hidden' },
   iconBtnGrad: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  editBtnGrad: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  editBtnText: { fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.5 },
   listContent: { paddingBottom: 40 },
   listHeader: { marginBottom: 20, paddingHorizontal: 20 },
 
@@ -282,9 +287,6 @@ const styles = StyleSheet.create({
   viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
   viewerClose: { position: 'absolute', top: 50, right: 20 },
   viewerImage: { width: '100%', height: '80%' },
-  downloadBtn: { position: 'absolute', bottom: 40, borderRadius: 20, overflow: 'hidden' },
-  downloadBtnGrad: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 14 },
-
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 30 },
