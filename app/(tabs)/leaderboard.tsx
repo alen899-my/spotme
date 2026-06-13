@@ -422,21 +422,19 @@ export default function LeaderboardScreen() {
     setShowTierPromo(false);
   }, []);
 
-  // ── Auto-show promotion when tier changes ──
+  // ── Auto-show promotion when user progresses to next tier ──
   useEffect(() => {
     if (!nearbyMe?.league_tier) return;
     AsyncStorage.getItem('lastSeenTier').then(lastSeen => {
-      if (nearbyMe.league_tier !== lastSeen) openTierPromo();
+      if (!lastSeen) {
+        AsyncStorage.setItem('lastSeenTier', nearbyMe.league_tier);
+        return;
+      }
+      const newIdx = TIERS.findIndex(t => t.name === nearbyMe.league_tier);
+      const oldIdx = TIERS.findIndex(t => t.name === lastSeen);
+      if (newIdx > oldIdx) openTierPromo();
     });
   }, [nearbyMe]);
-
-  // ── Auto-close after 3 seconds ──
-  const autoCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!showTierPromo) return;
-    autoCloseTimer.current = setTimeout(closeTierPromo, 3000);
-    return () => { if (autoCloseTimer.current) clearTimeout(autoCloseTimer.current); };
-  }, [showTierPromo]);
 
   // ── Save viewed tier when modal dismisses ──
   useEffect(() => {
