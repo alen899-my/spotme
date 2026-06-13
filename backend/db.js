@@ -430,6 +430,16 @@ const initDB = async () => {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_xp_transactions_user ON xp_transactions (user_id);`);
 
+    // ── Leaderboard performance indexes ─────────────────────────────────────
+    // Global sort (used by GET /leaderboard and GET /leaderboard/top)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_xp ON users (total_xp DESC);`);
+    // Tier-filtered sort (used by GET /leaderboard?tier=Gold etc.)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_tier_xp ON users (league_tier, total_xp DESC);`);
+    // Rank lookup for /me ("how many users have more XP than me?")
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_xp_asc ON users (total_xp ASC);`);
+    // Name search for /search
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_full_name ON users (full_name text_pattern_ops);`);
+
     // Water goal tracking column
     await pool.query(`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS water_goal_date DATE;
