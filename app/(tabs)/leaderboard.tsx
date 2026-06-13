@@ -16,6 +16,7 @@ import { P } from '../../constants/homeTheme';
 import { LeaderboardSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import CheerCard from '../../components/modals/CheerCard';
 
 const { width: W } = Dimensions.get('window');
 const TOP_COUNT    = 10;     // always-visible top rows
@@ -393,6 +394,55 @@ export default function LeaderboardScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching]         = useState(false);
   const searchTimer = useRef<any>(null);
+
+  // ── Tier Promotion Overlay ──────────────────────────────────────────────────
+  const [showTierPromo, setShowTierPromo] = useState(false);
+  const [promoTierName, setPromoTierName] = useState('Diamond');
+  const [promoXp, setPromoXp] = useState(0);
+  const [promoXpNeeded, setPromoXpNeeded] = useState(0);
+
+  const openTierPromo = useCallback(() => {
+    const name = nearbyMe?.league_tier;
+    if (!name || !nearbyMe) return;
+
+    const tierIdx = TIERS.findIndex(t => t.name === name);
+    if (tierIdx < 0 || tierIdx >= TIERS.length - 1) return;
+
+    const tierMins = [0, 2000, 6000, 12000, 24000, 40000, 60000, 80000, 120000, 200000];
+    const userXp = nearbyMe.xp ?? 0;
+    const nextMin = tierMins[tierIdx] ?? 200000;
+
+    setPromoXp(userXp);
+    setPromoXpNeeded(nextMin);
+    setPromoTierName(name);
+    setShowTierPromo(true);
+  }, [nearbyMe]);
+
+  const closeTierPromo = useCallback(() => {
+    setShowTierPromo(false);
+  }, []);
+
+  // ── Auto-show promotion when tier changes ──
+  useEffect(() => {
+    if (!nearbyMe?.league_tier) return;
+    AsyncStorage.getItem('lastSeenTier').then(lastSeen => {
+      if (nearbyMe.league_tier !== lastSeen) openTierPromo();
+    });
+  }, [nearbyMe]);
+
+  // ── Auto-close after 3 seconds ──
+  const autoCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!showTierPromo) return;
+    autoCloseTimer.current = setTimeout(closeTierPromo, 3000);
+    return () => { if (autoCloseTimer.current) clearTimeout(autoCloseTimer.current); };
+  }, [showTierPromo]);
+
+  // ── Save viewed tier when modal dismisses ──
+  useEffect(() => {
+    if (showTierPromo || !nearbyMe?.league_tier) return;
+    AsyncStorage.setItem('lastSeenTier', nearbyMe.league_tier);
+  }, [showTierPromo, nearbyMe?.league_tier]);
 
   const isFetching  = useRef(false);
   const currentTab  = useRef('All');
@@ -901,6 +951,9 @@ export default function LeaderboardScreen() {
           />
         )}
       />
+
+      {/* ── TIER PROMOTION OVERLAY ── */}
+      <CheerCard visible={showTierPromo} tierName={promoTierName} xp={promoXp} xpNeeded={promoXpNeeded} onClose={closeTierPromo} />
     </View>
   );
 }
@@ -1008,4 +1061,5 @@ const styles = StyleSheet.create({
   centered: { justifyContent: 'center', alignItems: 'center', gap: 12, paddingTop: 60 },
   loadingText: { fontFamily: FONTS.body, fontSize: 14 },
   emptyText: { fontFamily: FONTS.body, fontSize: 15 },
+
 });
