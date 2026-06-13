@@ -44,6 +44,7 @@ router.get('/', authenticateToken, async (req, res) => {
           u.total_xp AS xp,
           u.league_tier,
           u.current_streak,
+          u.prev_rank,
           ROW_NUMBER() OVER (ORDER BY u.total_xp DESC) AS global_rank
        FROM users u
        ${where}
@@ -52,13 +53,26 @@ router.get('/', authenticateToken, async (req, res) => {
       params
     );
 
+    // Compute rank_change and update prev_rank
+    const rows = result.rows.map((row) => {
+      const rank = Number(row.global_rank);
+      const prev = Number(row.prev_rank);
+      const rankChange = prev > 0 ? prev - rank : 0;
+      return { ...row, global_rank: rank, rank_change: rankChange };
+    });
+
+    // Update prev_rank for all users in this result
+    for (const row of rows) {
+      await pool.query(`UPDATE users SET prev_rank = $1 WHERE id = $2`, [row.global_rank, row.id]);
+    }
+
     // Total count for pagination
     const countWhere = tier && tier !== 'All' ? `WHERE league_tier = $1` : '';
     const countParams = tier && tier !== 'All' ? [tier] : [];
     const countRes = await pool.query(`SELECT COUNT(*) FROM users ${countWhere}`, countParams);
 
     res.json({
-      data:  result.rows,
+      data:  rows,
       total: Number(countRes.rows[0].count),
     });
   } catch (err) {
@@ -128,13 +142,19 @@ router.get('/top', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT
-          id, full_name, profile_pic_url, total_xp AS xp, league_tier, current_streak,
+          id, full_name, profile_pic_url, total_xp AS xp, league_tier, current_streak, prev_rank,
           ROW_NUMBER() OVER (ORDER BY total_xp DESC) AS global_rank
        FROM users
        ORDER BY total_xp DESC
        LIMIT 10`
     );
-    res.json(result.rows);
+    const rows = result.rows.map((row) => {
+      const rank = Number(row.global_rank);
+      const prev = Number(row.prev_rank);
+      const rankChange = prev > 0 ? prev - rank : 0;
+      return { ...row, global_rank: rank, rank_change: rankChange };
+    });
+    res.json(rows);
   } catch (err) {
     console.error('GET /leaderboard/top error:', err);
     res.status(500).json({ error: err.message });

@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -75,19 +76,117 @@ function Avatar({ uri, size, border }: { uri?: string; size: number; border: str
   );
 }
 
+// ── SVG Crown ─────────────────────────────────────────────────────────────────
+function CrownSvg({ size }: { size: number }) {
+  const s = size;
+  return (
+    <Svg width={s} height={s * 0.75} viewBox="0 0 200 150">
+      <Path
+        d="M 20,130 L 20,80 L 55,100 L 100,55 L 145,100 L 180,80 L 180,130 Z"
+        fill="#F7CB16"
+        stroke="#B8960E"
+        strokeWidth={3}
+      />
+      <Circle cx="100" cy="55" r="14" fill="#D4A800" />
+      <Circle cx="100" cy="55" r="7" fill="#FFF" opacity={0.7} />
+      <Circle cx="100" cy="55" r="3" fill="#B8960E" />
+      <Circle cx="55" cy="100" r="5" fill="#FFF" opacity={0.3} />
+      <Circle cx="145" cy="100" r="5" fill="#FFF" opacity={0.3} />
+      <Path d="M 20,130 L 100,115 L 180,130" stroke="#B8960E" strokeWidth={2} fill="none" opacity={0.5} />
+    </Svg>
+  );
+}
+
+// ── SVG Medal ──────────────────────────────────────────────────────────────────
+function MedalSvg({ position, size = 34 }: { position: number; size?: number }) {
+  const colors: Record<number, string> = {
+    1: '#F7CB16', 2: '#C8D6E5', 3: '#E67E22',
+  };
+  const innerColors: Record<number, string> = {
+    1: '#D4A800', 2: '#8395A7', 3: '#A04000',
+  };
+  const ribbonColors: Record<number, string> = {
+    1: '#B8960E', 2: '#6B7A85', 3: '#8A3E00',
+  };
+  return (
+    <Svg width={size} height={size * 1.1} viewBox="0 0 34 38">
+      <Path
+        d="M 6,20 L 17,28 L 28,20 V 34 L 17,38 L 6,34 Z"
+        fill={ribbonColors[position]}
+        opacity={0.6}
+      />
+      <Circle cx="17" cy="15" r="13" fill={colors[position]} />
+      <Circle cx="17" cy="15" r="10" fill="none" stroke="#FFF" strokeWidth={1.2} opacity={0.4} />
+      <Circle cx="17" cy="15" r="5" fill="#FFF" opacity={0.85} />
+      <Circle cx="17" cy="15" r="2" fill={innerColors[position]} />
+    </Svg>
+  );
+}
+
+// ── 3D Podium Block (Views) ───────────────────────────────────────────────────
+function PodiumBlockView({ position, heightFactor }: { position: number; heightFactor: number }) {
+  const blockH = Math.max(80 * heightFactor, 50);
+  const colors: Record<number, { main: string; dark: string; light: string }> = {
+    1: { main: '#F7CB16', dark: '#B8960E', light: '#FFF8DC' },
+    2: { main: '#C8D6E5', dark: '#9EA8B0', light: '#F0F4F8' },
+    3: { main: '#E67E22', dark: '#B85E10', light: '#FDEBD0' },
+  };
+  const c = colors[position];
+  const medalLabel = position === 1 ? '1' : position === 2 ? '2' : '3';
+
+  return (
+    <View style={{ width: '100%', alignItems: 'center' }}>
+      {/* Depth block (offset for 3D effect) */}
+      <View style={{
+        width: '86%',
+        height: blockH,
+        backgroundColor: c.dark,
+        borderRadius: 14,
+        position: 'absolute',
+        bottom: -5,
+        opacity: 0.8,
+      }} />
+      {/* Main block */}
+      <View style={{
+        width: '86%',
+        height: blockH,
+        backgroundColor: c.main,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 8,
+      }}>
+        {/* Light top strip */}
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: blockH * 0.35,
+          backgroundColor: c.light, opacity: 0.2,
+          borderTopLeftRadius: 14, borderTopRightRadius: 14,
+        }} />
+        <MedalSvg position={position} size={30} />
+        <Text style={{
+          fontFamily: FONTS.heading,
+          fontSize: 15,
+          color: 'rgba(0,0,0,0.4)',
+          marginTop: 3,
+        }}>#{medalLabel}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ── Podium Card ───────────────────────────────────────────────────────────────
 function PodiumCard({ item, position, heightFactor }: { item: any; position: number; heightFactor: number }) {
   const { colors } = useTheme();
   const tier = getTier(item.league_tier);
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
-  const podiumColors: Record<number, [string, string]> = {
-    1: ['#F7CB16', '#D4A800'],
-    2: ['#C8D6E5', '#8395A7'],
-    3: ['#E67E22', '#A04000'],
-  };
   const medalBorder = position === 1 ? '#F7CB16' : position === 2 ? '#B0B8C1' : '#CD7F32';
-  const podiumH = 80 * heightFactor;
+  const avatarSize = position === 1 ? 64 : 52;
+  const isTop = position === 1;
 
   useEffect(() => {
     Animated.spring(scaleAnim, {
@@ -98,12 +197,16 @@ function PodiumCard({ item, position, heightFactor }: { item: any; position: num
 
   return (
     <Animated.View style={[styles.podiumCard, { transform: [{ scale: scaleAnim }] }]}>
-      {position === 1 && <Text style={styles.crownEmoji}>👑</Text>}
+      {isTop && (
+        <View style={styles.crownWrap}>
+          <CrownSvg size={36} />
+        </View>
+      )}
 
-      {/* Medal badge behind avatar */}
+      {/* Avatar */}
       <View style={styles.podiumAvatarWrap}>
-        <Avatar uri={item.profile_pic_url} size={position === 1 ? 66 : 54} border={medalBorder} />
-        {/* Tier icon bottom-right of avatar */}
+        <View style={[styles.podiumAvatarGlow, { backgroundColor: medalBorder + '30' }]} />
+        <Avatar uri={item.profile_pic_url} size={avatarSize} border={medalBorder} />
         <View style={styles.podiumTierBadge}>
           <TierBadge tierName={item.league_tier} size={10} />
         </View>
@@ -116,43 +219,35 @@ function PodiumCard({ item, position, heightFactor }: { item: any; position: num
         {item.xp >= 1000 ? `${(item.xp / 1000).toFixed(1)}k` : item.xp} XP
       </Text>
 
-      <LinearGradient
-        colors={podiumColors[position]}
-        style={[styles.podiumPlatform, { height: podiumH }]}
-      >
-        <Text style={styles.podiumRankNum}>
-          {position === 1 ? '🥇' : position === 2 ? '🥈' : '🥉'}
-        </Text>
-        <Text style={styles.podiumRankLabel}>#{position}</Text>
-      </LinearGradient>
+      {/* 3D Podium Block */}
+      <View style={styles.podiumBlock}>
+        <PodiumBlockView position={position} heightFactor={heightFactor} />
+      </View>
     </Animated.View>
   );
 }
 
-// ── Leader Row ────────────────────────────────────────────────────────────────
-const getCardGradient = (tierName: string, rank: number): [string, string] => {
-  if (rank === 1) return ['#9A7800', '#3A2000']; // Elegant Dark Golden Amber
-  if (rank === 2) return ['#4E5E70', '#1C2836']; // Radiant Slate Platinum
-  if (rank === 3) return ['#7E4815', '#2A1404']; // Copper Bronze
-  
-  switch (tierName) {
-    case 'Bronze':      return ['#543620', '#201108']; // Rich Bronze
-    case 'Silver':      return ['#3E4C5E', '#16202C']; // Steel Silver
-    case 'Gold':        return ['#856006', '#2E1E00']; // Amber Gold
-    case 'Platinum':    return ['#086F83', '#02242D']; // Teal Platinum
-    case 'Diamond':     return ['#0D6191', '#031E33']; // Sapphire Diamond
-    case 'Master':      return ['#6D28D9', '#2E0665']; // Purple Master
-    case 'Grandmaster': return ['#B91C1C', '#450616']; // Crimson Grandmaster
-    case 'Elite':       return ['#C2410C', '#431407']; // Sunset Orange
-    case 'Champion':    return ['#991B1B', '#380202']; // Fiery Crimson
-    case 'Legend':      return ['#D97706', '#4C0519']; // Blazing Amber-Red
-    default:            return ['#1E293B', '#0F172A']; // Default dark metallic
+// ── Rank Change Badge ─────────────────────────────────────────────────────────
+function RankChange({ change }: { change: number }) {
+  if (change === 0) {
+    return (
+      <View style={styles.changeBadge}>
+        <Text style={[styles.changeText, { color: '#888' }]}>—</Text>
+      </View>
+    );
   }
-};
+  const isUp = change > 0;
+  return (
+    <View style={[styles.changeBadge, { backgroundColor: isUp ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)' }]}>
+      <Ionicons name={isUp ? 'arrow-up' : 'arrow-down'} size={11} color={isUp ? '#10B981' : '#EF4444'} />
+      <Text style={[styles.changeText, { color: isUp ? '#10B981' : '#EF4444' }]}>{Math.abs(change)}</Text>
+    </View>
+  );
+}
 
 // ── Leader Row ────────────────────────────────────────────────────────────────
 function LeaderRow({ item, isMe, index }: { item: any; isMe: boolean; index: number }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const tier = getTier(item.league_tier);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(24)).current;
@@ -166,115 +261,71 @@ function LeaderRow({ item, isMe, index }: { item: any; isMe: boolean; index: num
 
   const rank = Number(item.global_rank);
   const isTop3 = rank <= 3;
-  const medalColor = rank === 1 ? '#F7CB16' : rank === 2 ? '#B0B8C1' : '#CD7F32';
   const medalEmoji  = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
-
-  const accentColor = isMe ? P.cta : tier.color;
-  const cardGradient = getCardGradient(item.league_tier, rank);
-
-  // Border & Glow settings
-  const borderCol = isMe 
-    ? '#FFFFFF' 
-    : isTop3 
-      ? medalColor + '90' 
-      : accentColor + '30';
-  const borderWidth = isMe ? 2 : 1;
-  const shadowCol = isMe ? P.sun : isTop3 ? medalColor : accentColor;
-  const shadowOpacity = isMe ? 0.65 : isTop3 ? 0.45 : 0.2;
-  const shadowRadius = isMe ? 8 : isTop3 ? 6 : 4;
-  const elevation = isMe ? 8 : isTop3 ? 6 : 3;
+  const rankChange = Number(item.rank_change) || 0;
 
   return (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
       <TouchableOpacity
-        activeOpacity={0.85}
+        activeOpacity={0.7}
         onPress={() => router.push(`/profile/${item.id}`)}
+        style={[
+          styles.leaderRowCard,
+          {
+            borderBottomColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)',
+          },
+          isMe && { backgroundColor: isDark ? `${P.cta}12` : `${P.cta}08` },
+        ]}
       >
-        <LinearGradient
-          colors={cardGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.gameCard, {
-            borderColor: borderCol,
-            borderWidth: borderWidth,
-            shadowColor: shadowCol,
-            shadowOpacity: shadowOpacity,
-            shadowRadius: shadowRadius,
-            elevation: elevation,
-          }]}
-        >
-          {/* Top subtle gloss line to make it look 3D and premium */}
-          <View style={styles.cardGlossOverlay} />
-          
-          {/* ── LEFT: Rank Zone ── */}
-          <View style={[styles.gameRankPlate, { 
-            backgroundColor: isTop3 ? medalColor + '20' : 'rgba(0,0,0,0.25)',
-            borderColor: isTop3 ? medalColor + '30' : 'rgba(255,255,255,0.06)'
-          }]}>
-            {isTop3 ? (
-              <View style={styles.topRankBadge}>
-                <Text style={styles.medalIconText}>{medalEmoji}</Text>
-                <Text style={[styles.gameRankNum, { color: medalColor, fontSize: 13, marginTop: 1 }]}>#{rank}</Text>
-              </View>
-            ) : (
-              <Text style={[styles.gameRankNum, { 
-                color: '#FFFFFF',
-                fontSize: rank >= 100 ? 12 : rank >= 10 ? 15 : 17,
-                opacity: 0.9
-              }]}>{rank}</Text>
-            )}
-          </View>
+        {/* "You" left accent */}
+        {isMe && <View style={[styles.lrYouAccent, { backgroundColor: P.cta }]} />}
 
-          {/* ── MIDDLE: Avatar ── */}
-          <View style={styles.gameAvatarWrap}>
-            <Avatar 
-              uri={item.profile_pic_url} 
-              size={44} 
-              border={isTop3 ? medalColor : accentColor} 
-            />
-            {isMe && (
-              <LinearGradient colors={[P.sun, '#FF8C00']} style={styles.youBadge}>
-                <Text style={styles.youBadgeText}>YOU</Text>
-              </LinearGradient>
-            )}
-          </View>
+        {/* ── RANK ── */}
+        <View style={styles.lrRank}>
+          {isTop3 ? (
+            <Text style={styles.lrMedal}>{medalEmoji}</Text>
+          ) : (
+            <Text style={[styles.lrRankNum, { color: colors.textMuted }]}>{rank}</Text>
+          )}
+        </View>
 
-          {/* ── INFO ZONE ── */}
-          <View style={styles.gameInfo}>
-            <Text style={[styles.gameName, { color: '#FFFFFF' }]} numberOfLines={1}>
+        {/* ── AVATAR ── */}
+        <Avatar uri={item.profile_pic_url} size={40} border={tier.color} />
+
+        {/* ── NAME + TIER ── */}
+        <View style={styles.lrInfo}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[styles.lrName, { color: colors.text }]} numberOfLines={1}>
               {item.full_name ?? 'Athlete'}
             </Text>
-            
-            <View style={styles.gameSubInfoRow}>
-              {/* Tier capsule */}
-              <LinearGradient colors={tier.gradient} style={styles.gameTierBadge}>
-                <MaterialCommunityIcons name={tier.mcIcon as any} size={9}
-                  color={tier.textDark ? '#021518' : '#FFF'} />
-                <Text style={[styles.gameTierText, { color: tier.textDark ? '#021518' : '#FFF' }]}>
-                  {item.league_tier.toUpperCase()}
-                </Text>
-              </LinearGradient>
-              
-              {/* Streak if any */}
-              {item.current_streak > 0 && (
-                <View style={styles.gameStreakBadge}>
-                  <Ionicons name="flame" size={11} color="#FF9F43" />
-                  <Text style={styles.gameStreakText}>{item.current_streak}d streak</Text>
-                </View>
-              )}
-            </View>
+            {isMe && <Text style={[styles.lrYouTag, { color: P.cta }]}>YOU</Text>}
           </View>
-
-          {/* ── RIGHT: XP Capsule ── */}
-          <View style={[styles.xpCapsule, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-            <Ionicons name="flash" size={10} color={isTop3 ? medalColor : P.sun} />
-            <Text style={[styles.gameXP, { color: isTop3 ? medalColor : '#FFFFFF' }]}>
-              {item.xp >= 1000 ? `${(item.xp / 1000).toFixed(1)}k` : item.xp}
-            </Text>
-            <Text style={styles.gameXPLabel}>XP</Text>
+          <View style={styles.lrTierRow}>
+            <LinearGradient colors={tier.gradient} style={styles.lrTierBadge}>
+              <MaterialCommunityIcons name={tier.mcIcon as any} size={8} color={tier.textDark ? '#021518' : '#FFF'} />
+              <Text style={[styles.lrTierText, { color: tier.textDark ? '#021518' : '#FFF' }]}>
+                {item.league_tier.toUpperCase()}
+              </Text>
+            </LinearGradient>
+            {item.current_streak > 0 && (
+              <View style={styles.lrStreak}>
+                <Ionicons name="flame" size={10} color="#FF9F43" />
+                <Text style={styles.lrStreakText}>{item.current_streak}</Text>
+              </View>
+            )}
           </View>
+        </View>
 
-        </LinearGradient>
+        {/* ── CHANGE ── */}
+        <RankChange change={rankChange} />
+
+        {/* ── XP ── */}
+        <View style={styles.lrXP}>
+          <Text style={[styles.lrXPText, { color: colors.text }]}>
+            {item.xp >= 1000 ? `${(item.xp / 1000).toFixed(1)}k` : item.xp}
+          </Text>
+          <Text style={[styles.lrXPLabel, { color: colors.textMuted }]}>XP</Text>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -449,59 +500,6 @@ export default function LeaderboardScreen() {
             {/* ── HIDE NORMAL CONTENT WHEN SEARCHING ── */}
             {searchQuery.trim() === '' && (
             <>
-            {/* ── MY RANK CARD ── */}
-            {me && (
-              <Animated.View style={[
-                styles.heroCard,
-                {
-                  backgroundColor: isDark ? colors.card : '#FFF',
-                  borderColor: isDark ? colors.border : 'rgba(37,150,190,0.2)',
-                  opacity: headerAnim,
-                  transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
-                }
-              ]}>
-                <View style={[styles.heroAccent, { backgroundColor: myTier.color }]} />
-                <View style={styles.heroLeft}>
-                  <Avatar uri={me.profile_pic_url} size={52} border={myTier.color} />
-                  <View style={{ marginLeft: 12 }}>
-                    <Text style={[styles.heroLabel, { color: colors.textMuted }]}>YOUR RANK</Text>
-                    <Text style={[styles.heroName, { color: colors.text }]} numberOfLines={1}>{me.full_name ?? 'You'}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                      <TierBadge tierName={me.league_tier} size={11} />
-                      <Text style={[styles.heroTierName, { color: myTier.color }]}>{me.league_tier}</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.heroRight}>
-                  <Text style={[styles.heroRank, { color: myTier.color }]}>#{me.global_rank}</Text>
-                  <Text style={[styles.heroRankLabel, { color: colors.textMuted }]}>GLOBAL</Text>
-                  <Text style={[styles.heroXP, { color: colors.text }]}>{me.xp?.toLocaleString()} XP</Text>
-                </View>
-              </Animated.View>
-            )}
-
-            {/* ── XP PROGRESS ── */}
-            {me && (
-              <View style={styles.xpBarWrap}>
-                <View style={styles.xpBarLabels}>
-                  <Text style={[styles.xpBarTier, { color: myTier.color }]}>{me.league_tier}</Text>
-                  {me.xp_to_next != null && (
-                    <Text style={[styles.xpBarToNext, { color: colors.textMuted }]}>
-                      {me.xp_to_next.toLocaleString()} XP to {me.next_tier?.name}
-                    </Text>
-                  )}
-                  {me.next_tier && <Text style={[styles.xpBarTier, { color: colors.textMuted }]}>{me.next_tier.name}</Text>}
-                </View>
-                <View style={[styles.xpBarTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)' }]}>
-                  <LinearGradient
-                    colors={myTier.gradient}
-                    style={[styles.xpBarFill, { width: `${me.tier_progress ?? 0}%` }]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  />
-                </View>
-              </View>
-            )}
-
             {/* ── PODIUM ── */}
             {top3.length >= 3 && tab === 'All' && (
               <View style={styles.podiumWrap}>
@@ -556,8 +554,9 @@ export default function LeaderboardScreen() {
 
             {/* ── LIST HEADER ── */}
             <View style={styles.listHeaderRow}>
-              <Text style={[styles.listHeaderRank, { color: colors.textMuted }]}>RANK</Text>
+              <Text style={[styles.listHeaderRank, { color: colors.textMuted }]}>#</Text>
               <Text style={[styles.listHeaderPlayer, { color: colors.textMuted }]}>ATHLETE</Text>
+              <Text style={[styles.listHeaderChange, { color: colors.textMuted }]}>CHG</Text>
               <Text style={[styles.listHeaderXP, { color: colors.textMuted }]}>XP</Text>
             </View>
             {refreshing && (
@@ -662,60 +661,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
 
-  // Hero Card
-  heroCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderRadius: 20, borderWidth: 1,
-    marginBottom: 10, paddingVertical: 14, paddingHorizontal: 16,
-    overflow: 'hidden',
-  },
-  heroAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 },
-  heroLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  heroLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1.5, marginBottom: 2 },
-  heroName: { fontFamily: FONTS.heading, fontSize: 17 },
-  heroTierName: { fontFamily: FONTS.bodyBold, fontSize: 11 },
-  heroRight: { alignItems: 'center', minWidth: 64 },
-  heroRank: { fontFamily: FONTS.heading, fontSize: 34, lineHeight: 36 },
-  heroRankLabel: { fontFamily: FONTS.bodyBold, fontSize: 8, letterSpacing: 2 },
-  heroXP: { fontFamily: FONTS.bodyBold, fontSize: 11, marginTop: 2 },
-
-  // XP Bar
-  xpBarWrap: { marginBottom: 10 },
-  xpBarLabels: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
-  xpBarTier: { fontFamily: FONTS.bodyBold, fontSize: 10 },
-  xpBarToNext: { fontFamily: FONTS.body, fontSize: 10 },
-  xpBarTrack: { height: 10, borderRadius: 6, overflow: 'hidden' },
-  xpBarFill: { height: '100%', borderRadius: 6, minWidth: 8 },
-
   // Podium
   podiumWrap: {
-    borderRadius: 24, overflow: 'hidden', marginBottom: 12,
+    marginBottom: 16,
   },
   podiumRow: {
     flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center',
-    paddingTop: 12, gap: 4,
+    paddingTop: 16, gap: 4,
   },
-  podiumCard: { alignItems: 'center', flex: 1 },
-  crownEmoji: { fontSize: 24, marginBottom: 4, transform: [{ rotate: '-8deg' }] },
-  podiumAvatarWrap: { position: 'relative', marginBottom: 6 },
+  podiumCard: { alignItems: 'center', flex: 1, paddingHorizontal: 2 },
+  crownWrap: {
+    marginBottom: 2,
+    shadowColor: '#F7CB16', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4, shadowRadius: 6,
+  },
+  podiumAvatarWrap: {
+    position: 'relative', marginBottom: 6, alignItems: 'center', justifyContent: 'center',
+  },
+  podiumAvatarGlow: {
+    position: 'absolute',
+    width: 72, height: 72, borderRadius: 36,
+    top: -4,
+  },
   podiumTierBadge: {
     position: 'absolute', bottom: -2, right: -2,
   },
-  podiumName: { fontFamily: FONTS.bodyBold, fontSize: 11, maxWidth: 78, textAlign: 'center' },
-  podiumXP: { fontFamily: FONTS.bodyBold, fontSize: 10, marginBottom: 4 },
-  podiumPlatform: {
-    width: '92%', borderTopLeftRadius: 18, borderTopRightRadius: 18,
-    justifyContent: 'center', alignItems: 'center',
-    paddingVertical: 10, gap: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2, shadowRadius: 6, elevation: 6,
+  podiumName: {
+    fontFamily: FONTS.bodyBold, fontSize: 11, maxWidth: 80, textAlign: 'center',
+    marginBottom: 2,
   },
-  podiumRankNum: { fontSize: 20 },
-  podiumRankLabel: {
-    fontFamily: FONTS.heading, fontSize: 18,
-    color: 'rgba(0,0,0,0.45)',
-    textShadowColor: 'rgba(255,255,255,0.4)',
-    textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  podiumXP: {
+    fontFamily: FONTS.bodyBold, fontSize: 9, marginBottom: 6,
+  },
+  podiumBlock: {
+    width: '100%',
+    alignItems: 'center',
   },
 
   // Tier Filter Chips
@@ -731,141 +711,119 @@ const styles = StyleSheet.create({
   // List Header Row
   listHeaderRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 4, paddingVertical: 6, marginBottom: 4,
+    paddingHorizontal: 12, paddingVertical: 6, marginBottom: 4,
   },
-  listHeaderRank: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1, width: 46, textAlign: 'center' },
-  listHeaderPlayer: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1, flex: 1, paddingLeft: 52 },
-  listHeaderXP: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1, width: 48, textAlign: 'center' },
+  listHeaderRank: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1, width: 36, textAlign: 'center' },
+  listHeaderPlayer: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1, flex: 1, marginLeft: 8 },
+  listHeaderChange: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1, width: 44, textAlign: 'center' },
+  listHeaderXP: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 1, width: 44, textAlign: 'right' },
   refreshBar: { alignItems: 'center', paddingVertical: 8 },
 
-  // ── Game Cards ─────────────────────────────────────────────────────────────
-  gameCard: {
+  // ── Leader Row ────────────────────────────────────────────────────────────
+  leaderRowCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
-    marginBottom: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
-    minHeight: 68,
-    paddingVertical: 8,
-    shadowOffset: { width: 0, height: 4 },
   },
-  cardGlossOverlay: {
+  lrYouAccent: {
     position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    left: 0,
+    top: 8,
+    bottom: 8,
+    width: 3,
+    borderRadius: 2,
   },
-  gameRankPlate: {
-    minWidth: 40,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
+  lrRank: {
+    width: 30,
     alignItems: 'center',
-    marginLeft: 10,
-    paddingHorizontal: 6,
-    borderWidth: 1,
-  },
-  topRankBadge: {
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  medalIconText: {
+  lrMedal: {
     fontSize: 16,
-    lineHeight: 18,
-    marginBottom: -2,
+    lineHeight: 20,
   },
-  gameRankNum: {
+  lrRankNum: {
     fontFamily: FONTS.heading,
+    fontSize: 14,
     letterSpacing: -0.5,
   },
-  gameAvatarWrap: {
-    marginLeft: 10,
-    marginRight: 10,
-    position: 'relative',
-  },
-  youBadge: {
-    position: 'absolute',
-    bottom: -3, right: -6,
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 5,
-  },
-  youBadgeText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 7.5,
-    color: '#FFF',
-    letterSpacing: 0.8,
-  },
-  gameInfo: {
+  lrInfo: {
     flex: 1,
-    justifyContent: 'center',
+    marginLeft: 10,
+    marginRight: 8,
     minWidth: 0,
-    paddingRight: 4,
   },
-  gameName: {
+  lrName: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 14.5,
+    fontSize: 13.5,
     letterSpacing: 0.2,
   },
-  gameSubInfoRow: {
+  lrYouTag: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 8,
+    letterSpacing: 0.8,
+  },
+  lrTierRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginTop: 4,
-    flexWrap: 'wrap',
+    marginTop: 3,
   },
-  gameTierBadge: {
+  lrTierBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2.5,
-    borderRadius: 6,
-  },
-  gameTierText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 8,
-    letterSpacing: 0.8,
-  },
-  gameStreakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 159, 67, 0.12)',
     paddingHorizontal: 5,
     paddingVertical: 2,
-    borderRadius: 6,
-    gap: 2.5,
+    borderRadius: 5,
   },
-  gameStreakText: {
+  lrTierText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 8.5,
-    color: '#FF9F43',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    fontSize: 7.5,
+    letterSpacing: 0.6,
   },
-  xpCapsule: {
+  lrStreak: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    gap: 2,
   },
-  gameXP: {
-    fontFamily: FONTS.heading,
-    fontSize: 13,
-    letterSpacing: 0.5,
-  },
-  gameXPLabel: {
+  lrStreakText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 8,
-    color: 'rgba(255, 255, 255, 0.45)',
-    marginLeft: 1,
+    color: '#FF9F43',
+  },
+  changeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    minWidth: 34,
+    justifyContent: 'center',
+  },
+  changeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    letterSpacing: 0.2,
+  },
+  lrXP: {
+    alignItems: 'flex-end',
+    minWidth: 40,
+  },
+  lrXPText: {
+    fontFamily: FONTS.heading,
+    fontSize: 13,
+    letterSpacing: 0.3,
+  },
+  lrXPLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 8,
+    letterSpacing: 0.5,
+    marginTop: 1,
   },
 
   // States

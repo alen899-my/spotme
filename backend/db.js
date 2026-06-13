@@ -433,6 +433,7 @@ const initDB = async () => {
     // Water goal tracking column
     await pool.query(`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS water_goal_date DATE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS prev_rank INT DEFAULT 0;
     `);
 
   } catch (error) {
