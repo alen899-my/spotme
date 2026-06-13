@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Platform,
+  TouchableOpacity, ActivityIndicator, Platform, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -166,7 +166,23 @@ export default function NewDailyWorkout() {
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.splitName, { color: colors.text }]}>{split.name}</Text>
-                        <Text style={[styles.splitMeta, { color: colors.textMuted }]}>{split.session_count} sessions</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.splitMeta, { color: colors.textMuted }]}>{split.session_count} sessions</Text>
+                          {split.original_creator_name && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                              {split.original_creator_pic ? (
+                                <Image source={{ uri: split.original_creator_pic }} style={{ width: 14, height: 14, borderRadius: 7 }} />
+                              ) : (
+                                <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
+                                  <Ionicons name="person" size={8} color="#FFF" />
+                                </View>
+                              )}
+                              <Text style={[styles.splitMeta, { color: colors.textMuted, fontSize: 10 }]} numberOfLines={1}>
+                                @{split.original_creator_name}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
                       <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                     </TouchableOpacity>

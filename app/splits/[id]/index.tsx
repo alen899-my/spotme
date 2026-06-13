@@ -24,6 +24,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
+import SplitRating from '../../../components/ui/SplitRating';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -95,6 +96,7 @@ export default function SplitSessionsScreen() {
   const [renameSession, setRenameSession] = useState<any>(null);
 
   const isShared = shared === '1';
+  const clonedFromId = splitDetail?.cloned_from_id;
 
   const fetchData = useCallback(async () => {
     const token = await getToken();
@@ -148,7 +150,7 @@ export default function SplitSessionsScreen() {
             await axios.delete(`${API_URL}/workouts/sessions/${sessionId}`, {
               headers: { Authorization: `Bearer ${token}` }
             });
-            fetchSessions();
+            setSessions((prev: any[]) => prev.filter(s => s.id !== sessionId));
           } catch (err) {
             console.error('Error deleting session:', err);
           }
@@ -182,6 +184,25 @@ export default function SplitSessionsScreen() {
       setRenameSession(null);
     } catch (err) {
       showToast('Failed to rename', 'error');
+    }
+  };
+
+  const handleRate = async (rating: number) => {
+    try {
+      const token = await getToken();
+      const res = await axios.post(`${API_URL}/workouts/splits/${id}/rate`,
+        { rating },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSplitDetail((prev: any) => ({
+        ...prev,
+        avg_rating: res.data.avg_rating,
+        rating_count: res.data.rating_count,
+        user_rating: rating,
+      }));
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Failed to rate', 'error');
+      throw err;
     }
   };
 
@@ -219,7 +240,7 @@ export default function SplitSessionsScreen() {
       activeOpacity={0.8}
       onPress={() => router.push({
         pathname: `/splits/session/${item.id}`,
-        params: isShared ? { shared: '1' } : undefined
+        params: isShared ? { shared: '1' } : { clonedFromId: clonedFromId || undefined }
       })}
     >
       <View style={styles.cardMain}>
@@ -236,7 +257,7 @@ export default function SplitSessionsScreen() {
             <Ionicons name="barbell-outline" size={12} color={isDark ? colors.textMuted : '#FFF'} /> {item.exercise_count} Exercises
           </Text>
         </View>
-        {!isShared && (
+        {!isShared && !clonedFromId && (
           <View style={{ flexDirection: 'row', gap: 6 }}>
             <TouchableOpacity
               style={[styles.editIconBtn, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(255,255,255,0.12)', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(255,255,255,0.22)', borderWidth: 1 }]}
@@ -286,9 +307,28 @@ export default function SplitSessionsScreen() {
                 <Text style={[styles.headerTitle, { color: colors.text }]}>
                   {initialSplitName || splitDetail?.name || 'Program'}
                 </Text>
-                <Text style={[styles.headerSub, { color: colors.textMuted, fontSize: 12, marginTop: 1 }]}>
-                  @{creatorName || 'user'}
-                </Text>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    const cid = splitDetail?.creator_id;
+                    if (cid) router.push(`/profile/${cid}`);
+                  }}
+                >
+                  {splitDetail?.creator_pic || creatorPic ? (
+                    <Image
+                      source={{ uri: splitDetail?.creator_pic || (creatorPic as string) }}
+                      style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.inputBg }}
+                    />
+                  ) : (
+                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center' }}>
+                      <Ionicons name="person" size={10} color={colors.textMuted} />
+                    </View>
+                  )}
+                  <Text style={[styles.headerSub, { color: colors.textMuted, fontSize: 12 }]}>
+                    @{splitDetail?.creator_name || creatorName || 'user'}
+                  </Text>
+                </TouchableOpacity>
               </>
             ) : (
               <>
@@ -296,15 +336,41 @@ export default function SplitSessionsScreen() {
                   <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>
                     {splitDetail?.name || 'Program'}
                   </Text>
-                  <TouchableOpacity onPress={() => setShowSplitRename(true)}>
-                    <Ionicons name="create-outline" size={18} color={colors.primary} />
-                  </TouchableOpacity>
+                  {!clonedFromId && (
+                    <TouchableOpacity onPress={() => setShowSplitRename(true)}>
+                      <Ionicons name="create-outline" size={18} color={colors.primary} />
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <Text style={[styles.headerSub, { color: colors.textMuted }]}>{sessions.length} session{sessions.length !== 1 ? 's' : ''}</Text>
+                {clonedFromId && splitDetail?.original_creator_name && (
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      const cid = splitDetail?.original_creator_id;
+                      if (cid) router.push(`/profile/${cid}`);
+                    }}
+                  >
+                    {splitDetail?.original_creator_pic ? (
+                      <Image
+                        source={{ uri: splitDetail.original_creator_pic }}
+                        style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: colors.inputBg }}
+                      />
+                    ) : (
+                      <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center' }}>
+                        <Ionicons name="person" size={10} color={colors.textMuted} />
+                      </View>
+                    )}
+                    <Text style={[styles.headerSub, { color: colors.textMuted, fontSize: 11 }]}>
+                      by @{splitDetail.original_creator_name}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </>
             )}
           </View>
-          {!isShared && (
+          {!isShared && !clonedFromId && (
             <TouchableOpacity
               style={styles.addBtn}
               onPress={() => router.push({ pathname: `/splits/${id}/create-session` })}
@@ -345,7 +411,36 @@ export default function SplitSessionsScreen() {
               { paddingBottom: isShared ? 100 + Math.max(insets.bottom, 12) : 32 + Math.max(insets.bottom, 12) }
             ]}
             showsVerticalScrollIndicator={false}
+            ListFooterComponent={
+              splitDetail ? (
+                <View style={[styles.ratingSection, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
+                  <Text style={[styles.ratingLabel, { color: colors.text }]}>Rate this Program</Text>
+                  <SplitRating
+                    avgRating={splitDetail.avg_rating}
+                    ratingCount={splitDetail.rating_count}
+                    userRating={splitDetail.user_rating}
+                    canRate={splitDetail.can_rate}
+                    onRate={handleRate}
+                    size="md"
+                  />
+                </View>
+              ) : null
+            }
           />
+        )}
+
+        {!loading && sessions.length === 0 && splitDetail && (
+          <View style={[styles.ratingSectionStandalone, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
+            <Text style={[styles.ratingLabel, { color: colors.text }]}>Rate this Program</Text>
+            <SplitRating
+              avgRating={splitDetail.avg_rating}
+              ratingCount={splitDetail.rating_count}
+              userRating={splitDetail.user_rating}
+              canRate={splitDetail.can_rate}
+              onRate={handleRate}
+              size="md"
+            />
+          </View>
         )}
 
         {isShared && (
@@ -548,4 +643,25 @@ const styles = StyleSheet.create({
   emptyIconWrap: { marginBottom: 20 },
   emptyTitle: { fontFamily: FONTS.heading, fontSize: 24, marginBottom: 8 },
   emptySub: { fontFamily: FONTS.body, fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+
+  // Rating
+  ratingSection: {
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    marginTop: 8,
+  },
+  ratingSectionStandalone: {
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    marginHorizontal: 0,
+  },
+  ratingLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 13,
+    marginBottom: 10,
+  },
 });

@@ -42,6 +42,8 @@ interface Props {
   onViewChange?: (year: number, month: number) => void;
   /** Called when a day cell is tapped. */
   onDayPress?: (date: string, count: number) => void;
+  /** Show a red cross on past days with no workouts. */
+  showInactiveCross?: boolean;
 }
 
 export default function WorkoutCalendarHeatmap({
@@ -52,6 +54,7 @@ export default function WorkoutCalendarHeatmap({
   controlledMonth,
   onViewChange,
   onDayPress,
+  showInactiveCross = true,
 }: Props) {
   const { colors, isDark } = useTheme();
 
@@ -200,12 +203,13 @@ export default function WorkoutCalendarHeatmap({
         {weeks.map((week, wi) => (
           <View key={wi} style={[styles.weekRow, { gap: GAP }]}>
             {week.map((day, di) => {
-              const todayCell   = day !== null && isTodayCell(day);
-              const futureCell  = day !== null && isFutureDay(day);
-              const activeCell  = hasActivity(day);
-
               const dateStr = day !== null ? dateString(day) : null;
               const count   = dateStr ? (dateMap[dateStr] || 0) : 0;
+
+              const todayCell    = day !== null && isTodayCell(day);
+              const futureCell   = day !== null && isFutureDay(day);
+              const activeCell   = hasActivity(day);
+              const inactivePast = day !== null && !futureCell && !todayCell && count === 0;
 
               return (
                 <TouchableOpacity
@@ -229,21 +233,31 @@ export default function WorkoutCalendarHeatmap({
                   ]}
                 >
                   {day !== null && (
-                    <Text
-                      style={[
-                        styles.dayNum,
-                        {
-                          color: todayCell
-                            ? accentColor
-                            : activeCell
-                            ? isDark ? "#ffffff" : "#111111"
-                            : colors.textMuted,
-                          fontFamily: todayCell ? FONTS.bodyBold : FONTS.body,
-                        },
-                      ]}
-                    >
-                      {day}
-                    </Text>
+                    <View style={styles.cellInner}>
+                      <Text
+                        style={[
+                          styles.dayNum,
+                          {
+                            color: todayCell
+                              ? accentColor
+                              : activeCell
+                              ? isDark ? "#ffffff" : "#111111"
+                              : colors.textMuted,
+                            fontFamily: todayCell ? FONTS.bodyBold : FONTS.body,
+                          },
+                        ]}
+                      >
+                        {day}
+                      </Text>
+                      {showInactiveCross && inactivePast && (
+                        <Ionicons
+                          name="close"
+                          size={10}
+                          color="#FF3B30"
+                          style={styles.crossIcon}
+                        />
+                      )}
+                    </View>
                   )}
                 </TouchableOpacity>
               );
@@ -357,6 +371,17 @@ const styles = StyleSheet.create({
   cell: {
     alignItems:     "center",
     justifyContent: "center",
+  },
+  cellInner: {
+    width:          "100%",
+    height:         "100%",
+    alignItems:     "center",
+    justifyContent: "center",
+  },
+  crossIcon: {
+    position: "absolute",
+    top:      1,
+    right:    1,
   },
   dayNum: {
     fontSize: 11,

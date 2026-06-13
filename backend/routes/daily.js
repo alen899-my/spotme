@@ -1118,12 +1118,12 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // 1. Fetch all workout sessions available to the user (their splits + templates)
+    // 1. Fetch all workout sessions available to the user
     const sessionsRes = await pool.query(`
-      SELECT ws.id AS session_id, ws.name AS session_name, s.id AS split_id, s.name AS split_name, s.is_template
+      SELECT ws.id AS session_id, ws.name AS session_name, s.id AS split_id, s.name AS split_name
       FROM workout_sessions ws
       JOIN workout_splits s ON ws.split_id = s.id
-      WHERE s.user_id = $1 OR s.is_template = true
+      WHERE s.user_id = $1
     `, [userId]);
 
     if (sessionsRes.rows.length === 0) {
@@ -1222,7 +1222,6 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
         session_name: session.session_name,
         split_id: session.split_id,
         split_name: session.split_name,
-        is_template: session.is_template,
         score,
         reason,
         scoreTag,
@@ -1233,12 +1232,9 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
       };
     });
 
-    // Sort by score desc, but put user's own splits slightly higher than template splits if scores are equal
+    // Sort by score desc
     scoredSessions.sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      return (a.is_template ? 1 : 0) - (b.is_template ? 1 : 0);
+      return b.score - a.score;
     });
 
     // Return the top 3 recommendations

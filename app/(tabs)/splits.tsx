@@ -21,6 +21,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import { SplitsSkeleton } from '../../components/ui/Skeleton';
+import SplitRating from '../../components/ui/SplitRating';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 
@@ -151,8 +152,8 @@ export default function SplitsTab() {
   };
 
   const renderSplit = ({ item, index }: { item: any, index: number }) => {
-    const cardBg = isDark ? colors.card : (item.template_color || colors.primary || '#E00000');
-    const cardBorderColor = isDark ? colors.border : (item.template_color || colors.primary || '#E00000');
+    const cardBg = isDark ? colors.card : (colors.primary || '#E00000');
+    const cardBorderColor = isDark ? colors.border : (colors.primary || '#E00000');
 
     const rawImages = item.exercise_images || [];
     const images = [...rawImages];
@@ -180,7 +181,7 @@ export default function SplitsTab() {
       >
         <View style={styles.cardHeader}>
           <View style={[styles.iconWrap, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.2)' }]}>
-            <MaterialCommunityIcons name={item.template_icon || "folder-outline"} size={22} color={isDark ? colors.primary : "#FFF"} />
+            <MaterialCommunityIcons name={"folder-outline"} size={22} color={isDark ? colors.primary : "#FFF"} />
           </View>
           <TouchableOpacity
             style={styles.deleteBtn}
@@ -193,6 +194,12 @@ export default function SplitsTab() {
 
         <Text style={[styles.splitName, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1}>{item.name}</Text>
 
+        {item.avg_rating > 0 && (
+          <View style={{ marginTop: 4 }}>
+            <SplitRating avgRating={item.avg_rating} ratingCount={item.rating_count} size="sm" />
+          </View>
+        )}
+
         <View style={styles.cardFooterArea}>
           <View style={styles.cardStatsArea}>
             <View style={styles.miniStat}>
@@ -203,6 +210,29 @@ export default function SplitsTab() {
               <Ionicons name="calendar" size={12} color={isDark ? colors.primary : "rgba(255,255,255,0.8)"} />
               <Text style={[styles.miniStatText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}>Program</Text>
             </View>
+            {item.user_count > 0 && (
+              <View style={styles.miniStat}>
+                <Ionicons name="people-outline" size={12} color={isDark ? colors.primary : "rgba(255,255,255,0.8)"} />
+                <Text style={[styles.miniStatText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}>{item.user_count} users</Text>
+              </View>
+            )}
+            {item.original_creator_name && (
+              <TouchableOpacity
+                style={styles.creatorBadge}
+                onPress={() => router.push(`/profile/${item.original_creator_id}`)}
+              >
+                {item.original_creator_pic ? (
+                  <Image source={{ uri: item.original_creator_pic }} style={styles.creatorBadgeAvatar} />
+                ) : (
+                  <View style={[styles.creatorBadgeAvatar, { backgroundColor: colors.primary }]}>
+                    <Ionicons name="person" size={10} color="#FFF" />
+                  </View>
+                )}
+                <Text style={[styles.creatorBadgeName, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>
+                  @{item.original_creator_name}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.miniImageStack}>
@@ -263,6 +293,14 @@ export default function SplitsTab() {
         </View>
         <Text style={[styles.horiSplitName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
         <Text style={[styles.horiSplitSessions, { color: colors.textMuted }]}>{item.session_count} sessions</Text>
+        {item.user_count > 0 && (
+          <Text style={[styles.horiSplitSessions, { color: colors.textMuted }]}>
+            <Ionicons name="people-outline" size={10} color={colors.textMuted} /> {item.user_count} users
+          </Text>
+        )}
+        {item.avg_rating > 0 && (
+          <SplitRating avgRating={item.avg_rating} ratingCount={item.rating_count} size="sm" />
+        )}
         {item.is_already_added ? (
           <View style={[styles.horiBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
             <Ionicons name="checkmark-circle" size={10} color={colors.textMuted} />
@@ -336,15 +374,8 @@ export default function SplitsTab() {
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Programs Yet</Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              Start with an expert split or build your own custom program from scratch.
+              Build your own custom program from scratch.
             </Text>
-            <TouchableOpacity
-              style={[styles.createNowBtn, { backgroundColor: '#7C3AED', marginBottom: 12 }]}
-              onPress={() => router.push('/splits/templates')}
-            >
-              <Ionicons name="albums-outline" size={18} color="#FFF" style={{ marginRight: 8 }} />
-              <Text style={styles.createNowText}>BROWSE EXPERT SPLITS</Text>
-            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.createNowBtn, { backgroundColor: colors.primary }]}
               onPress={() => router.push('/splits/create')}
@@ -365,29 +396,7 @@ export default function SplitsTab() {
           showsVerticalScrollIndicator={false}
           numColumns={2}
           columnWrapperStyle={styles.columnWrapper}
-          ListHeaderComponent={
-            <TouchableOpacity
-              style={styles.templatesBanner}
-              onPress={() => router.push('/splits/templates')}
-              activeOpacity={0.85}
-            >
-              <LinearGradient
-                colors={['#7C3AED', '#4F46E5']}
-                style={StyleSheet.absoluteFillObject}
-                start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }}
-              />
-              <View style={styles.bannerIcon}>
-                <Ionicons name="albums" size={22} color="#FFF" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.templatesBannerTitle}>Browse Expert Splits</Text>
-                <Text style={styles.templatesBannerSub}>Elite programs for faster results</Text>
-              </View>
-              <View style={styles.bannerBadge}>
-                <Text style={styles.bannerBadgeText}>NEW</Text>
-              </View>
-            </TouchableOpacity>
-          }
+          ListHeaderComponent={null}
         />
       );
     }
@@ -467,12 +476,6 @@ export default function SplitsTab() {
           {activeTab === 'my' && (
             <View style={styles.headerBtns}>
               <TouchableOpacity
-                style={[styles.templateBtn, { backgroundColor: colors.inputBg }]}
-                onPress={() => router.push('/splits/templates')}
-              >
-                <Ionicons name="albums-outline" size={20} color="#8B5CF6" />
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={styles.addBtn}
                 onPress={() => router.push('/splits/create')}
               >
@@ -549,10 +552,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontFamily: FONTS.heading, fontSize: 32 },
   headerSub: { fontFamily: FONTS.body, fontSize: 14, marginTop: 2 },
   headerBtns: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  templateBtn: {
-    width: 44, height: 44, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
-  },
   addBtn: {
     borderRadius: 12, overflow: 'hidden', elevation: 4,
     shadowColor: '#2596BE', shadowOffset: { width: 0, height: 4 },
@@ -581,23 +580,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodySemiBold,
     fontSize: 14,
   },
-
-  templatesBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 24, padding: 18, marginBottom: 20, overflow: 'hidden',
-    width: '100%',
-  },
-  bannerIcon: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  templatesBannerTitle: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF' },
-  templatesBannerSub: { fontFamily: FONTS.body, fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  bannerBadge: {
-    backgroundColor: '#FFF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
-  },
-  bannerBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 10, color: '#7C3AED' },
 
   listContent: { paddingHorizontal: 16, paddingBottom: 130, flexGrow: 1 },
   columnWrapper: { justifyContent: 'space-between', gap: 12 },
@@ -663,6 +645,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     position: 'absolute',
     zIndex: 1,
+  },
+
+  creatorBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  creatorBadgeAvatar: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  creatorBadgeName: {
+    fontFamily: FONTS.body,
+    fontSize: 10,
+    maxWidth: 100,
   },
 
   // Search bar

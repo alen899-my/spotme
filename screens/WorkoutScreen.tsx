@@ -85,46 +85,7 @@ export default function WorkoutScreen() {
             <Text style={[styles.tileLabel, { color: colors.text }]}>My Custom{"\n"}Splits</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => router.push('/splits/templates')}
-          >
-            <View style={[styles.tileIconWrap, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
-              <Ionicons name="albums" size={30} color="#8B5CF6" />
-            </View>
-            <Text style={[styles.tileLabel, { color: colors.text }]}>Browse{"\n"}Expert Splits</Text>
-          </TouchableOpacity>
         </View>
-
-        {/* ── Templates Banner ────────────────────────────────────── */}
-        <TouchableOpacity
-          style={styles.templateBanner}
-          onPress={() => router.push('/splits/templates')}
-          activeOpacity={0.88}
-        >
-          <LinearGradient
-            colors={['#7C3AED', '#4F46E5']}
-            style={StyleSheet.absoluteFillObject}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          />
-          <View style={styles.templateBannerContent}>
-            <View style={styles.templateBannerIcon}>
-              <Ionicons name="albums" size={28} color="#FFF" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.templateBannerTitle}>Expert Workout Splits</Text>
-              <Text style={styles.templateBannerSub}>PPL · Bro Split · Upper/Lower · Fat Burn · More</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
-          </View>
-          <View style={styles.templateBadgeRow}>
-            {['6-Day PPL', 'Fat Loss', 'Beginner', 'Home'].map((tag) => (
-              <View key={tag} style={styles.templateTag}>
-                <Text style={styles.templateTagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        </TouchableOpacity>
 
         {/* ── My Routines (Synchronized with Exercise Grid) ──────────── */}
         <View style={styles.sectionHeader}>
@@ -209,29 +170,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
   tileLabel: { fontFamily: FONTS.bodyBold, fontSize: 12, textAlign: 'center', lineHeight: 15 },
-
-  // Templates Banner
-  templateBanner: {
-    borderRadius: 24, overflow: 'hidden', marginBottom: 32,
-    elevation: 6, shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16,
-  },
-  templateBannerContent: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    padding: 18, paddingBottom: 12,
-  },
-  templateBannerIcon: {
-    width: 52, height: 52, borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center',
-  },
-  templateBannerTitle: { fontFamily: FONTS.heading, fontSize: 18, color: '#FFF', marginBottom: 2 },
-  templateBannerSub: { fontFamily: FONTS.body, fontSize: 12, color: 'rgba(255,255,255,0.75)' },
-  templateBadgeRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 18, paddingBottom: 16 },
-  templateTag: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-  },
-  templateTagText: { fontFamily: FONTS.bodyBold, fontSize: 10, color: '#FFF' },
 
   // Routine Grid (Premium Consistency)
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },

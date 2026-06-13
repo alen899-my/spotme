@@ -281,6 +281,32 @@ const initDB = async () => {
       console.warn('Could not add status column (may already exist):', _);
     }
 
+    // ── Drop template columns (expert splits feature removed) ──────────────
+    await pool.query(`
+      DELETE FROM workout_splits WHERE user_id IS NULL;
+      ALTER TABLE workout_splits DROP COLUMN IF EXISTS is_template;
+      ALTER TABLE workout_splits DROP COLUMN IF EXISTS template_goal;
+      ALTER TABLE workout_splits DROP COLUMN IF EXISTS template_level;
+      ALTER TABLE workout_splits DROP COLUMN IF EXISTS template_days;
+      ALTER TABLE workout_splits DROP COLUMN IF EXISTS template_color;
+      ALTER TABLE workout_splits DROP COLUMN IF EXISTS template_icon;
+    `);
+
+    // ── Split Ratings ───────────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS split_ratings (
+        id SERIAL PRIMARY KEY,
+        split_id INT NOT NULL REFERENCES workout_splits(id) ON DELETE CASCADE,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        rating INT NOT NULL CHECK (rating >= 1 AND rating <= 10),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(split_id, user_id)
+      );
+      ALTER TABLE workout_splits ADD COLUMN IF NOT EXISTS avg_rating NUMERIC(3,1) DEFAULT 0;
+      ALTER TABLE workout_splits ADD COLUMN IF NOT EXISTS rating_count INT DEFAULT 0;
+      ALTER TABLE workout_splits ADD COLUMN IF NOT EXISTS cloned_from_id INT REFERENCES workout_splits(id) ON DELETE SET NULL;
+    `);
+
     // ── Water Intake Logging ─────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS water_logs (

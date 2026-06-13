@@ -35,11 +35,12 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function SessionDetailScreen() {
   const router = useRouter();
-  const { id, shared } = useLocalSearchParams();
+  const { id, shared, clonedFromId: cfId } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const isShared = shared === '1';
+  const clonedFromId = cfId;
   
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,7 +214,7 @@ export default function SessionDetailScreen() {
         </View>
       </View>
 
-      {!isShared && (
+      {!isShared && !clonedFromId && (
       <View style={styles.actionRow}>
         <TouchableOpacity 
           style={[
@@ -268,9 +269,11 @@ export default function SessionDetailScreen() {
                   <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>
                     {session?.name || 'Routine'}
                   </Text>
-                  <TouchableOpacity onPress={() => { setRenameName(session?.name || ''); setShowRenameModal(true); }}>
-                    <Ionicons name="create-outline" size={18} color={colors.primary} />
-                  </TouchableOpacity>
+                  {!clonedFromId && (
+                    <TouchableOpacity onPress={() => { setRenameName(session?.name || ''); setShowRenameModal(true); }}>
+                      <Ionicons name="create-outline" size={18} color={colors.primary} />
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <Text style={[styles.headerSub, { color: colors.textMuted }]}>{exercises.length} exercise{exercises.length !== 1 ? 's' : ''}</Text>
               </>
@@ -300,7 +303,7 @@ export default function SessionDetailScreen() {
           />
         )}
 
-        {!isShared && (
+        {!isShared && !clonedFromId && (
         <View
           style={[
             styles.bottomBar,

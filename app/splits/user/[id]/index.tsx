@@ -15,6 +15,7 @@ import axios from 'axios';
 import { FONTS } from '../../../../constants/theme';
 import { useTheme } from '../../../../contexts/ThemeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import SplitRating from '../../../../components/ui/SplitRating';
 import { API_URL } from '../../../../utils/api';
 import { getToken } from '../../../../utils/tokenStorage';
 
@@ -87,6 +88,14 @@ export default function UserSplitsScreen() {
         <View style={styles.cardCenter}>
           <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
           <Text style={[styles.cardSessions, { color: colors.textMuted }]}>{item.session_count} sessions</Text>
+          {item.user_count > 0 && (
+            <Text style={[styles.cardSessions, { color: colors.textMuted }]}>
+              <Ionicons name="people-outline" size={10} color={colors.textMuted} /> {item.user_count} users
+            </Text>
+          )}
+          {item.avg_rating > 0 && (
+            <SplitRating avgRating={item.avg_rating} ratingCount={item.rating_count} size="sm" />
+          )}
         </View>
         <View style={styles.cardRight}>
           {item.is_already_added ? (

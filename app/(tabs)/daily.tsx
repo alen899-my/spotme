@@ -418,6 +418,20 @@ export default function DailyTab() {
                             <Ionicons name="calendar-outline" size={14} color={isDark ? colors.textMuted : "rgba(255,255,255,0.82)"} />
                             <Text style={[styles.splitMenuMeta, isDark && { color: colors.textMuted }]}>{split.session_count} Sessions</Text>
                           </View>
+                          {split.original_creator_name && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
+                              {split.original_creator_pic ? (
+                                <Image source={{ uri: split.original_creator_pic }} style={{ width: 14, height: 14, borderRadius: 7 }} />
+                              ) : (
+                                <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: isDark ? colors.primary : 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center' }}>
+                                  <Ionicons name="person" size={8} color="#FFF" />
+                                </View>
+                              )}
+                              <Text style={[styles.splitMenuMeta, isDark && { color: colors.textMuted }]} numberOfLines={1}>
+                                @{split.original_creator_name}
+                              </Text>
+                            </View>
+                          )}
                         </View>
                       </LinearGradient>
                     </TouchableOpacity>
