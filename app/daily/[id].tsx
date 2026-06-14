@@ -15,7 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useWorkoutTimer } from '../../contexts/WorkoutTimerContext';
-import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import ActionModal from '../../components/ui/ActionModal';
 import ExercisePreviewModal from '../../components/modals/ExercisePreviewModal';
 import ExerciseFilterModal, { ExerciseFilters } from '../../components/exercises/ExerciseFilterModal';
 import { ActiveWorkoutSkeleton } from '../../components/ui/Skeleton';
@@ -459,12 +459,13 @@ export default function ActiveWorkoutScreen() {
     workoutElapsed,
     restTimer,
     restRunning,
-    totalRestElapsed,
     isWorkoutActive,
     startWorkoutSession,
     endWorkoutSession,
     startRestTimer,
     stopRestTimer,
+    pauseIdleTimer,
+    resumeIdleTimer,
   } = useWorkoutTimer();
 
   const [activeExercise, setActiveExercise] = useState<any>(null);
@@ -490,7 +491,7 @@ export default function ActiveWorkoutScreen() {
   const [loadingAddEx, setLoadingAddEx] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [timerModalVisible, setTimerModalVisible] = useState(false);
-  const [selectedTimerType, setSelectedTimerType] = useState<'workout' | 'rest' | 'totalRest' | null>(null);
+  const [selectedTimerType, setSelectedTimerType] = useState<'workout' | 'rest' | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showDeleteSetModal, setShowDeleteSetModal] = useState(false);
@@ -611,6 +612,7 @@ export default function ActiveWorkoutScreen() {
     setActiveExercise(ex);
     setEditingSet(null);
     setActiveSetNum((ex.sets?.length || 0) + 1);
+    pauseIdleTimer();
     setSetModalVisible(true);
   };
 
@@ -642,7 +644,6 @@ export default function ActiveWorkoutScreen() {
         duration_seconds: isCardio ? setTimer : setTimer,
         rest_seconds: 0,
         workout_duration: workoutElapsed,
-        total_rest_duration: totalRestElapsed,
       }, { headers: { Authorization: `Bearer ${token}` } });
       showToast(isCardio ? `Duration logged! 🔥` : `Set ${activeSetNum} logged! 🔥`);
       setSetModalVisible(false);
@@ -673,6 +674,7 @@ export default function ActiveWorkoutScreen() {
       showToast('Failed to log set', 'error');
     } finally {
       setLoadingLogSet(false);
+      resumeIdleTimer();
     }
   };
 
@@ -832,7 +834,6 @@ export default function ActiveWorkoutScreen() {
       const token = await getToken();
       await axios.patch(`${API_URL}/daily/workouts/${workoutId}/metrics`, {
         total_duration_seconds: workoutElapsed,
-        total_rest_seconds: totalRestElapsed,
       }, { headers: { Authorization: `Bearer ${token}` } });
       showToast('Workout saved in progress!', 'info');
       setShowExitModal(false);
@@ -875,7 +876,7 @@ export default function ActiveWorkoutScreen() {
     }
   };
 
-  const openTimerDetail = (type: 'workout' | 'rest' | 'totalRest') => {
+  const openTimerDetail = (type: 'workout' | 'rest') => {
     setSelectedTimerType(type);
     setTimerModalVisible(true);
   };
@@ -884,7 +885,6 @@ export default function ActiveWorkoutScreen() {
     switch (selectedTimerType) {
       case 'workout':   return { title: 'TOTAL WORKOUT',   value: formatTime(workoutElapsed),   color: P.cta,      icon: 'timer-outline' };
       case 'rest':      return { title: 'CURRENT REST',    value: formatTime(restTimer),         color: P.ctaDark,  icon: 'cafe-outline'  };
-      case 'totalRest': return { title: 'TOTAL REST TAKEN', value: formatTime(totalRestElapsed), color: '#10B981',  icon: 'hourglass-outline' };
       default:          return { title: '', value: '', color: '#000', icon: 'help' };
     }
   };
@@ -924,12 +924,11 @@ export default function ActiveWorkoutScreen() {
       }
       await axios.patch(`${API_URL}/daily/workouts/${workoutId}/complete`, {
         total_duration_seconds: workoutElapsed,
-        total_rest_seconds: totalRestElapsed,
         total_volume: Math.round(totalVolume),
       }, { headers: { Authorization: `Bearer ${token}` } });
       endWorkoutSession();
       showToast('Workout finished! Great job! 🏆');
-      router.replace(`/daily/complete?id=${workoutId}&duration=${workoutElapsed}&volume=${totalVolume}&rest=${totalRestElapsed}`);
+      router.replace(`/daily/complete?id=${workoutId}&duration=${workoutElapsed}&volume=${totalVolume}`);
     } catch (err: any) {
       console.error('Error finishing workout:', err);
       showToast('Failed to save workout', 'error');
@@ -1115,18 +1114,6 @@ export default function ActiveWorkoutScreen() {
                   </Text>
                 </View>
               </TouchableOpacity>
-
-              <View style={[styles.dashDivider, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.16)' }]} />
-
-              <TouchableOpacity style={styles.dashSegment} onPress={() => openTimerDetail('totalRest')}>
-                <View style={[styles.dashIconBox, { backgroundColor: '#10B981' }]}>
-                  <Ionicons name="hourglass" size={16} color="#FFF" />
-                </View>
-                <View style={styles.dashTextWrap}>
-                  <Text style={[styles.dashLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>TOTAL REST</Text>
-                  <Text style={[styles.dashText, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatTime(totalRestElapsed)}</Text>
-                </View>
-              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -1273,10 +1260,10 @@ export default function ActiveWorkoutScreen() {
         </View>
       </Modal>
 
-      <ConfirmationModal visible={showFinishModal} title="Finish Session?" message="Are you sure you want to end this workout? All your stats will be finalized." confirmText={finishing ? 'FINISHING...' : 'YES, FINISH'} confirmColor="#10B981" onConfirm={handleFinishWorkout} onCancel={() => setShowFinishModal(false)} />
-      <ConfirmationModal visible={showExitModal} title="Save & Exit?" message="Your workout is in progress. Save current progress and continue later?" confirmText={updatingMetrics ? 'SAVING...' : 'SAVE & EXIT'} confirmColor="#3B82F6" onConfirm={handleSaveAndExit} onCancel={() => setShowExitModal(false)} />
-      <ConfirmationModal visible={showDeleteModal} title="Remove Exercise?" message="Are you sure you want to remove this movement from today's session? This won't affect your main split." confirmText="REMOVE" confirmColor="#EF4444" onConfirm={handleConfirmDelete} onCancel={() => { setShowDeleteModal(false); setDeleteId(null); }} />
-      <ConfirmationModal visible={showDeleteSetModal} title="Delete Set?" message="Are you sure you want to remove this set? Your volume and stats will be updated." confirmText="DELETE" confirmColor="#EF4444" onConfirm={handleConfirmDeleteSet} onCancel={() => { setShowDeleteSetModal(false); setDeleteSetId(null); }} />
+      <ActionModal visible={showFinishModal} type="confirm" title="Finish Session?" message="Are you sure you want to end this workout? All your stats will be finalized." confirmText={finishing ? 'FINISHING...' : 'YES, FINISH'} onConfirm={handleFinishWorkout} onCancel={() => setShowFinishModal(false)} />
+      <ActionModal visible={showExitModal} type="confirm" title="Save & Exit?" message="Your workout is in progress. Save current progress and continue later?" confirmText={updatingMetrics ? 'SAVING...' : 'SAVE & EXIT'} onConfirm={handleSaveAndExit} onCancel={() => setShowExitModal(false)} />
+      <ActionModal visible={showDeleteModal} type="delete" title="Remove Exercise?" message="Are you sure you want to remove this movement from today's session? This won't affect your main split." confirmText="REMOVE" onConfirm={handleConfirmDelete} onCancel={() => { setShowDeleteModal(false); setDeleteId(null); }} />
+      <ActionModal visible={showDeleteSetModal} type="delete" title="Delete Set?" message="Are you sure you want to remove this set? Your volume and stats will be updated." confirmText="DELETE" onConfirm={handleConfirmDeleteSet} onCancel={() => { setShowDeleteSetModal(false); setDeleteSetId(null); }} />
 
       <ExercisePreviewModal visible={guideModalVisible} exercise={guideExercise} onClose={() => setGuideModalVisible(false)} />
 

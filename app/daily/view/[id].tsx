@@ -47,9 +47,12 @@ export default function WorkoutViewScreen() {
   const fetchWorkout = useCallback(async () => {
     try {
       const token = await getToken();
+      const apiParams: any = {};
+      if (isShared) apiParams.shared = '1';
       const [workoutRes, reportRes] = await Promise.all([
         axios.get(`${API_URL}/daily/workouts/${workoutId}`, {
           headers: { Authorization: `Bearer ${token}` },
+          params: apiParams,
         }),
         axios.get(`${API_URL}/daily/workouts/${workoutId}/report`, {
           headers: { Authorization: `Bearer ${token}` },

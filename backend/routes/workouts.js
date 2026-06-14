@@ -286,7 +286,7 @@ router.get('/splits', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT s.*, 
-        ou.username AS original_creator_name,
+        COALESCE(ou.username, ou.full_name) AS original_creator_name,
         ou.profile_pic_url AS original_creator_pic,
         ou.id AS original_creator_id,
         (SELECT rating FROM split_ratings WHERE split_id = s.id AND user_id = $1) AS user_rating,
@@ -355,7 +355,7 @@ router.get('/splits/:id', authenticateToken, async (req, res) => {
     const result = await pool.query(
       `      SELECT s.id, s.user_id, s.name, s.description, s.created_at,
               s.avg_rating, s.rating_count, s.cloned_from_id,
-              ou.username AS original_creator_name,
+              COALESCE(ou.username, ou.full_name) AS original_creator_name,
               ou.profile_pic_url AS original_creator_pic,
               ou.id AS original_creator_id,
         (SELECT rating FROM split_ratings WHERE split_id = s.id AND user_id = $2) AS user_rating,

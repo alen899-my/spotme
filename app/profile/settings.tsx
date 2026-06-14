@@ -22,6 +22,7 @@ import axios from "axios";
 import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
 import { API_URL } from "../../utils/api";
+import ActionModal from "../../components/ui/ActionModal";
 
 const makeStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -361,6 +362,7 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [savingShare, setSavingShare] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [alertModal, setAlertModal] = useState<{ visible: boolean; type: 'info' | 'error'; title: string; message: string }>({ visible: false, type: 'info', title: '', message: '' });
 
   useEffect(() => {
     loadSettings();
@@ -436,7 +438,7 @@ export default function SettingsScreen() {
     try {
       const token = await getToken();
       if (!token) {
-        Alert.alert("Session Expired", "Please log in again.");
+        setAlertModal({ visible: true, type: 'info', title: 'Session Expired', message: 'Please log in again.' });
         router.replace('/login');
         return;
       }
@@ -447,7 +449,7 @@ export default function SettingsScreen() {
       router.replace('/login');
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message || "Failed to delete account. Please try again.";
-      Alert.alert("Error", msg);
+      setAlertModal({ visible: true, type: 'error', title: 'Error', message: msg });
     }
   };
 
@@ -668,6 +670,14 @@ export default function SettingsScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <ActionModal
+        visible={alertModal.visible}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        onConfirm={() => setAlertModal({ ...alertModal, visible: false })}
+      />
     </View>
   );
 }

@@ -339,9 +339,15 @@ router.get('/workouts/:id', authenticateToken, async (req, res) => {
     const params = [parseInt(req.params.id)];
 
     if (shared === '1') {
-      // Shared view — any authenticated user can view if owner's profile is public
+      // Shared view — any authenticated user can view if owner's profile is public,
+      // or if the requester follows the owner with an accepted follow request
       whereClause += ` AND EXISTS (
-        SELECT 1 FROM users u WHERE u.id = dw.user_id AND (u.is_private = false OR u.id = $2)
+        SELECT 1 FROM users u WHERE u.id = dw.user_id AND (
+          u.is_private = false OR u.id = $2 OR EXISTS (
+            SELECT 1 FROM follows
+            WHERE follower_id = $2 AND following_id = u.id AND status = 'accepted'
+          )
+        )
       )`;
       params.push(req.user.id);
     } else {

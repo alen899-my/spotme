@@ -10,12 +10,13 @@ interface WorkoutTimerContextType {
   workoutElapsed: number;
   restTimer: number;
   restRunning: boolean;
-  totalRestElapsed: number;
   isWorkoutActive: boolean;
-  startWorkoutSession: (id: string, existingElapsed?: number, existingTotalRest?: number) => void;
+  startWorkoutSession: (id: string, existingElapsed?: number, existingIdle?: number) => void;
   endWorkoutSession: () => void;
   startRestTimer: (seconds: number) => Promise<void>;
   stopRestTimer: () => void;
+  pauseIdleTimer: () => void;
+  resumeIdleTimer: () => void;
 }
 
 const WorkoutTimerContext = createContext<WorkoutTimerContextType>({
@@ -23,12 +24,13 @@ const WorkoutTimerContext = createContext<WorkoutTimerContextType>({
   workoutElapsed: 0,
   restTimer: 0,
   restRunning: false,
-  totalRestElapsed: 0,
   isWorkoutActive: false,
   startWorkoutSession: () => {},
   endWorkoutSession: () => {},
   startRestTimer: async () => {},
   stopRestTimer: () => {},
+  pauseIdleTimer: () => {},
+  resumeIdleTimer: () => {},
 });
 
 export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
@@ -36,25 +38,23 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
   const [workoutElapsed, setWorkoutElapsed] = useState(0);
   const [restTimer, setRestTimer] = useState(0);
   const [restRunning, setRestRunning] = useState(false);
-  const [totalRestElapsed, setTotalRestElapsed] = useState(0);
 
   const workoutStartedAtRef = useRef<number>(Date.now());
   const workoutTimerRef = useRef<any>(null);
   const restTimerRef = useRef<any>(null);
   const restTimerEndAtRef = useRef<number>(Date.now());
-  const totalRestAccumulatedRef = useRef<number>(0);
-  const totalRestPeriodStartRef = useRef<number | null>(null);
 
-  const totalRestTimerRef = useRef<any>(null);
+  // Idle timer tracking
+  const idleAccumulatedRef = useRef<number>(0);
+  const idlePeriodStartRef = useRef<number | null>(null);
 
   const startWorkoutTimer = useCallback(() => {
     if (workoutTimerRef.current) return;
-    // Tick both workout elapsed and total rest every second
     workoutTimerRef.current = setInterval(() => {
       setWorkoutElapsed(Math.floor((Date.now() - workoutStartedAtRef.current) / 1000));
-      if (totalRestPeriodStartRef.current !== null) {
-        const currentPeriod = Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000);
-        setTotalRestElapsed(totalRestAccumulatedRef.current + currentPeriod);
+      if (idlePeriodStartRef.current !== null) {
+        const currentPeriod = Math.floor((Date.now() - idlePeriodStartRef.current) / 1000);
+        setIdleAccumulated(idleAccumulatedRef.current + currentPeriod);
       }
     }, 1000);
   }, []);
@@ -66,29 +66,44 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const startWorkoutSession = useCallback((id: string, existingElapsed?: number, existingTotalRest?: number) => {
-    const isResume = activeWorkoutId === id;
-    if (!isResume) {
-      setActiveWorkoutId(id);
-      if (existingElapsed && existingElapsed > 0) {
-        setWorkoutElapsed(existingElapsed);
-        workoutStartedAtRef.current = Date.now() - (existingElapsed * 1000);
-      } else {
-        setWorkoutElapsed(0);
-        workoutStartedAtRef.current = Date.now();
-      }
-      if (existingTotalRest && existingTotalRest > 0) {
-        setTotalRestElapsed(existingTotalRest);
-        totalRestAccumulatedRef.current = existingTotalRest;
-      } else {
-        setTotalRestElapsed(0);
-        totalRestAccumulatedRef.current = 0;
-      }
-      // Don't start rest tracking here — wait for first actual rest period
-      totalRestPeriodStartRef.current = null;
+  const getCurrentIdle = useCallback(() => {
+    if (idlePeriodStartRef.current !== null) {
+      const currentPeriod = Math.floor((Date.now() - idlePeriodStartRef.current) / 1000);
+      return idleAccumulatedRef.current + currentPeriod;
     }
+    return idleAccumulatedRef.current;
+  }, []);
+
+  const [idleAccumulated, setIdleAccumulated] = useState(0);
+
+  const flushIdlePeriod = useCallback(() => {
+    if (idlePeriodStartRef.current !== null) {
+      const elapsed = Math.floor((Date.now() - idlePeriodStartRef.current) / 1000);
+      idleAccumulatedRef.current += elapsed;
+      idlePeriodStartRef.current = null;
+    }
+  }, []);
+
+  const startWorkoutSession = useCallback((id: string, existingElapsed?: number, existingIdle?: number) => {
+    setActiveWorkoutId(id);
+    if (existingElapsed && existingElapsed > 0) {
+      setWorkoutElapsed(existingElapsed);
+      workoutStartedAtRef.current = Date.now() - (existingElapsed * 1000);
+    } else {
+      setWorkoutElapsed(0);
+      workoutStartedAtRef.current = Date.now();
+    }
+    if (existingIdle && existingIdle > 0) {
+      idleAccumulatedRef.current = existingIdle;
+      setIdleAccumulated(existingIdle);
+    } else {
+      idleAccumulatedRef.current = 0;
+      setIdleAccumulated(0);
+    }
+    // Start idle accumulation immediately (counts warmup/setup/talking)
+    idlePeriodStartRef.current = Date.now();
     startWorkoutTimer();
-  }, [activeWorkoutId, startWorkoutTimer]);
+  }, [startWorkoutTimer]);
 
   const endWorkoutSession = useCallback(() => {
     stopWorkoutTimer();
@@ -96,43 +111,28 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
       clearInterval(restTimerRef.current);
       restTimerRef.current = null;
     }
-    // Finalize total rest
-    if (totalRestPeriodStartRef.current !== null) {
-      const elapsed = Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000);
-      totalRestAccumulatedRef.current += elapsed;
-      totalRestPeriodStartRef.current = null;
-    }
+    flushIdlePeriod();
     setActiveWorkoutId(null);
     setWorkoutElapsed(0);
     setRestTimer(0);
     setRestRunning(false);
-    setTotalRestElapsed(0);
-    totalRestAccumulatedRef.current = 0;
+    setIdleAccumulated(0);
+    idleAccumulatedRef.current = 0;
     AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
-  }, [stopWorkoutTimer]);
+  }, [stopWorkoutTimer, flushIdlePeriod]);
 
   const stopRestTimer = useCallback(() => {
     if (restTimerRef.current) {
       clearInterval(restTimerRef.current);
       restTimerRef.current = null;
     }
-    // Accumulate rest time when rest period ends
-    if (totalRestPeriodStartRef.current !== null) {
-      const elapsed = Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000);
-      totalRestAccumulatedRef.current += elapsed;
-      totalRestPeriodStartRef.current = null;
-    }
     setRestRunning(false);
     setRestTimer(0);
-    setTotalRestElapsed(totalRestAccumulatedRef.current);
     AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
   }, []);
 
   const startRestTimer = useCallback(async (seconds: number) => {
     stopRestTimer();
-
-    // Start tracking rest period
-    totalRestPeriodStartRef.current = Date.now();
 
     const endAt = Date.now() + (seconds * 1000);
     restTimerEndAtRef.current = endAt;
@@ -148,13 +148,22 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
           clearInterval(restTimerRef.current);
           restTimerRef.current = null;
         }
-        // Just stop the visual countdown — keep accumulating rest time
-        // until the user explicitly starts the per-set timer (stopRestTimer)
         setRestRunning(false);
         AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
       }
     }, 1000);
   }, [stopRestTimer]);
+
+  // Pause idle — call when user opens the set-logging modal
+  const pauseIdleTimer = useCallback(() => {
+    flushIdlePeriod();
+    setIdleAccumulated(idleAccumulatedRef.current);
+  }, [flushIdlePeriod]);
+
+  // Resume idle — call when set is saved and modal closes
+  const resumeIdleTimer = useCallback(() => {
+    idlePeriodStartRef.current = Date.now();
+  }, []);
 
   // Resume rest timer from AsyncStorage on mount
   useEffect(() => {
@@ -170,10 +179,6 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
       restTimerEndAtRef.current = endAt;
       setRestTimer(remaining);
       setRestRunning(true);
-      // Resume rest tracking too
-      if (totalRestPeriodStartRef.current === null) {
-        totalRestPeriodStartRef.current = Date.now();
-      }
       restTimerRef.current = setInterval(() => {
         const rem = Math.max(0, Math.floor((restTimerEndAtRef.current - Date.now()) / 1000));
         setRestTimer(rem);
@@ -201,9 +206,9 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
           setRestTimer(remaining);
           if (remaining <= 0) setRestRunning(false);
         }
-        if (totalRestPeriodStartRef.current !== null) {
-          const currentPeriod = Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000);
-          setTotalRestElapsed(totalRestAccumulatedRef.current + currentPeriod);
+        if (idlePeriodStartRef.current !== null) {
+          const currentPeriod = Math.floor((Date.now() - idlePeriodStartRef.current) / 1000);
+          setIdleAccumulated(idleAccumulatedRef.current + currentPeriod);
         }
       }
     });
@@ -216,17 +221,15 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
     const interval = setInterval(async () => {
       try {
         const token = await getToken();
-        const totalRest = totalRestPeriodStartRef.current !== null
-          ? totalRestAccumulatedRef.current + Math.floor((Date.now() - totalRestPeriodStartRef.current) / 1000)
-          : totalRestAccumulatedRef.current;
+        const totalIdle = getCurrentIdle();
         await axios.patch(`${API_URL}/daily/workouts/${activeWorkoutId}/metrics`, {
           total_duration_seconds: Math.floor((Date.now() - workoutStartedAtRef.current) / 1000),
-          total_rest_seconds: totalRest,
+          total_rest_seconds: totalIdle,
         }, { headers: { Authorization: `Bearer ${token}` } });
       } catch {}
     }, 15000);
     return () => clearInterval(interval);
-  }, [activeWorkoutId]);
+  }, [activeWorkoutId, getCurrentIdle]);
 
   return (
     <WorkoutTimerContext.Provider
@@ -235,12 +238,13 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
         workoutElapsed,
         restTimer,
         restRunning,
-        totalRestElapsed,
         isWorkoutActive: activeWorkoutId !== null,
         startWorkoutSession,
         endWorkoutSession,
         startRestTimer,
         stopRestTimer,
+        pauseIdleTimer,
+        resumeIdleTimer,
       }}
     >
       {children}

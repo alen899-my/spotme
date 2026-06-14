@@ -33,7 +33,6 @@ export default function FloatingTimerBar() {
     workoutElapsed,
     restTimer,
     restRunning,
-    totalRestElapsed,
     isWorkoutActive,
   } = useWorkoutTimer();
 
@@ -138,19 +137,6 @@ export default function FloatingTimerBar() {
             >
               {formatTime(restTimer)}
             </Text>
-          </View>
-        </View>
-
-        <View style={[styles.divider, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.16)' }]} />
-
-        {/* TOTAL REST */}
-        <View style={styles.segment}>
-          <View style={[styles.iconBox, { backgroundColor: '#10B981' }]}>
-            <Ionicons name="hourglass" size={14} color="#FFF" />
-          </View>
-          <View style={styles.textWrap}>
-            <Text style={[styles.label, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>TOTAL REST</Text>
-            <Text style={[styles.value, { color: isDark ? colors.text : '#FFF' }]}>{formatTime(totalRestElapsed)}</Text>
           </View>
         </View>
 

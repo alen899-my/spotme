@@ -348,6 +348,7 @@ export default function WorkoutSummary({
           const isBodyWeight = s.key === 'BODY WEIGHT';
           const card = (
             <View
+              key={s.key}
               style={[
                 styles.statCard,
                 { width: s.wide ? SCREEN_WIDTH - 40 : (SCREEN_WIDTH - 50) / 2 },
@@ -372,7 +373,7 @@ export default function WorkoutSummary({
           );
           if (isBodyWeight && onEditMetrics) {
             return (
-              <TouchableOpacity key={s.key} onPress={onEditMetrics} activeOpacity={0.7}>
+              <TouchableOpacity key={`${s.key}-btn`} onPress={onEditMetrics} activeOpacity={0.7}>
                 {card}
               </TouchableOpacity>
             );

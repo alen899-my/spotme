@@ -25,6 +25,7 @@ import { clearAll } from "../../utils/tokenStorage";
 import StreakIcon from "./StreakIcon";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useWorkoutTimer } from "../../contexts/WorkoutTimerContext";
+import ActionModal from "./ActionModal";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const SIDEBAR_WIDTH = SCREEN_WIDTH;
@@ -198,6 +199,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
   const slideAnim   = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const [shouldRender, setShouldRender] = React.useState(visible);
+  const [showLogoutModal, setShowLogoutModal] = React.useState(false);
 
   // MENU_ITEMS.length entries + 1 for logout
   const TOTAL_ANIM_COUNT = MENU_ITEMS.length + 1;
@@ -233,32 +235,25 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
   };
 
   // ── Logout handler ─────────────────────────────────────────────────────────
-  const handleLogout = () => {
-    const doLogout = async () => {
-      try {
-        endWorkoutSession();
-        onClose();
-        // Small delay so sidebar closes cleanly before clearing storage
-        setTimeout(async () => {
-          await clearAll();
-          router.replace("/login" as any);
-        }, 300);
-      } catch (e) {
-        console.error("Logout error:", e);
-      }
-    };
+  const doLogout = React.useCallback(async () => {
+    try {
+      endWorkoutSession();
+      onClose();
+      // Small delay so sidebar closes cleanly before clearing storage
+      setTimeout(async () => {
+        await clearAll();
+        router.replace("/login" as any);
+      }, 300);
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+  }, [endWorkoutSession, onClose, clearAll]);
 
+  const handleLogout = () => {
     if (Platform.OS === "web") {
       if (window.confirm("Are you sure you want to logout?")) doLogout();
     } else {
-      Alert.alert(
-        "Logout",
-        "Are you sure you want to sign out?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Logout", style: "destructive", onPress: doLogout },
-        ]
-      );
+      setShowLogoutModal(true);
     }
   };
 
@@ -400,6 +395,16 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
           </ScrollView>
         </Animated.View>
       </View>
+
+      <ActionModal
+        visible={showLogoutModal}
+        type="delete"
+        title="Logout"
+        message="Are you sure you want to sign out?"
+        confirmText="LOGOUT"
+        onConfirm={() => { setShowLogoutModal(false); doLogout(); }}
+        onCancel={() => setShowLogoutModal(false)}
+      />
     </Modal>
   );
 }

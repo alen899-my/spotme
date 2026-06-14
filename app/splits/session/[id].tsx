@@ -25,7 +25,7 @@ import { P } from '../../../constants/homeTheme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
-import ConfirmationModal from '../../../components/ui/ConfirmationModal';
+import ActionModal from '../../../components/ui/ActionModal';
 import ExercisePreviewModal from '../../../components/modals/ExercisePreviewModal';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
@@ -423,8 +423,9 @@ export default function SessionDetailScreen() {
           </KeyboardAvoidingView>
         </Modal>
 
-        <ConfirmationModal
+        <ActionModal
           visible={removeId !== null}
+          type="delete"
           title="Remove Exercise"
           message="Are you sure you want to remove this movement from your session? You can add it back anytime from the library."
           confirmText="REMOVE"

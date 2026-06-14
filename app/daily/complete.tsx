@@ -449,7 +449,6 @@ export default function WorkoutCompleteScreen() {
 
       const payload: any = {
         total_duration_seconds: duration,
-        total_rest_seconds: rest,
         total_volume: volume,
       };
       if (weight.trim()) {

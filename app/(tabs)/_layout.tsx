@@ -19,9 +19,8 @@ const INK = "#04282B";
 
 const TABS = [
   { name: "index",       icon: "home",          label: "Home" },
-  { name: "exercises",   icon: "fitness",       label: "Exercises" },
   { name: "meals",       icon: "restaurant",     label: "Meals" },
-  { name: "daily",       icon: "calendar",       label: "Daily" },
+  { name: "daily",       icon: "calendar",       label: "Workouts" },
   { name: "leaderboard", icon: "trophy",         label: "Leaderboard" },
 ] as const;
 

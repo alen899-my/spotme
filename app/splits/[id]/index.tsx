@@ -25,6 +25,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
 import SplitRating from '../../../components/ui/SplitRating';
+import ActionModal from '../../../components/ui/ActionModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -94,6 +95,7 @@ export default function SplitSessionsScreen() {
   const [splitDetail, setSplitDetail] = useState<any>(null);
   const [showSplitRename, setShowSplitRename] = useState(false);
   const [renameSession, setRenameSession] = useState<any>(null);
+  const [deleteSessionId, setDeleteSessionId] = useState<number | null>(null);
 
   const isShared = shared === '1';
   const clonedFromId = splitDetail?.cloned_from_id;
@@ -139,24 +141,22 @@ export default function SplitSessionsScreen() {
   );
 
   const handleDelete = async (sessionId: number) => {
-    Alert.alert("Delete Session", "Are you sure you want to delete this session?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const token = await getToken();
-            await axios.delete(`${API_URL}/workouts/sessions/${sessionId}`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            setSessions((prev: any[]) => prev.filter(s => s.id !== sessionId));
-          } catch (err) {
-            console.error('Error deleting session:', err);
-          }
-        }
-      }
-    ]);
+    setDeleteSessionId(sessionId);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!deleteSessionId) return;
+    try {
+      const token = await getToken();
+      await axios.delete(`${API_URL}/workouts/sessions/${deleteSessionId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSessions((prev: any[]) => prev.filter(s => s.id !== deleteSessionId));
+      setDeleteSessionId(null);
+    } catch (err) {
+      console.error('Error deleting session:', err);
+      setDeleteSessionId(null);
+    }
   };
 
   const handleRenameSplit = async (newName: string) => {
@@ -507,6 +507,16 @@ export default function SplitSessionsScreen() {
         onClose={() => setRenameSession(null)}
         colors={colors}
         isDark={isDark}
+      />
+
+      <ActionModal
+        visible={deleteSessionId !== null}
+        type="delete"
+        title="Delete Session"
+        message="Are you sure you want to delete this session?"
+        confirmText="DELETE"
+        onConfirm={confirmDeleteSession}
+        onCancel={() => setDeleteSessionId(null)}
       />
     </SafeAreaView>
   );

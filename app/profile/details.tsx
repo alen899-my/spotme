@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Platform,
   Image,
   TextInput,
@@ -18,6 +17,7 @@ import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
+import ActionModal from "../../components/ui/ActionModal";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
@@ -56,6 +56,7 @@ export default function MyDetailsScreen() {
   });
 
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [alertModal, setAlertModal] = useState<{ visible: boolean; type: 'info' | 'success' | 'error'; title: string; message: string }>({ visible: false, type: 'info', title: '', message: '' });
 
   // Modal State for Dropdowns
   const [modalConfig, setModalConfig] = useState<{
@@ -85,7 +86,7 @@ export default function MyDetailsScreen() {
       setFormData(res.data);
     } catch (err) {
       console.error("Error fetching user details:", err);
-      Alert.alert("Error", "Failed to load profile details");
+      setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Failed to load profile details' });
     } finally {
       setLoading(false);
     }
@@ -174,11 +175,11 @@ export default function MyDetailsScreen() {
           side_photo: null,
         });
         setIsEditing(false);
-        Alert.alert("Success", "Profile updated successfully");
+        setAlertModal({ visible: true, type: 'success', title: 'Success', message: 'Profile updated successfully' });
       }
     } catch (err) {
       console.error("Error saving profile:", err);
-      Alert.alert("Error", "Failed to update profile. Please try again.");
+      setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Failed to update profile. Please try again.' });
     } finally {
       setSaving(false);
     }
@@ -602,6 +603,14 @@ export default function MyDetailsScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <ActionModal
+        visible={alertModal.visible}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        onConfirm={() => setAlertModal({ ...alertModal, visible: false })}
+      />
     </View>
   );
 }

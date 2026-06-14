@@ -19,9 +19,10 @@ import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
-import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import ActionModal from '../../components/ui/ActionModal';
 import { SplitsSkeleton } from '../../components/ui/Skeleton';
 import SplitRating from '../../components/ui/SplitRating';
+import SplitCard from '../../components/ui/SplitCard';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 
@@ -151,107 +152,9 @@ export default function SplitsTab() {
     }
   };
 
-  const renderSplit = ({ item, index }: { item: any, index: number }) => {
-    const cardBg = isDark ? colors.card : (colors.primary || '#E00000');
-    const cardBorderColor = isDark ? colors.border : (colors.primary || '#E00000');
-
-    const rawImages = item.exercise_images || [];
-    const images = [...rawImages];
-    if (images.length > 2) {
-      const shift = index % images.length;
-      for (let i = 0; i < shift; i++) {
-        images.push(images.shift());
-      }
-    }
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.splitCard,
-          {
-            backgroundColor: cardBg,
-            borderColor: cardBorderColor,
-            borderWidth: isDark ? 1 : 0,
-            shadowColor: isDark ? 'transparent' : cardBg,
-            elevation: isDark ? 0 : 4
-          }
-        ]}
-        activeOpacity={0.9}
-        onPress={() => router.push(`/splits/${item.id}`)}
-      >
-        <View style={styles.cardHeader}>
-          <View style={[styles.iconWrap, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.2)' }]}>
-            <MaterialCommunityIcons name={"folder-outline"} size={22} color={isDark ? colors.primary : "#FFF"} />
-          </View>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => handleDelete(item.id)}
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-          >
-            <Ionicons name="trash-outline" size={16} color={isDark ? colors.textMuted : "rgba(255,255,255,0.6)"} />
-          </TouchableOpacity>
-        </View>
-
-        <Text style={[styles.splitName, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1}>{item.name}</Text>
-
-        {item.avg_rating > 0 && (
-          <View style={{ marginTop: 4 }}>
-            <SplitRating avgRating={item.avg_rating} ratingCount={item.rating_count} size="sm" />
-          </View>
-        )}
-
-        <View style={styles.cardFooterArea}>
-          <View style={styles.cardStatsArea}>
-            <View style={styles.miniStat}>
-              <Ionicons name="flash" size={12} color={isDark ? colors.primary : "rgba(255,255,255,0.8)"} />
-              <Text style={[styles.miniStatText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}>{item.session_count} Sessions</Text>
-            </View>
-            <View style={styles.miniStat}>
-              <Ionicons name="calendar" size={12} color={isDark ? colors.primary : "rgba(255,255,255,0.8)"} />
-              <Text style={[styles.miniStatText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}>Program</Text>
-            </View>
-            {item.user_count > 0 && (
-              <View style={styles.miniStat}>
-                <Ionicons name="people-outline" size={12} color={isDark ? colors.primary : "rgba(255,255,255,0.8)"} />
-                <Text style={[styles.miniStatText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.8)' }]}>{item.user_count} users</Text>
-              </View>
-            )}
-            {item.original_creator_name && (
-              <TouchableOpacity
-                style={styles.creatorBadge}
-                onPress={() => router.push(`/profile/${item.original_creator_id}`)}
-              >
-                {item.original_creator_pic ? (
-                  <Image source={{ uri: item.original_creator_pic }} style={styles.creatorBadgeAvatar} />
-                ) : (
-                  <View style={[styles.creatorBadgeAvatar, { backgroundColor: colors.primary }]}>
-                    <Ionicons name="person" size={10} color="#FFF" />
-                  </View>
-                )}
-                <Text style={[styles.creatorBadgeName, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>
-                  @{item.original_creator_name}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.miniImageStack}>
-            <Image
-              source={{ uri: images.length > 1 ? images[1] : images[0] || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=200&auto=format&fit=crop' }}
-              style={[styles.miniThumbnailBack, { opacity: 0.3, transform: [{ rotate: '12deg' }, { translateX: 6 }] }]}
-            />
-            {images.length > 0 ? (
-              <Image source={{ uri: images[0] }} style={[styles.miniThumbnailFront, { borderColor: isDark ? colors.border : '#FFF' }]} />
-            ) : (
-              <View style={[styles.miniThumbnailFront, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.1)', borderColor: isDark ? colors.border : '#FFF', justifyContent: 'center', alignItems: 'center' }]}>
-                <Ionicons name="barbell-outline" size={12} color={isDark ? colors.textMuted : "rgba(255,255,255,0.5)"} />
-              </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderSplit = ({ item }: { item: any }) => (
+    <SplitCard item={item} onDelete={handleDelete} />
+  );
 
   const splitCardWidth = 160;
 
@@ -278,7 +181,7 @@ export default function SplitsTab() {
               style={[
                 styles.horiStackImg,
                 {
-                  marginLeft: i > 0 ? -12 : 0,
+                  marginLeft: i > 0 ? -14 : 0,
                   zIndex: 3 - i,
                   borderColor: colors.card,
                 }
@@ -391,11 +294,9 @@ export default function SplitsTab() {
           key="splits-grid"
           data={splits}
           keyExtractor={(item) => String(item.id)}
-          renderItem={({ item, index }) => renderSplit({ item, index })}
+          renderItem={({ item }) => renderSplit({ item })}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          numColumns={2}
-          columnWrapperStyle={styles.columnWrapper}
           ListHeaderComponent={null}
         />
       );
@@ -526,8 +427,9 @@ export default function SplitsTab() {
 
         {renderContent()}
 
-        <ConfirmationModal
+        <ActionModal
           visible={deleteId !== null}
+          type="delete"
           title="Delete Program"
           message="Are you sure you want to delete this program? All sessions and exercises inside will be permanently removed."
           confirmText={isDeleting ? 'DELETING...' : 'DELETE ALL'}
@@ -581,90 +483,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  listContent: { paddingHorizontal: 16, paddingBottom: 130, flexGrow: 1 },
-  columnWrapper: { justifyContent: 'space-between', gap: 12 },
-
-  // Split Card
-  splitCard: {
-    flex: 1,
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 12,
-    minHeight: 140,
-    justifyContent: 'space-between',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteBtn: { padding: 4 },
-  splitName: { fontFamily: FONTS.bodyBold, fontSize: 16, marginTop: 12 },
-
-  cardStatsArea: {
-    marginTop: 8,
-    gap: 4,
-  },
-  miniStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  miniStatText: { fontFamily: FONTS.body, fontSize: 11 },
-
-  cardFooterArea: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 10,
-  },
-  miniImageStack: {
-    width: 45,
-    height: 40,
-    position: 'relative',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  miniThumbnailFront: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#FFF',
-    zIndex: 2,
-  },
-  miniThumbnailBack: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    position: 'absolute',
-    zIndex: 1,
-  },
-
-  creatorBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-  },
-  creatorBadgeAvatar: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  creatorBadgeName: {
-    fontFamily: FONTS.body,
-    fontSize: 10,
-    maxWidth: 100,
-  },
+  listContent: { paddingBottom: 130, flexGrow: 1 },
 
   // Search bar
   searchWrap: {
@@ -723,18 +542,18 @@ const styles = StyleSheet.create({
     width: 160,
     borderRadius: 18,
     borderWidth: 1,
-    padding: 12,
-    gap: 6,
+    padding: 10,
+    gap: 5,
   },
   horiImageStack: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 32,
-    marginBottom: 2,
+    height: 40,
+    marginBottom: 4,
   },
   horiStackImg: {
-    width: 30,
-    height: 30,
+    width: 36,
+    height: 36,
     borderRadius: 8,
     borderWidth: 2,
   },
@@ -750,8 +569,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
     alignSelf: 'flex-start',

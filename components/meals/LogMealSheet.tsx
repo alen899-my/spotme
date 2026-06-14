@@ -44,14 +44,7 @@ const SOURCE_OPTIONS = [
     gradient: ['#065f46', '#10B981'] as [string, string],
     glow: '#10B98140',
   },
-  {
-    id: 'manual',
-    icon: 'pencil' as const,
-    label: 'Enter Manually',
-    sub: 'Type ingredients and quantities',
-    gradient: ['#6d28d9', '#8B5CF6'] as [string, string],
-    glow: '#8B5CF640',
-  },
+  
 ];
 
 export default function LogMealSheet({

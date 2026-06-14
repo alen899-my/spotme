@@ -17,12 +17,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { P } from '../../../constants/homeTheme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
-
-
 
 const TIERS = [
   { name: 'Bronze',      color: '#CD7F32', textDark: false, gradient: ['#CD7F32','#8B4513'] as [string,string],       mcIcon: 'shield'                },
@@ -38,22 +35,6 @@ const TIERS = [
 ];
 
 function getTier(name: string) { return TIERS.find(t => t.name === name) ?? TIERS[0]; }
-
-function getCardGradient(tierName: string): [string, string] {
-  switch (tierName) {
-    case 'Bronze':      return ['#543620', '#201108'];
-    case 'Silver':      return ['#3E4C5E', '#16202C'];
-    case 'Gold':        return ['#856006', '#2E1E00'];
-    case 'Platinum':    return ['#086F83', '#02242D'];
-    case 'Diamond':     return ['#0D6191', '#031E33'];
-    case 'Master':      return ['#6D28D9', '#2E0665'];
-    case 'Grandmaster': return ['#B91C1C', '#450616'];
-    case 'Elite':       return ['#C2410C', '#431407'];
-    case 'Champion':    return ['#991B1B', '#380202'];
-    case 'Legend':      return ['#D97706', '#4C0519'];
-    default:            return ['#1E293B', '#0F172A'];
-  }
-}
 
 function Avatar({ uri, size, border }: { uri?: string; size: number; border: string }) {
   const { colors } = useTheme();
@@ -160,113 +141,66 @@ export default function FollowListScreen() {
     }
   };
 
-  const renderCard = ({ item }: { item: any }) => {
+  const renderRow = ({ item }: { item: any }) => {
     const tier = getTier(item.league_tier);
-    const cardGradient = getCardGradient(item.league_tier);
-
     const isFollowerTab = activeTab === 'followers';
     const isFollowingBack = item.is_followed_by_me;
-    const followsMe = item.follows_me;
 
-    const getActionButton = () => {
+    const renderAction = () => {
       if (!isOwnList) return null;
-
-      if (isFollowerTab) {
-        // Followers tab
-        if (isFollowingBack) {
-          // I follow them back → "Following"
-          return (
-            <TouchableOpacity
-              style={[styles.actionPill, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-              onPress={() => { setActionUser(item); setActionSource('followers'); }}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionPillText}>Following</Text>
-            </TouchableOpacity>
-          );
-        }
-        // They just follow me, I don't follow back → "Remove"
+      if (isFollowerTab && !isFollowingBack) {
         return (
           <TouchableOpacity
-            style={[styles.actionPill, { backgroundColor: 'transparent', borderColor: colors.border }]}
+            style={[styles.followBtn, { borderColor: colors.border }]}
             onPress={() => { setActionUser(item); setActionSource('followers'); }}
-            activeOpacity={0.7}
           >
-            <Text style={[styles.actionPillText, { color: colors.textMuted }]}>Remove</Text>
+            <Text style={[styles.followBtnText, { color: colors.textMuted }]}>Remove</Text>
           </TouchableOpacity>
         );
       }
-
-      // Following tab
       return (
         <TouchableOpacity
-          style={[styles.actionPill, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-          onPress={() => { setActionUser(item); setActionSource('following'); }}
-          activeOpacity={0.7}
+          style={[styles.followBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+          onPress={() => { setActionUser(item); setActionSource(isFollowerTab ? 'followers' : 'following'); }}
         >
-          <Text style={styles.actionPillText}>Following</Text>
+          <Text style={[styles.followBtnText, { color: '#FFF' }]}>Following</Text>
         </TouchableOpacity>
       );
     };
 
     return (
       <TouchableOpacity
-        activeOpacity={0.85}
+        activeOpacity={0.7}
         onPress={() => router.push(`/profile/${item.id}`)}
+        style={[styles.row, { borderBottomColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]}
       >
-        <LinearGradient
-          colors={cardGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.card, {
-            borderColor: tier.color + '30',
-            shadowColor: tier.color,
-            shadowOpacity: 0.2,
-            shadowRadius: 4,
-            elevation: 3,
-          }]}
-        >
-          <View style={styles.cardGlossOverlay} />
-
-          <View style={styles.cardAvatarWrap}>
-            <Avatar uri={item.profile_pic_url} size={44} border={tier.color} />
-          </View>
-
-          <View style={styles.cardInfo}>
-            <Text style={styles.cardName} numberOfLines={1}>
-              {item.full_name ?? 'Athlete'}
-            </Text>
-
-            <View style={styles.cardSubRow}>
-              <LinearGradient colors={tier.gradient} style={styles.cardTierBadge}>
-                <MaterialCommunityIcons name={tier.mcIcon as any} size={9}
-                  color={tier.textDark ? '#021518' : '#FFF'} />
-                <Text style={[styles.cardTierText, { color: tier.textDark ? '#021518' : '#FFF' }]}>
-                  {item.league_tier.toUpperCase()}
-                </Text>
-              </LinearGradient>
-
-              {item.current_streak > 0 && (
-                <View style={styles.cardStreakBadge}>
-                  <Ionicons name="flame" size={11} color="#FF9F43" />
-                  <Text style={styles.cardStreakText}>{item.current_streak}d</Text>
-                </View>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.cardRight}>
-            <View style={[styles.xpCapsule, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-              <Ionicons name="flash" size={10} color={P.sun} />
-              <Text style={styles.cardXP}>
-                {item.xp >= 1000 ? `${(item.xp / 1000).toFixed(1)}k` : item.xp}
+        <Avatar uri={item.profile_pic_url} size={40} border={tier.color} />
+        <View style={styles.rowInfo}>
+          <Text style={[styles.rowName, { color: colors.text }]} numberOfLines={1}>
+            {item.full_name ?? 'Athlete'}
+          </Text>
+          <View style={styles.rowSub}>
+            <LinearGradient colors={tier.gradient} style={styles.rowTier}>
+              <MaterialCommunityIcons name={tier.mcIcon as any} size={8} color={tier.textDark ? '#021518' : '#FFF'} />
+              <Text style={[styles.rowTierText, { color: tier.textDark ? '#021518' : '#FFF' }]}>
+                {item.league_tier.toUpperCase()}
               </Text>
-              <Text style={styles.cardXPLabel}>XP</Text>
-            </View>
-
-            {getActionButton()}
+            </LinearGradient>
+            {item.current_streak > 0 && (
+              <View style={styles.rowStreak}>
+                <Ionicons name="flame" size={10} color="#FF9F43" />
+                <Text style={styles.rowStreakText}>{item.current_streak}</Text>
+              </View>
+            )}
           </View>
-        </LinearGradient>
+        </View>
+        <View style={styles.rowRight}>
+          <Text style={[styles.rowXP, { color: colors.text }]}>
+            {item.xp >= 1000 ? `${(item.xp / 1000).toFixed(1)}k` : item.xp}
+          </Text>
+          <Text style={[styles.rowXPLabel, { color: colors.textMuted }]}>XP</Text>
+        </View>
+        {renderAction()}
       </TouchableOpacity>
     );
   };
@@ -343,7 +277,7 @@ export default function FollowListScreen() {
           <FlatList
             data={filtered}
             keyExtractor={(item) => String(item.id)}
-            renderItem={renderCard}
+            renderItem={renderRow}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
@@ -492,120 +426,79 @@ const styles = StyleSheet.create({
   },
 
   listContent: {
-    paddingHorizontal: 16,
     paddingBottom: 40,
-    paddingTop: 4,
     flexGrow: 1,
   },
 
-  card: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
-    marginBottom: 12,
-    overflow: 'hidden',
-    minHeight: 68,
-    paddingVertical: 8,
-    shadowOffset: { width: 0, height: 4 },
-    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
   },
-  cardGlossOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  cardAvatarWrap: {
-    marginLeft: 14,
-    marginRight: 12,
-  },
-  cardInfo: {
+  rowInfo: {
     flex: 1,
-    justifyContent: 'center',
+    marginLeft: 12,
     minWidth: 0,
-    paddingRight: 4,
+    justifyContent: 'center',
   },
-  cardName: {
+  rowName: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 14.5,
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
+    fontSize: 15,
   },
-  cardSubRow: {
+  rowSub: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginTop: 4,
-    flexWrap: 'wrap',
+    marginTop: 3,
   },
-  cardTierBadge: {
+  rowTier: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     paddingHorizontal: 6,
-    paddingVertical: 2.5,
+    paddingVertical: 2,
     borderRadius: 6,
   },
-  cardTierText: {
+  rowTierText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 8,
     letterSpacing: 0.8,
   },
-  cardStreakBadge: {
+  rowStreak: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 159, 67, 0.12)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 6,
-    gap: 2.5,
+    gap: 2,
   },
-  cardStreakText: {
+  rowStreakText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 8.5,
+    fontSize: 10,
     color: '#FF9F43',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
-  cardRight: {
-    alignItems: 'flex-end',
-    gap: 6,
-    marginRight: 14,
-  },
-  xpCapsule: {
-    flexDirection: 'row',
+  rowRight: {
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    marginRight: 10,
   },
-  cardXP: {
+  rowXP: {
     fontFamily: FONTS.heading,
-    fontSize: 13,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+    fontSize: 14,
   },
-  cardXPLabel: {
+  rowXPLabel: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 8,
-    color: 'rgba(255, 255, 255, 0.45)',
-    marginLeft: 1,
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.45)',
+    marginTop: -1,
   },
-  actionPill: {
+  followBtn: {
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 14,
     borderWidth: 1,
   },
-  actionPillText: {
+  followBtnText: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: 11,
-    color: '#FFF',
   },
 
   // Modal

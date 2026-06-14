@@ -14,7 +14,7 @@ import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useWorkoutTimer } from '../../contexts/WorkoutTimerContext';
-import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import ActionModal from '../../components/ui/ActionModal';
 import DatePicker from '../../components/ui/DatePicker';
 import { DailySkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
@@ -441,16 +441,16 @@ export default function DailyTab() {
                       styles.addSplitCard,
                       isDark && { borderColor: colors.border, shadowColor: '#000000' }
                     ]}
-                    onPress={() => router.push('/splits/create')}
+                    onPress={() => router.push('/(tabs)/splits')}
                     activeOpacity={0.86}
                   >
                     <LinearGradient colors={isDark ? ['#0D0D0D', '#050505'] : [P.ctaLight, '#FFFFFF']} style={styles.addSplitCardInner}>
                       <View style={[styles.addSplitIconWrap, isDark && { backgroundColor: 'rgba(247,203,22,0.12)' }]}>
-                        <Ionicons name="add" size={26} color={isDark ? colors.primary : P.cta} />
+                        <Ionicons name="compass-outline" size={26} color={isDark ? colors.primary : P.cta} />
                       </View>
                       <View style={styles.addSplitCopy}>
-                        <Text style={[styles.addSplitTitle, { color: isDark ? '#F1F5F9' : P.ctaDeep }]}>Add Program</Text>
-                        <Text style={[styles.addSplitMeta, { color: isDark ? 'rgba(241,245,249,0.5)' : P.muted }]}>Create a new split</Text>
+                        <Text style={[styles.addSplitTitle, { color: isDark ? '#F1F5F9' : P.ctaDeep }]}>Explore Programs</Text>
+                        <Text style={[styles.addSplitMeta, { color: isDark ? 'rgba(241,245,249,0.5)' : P.muted }]}>Browse all programs</Text>
                       </View>
                     </LinearGradient>
                   </TouchableOpacity>
@@ -537,12 +537,12 @@ export default function DailyTab() {
         )}
       />
 
-      <ConfirmationModal
+      <ActionModal
         visible={deletingId !== null}
+        type="delete"
         title="Delete Workout?"
         message="This will permanently remove this session and all associated photos. Are you sure?"
         confirmText={isDeleting ? "DELETING..." : "YES, DELETE"}
-        confirmColor="#EF4444"
         onConfirm={handleDeleteWorkout}
         onCancel={() => setDeletingId(null)}
       />

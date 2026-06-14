@@ -11,7 +11,7 @@ import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
-import ConfirmationModal from '../../../components/ui/ConfirmationModal';
+import ActionModal from '../../../components/ui/ActionModal';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
 
@@ -231,12 +231,12 @@ export default function ReportsListScreen() {
         />
       )}
 
-      <ConfirmationModal
+      <ActionModal
         visible={Boolean(deleteTarget)}
+        type="delete"
         title="Delete Report?"
         message="This removes the workout analysis from your reports. Your original workout stays saved."
         confirmText={actionId === `delete-${deleteTarget?.id}` ? 'DELETING...' : 'DELETE'}
-        confirmColor="#EF4444"
         onConfirm={handleDelete}
         onCancel={() => {
           if (!actionId) setDeleteTarget(null);

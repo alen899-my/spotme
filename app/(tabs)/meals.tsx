@@ -721,9 +721,13 @@ export default function MealsScreen() {
       <View style={[styles.accCard, isDark ? { backgroundColor: colors.card, borderColor: colors.border } : { backgroundColor: '#2596BE', borderColor: '#2596BE' }, isDark && { borderWidth: 1 }]}>
         <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
           <View style={styles.cardHeaderRow}>
-            <View style={[styles.mealIconBox, { backgroundColor: isDark ? colors.inputBg : iconInfo.bg }, isDark && { borderWidth: 1, borderColor: iconInfo.color + '30' }]}>
-              <Ionicons name={iconInfo.icon as any} size={23} color={iconInfo.color} />
-            </View>
+            {item.image_url ? (
+              <Image source={{ uri: item.image_url }} style={styles.mealThumbImage} />
+            ) : (
+              <View style={[styles.mealIconBox, { backgroundColor: isDark ? colors.inputBg : iconInfo.bg }, isDark && { borderWidth: 1, borderColor: iconInfo.color + '30' }]}>
+                <Ionicons name={iconInfo.icon as any} size={23} color={iconInfo.color} />
+              </View>
+            )}
 
             <View style={styles.mealMetaInfo}>
               <Text style={[styles.mealTitleLabel, { color: isDark ? colors.text : '#FFF' }]}>{iconInfo.label}</Text>
@@ -733,14 +737,6 @@ export default function MealsScreen() {
             <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
               <Ionicons name="chevron-down" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.82)'} />
             </Animated.View>
-
-            {item.image_url ? (
-              <Image source={{ uri: item.image_url }} style={styles.mealThumbImage} />
-            ) : (
-              <View style={[styles.mealThumbImagePlaceholder, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)', borderColor: isDark ? colors.border : 'rgba(255,255,255,0.22)' }]}>
-                <Ionicons name="image-outline" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.8)'} />
-              </View>
-            )}
           </View>
 
           {!open && (
@@ -2296,7 +2292,7 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodyBold, fontSize: 11, color: '#10B981',
   },
   mealThumbImage: {
-    width: 60, height: 60, borderRadius: 16,
+    width: 80, height: 80, borderRadius: 16,
   },
   mealThumbImagePlaceholder: {
     width: 60, height: 60, borderRadius: 16, borderWidth: 1,

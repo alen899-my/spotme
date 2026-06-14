@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -272,15 +272,34 @@ function PushReminderDisplay() {
   );
 }
 
+const DISMISS_KEY = 'lastDismissedWaterReminder';
+
 function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
   const [, setTick] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
+  const [dismissedUntil, setDismissedUntil] = useState<number | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(DISMISS_KEY).then((val) => {
+      if (val) setDismissedUntil(Number(val));
+    });
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 30_000);
     return () => clearInterval(id);
   }, []);
 
+  const handleDismiss = useCallback(async () => {
+    await AsyncStorage.setItem(DISMISS_KEY, String(Date.now()));
+    setDismissed(true);
+  }, []);
+
   const nowMs = Date.now();
+
+  if (dismissed || (dismissedUntil && nowMs - dismissedUntil < interval * 60 * 1000)) {
+    return null;
+  }
 
   if (!lastLog) {
     return (
@@ -289,6 +308,9 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
         <Text style={[rb.text, { color: HYDRATION.ink }]}>
           Start your hydration journey and log your first drink.
         </Text>
+        <TouchableOpacity onPress={handleDismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={rb.dismissBtn}>
+          <Ionicons name="close" size={16} color={HYDRATION.ink} />
+        </TouchableOpacity>
       </View>
     );
   }
@@ -300,6 +322,9 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
         <Text style={[rb.text, { color: HYDRATION.ink }]}>
           Amazing. Daily hydration goal achieved.
         </Text>
+        <TouchableOpacity onPress={handleDismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={rb.dismissBtn}>
+          <Ionicons name="close" size={16} color={HYDRATION.ink} />
+        </TouchableOpacity>
       </View>
     );
   }
@@ -314,6 +339,9 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
         <Text style={[rb.text, { color: HYDRATION.white }]}>
           Next drink in <Text style={[rb.emphasis, { color: HYDRATION.white }]}>{nextIn} min</Text>. Stay consistent.
         </Text>
+        <TouchableOpacity onPress={handleDismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={rb.dismissBtn}>
+          <Ionicons name="close" size={16} color={HYDRATION.white} />
+        </TouchableOpacity>
       </View>
     );
   }
@@ -328,6 +356,9 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
       <Text style={[rb.text, { color: textColor }]}>
         {urgency ? `${elapsedMin} min since your last drink. Hydrate now!` : `Time to hydrate. It has been ${elapsedMin} min.`}
       </Text>
+      <TouchableOpacity onPress={handleDismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={rb.dismissBtn}>
+        <Ionicons name="close" size={16} color={iconColor} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -343,6 +374,13 @@ const rb = StyleSheet.create({
   },
   text: { fontFamily: FONTS.bodySemiBold, fontSize: 13, flex: 1 },
   emphasis: { fontFamily: FONTS.bodyBold, color: HYDRATION.deepBlue },
+  dismissBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
 
 export default function WaterTracker({ selectedDate }: Props) {
