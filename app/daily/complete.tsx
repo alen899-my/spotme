@@ -105,7 +105,7 @@ function BentoTile({
         <Ionicons name={icon as any} size={fs(18)} color={iconColor} />
       </View>
       <Text style={[bentoStyles.tileLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#94A3B8' }]}>{label}</Text>
-      <Text style={[bentoStyles.tileValue, { color: isDark ? '#F1F5F9' : '#0F1923', fontSize: fs(wide ? 26 : 22) }]} numberOfLines={1}>
+      <Text style={[bentoStyles.tileValue, { color: isDark ? '#F1F5F9' : '#0F1923', fontSize: fs(wide ? 26 : 20) }]}>
         {value}
       </Text>
       <Text style={[bentoStyles.tileSub, { color: isDark ? 'rgba(241,245,249,0.30)' : '#94A3B8' }]}>{sub}</Text>
@@ -664,9 +664,10 @@ export default function WorkoutCompleteScreen() {
           <Text style={[st.sectionLabel, { color: colors.text, fontSize: fs(18) }]}>Session Summary</Text>
           <View style={st.bentoGrid}>
             <BentoTile icon="time-outline" iconColor="#2596BE" label="DURATION" value={formatDuration(displayDuration)} sub="Total session" colors={colors} isDark={isDark} />
+            <BentoTile icon="stopwatch-outline" iconColor="#00C9C8" label="Active time" value={formatDuration(Math.max(0, displayDuration - displayRest))} sub="Active exercising" colors={colors} isDark={isDark} />
+            <BentoTile icon="hourglass-outline" iconColor="#F59E0B" label="REST TIME" value={formatDuration(displayRest)} sub="Recovery" colors={colors} isDark={isDark} />
             <BentoTile icon="flame-outline" iconColor="#EF4444" label="CALORIES" value={`${caloriesBurned}`} sub="Est. kcal burn" colors={colors} isDark={isDark} />
             <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${Math.round(displayVolume)} kg`} sub="Weight lifted" wide colors={colors} isDark={isDark} />
-            <BentoTile icon="hourglass-outline" iconColor="#F59E0B" label="REST TIME" value={formatDuration(displayRest)} sub="Recovery" colors={colors} isDark={isDark} />
             <BentoTile icon="layers-outline" iconColor="#8B5CF6" label="TOTAL SETS" value={`${totalSets}`} sub="Completed" colors={colors} isDark={isDark} />
             <BentoTile
               icon="fitness-outline" iconColor="#2596BE" label="EXERCISES"

@@ -492,10 +492,7 @@ export default function SettingsScreen() {
               <View style={[s.iconCircle, { backgroundColor: isDark ? colors.iconCircle : 'rgba(37,150,190,0.1)' }]}>
                 <Ionicons name={isDark ? "moon" : "sunny"} size={20} color={colors.primary} />
               </View>
-              <View>
-                <Text style={s.settingTitle}>Dark Mode</Text>
-                <Text style={s.settingSubtitle}>{isDark ? "Dark theme enabled" : "Light theme enabled"}</Text>
-              </View>
+           
             </View>
             <Switch
               value={isDark}
