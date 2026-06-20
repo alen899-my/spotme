@@ -20,7 +20,9 @@ const upload = multer({
     key: function (req, file, cb) {
       const ext = file.originalname.split('.').pop() || 'jpg';
       // Dynamically set folder based on route
-      const folder = req.originalUrl.includes('/daily') ? 'daily' : 'onboarding';
+      const folder = req.originalUrl.includes('/physique') ? 'physique'
+                   : req.originalUrl.includes('/daily') ? 'daily'
+                   : 'onboarding';
       cb(null, `spotme/${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`);
     }
   })

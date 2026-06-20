@@ -22,6 +22,7 @@ const BG_IMAGES: Record<string, any> = {
   reports:   require("../../assets/explore/reports.png"),
   calendar:  require("../../assets/explore/calender.png"),
   followers: require("../../assets/explore/following.png"),
+  physique:  require("../../assets/explore/physique.png"),
 };
 
 interface ExploreItem {
@@ -36,12 +37,13 @@ interface ExploreItem {
 }
 
 const BENTO_LAYOUT: ExploreItem[] = [
-  { id: "exercises", title: "Exercises",       subtitle: "Exercise library",       icon: "fitness-outline",         iconType: "Ionicons",               href: "/(tabs)/exercises", span: 2 },
-  { id: "weight",    title: "Weight Tracker",  subtitle: "Log body weight",        icon: "scale-outline",           iconType: "Ionicons",               href: "/(tabs)/weight",   span: 1 },
-  { id: "splits",    title: "Splits",          subtitle: "Training splits",       icon: "layers-outline",          iconType: "Ionicons",               href: "/(tabs)/splits",    span: 1 },
-  { id: "reports",   title: "Workout Reports", subtitle: "AI insights",            icon: "clipboard-text-outline",  iconType: "MaterialCommunityIcons", href: "/daily/reports",   span: 2 },
-  { id: "calendar",  title: "Calendar",        subtitle: "Workout heatmap",        icon: "calendar-outline",        iconType: "Ionicons",               href: "/calendar",        span: 1 },
-  { id: "followers", title: "Followers",       subtitle: "Followers & following",  icon: "account-group-outline",   iconType: "MaterialCommunityIcons", href: "/profile/follow/", span: 1, dynamic: true },
+  { id: "exercises", title: "Exercises",           subtitle: "Exercise library",       icon: "fitness-outline",         iconType: "Ionicons",               href: "/(tabs)/exercises",  span: 2 },
+  { id: "weight",    title: "Weight Tracker",      subtitle: "Log body weight",        icon: "scale-outline",           iconType: "Ionicons",               href: "/(tabs)/weight",    span: 1 },
+  { id: "splits",    title: "Splits",              subtitle: "Training splits",        icon: "layers-outline",          iconType: "Ionicons",               href: "/(tabs)/splits",    span: 1 },
+  { id: "reports",   title: "Workout Reports",     subtitle: "AI insights",            icon: "clipboard-text-outline",  iconType: "MaterialCommunityIcons", href: "/daily/reports",    span: 2 },
+  { id: "calendar",  title: "Calendar",            subtitle: "Workout heatmap",        icon: "calendar-outline",        iconType: "Ionicons",               href: "/calendar",         span: 1 },
+  { id: "followers", title: "Followers",           subtitle: "Followers & following",  icon: "account-group-outline",   iconType: "MaterialCommunityIcons", href: "/profile/follow/",  span: 1, dynamic: true },
+  { id: "physique",  title: "Physique Analysis",   subtitle: "AI body assessment",     icon: "body-outline",            iconType: "Ionicons",               href: "/physique",         span: 2 },
 ];
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -109,6 +111,11 @@ export default function ExploreScreen() {
         <View style={styles.row}>
           {renderCard(rows[4], CARD_W, Math.floor(CARD_W * 0.8))}
           {renderCard(rows[5], CARD_W, Math.floor(CARD_W * 0.8))}
+        </View>
+
+        {/* Row 5: Physique Analysis (full width) */}
+        <View style={styles.row}>
+          {renderCard(rows[6], CARD_W * 2 + CARD_GAP, Math.floor(CARD_W * 0.9))}
         </View>
       </View>
     </ScrollView>

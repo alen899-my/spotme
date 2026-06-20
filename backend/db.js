@@ -474,6 +474,26 @@ const initDB = async () => {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS prev_rank INT DEFAULT 0;
     `);
 
+    // ── Physique Analysis AI ─────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS physique_analyses (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        photo_url VARCHAR(500),
+        overall_score INT DEFAULT 0,
+        body_fat_estimate VARCHAR(50),
+        muscle_symmetry INT DEFAULT 0,
+        posture_score INT DEFAULT 0,
+        strengths JSONB DEFAULT '[]'::jsonb,
+        improvements JSONB DEFAULT '[]'::jsonb,
+        muscle_groups JSONB DEFAULT '{}'::jsonb,
+        coach_message TEXT,
+        status VARCHAR(20) DEFAULT 'completed',
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_physique_analyses_user ON physique_analyses (user_id, created_at DESC);`);
+
   } catch (error) {
     console.error("Database initialization failed:", error);
   }

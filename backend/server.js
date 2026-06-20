@@ -15,6 +15,7 @@ const waterRoutes = require('./routes/water');
 const leaderboardRoutes = require('./routes/leaderboard');
 const weightRoutes = require('./routes/weight');
 const notificationRoutes = require('./routes/notifications');
+const physiqueRoutes = require('./routes/physique');
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use('/api/water', waterRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/weight', weightRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/physique', physiqueRoutes);
 
 // Global error-handling middleware
 app.use((err, req, res, _next) => {
