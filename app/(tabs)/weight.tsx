@@ -8,16 +8,23 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
-import { P, scale, vs } from '../../constants/homeTheme';
+import { scale, vs } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import WeightScale from '../../components/weight/WeightScale';
 import WeightHistoryCard from '../../components/weight/WeightHistoryCard';
+import WeightChart from '../../components/weight/WeightChart';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 
-
+const RANGE_OPTIONS = [
+  { key: '7d', label: '1W' },
+  { key: '30d', label: '1M' },
+  { key: '90d', label: '3M' },
+  { key: '1y', label: '1Y' },
+  { key: 'all', label: 'ALL' },
+];
 
 export default function WeightScreen() {
   const { colors, isDark } = useTheme();
@@ -29,16 +36,18 @@ export default function WeightScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [weightValue, setWeightValue] = useState(75);
+  const [range, setRange] = useState('7d');
 
   const fetchLogs = useCallback(async () => {
     try {
       const token = await getToken();
       const res = await axios.get(`${API_URL}/weight`, {
+        params: { range },
         headers: { Authorization: `Bearer ${token}` },
       });
       setLogs(res.data);
       if (res.data.length > 0) {
-        setWeightValue(parseFloat(res.data[0].weight));
+        setWeightValue(parseFloat(res.data[res.data.length - 1].weight));
       }
     } catch (err: any) {
       console.error('Error fetching weight logs:', err);
@@ -47,9 +56,9 @@ export default function WeightScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [range]);
 
-  useFocusEffect(useCallback(() => { fetchLogs(); }, []));
+  useFocusEffect(useCallback(() => { fetchLogs(); }, [range]));
 
   const handleSave = async () => {
     setSaving(true);
@@ -58,7 +67,7 @@ export default function WeightScreen() {
       const res = await axios.post(`${API_URL}/weight`, { weight: weightValue }, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setLogs(prev => [res.data, ...prev]);
+      setLogs(prev => [...prev, res.data]);
       showToast('Weight logged! 🎯');
     } catch (err: any) {
       console.error('Error saving weight:', err);
@@ -82,8 +91,8 @@ export default function WeightScreen() {
     }
   };
 
-  const currentWeight = logs.length > 0 ? parseFloat(logs[0].weight) : null;
-  const prevWeight = logs.length > 1 ? parseFloat(logs[1].weight) : null;
+  const currentWeight = logs.length > 0 ? parseFloat(logs[logs.length - 1].weight) : null;
+  const prevWeight = logs.length > 1 ? parseFloat(logs[logs.length - 2].weight) : null;
   const delta = currentWeight !== null && prevWeight !== null
     ? currentWeight - prevWeight
     : null;
@@ -132,11 +141,41 @@ export default function WeightScreen() {
             )}
           </View>
 
+          {/* Range Pills */}
+          <View style={styles.rangeRow}>
+            {RANGE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[
+                  styles.rangePill,
+                  {
+                    backgroundColor: range === opt.key ? colors.primary : (isDark ? '#0f0f0f' : '#f0f0eb'),
+                    borderColor: range === opt.key ? colors.primary : (isDark ? '#1e1e1e' : '#e0e0d8'),
+                  },
+                ]}
+                onPress={() => setRange(opt.key)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.rangePillText,
+                    { color: range === opt.key ? '#FFF' : colors.textMuted },
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Chart */}
+          <WeightChart data={logs} range={range} />
+
           {logs.length > 0 && (
             <View style={[styles.prevWeightBanner, { backgroundColor: isDark ? '#0f0f0f' : '#f0f0eb', borderColor: isDark ? '#1e1e1e' : '#e0e0d8' }]}>
               <Ionicons name="refresh-outline" size={14} color={colors.textMuted} />
-              <Text style={[styles.prevWeightLabel, { color: colors.textMuted }]}>Previous: </Text>
-              <Text style={[styles.prevWeightValue, { color: colors.text }]}>{parseFloat(logs[0].weight).toFixed(1)}</Text>
+              <Text style={[styles.prevWeightLabel, { color: colors.textMuted }]}>Latest: </Text>
+              <Text style={[styles.prevWeightValue, { color: colors.text }]}>{currentWeight?.toFixed(1)}</Text>
               <Text style={[styles.prevWeightUnit, { color: colors.textMuted }]}> kg</Text>
             </View>
           )}
@@ -182,8 +221,23 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     paddingTop: vs(8),
-    gap: vs(10),
+    gap: vs(12),
     marginBottom: vs(4),
+  },
+  rangeRow: {
+    flexDirection: 'row',
+    gap: scale(6),
+  },
+  rangePill: {
+    flex: 1,
+    paddingVertical: vs(8),
+    borderRadius: scale(10),
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  rangePillText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(12),
   },
   prevWeightBanner: {
     flexDirection: 'row',

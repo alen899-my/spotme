@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import ActionModal from "../../components/ui/ActionModal";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import DOBPicker from "../../components/ui/DOBPicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -66,7 +66,64 @@ export default function MyDetailsScreen() {
     key: string;
   }>({ visible: false, title: "", options: [], key: "" });
 
+  // Unit Toggle State
+  const [units, setUnits] = useState({
+    height: "cm", weight: "kg", neck: "cm", waist: "cm",
+    hip: "cm", chest: "cm", arm: "cm", thigh: "cm",
+  });
+  const updateUnit = (field: keyof typeof units, unit: string) =>
+    setUnits(prev => ({ ...prev, [field]: unit }));
 
+  const [editingBodyFat, setEditingBodyFat] = useState(false);
+
+  // Parse "175 cm" → "175"
+  const parseValue = (str: any) => {
+    if (!str) return "";
+    return String(str).trim().split(" ")[0] || "";
+  };
+  // Parse "175 cm" → "cm"
+  const parseUnit = (str: any, fallback = "cm") => {
+    if (!str) return fallback;
+    const parts = String(str).trim().split(" ");
+    return parts[1] || fallback;
+  };
+
+  // Body Fat calculation (Navy formula)
+  const calcBodyFat = useMemo(() => {
+    if (!formData.gender) return null;
+    const toCm = (val: any) => {
+      if (!val) return null;
+      const p = String(val).trim().split(" ");
+      const num = parseFloat(p[0]);
+      const u = p[1] || "cm";
+      if (isNaN(num)) return null;
+      return u === "in" ? num * 2.54 : num;
+    };
+    const h = toCm(formData.height);
+    const n = toCm(formData.neck);
+    const w = toCm(formData.waist);
+    if (h === null || n === null || w === null) return null;
+    const waistMinusNeck = w - n;
+    if (waistMinusNeck <= 0) return null;
+    if (formData.gender === "Male") {
+      return 495 / (1.0324 - 0.19077 * Math.log10(waistMinusNeck) + 0.15456 * Math.log10(h)) - 450;
+    } else {
+      const hp = toCm(formData.hip);
+      if (hp === null) return null;
+      const sum = w + hp - n;
+      if (sum <= 0) return null;
+      return 495 / (1.29579 - 0.35004 * Math.log10(sum) + 0.22100 * Math.log10(h)) - 450;
+    }
+  }, [formData.gender, formData.height, formData.neck, formData.waist, formData.hip]);
+
+  useEffect(() => {
+    if (editingBodyFat) return;
+    const bf = calcBodyFat;
+    if (bf !== null) {
+      const bfStr = bf.toFixed(1);
+      setFormData((prev: any) => ({ ...prev, body_fat: bfStr }));
+    }
+  }, [calcBodyFat, editingBodyFat]);
 
   useEffect(() => {
     fetchUserData();
@@ -84,6 +141,23 @@ export default function MyDetailsScreen() {
       });
       setUser(res.data);
       setFormData(res.data);
+      // Parse units from stored values (e.g. "175 cm")
+      const u = res.data;
+      const pu = (val: any, fallback: string) => {
+        if (!val) return fallback;
+        const p = String(val).trim().split(" ");
+        return p[1] || fallback;
+      };
+      setUnits({
+        height: pu(u.height, "cm"),
+        weight: pu(u.weight, "kg"),
+        neck: pu(u.neck, "cm"),
+        waist: pu(u.waist, "cm"),
+        hip: pu(u.hip, "cm"),
+        chest: pu(u.chest, "cm"),
+        arm: pu(u.arm, "cm"),
+        thigh: pu(u.thigh, "cm"),
+      });
     } catch (err) {
       console.error("Error fetching user details:", err);
       setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Failed to load profile details' });
@@ -175,6 +249,7 @@ export default function MyDetailsScreen() {
           side_photo: null,
         });
         setIsEditing(false);
+        setEditingBodyFat(false);
         setAlertModal({ visible: true, type: 'success', title: 'Success', message: 'Profile updated successfully' });
       }
     } catch (err) {
@@ -182,18 +257,6 @@ export default function MyDetailsScreen() {
       setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Failed to update profile. Please try again.' });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === "ios");
-    if (selectedDate) {
-      const dobStr = selectedDate.toISOString().split('T')[0];
-      setFormData({ 
-        ...formData, 
-        dob: dobStr,
-        age: calculateAge(dobStr)
-      });
     }
   };
 
@@ -235,10 +298,10 @@ export default function MyDetailsScreen() {
 
   const BadgeRow = ({ label, value, icon }: { label: string; value: any; icon: any }) => (
     <View style={[vStyles.badgeRow, { borderBottomColor: colors.border }]}>
-      <Text style={[vStyles.badgeLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[vStyles.badgeLabel, { color: colors.textMuted }]} numberOfLines={1}>{label}</Text>
       {value ? (
         <View style={[vStyles.badge, { backgroundColor: colors.primary }]}>
-          <Text style={vStyles.badgeText}>{value}</Text>
+          <Text style={vStyles.badgeText} numberOfLines={1}>{value}</Text>
         </View>
       ) : <Text style={[vStyles.fieldValue, { color: colors.text }]}>—</Text>}
     </View>
@@ -276,7 +339,7 @@ export default function MyDetailsScreen() {
 
       if (type === 'dropdown') {
         return (
-          <TouchableOpacity activeOpacity={0.7} onPress={() => openDropdown(label, options, key)} style={{ marginBottom: 12 }}>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => openDropdown(label, options, key)} style={{ marginBottom: 16 }}>
             <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>{label}</Text>
             <View pointerEvents="none" style={[styles.dietInputRow, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
               <IconComponent name={icon} size={18} color={colors.primary} style={{ marginRight: 10 }} />
@@ -294,7 +357,7 @@ export default function MyDetailsScreen() {
       }
 
       return (
-        <View style={{ marginBottom: 12 }}>
+        <View style={{ marginBottom: 16 }}>
           <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>{label}</Text>
           <View style={[styles.dietInputRow, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
             <IconComponent name={icon} size={18} color={colors.primary} style={{ marginRight: 10 }} />
@@ -314,6 +377,48 @@ export default function MyDetailsScreen() {
     return null; // view mode handled by dedicated components
   };
 
+  const renderUnitField = (label: string, value: any, key: string, icon: any, unitOptions: string[]) => {
+    if (!isEditing) return null;
+    const numVal = parseValue(formData[key]);
+    const currentUnit = parseUnit(formData[key], unitOptions[0]);
+    return (
+      <View style={{ marginBottom: 16 }}>
+        <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>{label}</Text>
+        <View style={[styles.dietInputRow, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+          <Ionicons name={icon} size={18} color={colors.primary} style={{ marginRight: 10 }} />
+          <TextInput
+            style={[styles.dietInputField, { color: colors.text }]}
+            value={numVal}
+            onChangeText={(text) => setFormData({ ...formData, [key]: `${text} ${currentUnit}` })}
+            placeholder={`Enter ${label.toLowerCase()}`}
+            placeholderTextColor={colors.textDim}
+            keyboardType="numeric"
+          />
+          <UnitToggle options={unitOptions} value={currentUnit} onChange={(u) => {
+            setFormData({ ...formData, [key]: `${numVal} ${u}` });
+            updateUnit(key as any, u);
+          }} />
+        </View>
+      </View>
+    );
+  };
+
+  function UnitToggle({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
+    return (
+      <View style={[subStyles.unitToggle, { borderColor: colors.border }]}>
+        {options.map(opt => (
+          <TouchableOpacity
+            key={opt}
+            style={[subStyles.unitBtn, value === opt && { backgroundColor: colors.primary }]}
+            onPress={() => onChange(opt)}
+          >
+            <Text style={[subStyles.unitBtnText, { color: value === opt ? "#FFF" : colors.textMuted }]}>{opt}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  }
+
   if (loading) {
     return (
       <View style={[styles.centered, { flex: 1, backgroundColor: colors.bg }]}>
@@ -323,11 +428,11 @@ export default function MyDetailsScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: isDark ? colors.bg : colors.primary }}>
       <View style={[
         styles.header,
         {
-          backgroundColor: isDark ? colors.bg : colors.primary,
+          backgroundColor: 'transparent',
           paddingTop: Math.max(insets.top, 12),
           borderBottomWidth: isDark ? 1 : 0,
           borderBottomColor: colors.border,
@@ -366,11 +471,12 @@ export default function MyDetailsScreen() {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
-        <ScrollView 
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
+        >
+          <ScrollView 
           contentContainerStyle={styles.scrollContent} 
           showsVerticalScrollIndicator={false}
         >
@@ -382,8 +488,8 @@ export default function MyDetailsScreen() {
                 {renderInfoRow("Full Name", formData.full_name, "full_name", "person-outline")}
                 {renderInfoRow("Email Address", formData.email, "email", "mail-outline")}
                 {renderInfoRow("Phone Number", formData.phone_number, "phone_number", "call-outline")}
-                {renderInfoRow("Gender", formData.gender, "gender", "transgender-outline", 'dropdown', ["Male", "Female", "Other", "Prefer not to say"])}
-                <View style={{ marginBottom: 12 }}>
+                {renderInfoRow("Gender", formData.gender, "gender", "transgender-outline", 'dropdown', ["Male", "Female"])}
+                <View style={{ marginBottom: 16 }}>
                   <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>Date of Birth</Text>
                   <TouchableOpacity activeOpacity={1} onPress={() => {
                     if (Platform.OS === "web") {
@@ -403,7 +509,18 @@ export default function MyDetailsScreen() {
                     </View>
                   </TouchableOpacity>
                   {Platform.OS === "web" && (<input id="profile-web-date-picker" type="date" style={{ position: "absolute", opacity: 0, width: 0, height: 0, pointerEvents: "none" }} onChange={(e) => { const v = e.target.value; if (v) setFormData({ ...formData, dob: v, age: calculateAge(v) }); }} />)}
-                  {Platform.OS !== "web" && showDatePicker && (<DateTimePicker value={formData.dob ? new Date(formData.dob) : new Date()} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={onDateChange} maximumDate={new Date()} />)}
+                  {Platform.OS !== "web" && (
+                    <DOBPicker
+                      visible={showDatePicker}
+                      selectedDate={formData.dob ? new Date(formData.dob) : new Date(new Date().getFullYear() - 18, 0, 1)}
+                      onSelect={(date) => {
+                        const dobStr = date.toISOString().split("T")[0];
+                        setFormData({ ...formData, dob: dobStr, age: calculateAge(dobStr) });
+                        setShowDatePicker(false);
+                      }}
+                      onClose={() => setShowDatePicker(false)}
+                    />
+                  )}
                 </View>
               </View>
             </View>
@@ -425,8 +542,44 @@ export default function MyDetailsScreen() {
             <View style={styles.section}>
               <SectionHeader title="Physical Metrics" colors={colors} />
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Age", formData.age, "age", "calendar-clear-outline")}</View><View style={styles.gridItem}>{renderInfoRow("Body Fat %", formData.body_fat, "body_fat", "water-outline")}</View></View>
-                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Height", formData.height, "height", "resize-outline")}</View><View style={styles.gridItem}>{renderInfoRow("Weight", formData.weight, "weight", "speedometer-outline")}</View></View>
+                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Age", formData.age, "age", "calendar-clear-outline")}</View><View style={styles.gridItem} /></View>
+                {renderUnitField("Height", formData.height, "height", "resize-outline", ["cm", "in"])}
+                {renderUnitField("Weight", formData.weight, "weight", "speedometer-outline", ["kg", "lbs"])}
+                {/* Body Fat Auto-Calculation */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>Body Fat</Text>
+                  {formData.neck && formData.waist && (formData.hip || formData.gender === "Male") && !editingBodyFat && calcBodyFat !== null ? (
+                    <View style={[subStyles.bodyFatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <View style={subStyles.bodyFatRow}>
+                        <Text style={[subStyles.bodyFatValue, { color: colors.primary }]}>
+                          {calcBodyFat.toFixed(1)}%
+                        </Text>
+                        <Text style={[subStyles.bodyFatLabel, { color: colors.textMuted }]}>Estimated Body Fat</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => setEditingBodyFat(true)} style={subStyles.bodyFatEditBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="create-outline" size={14} color={colors.textMuted} />
+                        <Text style={[subStyles.bodyFatEditText, { color: colors.textMuted }]}>Edit</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={[styles.dietInputRow, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                      <Ionicons name="water-outline" size={18} color={colors.primary} style={{ marginRight: 10 }} />
+                      <TextInput
+                        style={[styles.dietInputField, { color: colors.text }]}
+                        value={parseValue(formData.body_fat)}
+                        onChangeText={(text) => setFormData({ ...formData, body_fat: text })}
+                        placeholder={calcBodyFat !== null ? `${calcBodyFat.toFixed(1)} (calculated)` : "e.g. 18"}
+                        placeholderTextColor={colors.textDim}
+                        keyboardType="numeric"
+                      />
+                      {editingBodyFat && (
+                        <TouchableOpacity onPress={() => setEditingBodyFat(false)} style={{ paddingHorizontal: 8 }}>
+                          <Text style={[subStyles.bodyFatEditText, { color: colors.primary }]}>Auto</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
           ) : (
@@ -446,7 +599,7 @@ export default function MyDetailsScreen() {
             <View style={styles.section}>
               <SectionHeader title="Fitness Strategy" colors={colors} />
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                {renderInfoRow("Fitness Goal", formData.fitness_goal, "fitness_goal", "target", "dropdown", ["Lose Weight", "Build Muscle", "Improve Endurance", "Maintain Health", "Rehab"], 'MaterialCommunityIcons')}
+                {renderInfoRow("Fitness Goal", formData.fitness_goal, "fitness_goal", "target", "dropdown", ["Lose Weight", "Build Muscle", "Improve Endurance", "Maintain Health", "Rehab", "Gain Weight"], 'MaterialCommunityIcons')}
                 {renderInfoRow("Experience Level", formData.experience_level, "experience_level", "trophy-outline", "dropdown", ["Beginner (0-1 years)", "Intermediate (1-3 years)", "Advanced (3+ years)"])}
                 {renderInfoRow("Activity Level", formData.activity_level, "activity_level", "flash-outline", "dropdown", ["Sedentary", "Lightly Active", "Moderately Active", "Very Active"])}
               </View>
@@ -467,9 +620,12 @@ export default function MyDetailsScreen() {
             <View style={styles.section}>
               <SectionHeader title="Body Stats" colors={colors} />
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Neck", formData.neck, "neck", "bandage-outline")}</View><View style={styles.gridItem}>{renderInfoRow("Chest", formData.chest, "chest", "shirt-outline")}</View></View>
-                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Waist", formData.waist, "waist", "body-outline")}</View><View style={styles.gridItem}>{renderInfoRow("Hip", formData.hip, "hip", "body-outline")}</View></View>
-                <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Arm", formData.arm, "arm", "fitness-outline")}</View><View style={styles.gridItem}>{renderInfoRow("Thigh", formData.thigh, "thigh", "fitness-outline")}</View></View>
+                {renderUnitField("Neck", formData.neck, "neck", "bandage-outline", ["cm", "in"])}
+                {renderUnitField("Chest", formData.chest, "chest", "shirt-outline", ["cm", "in"])}
+                {renderUnitField("Waist", formData.waist, "waist", "body-outline", ["cm", "in"])}
+                {renderUnitField("Hip", formData.hip, "hip", "body-outline", ["cm", "in"])}
+                {renderUnitField("Arm", formData.arm, "arm", "fitness-outline", ["cm", "in"])}
+                {renderUnitField("Thigh", formData.thigh, "thigh", "fitness-outline", ["cm", "in"])}
               </View>
             </View>
           ) : (
@@ -565,6 +721,7 @@ export default function MyDetailsScreen() {
           {isEditing && (
              <TouchableOpacity style={styles.cancelBtn} onPress={() => {
                setIsEditing(false);
+               setEditingBodyFat(false);
                setNewPhotos({
                  profile_pic: null,
                  front_photo: null,
@@ -572,12 +729,29 @@ export default function MyDetailsScreen() {
                  side_photo: null,
                });
                setFormData(user);
+               // Re-parse units from original user data
+               const pu = (val: any, fb: string) => {
+                 if (!val) return fb;
+                 const p = String(val).trim().split(" ");
+                 return p[1] || fb;
+               };
+               setUnits({
+                 height: pu(user?.height, "cm"),
+                 weight: pu(user?.weight, "kg"),
+                 neck: pu(user?.neck, "cm"),
+                 waist: pu(user?.waist, "cm"),
+                 hip: pu(user?.hip, "cm"),
+                 chest: pu(user?.chest, "cm"),
+                 arm: pu(user?.arm, "cm"),
+                 thigh: pu(user?.thigh, "cm"),
+               });
              }}>
                <Text style={[styles.cancelBtnText, { color: colors.textDim }]}>Discard Changes</Text>
              </TouchableOpacity>
           )}
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
 
       {/* Dropdown Modal */}
       <Modal transparent animationType="fade" visible={modalConfig.visible}>
@@ -655,23 +829,23 @@ const styles = StyleSheet.create({
     backgroundColor: "#2596BE",
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 60,
+    padding: 20,
+    paddingBottom: 80,
     flexGrow: 1,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 36,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   sectionTitle: {
     fontFamily: FONTS.heading,
     fontSize: 18,
     color: '#666666',
-    marginRight: 12,
+    marginRight: 14,
     textTransform: 'uppercase',
   },
   sectionLine: {
@@ -682,7 +856,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 8,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#EEEEEE',
     shadowColor: "#000",
@@ -725,7 +899,7 @@ const styles = StyleSheet.create({
   },
   grid: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   gridItem: {
     flex: 1,
@@ -744,7 +918,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     paddingHorizontal: 14,
-    paddingVertical: 13,
+    paddingVertical: 14,
   },
   dietInputField: {
     flex: 1,
@@ -754,7 +928,7 @@ const styles = StyleSheet.create({
   },
 
   photoScroll: {
-    marginTop: 8,
+    marginTop: 12,
   },
   photoItem: {
     marginRight: 16,
@@ -880,8 +1054,8 @@ const styles = StyleSheet.create({
 
 const vStyles = StyleSheet.create({
   field: {
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
   },
   fieldLabel: {
@@ -898,11 +1072,11 @@ const vStyles = StyleSheet.create({
   statGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 14,
   },
   statTile: {
-    width: (SW - 32 - 12) / 2,
-    padding: 16,
+    width: (SW - 40 - 14) / 2,
+    padding: 18,
     borderRadius: 20,
     borderWidth: 1,
     alignItems: 'center',
@@ -921,21 +1095,24 @@ const vStyles = StyleSheet.create({
   },
   badgeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
+    gap: 8,
   },
   badgeLabel: {
     fontFamily: FONTS.body,
     fontSize: 14,
+    flex: 1,
+    flexShrink: 1,
   },
   badge: {
     backgroundColor: '#2596BE',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
+    flexShrink: 0,
   },
   badgeText: {
     fontFamily: FONTS.bodyBold,
@@ -945,11 +1122,11 @@ const vStyles = StyleSheet.create({
   measureGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
   measureChip: {
-    width: (SW - 32 - 16) / 3,
-    paddingVertical: 12,
+    width: (SW - 40 - 20) / 3,
+    paddingVertical: 14,
     alignItems: 'center',
     borderRadius: 16,
     borderWidth: 1,
@@ -967,8 +1144,8 @@ const vStyles = StyleSheet.create({
   healthRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
   },
   dot: {
@@ -976,6 +1153,43 @@ const vStyles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginRight: 16,
+  },
+});
+
+const subStyles = StyleSheet.create({
+  unitToggle: { flexDirection: "row", borderRadius: 8, overflow: "hidden", borderWidth: 1 },
+  unitBtn: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "transparent" },
+  unitBtnText: { fontFamily: FONTS.bodySemiBold, fontSize: 12 },
+  bodyFatCard: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  bodyFatRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+  },
+  bodyFatValue: {
+    fontFamily: FONTS.heading,
+    fontSize: 22,
+  },
+  bodyFatLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 13,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  bodyFatEditBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  bodyFatEditText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
   },
 });
 

@@ -277,11 +277,11 @@ const DISMISS_KEY = 'lastDismissedWaterReminder';
 function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
   const [, setTick] = useState(0);
   const [dismissed, setDismissed] = useState(false);
-  const [dismissedUntil, setDismissedUntil] = useState<number | null>(null);
+  const [dismissedUntil, setDismissedUntil] = useState<number | null | 'loading'>('loading');
 
   useEffect(() => {
     AsyncStorage.getItem(DISMISS_KEY).then((val) => {
-      if (val) setDismissedUntil(Number(val));
+      setDismissedUntil(val ? Number(val) : null);
     });
   }, []);
 
@@ -297,6 +297,7 @@ function ReminderBanner({ lastLog, interval, totalWater, waterTarget }: any) {
 
   const nowMs = Date.now();
 
+  if (dismissedUntil === 'loading') return null;
   if (dismissed || (dismissedUntil && nowMs - dismissedUntil < interval * 60 * 1000)) {
     return null;
   }

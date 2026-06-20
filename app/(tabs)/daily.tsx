@@ -460,7 +460,7 @@ export default function DailyTab() {
 
             {/* Date Picker */}
             <View style={{ marginBottom: 20 }}>
-              <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" />
+              <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" backgroundImage={require('../../assets/coach/workoutlog.jpg')} />
             </View>
 
             {/* Workouts for selected date */}

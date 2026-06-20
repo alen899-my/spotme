@@ -119,7 +119,7 @@ export default function MiniCalendar() {
       <View style={styles.daysRow}>
         {DAYS.map((d, i) => (
           <View key={i} style={{ flex: 1, alignItems: "center" }}>
-            <Text style={[styles.dayHead, { color: "rgba(255,255,255,0.45)" }]}>{d}</Text>
+            <Text style={[styles.dayHead, { color: "rgba(255,255,255,0.70)" }]}>{d}</Text>
           </View>
         ))}
       </View>
@@ -152,9 +152,7 @@ export default function MiniCalendar() {
                       <Ionicons name="checkmark" size={10} color="#FFFFFF" />
                     </View>
                   ) : inactivePast ? (
-                    <View style={styles.crossCircle}>
-                      <Ionicons name="close" size={9} color="#EF4444" />
-                    </View>
+                    <Ionicons name="close" size={10} color="#EF4444" style={styles.crossIcon} />
                   ) : null}
                   <Text
                     style={[
@@ -262,12 +260,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.35)",
   },
   cellActive: {
-    backgroundColor: "rgba(16,185,129,0.50)",
+    backgroundColor: "#065F46",
     borderWidth: 1,
-    borderColor: "rgba(16,185,129,0.55)",
+    borderColor: "#059669",
   },
   cellInactive: {
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "transparent",
   },
   checkCircle: {
     position: "absolute",
@@ -281,16 +279,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 1,
   },
-  crossCircle: {
+  crossIcon: {
     position: "absolute",
     top: 1,
     right: 1,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "rgba(239,68,68,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
     zIndex: 1,
   },
   dayNum: {

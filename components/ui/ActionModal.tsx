@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -29,39 +30,6 @@ interface ActionModalProps {
   loading?: boolean;
 }
 
-const TYPE_CONFIG = {
-  confirm: {
-    icon: 'help-circle-outline' as const,
-    color: '#3B82F6',
-    gradient: ['#3B82F6', '#2563EB'] as [string, string],
-    defaultConfirm: 'CONFIRM',
-  },
-  delete: {
-    icon: 'trash-outline' as const,
-    color: '#EF4444',
-    gradient: ['#EF4444', '#DC2626'] as [string, string],
-    defaultConfirm: 'DELETE',
-  },
-  info: {
-    icon: 'information-circle-outline' as const,
-    color: '#3B82F6',
-    gradient: ['#3B82F6', '#2563EB'] as [string, string],
-    defaultConfirm: 'OK',
-  },
-  success: {
-    icon: 'checkmark-circle-outline' as const,
-    color: '#10B981',
-    gradient: ['#10B981', '#059669'] as [string, string],
-    defaultConfirm: 'GOT IT',
-  },
-  error: {
-    icon: 'alert-circle-outline' as const,
-    color: '#EF4444',
-    gradient: ['#EF4444', '#DC2626'] as [string, string],
-    defaultConfirm: 'OK',
-  },
-};
-
 export default function ActionModal({
   visible,
   type = 'confirm',
@@ -73,10 +41,47 @@ export default function ActionModal({
   loading = false,
 }: ActionModalProps) {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const config = TYPE_CONFIG[type];
+
   const isSingle = type === 'info' || type === 'success' || type === 'error';
+
+  // Dynamic layout colors mapped to our theme system for premium aesthetics
+  const TYPE_CONFIG = {
+    confirm: {
+      icon: 'help-circle-outline' as const,
+      color: colors.primary || '#2596BE',
+      gradient: [colors.primary || '#2596BE', '#1a6e8a'] as [string, string],
+      defaultConfirm: 'CONFIRM',
+    },
+    delete: {
+      icon: 'trash-outline' as const,
+      color: '#FF4D4D',
+      gradient: ['#FF4D4D', '#cc2222'] as [string, string],
+      defaultConfirm: 'DELETE',
+    },
+    info: {
+      icon: 'information-circle-outline' as const,
+      color: colors.primary || '#2596BE',
+      gradient: [colors.primary || '#2596BE', '#1a6e8a'] as [string, string],
+      defaultConfirm: 'OK',
+    },
+    success: {
+      icon: 'checkmark-circle-outline' as const,
+      color: '#10B981',
+      gradient: ['#10B981', '#059669'] as [string, string],
+      defaultConfirm: 'GOT IT',
+    },
+    error: {
+      icon: 'alert-circle-outline' as const,
+      color: '#FF4D4D',
+      gradient: ['#FF4D4D', '#cc2222'] as [string, string],
+      defaultConfirm: 'OK',
+    },
+  };
+
+  const config = TYPE_CONFIG[type];
   const finalConfirmText = confirmText || config.defaultConfirm;
 
   useEffect(() => {
@@ -130,8 +135,11 @@ export default function ActionModal({
           style={[
             styles.sheet,
             {
-              backgroundColor: isDark ? '#1C1C1E' : '#FFF',
+              backgroundColor: colors.card,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
               transform: [{ translateY: slideAnim }],
+              paddingBottom: Math.max(insets.bottom, 24) + 16, // Raised spacing to clear navigation bars safely
             },
           ]}
         >
@@ -176,7 +184,7 @@ export default function ActionModal({
                   styles.btn,
                   styles.cancelBtn,
                   {
-                    backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
+                    backgroundColor: colors.inputBg,
                   },
                 ]}
                 onPress={onCancel}
@@ -186,7 +194,7 @@ export default function ActionModal({
                 <Text
                   style={[
                     styles.btnText,
-                    { color: colors.text },
+                    { color: colors.textMuted },
                   ]}
                 >
                   CANCEL
@@ -209,15 +217,9 @@ export default function ActionModal({
                   isSingle ? styles.fullBtn : styles.halfBtn,
                 ]}
               >
-                {loading ? (
-                  <Text style={[styles.btnText, { color: '#FFF' }]}>
-                    {finalConfirmText}
-                  </Text>
-                ) : (
-                  <Text style={[styles.btnText, { color: '#FFF' }]}>
-                    {finalConfirmText}
-                  </Text>
-                )}
+                <Text style={[styles.btnText, { color: '#FFF' }]}>
+                  {finalConfirmText}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -240,7 +242,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     paddingTop: 12,
     alignItems: 'center',
   },
@@ -260,7 +261,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FONTS.heading,
-    fontSize: 20,
+    fontSize: 22,
     textAlign: 'center',
     marginBottom: 8,
   },

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Modal, Pressable,
+  TouchableOpacity, Modal, Pressable, ImageBackground,
 } from 'react-native';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -12,6 +12,7 @@ interface DatePickerProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   variant?: 'default' | 'nutrition';
+  backgroundImage?: any;
 }
 
 const DAYS_SHOWN = 7;
@@ -218,7 +219,7 @@ const cal = StyleSheet.create({
 });
 
 // ── Main DatePicker ────────────────────────────────────────────────────────────
-export default function DatePicker({ selectedDate, onSelectDate, variant = 'default' }: DatePickerProps) {
+export default function DatePicker({ selectedDate, onSelectDate, variant = 'default', backgroundImage }: DatePickerProps) {
   const { colors, isDark } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const [showCal, setShowCal] = useState(false);
@@ -291,20 +292,20 @@ export default function DatePicker({ selectedDate, onSelectDate, variant = 'defa
   // Check if selected date is in the visible 7-day strip
   const inStrip = dates.some((d) => isSameDay(d, selectedDate));
 
-  return (
-    <View
-      style={[
-        styles.wrapper,
-        isNutrition && [
-          styles.nutritionWrapper,
-          {
-            backgroundColor: palette.cardBg,
-            borderColor: palette.cardBorder,
-            shadowColor: palette.shadow,
-          },
-        ],
-      ]}
-    >
+  const wrapperStyle = [
+    styles.wrapper,
+    isNutrition && [
+      styles.nutritionWrapper,
+      {
+        backgroundColor: backgroundImage ? 'transparent' : palette.cardBg,
+        borderColor: palette.cardBorder,
+        shadowColor: palette.shadow,
+      },
+    ],
+  ];
+
+  const content = (
+    <>
       {isNutrition && <Text style={[styles.nutritionTodayLabel, { color: palette.text }]}>{todayLabel}</Text>}
       {/* Month + selected date label row */}
       <View style={[styles.labelRow, isNutrition && styles.nutritionLabelRow]}>
@@ -394,6 +395,18 @@ export default function DatePicker({ selectedDate, onSelectDate, variant = 'defa
         onSelect={onSelectDate}
         variant={variant}
       />
+    </>
+  );
+
+  return backgroundImage ? (
+    <View style={wrapperStyle}>
+      <ImageBackground source={backgroundImage} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 0 }]} />
+      <View style={{ zIndex: 1 }}>{content}</View>
+    </View>
+  ) : (
+    <View style={wrapperStyle}>
+      {content}
     </View>
   );
 }

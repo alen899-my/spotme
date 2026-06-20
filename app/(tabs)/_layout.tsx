@@ -19,8 +19,8 @@ const INK = "#04282B";
 
 const TABS = [
   { name: "index",       icon: "home",          label: "Home" },
-  { name: "exercises",   icon: "fitness",       label: "Exercises" },
   { name: "meals",       icon: "restaurant",     label: "Meals" },
+  { name: "explore",     icon: "compass",        label: "Explore" },
   { name: "daily",       icon: "calendar",       label: "Workouts" },
   { name: "leaderboard", icon: "trophy",         label: "Leaderboard" },
 ] as const;
@@ -147,10 +147,11 @@ export default function TabsLayout() {
         />
         <Tabs screenOptions={{ headerShown: false }} tabBar={() => null}>
           <Tabs.Screen name="index" />
-          <Tabs.Screen name="exercises" />
           <Tabs.Screen name="meals" />
+          <Tabs.Screen name="explore" />
           <Tabs.Screen name="daily" />
           <Tabs.Screen name="leaderboard" />
+          <Tabs.Screen name="exercises" />
           <Tabs.Screen name="splits" />
           <Tabs.Screen name="weight" />
           <Tabs.Screen name="workout" />

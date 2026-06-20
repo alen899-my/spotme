@@ -194,6 +194,7 @@ export default function CalendarScreen() {
           <WorkoutCalendarHeatmap
             history={history}
             accentColor={activeSlug ? "#FF4B4B" : "#2596BE"}
+            activeColor={activeSlug ? undefined : "#065F46"}
             title={activeSlug ? (parts.find(p => p.slug === activeSlug)?.label || "") : "All Workouts"}
             controlledYear={viewYear}
             onViewChange={(y) => setViewYear(y)}

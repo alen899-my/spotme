@@ -74,14 +74,12 @@ interface ProfileSidebarProps {
 }
 
 const MENU_ITEMS = [
-  { id: "splits",    title: "Splits",          subtitle: "Training splits & programs", icon: "layers-outline",          iconType: "Ionicons",               href: "/(tabs)/splits",    accent: false },
   { id: "details",   title: "Profile Details", subtitle: "Personal stats & data",      icon: "account-details-outline", iconType: "MaterialCommunityIcons", href: "/profile/details",  accent: false },
-  { id: "weight",    title: "Weight Tracker",  subtitle: "Log & track body weight",    icon: "scale-outline",           iconType: "Ionicons",               href: "/(tabs)/weight",   accent: false },
-  { id: "reports",   title: "Workout Reports", subtitle: "AI analysis & insights",    icon: "clipboard-text-outline",  iconType: "MaterialCommunityIcons", href: "/daily/reports",   accent: false },
-  { id: "followers", title: "Followers",       subtitle: "Followers & following",       icon: "account-group-outline",   iconType: "MaterialCommunityIcons", href: "/profile/follow/",  accent: false },
-  { id: "calendar",  title: "Calendar",        subtitle: "Workout history heatmap",    icon: "calendar-outline",        iconType: "Ionicons",               href: "/calendar",        accent: false },
   { id: "settings",  title: "Settings",        subtitle: "Preferences & theme",        icon: "settings-outline",        iconType: "Ionicons",               href: "/profile/settings", accent: false },
+  { id: "privacy",   title: "Privacy Policy",  subtitle: "Your data & privacy rights", icon: "shield-checkmark-outline",iconType: "Ionicons",               href: "/profile/privacy",  accent: false },
+  { id: "terms",     title: "Terms & Conditions", subtitle: "Terms of service & rules",  icon: "document-text-outline",    iconType: "Ionicons",               href: "/profile/terms",    accent: false },
 ];
+
 
 // ─── Animated menu row ────────────────────────────────────────────────────────
 function MenuItem({

@@ -187,6 +187,7 @@ export default function ProfileScreen() {
               <InfoRow label="Medication" value={u.medication} colors={colors} />
               <InfoRow label="Medical Issues" value={u.medical_conditions} colors={colors} />
               <InfoRow label="Allergies" value={u.allergies} colors={colors} />
+              <InfoRow label="Food Allergies" value={u.food_allergies} colors={colors} />
             </View>
           </View>
 

@@ -1482,7 +1482,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               <View>
                 {renderHeaderBar()}
                 <View style={styles.trackerHeaderContent}>
-                  <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" />
+                  <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" backgroundImage={require('../../assets/coach/foodlog.jpg')} />
 
                   <NutritionMeter
                     caloriesConsumed={calsConsumed}
@@ -1549,7 +1549,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         >
           {renderHeaderBar()}
           <View style={styles.trackerHeaderContent}>
-            <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" />
+            <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" backgroundImage={require('../../assets/coach/drink.jpg')} />
             <WaterTracker selectedDate={selectedDate} />
           </View>
         </ScrollView>
