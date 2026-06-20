@@ -206,6 +206,33 @@ export default function CalendarScreen() {
           />
         </ImageBackground>
 
+        {/* ── Rest & Leave Legend ── */}
+        <View style={[styles.legendCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.legendTitle, { color: colors.text }]}>Rest & Leave Markings</Text>
+          <View style={styles.legendGrid}>
+            {[
+              { letter: 'F', label: 'Fatigue', desc: 'Streak preserved', color: '#3B82F6' },
+              { letter: 'S', label: 'Sick Day', desc: 'Streak reset', color: '#F59E0B' },
+              { letter: 'I', label: 'Injury', desc: 'Streak reset', color: '#EF4444' },
+              { letter: 'A', label: 'After Workout', desc: 'Streak reset', color: '#14B8A6' },
+              { letter: 'L', label: 'Late / Busy', desc: 'Streak reset', color: '#8B5CF6' },
+              { letter: 'O', label: 'Other', desc: 'Streak reset', color: '#6B7280' },
+            ].map((item) => (
+              <View key={item.letter} style={styles.legendGridItem}>
+                <View style={[styles.legendBadge, { backgroundColor: item.color }]}>
+                  <Text style={styles.legendBadgeText}>{item.letter}</Text>
+                </View>
+                <View style={styles.legendItemTextWrap}>
+                  <Text style={[styles.legendItemLabel, { color: colors.text }]}>{item.label}</Text>
+                  <Text style={[styles.legendItemSub, { color: item.letter === 'F' ? colors.success : colors.textMuted }]}>
+                    {item.desc}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
         {!activeSlug && (
           <View style={styles.summary}>
             <Text style={[styles.summaryText, { color: colors.textMuted }]}>
@@ -406,6 +433,54 @@ const styles = StyleSheet.create({
   card: { borderRadius: 16, padding: 16, marginTop: 4 },
   summary: { alignItems: "center", paddingTop: 16 },
   summaryText: { fontFamily: FONTS.body, fontSize: 13 },
+
+  legendCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 14,
+  },
+  legendTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 14,
+    marginBottom: 12,
+    letterSpacing: 0.2,
+  },
+  legendGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 12,
+  },
+  legendGridItem: {
+    width: '50%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  legendBadgeText: {
+    fontFamily: FONTS.bodyBold,
+    color: '#FFF',
+    fontSize: 12,
+  },
+  legendItemTextWrap: {
+    flex: 1,
+  },
+  legendItemLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+  },
+  legendItemSub: {
+    fontFamily: FONTS.body,
+    fontSize: 9.5,
+    marginTop: 1,
+  },
 
   // Modal
   modalOverlay: {

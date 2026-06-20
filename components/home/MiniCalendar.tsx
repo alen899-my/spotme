@@ -217,16 +217,7 @@ export default function MiniCalendar() {
         ))}
       </View>
 
-      {/* Legend row */}
-      <View style={styles.legendRow}>
-        {Object.entries(REST_TYPE_CONFIG).map(([key, cfg]) => (
-          <View key={key} style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: cfg.color }]}>
-              <Text style={styles.legendLetter}>{cfg.letter}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
+ 
 
       <View style={styles.footer}>
         <View style={styles.footerDot} />

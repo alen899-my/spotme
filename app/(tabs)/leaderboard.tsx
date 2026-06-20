@@ -793,14 +793,27 @@ export default function LeaderboardScreen() {
             {/* ── PAGE TITLE ── */}
             <View style={styles.pageHeader}>
               <View>
-                <Text style={[styles.pageTitle, { color: colors.text }]}>LEADERBOARD</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.pageTitle, { color: colors.text }]}>LEADERBOARD</Text>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => router.push('/leaderboard/xp-guide')}
+                    style={{ padding: 4 }}
+                  >
+                    <Ionicons name="help-circle-outline" size={20} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
                 <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
                   {tab === 'All' ? 'Global Rankings' : `${tab} League`}
                 </Text>
               </View>
-              <View style={[styles.pageTitleIcon, { backgroundColor: isDark ? 'rgba(247,203,22,0.12)' : 'rgba(247,203,22,0.15)' }]}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => router.push('/leaderboard/xp-guide')}
+                style={[styles.pageTitleIcon, { backgroundColor: isDark ? 'rgba(247,203,22,0.12)' : 'rgba(247,203,22,0.15)' }]}
+              >
                 <MaterialCommunityIcons name="trophy" size={26} color={P.sun} />
-              </View>
+              </TouchableOpacity>
             </View>
 
             {/* ── SEARCH BAR ── */}
