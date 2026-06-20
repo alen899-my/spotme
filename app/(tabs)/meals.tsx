@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -31,6 +32,7 @@ export default function MealsScreen() {
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const [meals, setMeals] = useState<any[]>([]);
+  const [loggedWaterDates, setLoggedWaterDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   
@@ -104,7 +106,15 @@ export default function MealsScreen() {
   useEffect(() => {
     loadUser();
     fetchMeals();
+    fetchLoggedWaterDates();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMeals();
+      fetchLoggedWaterDates();
+    }, [])
+  );
 
   // DietRecsScreen handles its own data fetching internally
 
@@ -542,6 +552,18 @@ export default function MealsScreen() {
       showToast('Failed to load meals', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLoggedWaterDates = async () => {
+    try {
+      const token = await getToken();
+      const res = await axios.get(`${API_URL}/water/logged-dates`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLoggedWaterDates(res.data || []);
+    } catch (err) {
+      console.error('Error fetching water logged dates:', err);
     }
   };
 
@@ -1395,6 +1417,21 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
   };
 
   const filteredMeals = meals.filter(m => isSameDay(new Date(m.logged_at), selectedDate));
+  
+  const loggedMealsDates = React.useMemo(() => {
+    const datesSet = new Set<string>();
+    meals.forEach(m => {
+      if (m.logged_at) {
+        const d = new Date(m.logged_at);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const dayVal = String(d.getDate()).padStart(2, '0');
+        datesSet.add(`${year}-${month}-${dayVal}`);
+      }
+    });
+    return Array.from(datesSet);
+  }, [meals]);
+
   const isSelectedToday = isToday(selectedDate);
   
   const calsConsumed = filteredMeals.reduce((acc, curr) => acc + (curr.total_calories || 0), 0);
@@ -1482,7 +1519,14 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               <View>
                 {renderHeaderBar()}
                 <View style={styles.trackerHeaderContent}>
-                  <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" backgroundImage={require('../../assets/coach/foodlog.jpg')} />
+                  <DatePicker
+                    selectedDate={selectedDate}
+                    onSelectDate={setSelectedDate}
+                    variant="nutrition"
+                    backgroundImage={require('../../assets/coach/foodlog.jpg')}
+                    loggedDates={loggedMealsDates}
+                    showStatusMarkers={true}
+                  />
 
                   <NutritionMeter
                     caloriesConsumed={calsConsumed}
@@ -1549,8 +1593,15 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         >
           {renderHeaderBar()}
           <View style={styles.trackerHeaderContent}>
-            <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" backgroundImage={require('../../assets/coach/drink.jpg')} />
-            <WaterTracker selectedDate={selectedDate} />
+            <DatePicker
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              variant="nutrition"
+              backgroundImage={require('../../assets/coach/drink.jpg')}
+              loggedDates={loggedWaterDates}
+              showStatusMarkers={true}
+            />
+            <WaterTracker selectedDate={selectedDate} onLogChange={fetchLoggedWaterDates} />
           </View>
         </ScrollView>
       ) : activeTab === 2 ? (

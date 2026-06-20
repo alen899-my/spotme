@@ -518,6 +518,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 24,
     marginBottom: 1,
+    flexWrap: 'wrap',
   },
   statSub: {
     fontFamily: FONTS.body,

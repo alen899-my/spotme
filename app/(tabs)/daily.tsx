@@ -121,6 +121,22 @@ export default function DailyTab() {
   // Date filter
   const [selectedDate, setSelectedDate] = useState(new Date());
 
+  const loggedDates = React.useMemo(() => {
+    const datesSet = new Set<string>();
+    workouts.forEach(w => {
+      if (w.status === 'completed' && w.started_at) {
+        const d = parseUTC(w.started_at);
+        if (d) {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const dayVal = String(d.getDate()).padStart(2, '0');
+          datesSet.add(`${year}-${month}-${dayVal}`);
+        }
+      }
+    });
+    return Array.from(datesSet);
+  }, [workouts]);
+
   const filteredWorkouts = workouts.filter(w => {
     if (!w.started_at) return false;
     const d = parseUTC(w.started_at);
@@ -460,7 +476,14 @@ export default function DailyTab() {
 
             {/* Date Picker */}
             <View style={{ marginBottom: 20 }}>
-              <DatePicker selectedDate={selectedDate} onSelectDate={setSelectedDate} variant="nutrition" backgroundImage={require('../../assets/coach/workoutlog.jpg')} />
+              <DatePicker
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                variant="nutrition"
+                backgroundImage={require('../../assets/coach/workoutlog.jpg')}
+                loggedDates={loggedDates}
+                showStatusMarkers={true}
+              />
             </View>
 
             {/* Workouts for selected date */}

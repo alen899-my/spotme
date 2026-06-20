@@ -8,13 +8,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { isSameDay } from '../../utils/datetime';
 
-interface DatePickerProps {
-  selectedDate: Date;
-  onSelectDate: (date: Date) => void;
-  variant?: 'default' | 'nutrition';
-  backgroundImage?: any;
-}
-
 const DAYS_SHOWN = 7;
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
@@ -28,15 +21,27 @@ const today = () => {
   return d;
 };
 
+interface DatePickerProps {
+  selectedDate: Date;
+  onSelectDate: (date: Date) => void;
+  variant?: 'default' | 'nutrition';
+  backgroundImage?: any;
+  loggedDates?: string[];
+  showStatusMarkers?: boolean;
+}
+
 // ── Mini Calendar Modal ────────────────────────────────────────────────────────
 function CalendarModal({
   visible, baseDate, onClose, onSelect, variant = 'default',
+  loggedDates, showStatusMarkers,
 }: {
   visible: boolean;
   baseDate: Date;
   onClose: () => void;
   onSelect: (d: Date) => void;
   variant?: 'default' | 'nutrition';
+  loggedDates?: string[];
+  showStatusMarkers?: boolean;
 }) {
   const { colors, isDark } = useTheme();
   const [viewYear, setViewYear]   = useState(baseDate.getFullYear());
@@ -153,6 +158,10 @@ function CalendarModal({
               const todayC   = isTodayCell(day);
               const selected = isSelected(day);
 
+              const dayStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const isLogged = loggedDates?.includes(dayStr);
+              const isPast = !future && !todayC;
+
               return (
                 <TouchableOpacity
                   key={idx}
@@ -172,6 +181,14 @@ function CalendarModal({
                   disabled={future}
                   activeOpacity={0.7}
                 >
+                  {showStatusMarkers && isLogged && (
+                    <View style={cal.checkCircle}>
+                      <Ionicons name="checkmark" size={8} color="#FFFFFF" />
+                    </View>
+                  )}
+                  {showStatusMarkers && isPast && !isLogged && (
+                    <Ionicons name="close" size={8} color="#EF4444" style={cal.crossIcon} />
+                  )}
                   <Text style={[
                     cal.dayNum,
                     { color: selected ? palette.activeText : todayC ? palette.accent : palette.inactiveText },
@@ -211,15 +228,36 @@ const cal = StyleSheet.create({
   weekLabel: { flex: 1, textAlign: 'center', fontFamily: FONTS.bodyBold, fontSize: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: `${100 / 7}%`, aspectRatio: 1, justifyContent: 'center', alignItems: 'center' },
-  dayNum: { fontFamily: FONTS.bodySemiBold, fontSize: 14 },
+  dayNum: { fontFamily: FONTS.bodySemiBold, fontSize: 14, zIndex: 1 },
   todayBtn: {
     marginTop: 16, borderTopWidth: 1, paddingTop: 14, alignItems: 'center',
   },
   todayBtnText: { fontFamily: FONTS.bodyBold, fontSize: 14 },
+  checkCircle: {
+    position: 'absolute',
+    top: 1,
+    right: 1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  crossIcon: {
+    position: 'absolute',
+    top: 1,
+    right: 1,
+    zIndex: 2,
+  },
 });
 
 // ── Main DatePicker ────────────────────────────────────────────────────────────
-export default function DatePicker({ selectedDate, onSelectDate, variant = 'default', backgroundImage }: DatePickerProps) {
+export default function DatePicker({
+  selectedDate, onSelectDate, variant = 'default', backgroundImage,
+  loggedDates, showStatusMarkers,
+}: DatePickerProps) {
   const { colors, isDark } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const [showCal, setShowCal] = useState(false);
@@ -342,23 +380,44 @@ export default function DatePicker({ selectedDate, onSelectDate, variant = 'defa
         contentContainerStyle={[styles.scrollContent, isNutrition && styles.nutritionScrollContent]}
       >
         {/* If selected date is outside the strip, show it as an extra pill at the start */}
-        {!inStrip && (
-          <TouchableOpacity
-            style={[styles.pill, isNutrition && styles.nutritionPill, { backgroundColor: palette.accent, borderColor: palette.accent }]}
-            activeOpacity={0.8}
-            onPress={() => setShowCal(true)}
-          >
-            <Text style={[styles.pillDay, { color: isNutrition ? 'rgba(4,40,43,0.72)' : 'rgba(255,255,255,0.8)' }]}>
-              {MONTHS[selectedDate.getMonth()].slice(0, 3).toUpperCase()}
-            </Text>
-            <Text style={[styles.pillNum, { color: palette.activeText }]}>{selectedDate.getDate()}</Text>
-            <View style={[styles.activeDot, { backgroundColor: isNutrition ? 'rgba(4,40,43,0.72)' : 'rgba(255,255,255,0.7)' }]} />
-          </TouchableOpacity>
-        )}
+        {/* If selected date is outside the strip, show it as an extra pill at the start */}
+        {!inStrip && (() => {
+          const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+          const isLogged = loggedDates?.includes(dateStr);
+          const future = selectedDate > today();
+          const isPast = !future && !isSameDay(selectedDate, today());
+
+          return (
+            <TouchableOpacity
+              style={[styles.pill, isNutrition && styles.nutritionPill, { backgroundColor: palette.accent, borderColor: palette.accent }]}
+              activeOpacity={0.8}
+              onPress={() => setShowCal(true)}
+            >
+              {showStatusMarkers && isLogged && (
+                <View style={styles.checkCircle}>
+                  <Ionicons name="checkmark" size={8} color="#FFFFFF" />
+                </View>
+              )}
+              {showStatusMarkers && isPast && !isLogged && (
+                <Ionicons name="close" size={8} color="#EF4444" style={styles.crossIcon} />
+              )}
+              <Text style={[styles.pillDay, { color: isNutrition ? 'rgba(4,40,43,0.72)' : 'rgba(255,255,255,0.8)' }]}>
+                {MONTHS[selectedDate.getMonth()].slice(0, 3).toUpperCase()}
+              </Text>
+              <Text style={[styles.pillNum, { color: palette.activeText }]}>{selectedDate.getDate()}</Text>
+              <View style={[styles.activeDot, { backgroundColor: isNutrition ? 'rgba(4,40,43,0.72)' : 'rgba(255,255,255,0.7)' }]} />
+            </TouchableOpacity>
+          );
+        })()}
 
         {dates.map((date, idx) => {
           const active = isSameDay(date, selectedDate);
           const isT = isSameDay(date, today());
+
+          const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          const isLogged = loggedDates?.includes(dateStr);
+          const future = date > today();
+          const isPast = !future && !isT;
 
           return (
             <TouchableOpacity
@@ -375,6 +434,14 @@ export default function DatePicker({ selectedDate, onSelectDate, variant = 'defa
                 },
               ]}
             >
+              {showStatusMarkers && isLogged && (
+                <View style={styles.checkCircle}>
+                  <Ionicons name="checkmark" size={8} color="#FFFFFF" />
+                </View>
+              )}
+              {showStatusMarkers && isPast && !isLogged && (
+                <Ionicons name="close" size={8} color="#EF4444" style={styles.crossIcon} />
+              )}
               <Text style={[styles.pillDay, { color: active ? 'rgba(4,40,43,0.72)' : palette.pillMuted }]}>
                 {isT ? 'TDY' : DAYS[date.getDay()].toUpperCase()}
               </Text>
@@ -394,6 +461,8 @@ export default function DatePicker({ selectedDate, onSelectDate, variant = 'defa
         onClose={() => setShowCal(false)}
         onSelect={onSelectDate}
         variant={variant}
+        loggedDates={loggedDates}
+        showStatusMarkers={showStatusMarkers}
       />
     </>
   );
@@ -464,10 +533,28 @@ const styles = StyleSheet.create({
     width: 50,
     height: 64,
   },
-  pillDay: { fontFamily: FONTS.bodyBold, fontSize: 8, letterSpacing: 0.5, marginBottom: 3 },
-  pillNum: { fontFamily: FONTS.heading, fontSize: 18 },
+  pillDay: { fontFamily: FONTS.bodyBold, fontSize: 8, letterSpacing: 0.5, marginBottom: 3, zIndex: 1 },
+  pillNum: { fontFamily: FONTS.heading, fontSize: 18, zIndex: 1 },
   activeDot: {
     width: 5, height: 5, borderRadius: 2.5,
-    backgroundColor: 'rgba(255,255,255,0.7)', marginTop: 4,
+    backgroundColor: 'rgba(255,255,255,0.7)', marginTop: 4, zIndex: 1,
+  },
+  checkCircle: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  crossIcon: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    zIndex: 2,
   },
 });

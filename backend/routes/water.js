@@ -105,6 +105,27 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/water/logged-dates — get all dates with water logs
+router.get('/logged-dates', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT DATE(logged_at) AS date FROM water_logs WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const dates = result.rows.map(r => {
+      const d = new Date(r.date);
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dateVal = String(d.getUTCDate()).padStart(2, '0');
+      return `${year}-${month}-${dateVal}`;
+    });
+    res.json(dates);
+  } catch (err) {
+    console.error('GET /water/logged-dates error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/water?date=YYYY-MM-DD — get logs for a specific day
 router.get('/', authenticateToken, async (req, res) => {
   try {

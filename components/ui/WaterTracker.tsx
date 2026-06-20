@@ -27,6 +27,7 @@ const rem = (size: number) => Math.round((size / 390) * W);
 
 interface Props {
   selectedDate: Date;
+  onLogChange?: () => void;
 }
 
 const HYDRATION = {
@@ -384,7 +385,7 @@ const rb = StyleSheet.create({
   },
 });
 
-export default function WaterTracker({ selectedDate }: Props) {
+export default function WaterTracker({ selectedDate, onLogChange }: Props) {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
 
@@ -564,6 +565,7 @@ export default function WaterTracker({ selectedDate }: Props) {
       );
 
       if (!exceeds) showToast(`+${amount} ml logged!`);
+      onLogChange?.();
     } catch (e) {
       setTotalWater(prevTotal);
       setWaterLogs(prevLogs);
@@ -582,6 +584,7 @@ export default function WaterTracker({ selectedDate }: Props) {
       showToast('Entry removed');
       setTotalWater((p) => Math.max(0, p - amount));
       setWaterLogs((p) => p.filter((l) => l.id !== id));
+      onLogChange?.();
     } catch (e) {
       showToast('Failed to remove entry', 'error');
     }

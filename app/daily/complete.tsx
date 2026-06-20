@@ -1150,6 +1150,7 @@ const bentoStyles = StyleSheet.create({
   },
   tileValue: {
     fontFamily: FONTS.heading,
+    flexWrap: 'wrap',
   },
   tileSub: {
     fontFamily: FONTS.body,
