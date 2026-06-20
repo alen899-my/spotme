@@ -17,6 +17,17 @@ import { useTheme } from "../../contexts/ThemeContext";
 
 const GREEN = "#10B981";
 
+const REST_TYPE_CONFIG: Record<string, { letter: string; color: string }> = {
+  fatigue:       { letter: 'F', color: '#3B82F6' },
+  sick:          { letter: 'S', color: '#F59E0B' },
+  injury:        { letter: 'I', color: '#EF4444' },
+  after_workout: { letter: 'A', color: '#14B8A6' },
+  late:          { letter: 'L', color: '#8B5CF6' },
+  other:         { letter: 'O', color: '#6B7280' },
+};
+
+const getRestConfig = (type?: string) => REST_TYPE_CONFIG[type ?? 'fatigue'] ?? REST_TYPE_CONFIG.fatigue;
+
 const darken = (hex: string, amount: number): string => {
   const num = parseInt(hex.replace("#", ""), 16);
   const r = Math.max(0, (num >> 16) - Math.round(255 * amount));
@@ -58,10 +69,13 @@ interface Props {
   vibrant?: boolean;
   /** Separate color for active cell heat shading (falls back to accentColor). Use to match MiniCalendar. */
   activeColor?: string;
+  /** Map of date → rest_type (fatigue/sick/injury/late/other) */
+  restDayMap?: Record<string, string>;
 }
 
 export default function WorkoutCalendarHeatmap({
   history,
+  restDayMap,
   accentColor = "#FF4B4B",
   activeColor,
   title,
@@ -235,6 +249,9 @@ export default function WorkoutCalendarHeatmap({
               const todayCell    = day !== null && isTodayCell(day);
               const futureCell   = day !== null && isFutureDay(day);
               const activeCell   = hasActivity(day);
+              const restType     = dateStr ? restDayMap?.[dateStr] : undefined;
+              const isRestDay    = restType !== undefined;
+              const restCfg      = isRestDay ? getRestConfig(restType) : null;
               const inactivePast = day !== null && !futureCell && !todayCell && count === 0;
 
               return (
@@ -269,10 +286,15 @@ export default function WorkoutCalendarHeatmap({
                           <Ionicons name="checkmark" size={10} color="#FFFFFF" />
                         </View>
                       )}
-                      {vibrant && inactivePast && (
+                      {isRestDay && restCfg && (
+                        <View style={[styles.checkCircle, { backgroundColor: restCfg.color }]}>
+                          <Text style={styles.restText}>{restCfg.letter}</Text>
+                        </View>
+                      )}
+                      {vibrant && inactivePast && !isRestDay && (
                         <Ionicons name="close" size={10} color="#EF4444" style={styles.crossIcon} />
                       )}
-                      {!vibrant && showInactiveCross && inactivePast && (
+                      {!vibrant && showInactiveCross && inactivePast && !isRestDay && (
                         <Ionicons
                           name="close"
                           size={10}
@@ -280,6 +302,7 @@ export default function WorkoutCalendarHeatmap({
                           style={styles.crossIcon}
                         />
                       )}
+                      {/* restBadgeHeatmap is now handled by the unified isRestDay block above */}
                       <Text
                         style={[
                           styles.dayNum,
@@ -426,6 +449,25 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
     backgroundColor: GREEN,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  restText: {
+    color: "#FFFFFF",
+    fontFamily: FONTS.bodyBold,
+    fontSize: 8,
+    lineHeight: 12,
+    textAlign: "center",
+  },
+  restBadgeHeatmap: {
+    position: "absolute",
+    top: 1,
+    right: 1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#3B82F6",
     alignItems: "center",
     justifyContent: "center",
     zIndex: 1,

@@ -58,6 +58,7 @@ export default function CalendarScreen() {
 
   const [overall, setOverall] = useState<DayEntry[]>([]);
   const [parts, setParts] = useState<PartEntry[]>([]);
+  const [restDayMap, setRestDayMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const today = new Date();
@@ -78,6 +79,7 @@ export default function CalendarScreen() {
         });
         setOverall(res.data.overall || []);
         setParts(res.data.parts || []);
+        setRestDayMap(res.data.restDays || {});
       } catch (err) {
         console.error("Failed to load calendar stats:", err);
       } finally {
@@ -193,6 +195,7 @@ export default function CalendarScreen() {
           <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.78)", borderRadius: 16 }]} />
           <WorkoutCalendarHeatmap
             history={history}
+            restDayMap={restDayMap}
             accentColor={activeSlug ? "#FF4B4B" : "#2596BE"}
             activeColor={activeSlug ? undefined : "#065F46"}
             title={activeSlug ? (parts.find(p => p.slug === activeSlug)?.label || "") : "All Workouts"}
@@ -254,6 +257,52 @@ export default function CalendarScreen() {
                 contentContainerStyle={styles.modalList}
                 showsVerticalScrollIndicator={false}
                 renderItem={({ item: w }) => {
+                  const isRest = w.status === 'rest';
+                  if (isRest) {
+                    const restTypeLabelMap: Record<string, { label: string; letter: string; color: string; icon: string }> = {
+                      fatigue:       { label: 'Normal Fatigue Rest', letter: 'F', color: '#3B82F6', icon: 'bed-clock' },
+                      sick:          { label: 'Sick Day',           letter: 'S', color: '#F59E0B', icon: 'thermometer' },
+                      injury:        { label: 'Injury Rest',        letter: 'I', color: '#EF4444', icon: 'bandage' },
+                      after_workout: { label: 'After Workout Rest', letter: 'A', color: '#14B8A6', icon: 'calendar-check-outline' },
+                      late:          { label: 'Late / Busy Day',    letter: 'L', color: '#8B5CF6', icon: 'clock-outline' },
+                      other:         { label: 'Other',              letter: 'O', color: '#6B7280', icon: 'dots-horizontal-circle-outline' },
+                    };
+                    const rtCfg = restTypeLabelMap[w.rest_type ?? 'fatigue'] ?? restTypeLabelMap.fatigue;
+                    return (
+                      <View
+                        style={[
+                          styles.workoutCard,
+                          { backgroundColor: colors.card, borderColor: rtCfg.color + '40' },
+                        ]}
+                      >
+                        <View style={styles.workoutCardInner}>
+                          <View style={[styles.workoutImgWrap, { borderColor: colors.border }]}>
+                            <View style={[styles.workoutImgPlaceholder, { backgroundColor: colors.inputBg }]}>
+                              <MaterialCommunityIcons name={rtCfg.icon as any} size={26} color={rtCfg.color} />
+                            </View>
+                            <View style={[styles.doneBadge, { backgroundColor: rtCfg.color }]}>
+                              <Text style={styles.doneBadgeText}>{rtCfg.letter}</Text>
+                            </View>
+                          </View>
+                          <View style={styles.workoutInfo}>
+                            <Text style={[styles.workoutTitle, { color: colors.text }]} numberOfLines={1}>Rest Day</Text>
+                            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11, color: rtCfg.color, marginTop: 2 }}>
+                              {rtCfg.label}
+                            </Text>
+                            <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textMuted, marginTop: 4 }}>
+                              {w.rest_type === 'fatigue' ? 'Streak preserved — recover and rebuild!' :
+                               w.rest_type === 'sick' ? 'Logged as sick — feel better soon!' :
+                               w.rest_type === 'injury' ? 'Logged as injury — heal up safely!' :
+                               w.rest_type === 'after_workout' ? 'Resting after hitting weekly workout goals.' :
+                               w.rest_type === 'late' ? 'Logged as late/busy — life happens!' :
+                               'Rest and come back stronger.'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  }
+
                   const tier = getTier(w.league_tier);
                   const totalExs  = parseInt(w.exercise_count || 0);
                   const totalSets = parseInt(w.total_sets || 0);

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Platform, Image,
+  Modal, Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,7 +18,69 @@ import { NewWorkoutSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 
-
+// ── Rest Type Config ────────────────────────────────────────────────────────
+const REST_TYPES = [
+  {
+    key: 'fatigue',
+    label: 'Normal Fatigue Rest',
+    sublabel: 'Post-workout recovery — muscles need time to rebuild.',
+    letter: 'F',
+    color: '#3B82F6',
+    icon: 'bed-outline' as const,
+    streakNote: '✅ Streak preserved — rest is part of training!',
+    affectsStreak: false,
+  },
+  {
+    key: 'sick',
+    label: 'Sick Day',
+    sublabel: 'Under the weather — health always comes first.',
+    letter: 'S',
+    color: '#F59E0B',
+    icon: 'thermometer' as const,
+    streakNote: '⚠️ Streak affected — breaks your current streak.',
+    affectsStreak: true,
+  },
+  {
+    key: 'injury',
+    label: 'Injury Rest',
+    sublabel: 'Dealing with a physical injury — recover safely.',
+    letter: 'I',
+    color: '#EF4444',
+    icon: 'bandage' as const,
+    streakNote: '⚠️ Streak affected — breaks your current streak.',
+    affectsStreak: true,
+  },
+  {
+    key: 'after_workout',
+    label: 'After Workout Rest',
+    sublabel: 'Resting after hitting weekly workout goals.',
+    letter: 'A',
+    color: '#14B8A6',
+    icon: 'calendar-check-outline' as const,
+    streakNote: '⚠️ Streak affected — breaks your current streak.',
+    affectsStreak: true,
+  },
+  {
+    key: 'late',
+    label: 'Late / Busy Day',
+    sublabel: 'Life got in the way today — happens to everyone.',
+    letter: 'L',
+    color: '#8B5CF6',
+    icon: 'clock-outline' as const,
+    streakNote: '⚠️ Streak affected — breaks your current streak.',
+    affectsStreak: true,
+  },
+  {
+    key: 'other',
+    label: 'Other',
+    sublabel: 'A rest day for another reason.',
+    letter: 'O',
+    color: '#6B7280',
+    icon: 'dots-horizontal-circle-outline' as const,
+    streakNote: '⚠️ Streak affected — breaks your current streak.',
+    affectsStreak: true,
+  },
+];
 
 export default function NewDailyWorkout() {
   const router = useRouter();
@@ -32,6 +95,11 @@ export default function NewDailyWorkout() {
   const [loadingSplits, setLoadingSplits] = useState(true);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [starting, setStarting] = useState(false);
+
+  // Rest day modal state
+  const [showRestModal, setShowRestModal] = useState(false);
+  const [loggingRest, setLoggingRest] = useState(false);
+  const [selectedRestType, setSelectedRestType] = useState<string | null>(null);
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -60,7 +128,6 @@ export default function NewDailyWorkout() {
     setLoadingSessions(true);
     try {
       const token = await getToken();
-      const cleanTitle = selectedSession?.name || selectedSplit?.name || 'Quick Workout';
       const res = await axios.get(`${API_URL}/workouts/splits/${split.id}/sessions`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -69,6 +136,25 @@ export default function NewDailyWorkout() {
       console.error('Error fetching sessions:', err);
     } finally {
       setLoadingSessions(false);
+    }
+  };
+
+  const handleRestDay = async (restType: string) => {
+    setLoggingRest(true);
+    try {
+      const token = await getToken();
+      await axios.post(`${API_URL}/daily/rest-day`, { rest_type: restType }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setShowRestModal(false);
+      const cfg = REST_TYPES.find(r => r.key === restType);
+      showToast(`${cfg?.label || 'Rest day'} logged!`, 'success');
+      router.replace('/(tabs)/daily');
+    } catch (err) {
+      console.error('Error logging rest day:', err);
+      showToast('Failed to log rest day', 'error');
+    } finally {
+      setLoggingRest(false);
     }
   };
 
@@ -111,7 +197,6 @@ export default function NewDailyWorkout() {
           <View style={{ width: 28 }} />
         </View>
 
-        {/* Date/Time Hero Card */}
         {/* Date/Time Hero Card */}
         <View style={[styles.heroCard, isDark && { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
           <View style={styles.heroBadge}>
@@ -252,13 +337,14 @@ export default function NewDailyWorkout() {
             {
               backgroundColor: colors.bg,
               paddingBottom: Math.max(insets.bottom, 12) + 12,
+              gap: 8,
             }
           ]}
         >
           <TouchableOpacity
             style={[styles.startBtn, (!selectedSplit || !selectedSession) && { opacity: 0.5 }]}
             onPress={handleStart}
-            disabled={!selectedSplit || !selectedSession || starting}
+            disabled={!selectedSplit || !selectedSession || starting || loggingRest}
           >
             <View style={[styles.startBtnGradient, { backgroundColor: colors.primary }]}>
               {starting ? <ActivityIndicator color="#FFF" /> : (
@@ -269,8 +355,119 @@ export default function NewDailyWorkout() {
               )}
             </View>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.restBtn, { borderColor: colors.border }]}
+            onPress={() => setShowRestModal(true)}
+            disabled={starting || loggingRest}
+          >
+            <View style={styles.restBtnInner}>
+              <MaterialCommunityIcons name="bed-clock" size={20} color={colors.primary} />
+              <Text style={[styles.restBtnText, { color: colors.text }]}>LOG REST DAY</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
+
+      {/* ── Rest Day Type Modal ──────────────────────────────────────────────── */}
+      <Modal
+        visible={showRestModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !loggingRest && setShowRestModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => !loggingRest && setShowRestModal(false)}>
+          <Pressable onPress={() => {}} style={[styles.modalSheet, { backgroundColor: colors.bg }]}>
+            {/* Handle */}
+            <View style={styles.modalHandle} />
+            <View style={[styles.modalHandleBar, { backgroundColor: colors.textMuted + '40' }]} />
+
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Log Rest Day</Text>
+              <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+                Select the reason for resting today
+              </Text>
+            </View>
+
+            {/* Rest type options */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalList}
+            >
+              {REST_TYPES.map((rt) => (
+                <TouchableOpacity
+                  key={rt.key}
+                  style={[
+                    styles.restTypeCard,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: selectedRestType === rt.key ? rt.color : colors.border,
+                      borderWidth: selectedRestType === rt.key ? 2 : 1,
+                    },
+                  ]}
+                  onPress={() => setSelectedRestType(rt.key)}
+                  disabled={loggingRest}
+                  activeOpacity={0.75}
+                >
+                  {/* Letter badge */}
+                  <View style={[styles.restTypeBadge, { backgroundColor: rt.color }]}>
+                    <Text style={styles.restTypeBadgeLetter}>{rt.letter}</Text>
+                  </View>
+
+                  {/* Info */}
+                  <View style={styles.restTypeInfo}>
+                    <Text style={[styles.restTypeLabel, { color: colors.text }]}>{rt.label}</Text>
+                    <Text style={[styles.restTypeSublabel, { color: colors.textMuted }]} numberOfLines={2}>
+                      {rt.sublabel}
+                    </Text>
+                    {selectedRestType === rt.key && (
+                      <Text style={[styles.restTypeStreakNote, { color: rt.color }]}>
+                        {rt.streakNote}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Check */}
+                  {selectedRestType === rt.key && (
+                    <Ionicons name="checkmark-circle" size={22} color={rt.color} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Confirm button */}
+            <View style={[styles.modalFooter, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
+              <TouchableOpacity
+                style={[
+                  styles.confirmBtn,
+                  {
+                    backgroundColor: selectedRestType
+                      ? (REST_TYPES.find(r => r.key === selectedRestType)?.color ?? colors.primary)
+                      : colors.border,
+                    opacity: selectedRestType ? 1 : 0.5,
+                  },
+                ]}
+                disabled={!selectedRestType || loggingRest}
+                onPress={() => selectedRestType && handleRestDay(selectedRestType)}
+              >
+                {loggingRest ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="bed-clock" size={20} color="#FFF" />
+                    <Text style={styles.confirmBtnText}>
+                      {selectedRestType
+                        ? `Log ${REST_TYPES.find(r => r.key === selectedRestType)?.label ?? 'Rest Day'}`
+                        : 'Select a type above'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -302,4 +499,123 @@ const styles = StyleSheet.create({
   startBtn: { borderRadius: 18, overflow: 'hidden' },
   startBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, height: 60, backgroundColor: P.cta },
   startBtnText: { fontFamily: FONTS.bodyBold, fontSize: 16, color: '#FFF', letterSpacing: 1 },
+  restBtn: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+  },
+  restBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    height: 54,
+  },
+  restBtnText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 16,
+    letterSpacing: 1,
+  },
+
+  // ── Rest Day Modal ──────────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '88%',
+    minHeight: 400,
+    paddingTop: 10,
+  },
+  modalHandle: {
+    alignItems: 'center',
+    paddingBottom: 6,
+  },
+  modalHandleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 6,
+  },
+  modalHeader: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    paddingTop: 8,
+  },
+  modalTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+  },
+  modalList: {
+    paddingHorizontal: 20,
+    gap: 12,
+    paddingBottom: 16,
+  },
+  restTypeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    padding: 16,
+    gap: 14,
+  },
+  restTypeBadge: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  restTypeBadgeLetter: {
+    fontFamily: FONTS.heading,
+    fontSize: 20,
+    color: '#FFF',
+  },
+  restTypeInfo: {
+    flex: 1,
+  },
+  restTypeLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+    marginBottom: 2,
+  },
+  restTypeSublabel: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  restTypeStreakNote: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    marginTop: 6,
+  },
+  modalFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.08)',
+  },
+  confirmBtn: {
+    borderRadius: 18,
+    height: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  confirmBtnText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 16,
+    color: '#FFF',
+    letterSpacing: 0.5,
+  },
 });

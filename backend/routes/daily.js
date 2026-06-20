@@ -2103,6 +2103,17 @@ router.get('/calendar-stats', authenticateToken, async (req, res) => {
       feet:          'Feet',
     };
 
+    // ── 1b. Rest days: dates when the user logged a rest day (with type) ──────
+    const restRes = await pool.query(
+      `SELECT DATE(dw.completed_at) AS date,
+              COALESCE(dw.rest_type, 'fatigue') AS rest_type
+       FROM daily_workouts dw
+       WHERE dw.user_id = $1
+         AND dw.status = 'rest'
+       ORDER BY dw.completed_at`,
+      [userId]
+    );
+
     // ── Build per-slug date→count map ───────────────────────────────────────
     const slugMap = {}; // slug -> { date: count }
     for (const row of exerciseRes.rows) {
@@ -2140,7 +2151,13 @@ router.get('/calendar-stats', authenticateToken, async (req, res) => {
       count: r.count,
     }));
 
-    res.json({ overall, parts });
+    const restDays = restRes.rows.reduce((acc, r) => {
+      const dateStr = new Date(r.date).toISOString().split('T')[0];
+      acc[dateStr] = r.rest_type;
+      return acc;
+    }, {});
+
+    res.json({ overall, parts, restDays });
   } catch (err) {
     console.error('GET /daily/calendar-stats error:', err);
     res.status(500).json({ error: err.message });
@@ -2176,6 +2193,77 @@ router.get('/workouts-by-date', authenticateToken, async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('GET /daily/workouts-by-date error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /daily/rest-day — log a typed rest day ───────────────────────────
+router.post('/rest-day', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  // rest_type: 'fatigue' | 'sick' | 'injury' | 'after_workout' | 'late' | 'other'
+  const { date, rest_type = 'fatigue' } = req.body;
+
+  // Validate rest_type
+  const validTypes = ['fatigue', 'sick', 'injury', 'after_workout', 'late', 'other'];
+  const safeType = validTypes.includes(rest_type) ? rest_type : 'fatigue';
+
+  try {
+    const targetDate = date ? new Date(date) : new Date();
+    const targetDateStr = targetDate.toISOString().split('T')[0];
+
+    // Prevent duplicate rest-day entries on the same date
+    const existing = await pool.query(
+      `SELECT id FROM daily_workouts
+       WHERE user_id = $1 AND DATE(completed_at) = $2::date AND status = 'rest'
+       LIMIT 1`,
+      [userId, targetDateStr]
+    );
+
+    let workout;
+    let isUpdated = false;
+
+    if (existing.rows.length > 0) {
+      const updateRes = await pool.query(
+        `UPDATE daily_workouts 
+         SET rest_type = $1, title = $2 
+         WHERE id = $3 
+         RETURNING *`,
+        [safeType, `Rest Day (${safeType})`, existing.rows[0].id]
+      );
+      workout = updateRes.rows[0];
+      isUpdated = true;
+    } else {
+      const insertRes = await pool.query(
+        `INSERT INTO daily_workouts (user_id, title, status, rest_type, started_at, completed_at)
+         VALUES ($1, $2, 'rest', $3, $4, $4) RETURNING *`,
+        [userId, `Rest Day (${safeType})`, safeType, targetDate]
+      );
+      workout = insertRes.rows[0];
+    }
+
+    // Streak logic:
+    // Only 'fatigue' (Normal Fatigue Rest) preserves/bridges the streak.
+    // All other rest types (sick, injury, after_workout, late, other) reset current_streak to 0.
+    if (safeType === 'fatigue') {
+      const userRes = await pool.query('SELECT last_workout_date FROM users WHERE id = $1', [userId]);
+      const currentLastDate = userRes.rows[0]?.last_workout_date;
+
+      if (!currentLastDate || new Date(targetDateStr) >= new Date(currentLastDate)) {
+        await pool.query(
+          `UPDATE users SET last_workout_date = $1 WHERE id = $2`,
+          [targetDateStr, userId]
+        );
+      }
+    } else {
+      await pool.query(
+        `UPDATE users SET current_streak = 0 WHERE id = $1`,
+        [userId]
+      );
+    }
+
+    res.status(isUpdated ? 200 : 201).json({ success: true, updated: isUpdated, workout });
+  } catch (err) {
+    console.error('POST /daily/rest-day error:', err);
     res.status(500).json({ error: err.message });
   }
 });

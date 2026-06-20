@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Image,
   ScrollView, Animated, Easing, Dimensions,
+  Modal, Pressable,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,7 +27,77 @@ const SCREEN_H = Dimensions.get('window').height;
 const s = (n: number) => Math.round((SCREEN_W / 390) * n);
 const vs = (n: number) => Math.round((SCREEN_H / 844) * n);
 const fs = (n: number) => Math.round((Math.min(SCREEN_W, 500) / 390) * n);
+const REST_LABELS: Record<string, { label: string; sublabel: string; color: string; icon: string }> = {
+  fatigue:       { label: 'Normal Fatigue Rest', sublabel: 'Post-workout recovery — muscles need time to rebuild.', color: '#3B82F6', icon: 'bed-clock' },
+  sick:          { label: 'Sick Day', sublabel: 'Under the weather — health always comes first.', color: '#F59E0B', icon: 'thermometer' },
+  injury:        { label: 'Injury Rest', sublabel: 'Dealing with a physical injury — recover safely.', color: '#EF4444', icon: 'bandage' },
+  after_workout: { label: 'After Workout Rest', sublabel: 'Resting after hitting weekly workout goals.', color: '#14B8A6', icon: 'calendar-check-outline' },
+  late:          { label: 'Late / Busy Day', sublabel: 'Life got in the way today — happens to everyone.', color: '#8B5CF6', icon: 'clock-outline' },
+  other:         { label: 'Other Rest', sublabel: 'Every rest day counts towards recovery.', color: '#6B7280', icon: 'dots-horizontal-circle-outline' },
+};
 
+const REST_TYPES = [
+  {
+    key: 'fatigue',
+    label: 'Normal Fatigue Rest',
+    sublabel: 'Post-workout recovery — muscles need time to rebuild.',
+    letter: 'F',
+    color: '#3B82F6',
+    icon: 'bed-outline' as const,
+    streakNote: '✅ Streak preserved — rest is part of training!',
+    affectsStreak: false,
+  },
+  {
+    key: 'sick',
+    label: 'Sick Day',
+    sublabel: 'Under the weather — health always comes first.',
+    letter: 'S',
+    color: '#F59E0B',
+    icon: 'thermometer' as const,
+    streakNote: '⚠️ Streak affected — breaks your current streak.',
+    affectsStreak: true,
+  },
+  {
+    key: 'injury',
+    label: 'Injury Rest',
+    sublabel: 'Dealing with a physical injury — recover safely.',
+    letter: 'I',
+    color: '#EF4444',
+    icon: 'bandage' as const,
+    streakNote: '⚠️ Streak affected — breaks your current streak.',
+    affectsStreak: true,
+  },
+  {
+    key: 'after_workout',
+    label: 'After Workout Rest',
+    sublabel: 'Resting after hitting weekly workout goals.',
+    letter: 'A',
+    color: '#14B8A6',
+    icon: 'calendar-check-outline' as const,
+    streakNote: '⚠️ Streak affected — breaks your current streak.',
+    affectsStreak: true,
+  },
+  {
+    key: 'late',
+    label: 'Late / Busy Day',
+    sublabel: 'Life got in the way today — happens to everyone.',
+    letter: 'L',
+    color: '#8B5CF6',
+    icon: 'clock-outline' as const,
+    streakNote: '⚠️ Streak affected — breaks your current streak.',
+    affectsStreak: true,
+  },
+  {
+    key: 'other',
+    label: 'Other',
+    sublabel: 'A rest day for another reason.',
+    letter: 'O',
+    color: '#6B7280',
+    icon: 'dots-horizontal-circle-outline' as const,
+    streakNote: '⚠️ Streak affected — breaks your current streak.',
+    affectsStreak: true,
+  },
+];
 
 // Profile gate colors
 const G = {
@@ -96,6 +167,30 @@ export default function DailyTab() {
 
   const { activeWorkoutId, endWorkoutSession } = useWorkoutTimer();
 
+  // Rest day modal state
+  const [showRestModal, setShowRestModal] = useState(false);
+  const [loggingRest, setLoggingRest] = useState(false);
+  const [selectedRestType, setSelectedRestType] = useState<string | null>(null);
+
+  const handleRestDay = async (restType: string) => {
+    setLoggingRest(true);
+    try {
+      const token = await getToken();
+      await axios.post(`${API_URL}/daily/rest-day`, { rest_type: restType }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setShowRestModal(false);
+      const cfg = REST_LABELS[restType];
+      showToast(`${cfg?.label || 'Rest day'} logged!`, 'success');
+      fetchWorkouts();
+    } catch (err) {
+      console.error('Error logging rest day:', err);
+      showToast('Failed to log rest day', 'error');
+    } finally {
+      setLoggingRest(false);
+    }
+  };
+
   // ── XP Celebration Modal ──
   const [xpModal, setXpModal] = useState<{ earned_xp: number; new_level: number | null; leveled_up: boolean } | null>(null);
   const xpModalFade = useRef(new Animated.Value(0)).current;
@@ -120,7 +215,6 @@ export default function DailyTab() {
 
   // Date filter
   const [selectedDate, setSelectedDate] = useState(new Date());
-
   const loggedDates = React.useMemo(() => {
     const datesSet = new Set<string>();
     workouts.forEach(w => {
@@ -135,6 +229,23 @@ export default function DailyTab() {
       }
     });
     return Array.from(datesSet);
+  }, [workouts]);
+
+  const restDayMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    workouts.forEach(w => {
+      if (w.status === 'rest' && w.started_at) {
+        const d = parseUTC(w.started_at);
+        if (d) {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const dayVal = String(d.getDate()).padStart(2, '0');
+          const dateStr = `${year}-${month}-${dayVal}`;
+          map[dateStr] = w.rest_type || 'fatigue';
+        }
+      }
+    });
+    return map;
   }, [workouts]);
 
   const filteredWorkouts = workouts.filter(w => {
@@ -240,6 +351,56 @@ export default function DailyTab() {
 
   const renderWorkout = ({ item }: { item: any }) => {
     const isCompleted = item.status === 'completed';
+    const isRest = item.status === 'rest';
+
+    if (isRest) {
+      const restType = item.rest_type || 'fatigue';
+      const restCfg = REST_LABELS[restType] || REST_LABELS.fatigue;
+
+      return (
+        <View
+          style={[styles.card, isDark && { borderColor: colors.border, borderWidth: 1 }]}
+        >
+          <LinearGradient 
+            colors={isDark ? ['#051525', '#020A12'] : ['#E8F0FE', '#D2E3FC']} 
+            style={styles.cardGradient}
+          >
+            <View style={styles.cardRow}>
+              <View style={styles.imageContainer}>
+                <LinearGradient 
+                  colors={isDark ? ['#1A365D', '#0A1D37'] : ['#C2D7FA', '#AECBFA']} 
+                  style={styles.workoutImgPlaceholder}
+                >
+                  <MaterialCommunityIcons name={restCfg.icon as any} size={32} color={restCfg.color} />
+                </LinearGradient>
+                <View style={[styles.statusBadge, { backgroundColor: restCfg.color }]}>
+                  <Text style={styles.statusText}>REST</Text>
+                </View>
+              </View>
+
+              <View style={styles.cardInfo}>
+                <View style={styles.cardHeader}>
+                  <Text style={[styles.dateText, { color: isDark ? colors.textMuted : '#5F6368' }]}>{formatDateTime(item.started_at)}</Text>
+                  <TouchableOpacity 
+                    style={styles.deleteBtn} 
+                    onPress={() => setDeletingId(item.id)}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={isDark ? colors.textMuted : "#5F6368"} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.cardTitle, { color: isDark ? colors.text : restCfg.color }]}>
+                  {restCfg.label}
+                </Text>
+                <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: isDark ? colors.textMuted : '#5F6368', marginTop: 4 }} numberOfLines={2}>
+                  {restCfg.sublabel}
+                </Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+      );
+    }
+
     const totalExs = parseInt(item.exercise_count || 0);
     const totalSets = parseInt(item.total_sets || 0);
     const hasPhoto = !!item.cover_photo_url || !!item.completion_photo_url;
@@ -361,21 +522,19 @@ export default function DailyTab() {
         ListHeaderComponent={(
           <View style={styles.listHeader}>
             <View style={styles.header}>
-              <View>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Daily Log</Text>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>Daily Log</Text>
                 <Text style={[styles.headerSub, { color: colors.textMuted }]}>Your workout history</Text>
               </View>
-              {isSelectedToday && (
-                <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/daily/new')}>
-                  <LinearGradient 
-                    colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} 
-                    style={[styles.newBtnGradient]}
-                  >
-                    <Ionicons name="add" size={s(20)} color="#FFF" />
-                    <Text style={[styles.newBtnText]}>New Workout</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/daily/new')}>
+                <LinearGradient 
+                  colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} 
+                  style={[styles.newBtnGradient]}
+                >
+                  <Ionicons name="add" size={s(20)} color="#FFF" />
+                  <Text style={[styles.newBtnText]}>New Workout</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.splitsSection}>
@@ -482,6 +641,7 @@ export default function DailyTab() {
                 variant="nutrition"
                 backgroundImage={require('../../assets/coach/workoutlog.jpg')}
                 loggedDates={loggedDates}
+                restDayMap={restDayMap}
                 showStatusMarkers={true}
               />
             </View>
@@ -520,39 +680,69 @@ export default function DailyTab() {
         ListEmptyComponent={(
           workouts.length === 0 ? (
             <View style={styles.centered}>
-              <MaterialCommunityIcons name="calendar-plus" size={80} color={colors.border} />
+              {isSelectedToday && (
+                <View style={styles.emptyTodayRow}>
+                  <TouchableOpacity style={styles.emptyColBtn} onPress={() => router.push('/daily/new')} activeOpacity={0.82}>
+                    <LinearGradient
+                      colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]}
+                      style={styles.emptyColBtnGradient}
+                    >
+                      <Ionicons name="play" size={20} color="#FFF" />
+                      <Text style={[styles.emptyColBtnText, { color: '#FFF' }]}>Log Workout</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.emptyColBtn} onPress={() => setShowRestModal(true)} activeOpacity={0.82}>
+                    <LinearGradient
+                      colors={isDark ? ['#1E3A5F', '#0F2040'] : ['#DBEAFE', '#BFDBFE']}
+                      style={styles.emptyColBtnGradient}
+                    >
+                      <MaterialCommunityIcons name="bed-clock" size={20} color="#3B82F6" />
+                      <Text style={[styles.emptyColBtnText, { color: '#3B82F6' }]}>Rest Day</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              )}
+              <MaterialCommunityIcons name="calendar-plus" size={64} color={colors.border} style={{ marginTop: 24 }} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>No Workouts Yet</Text>
               <Text style={[styles.emptySub, { color: colors.textMuted }]}>
                 Start your first workout session and track your progress daily.
               </Text>
-              {isSelectedToday ? (
-                <TouchableOpacity style={styles.startBtn} onPress={() => router.push('/daily/new')}>
-                  <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.startBtnGradient}>
-                    <Ionicons name="play" size={18} color="#FFF" />
-                    <Text style={styles.startBtnText}>START TODAY'S WORKOUT</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 }}>
+              {!isSelectedToday && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
-                  <Text style={[styles.emptySub, { color: colors.textMuted }]}>Can only log workouts for today</Text>
+                  <Text style={[styles.emptySub, { color: colors.textMuted, marginBottom: 0 }]}>Can only log for today</Text>
                 </View>
               )}
             </View>
           ) : (
             <View style={[styles.centered, { paddingVertical: 32 }]}>
-              <Ionicons name="calendar-outline" size={48} color={colors.border} />
+              {isSelectedToday && (
+                <View style={styles.emptyTodayRow}>
+                  <TouchableOpacity style={styles.emptyColBtn} onPress={() => router.push('/daily/new')} activeOpacity={0.82}>
+                    <LinearGradient
+                      colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]}
+                      style={styles.emptyColBtnGradient}
+                    >
+                      <Ionicons name="play" size={20} color="#FFF" />
+                      <Text style={[styles.emptyColBtnText, { color: '#FFF' }]}>Log Workout</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.emptyColBtn} onPress={() => setShowRestModal(true)} activeOpacity={0.82}>
+                    <LinearGradient
+                      colors={isDark ? ['#1E3A5F', '#0F2040'] : ['#DBEAFE', '#BFDBFE']}
+                      style={styles.emptyColBtnGradient}
+                    >
+                      <MaterialCommunityIcons name="bed-clock" size={20} color="#3B82F6" />
+                      <Text style={[styles.emptyColBtnText, { color: '#3B82F6' }]}>Rest Day</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              )}
+              <Ionicons name="calendar-outline" size={48} color={colors.border} style={{ marginTop: 24 }} />
               <Text style={[styles.emptyTitle, { color: colors.text, fontSize: 20 }]}>No Workouts This Day</Text>
-              {isSelectedToday ? (
-                <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-                  Pick another date or log a new session.
-                </Text>
-              ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                  
-                  <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-                    Can only log workouts for Past
-                  </Text>
+              {!isSelectedToday && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.emptySub, { color: colors.textMuted, marginBottom: 0 }]}>Can only log for today</Text>
                 </View>
               )}
             </View>
@@ -581,7 +771,7 @@ export default function DailyTab() {
                 </View>
                 <Text style={xpStyles.badgeText}>XP EARNED</Text>
               </View>
-              <Text style={xpStyles.xpAmount}>+{xpModal.earned_xp.toLocaleString()}</Text>
+               <Text style={xpStyles.xpAmount}>+{xpModal.earned_xp.toLocaleString()}</Text>
               {xpModal.leveled_up && (
                 <View style={xpStyles.levelUpRow}>
                   <Text style={xpStyles.levelUpLabel}>LEVEL UP!</Text>
@@ -603,10 +793,109 @@ export default function DailyTab() {
           </Animated.View>
         </Animated.View>
       )}
+
+      {/* ── Rest Day Type Modal ── */}
+      <Modal
+        visible={showRestModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !loggingRest && setShowRestModal(false)}
+      >
+        <Pressable style={restModalStyles.modalOverlay} onPress={() => !loggingRest && setShowRestModal(false)}>
+          <Pressable onPress={() => {}} style={[restModalStyles.modalSheet, { backgroundColor: colors.bg }]}>
+            {/* Handle */}
+            <View style={restModalStyles.modalHandle} />
+            <View style={[restModalStyles.modalHandleBar, { backgroundColor: colors.textMuted + '40' }]} />
+
+            {/* Header */}
+            <View style={restModalStyles.modalHeader}>
+              <Text style={[restModalStyles.modalTitle, { color: colors.text }]}>Log Rest Day</Text>
+              <Text style={[restModalStyles.modalSubtitle, { color: colors.textMuted }]}>
+                Select the reason for resting today
+              </Text>
+            </View>
+
+            {/* Rest type options */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={restModalStyles.modalList}
+            >
+              {REST_TYPES.map((rt) => (
+                <TouchableOpacity
+                  key={rt.key}
+                  style={[
+                    restModalStyles.restTypeCard,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: selectedRestType === rt.key ? rt.color : colors.border,
+                      borderWidth: selectedRestType === rt.key ? 2 : 1,
+                    },
+                  ]}
+                  onPress={() => setSelectedRestType(rt.key)}
+                  disabled={loggingRest}
+                  activeOpacity={0.75}
+                >
+                  {/* Letter badge */}
+                  <View style={[restModalStyles.restTypeBadge, { backgroundColor: rt.color }]}>
+                    <Text style={restModalStyles.restTypeBadgeLetter}>{rt.letter}</Text>
+                  </View>
+
+                  {/* Info */}
+                  <View style={restModalStyles.restTypeInfo}>
+                    <Text style={[restModalStyles.restTypeLabel, { color: colors.text }]}>{rt.label}</Text>
+                    <Text style={[restModalStyles.restTypeSublabel, { color: colors.textMuted }]} numberOfLines={2}>
+                      {rt.sublabel}
+                    </Text>
+                    {selectedRestType === rt.key && (
+                      <Text style={[restModalStyles.restTypeStreakNote, { color: rt.color }]}>
+                        {rt.streakNote}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Check */}
+                  {selectedRestType === rt.key && (
+                    <Ionicons name="checkmark-circle" size={22} color={rt.color} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Confirm button */}
+            <View style={[restModalStyles.modalFooter, { paddingBottom: 32 }]}>
+              <TouchableOpacity
+                style={[
+                  restModalStyles.confirmBtn,
+                  {
+                    backgroundColor: selectedRestType
+                      ? (REST_TYPES.find(r => r.key === selectedRestType)?.color ?? colors.primary)
+                      : colors.border,
+                    opacity: selectedRestType ? 1 : 0.5,
+                  },
+                ]}
+                disabled={!selectedRestType || loggingRest}
+                onPress={() => selectedRestType && handleRestDay(selectedRestType)}
+              >
+                {loggingRest ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="bed-clock" size={20} color="#FFF" />
+                    <Text style={restModalStyles.confirmBtnText}>
+                      {selectedRestType
+                        ? `Log ${REST_TYPES.find(r => r.key === selectedRestType)?.label ?? 'Rest Day'}`
+                        : 'Select a type above'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28, marginTop: 10 },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 32 },
@@ -667,6 +956,10 @@ const styles = StyleSheet.create({
   startBtn: { borderRadius: 18, overflow: 'hidden' },
   startBtnGradient: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 28, paddingVertical: 18 },
   startBtnText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF', letterSpacing: 1 },
+  emptyTodayRow: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginBottom: 8 },
+  emptyColBtn: { flex: 1, borderRadius: 16, overflow: 'hidden', height: 72 },
+  emptyColBtnGradient: { flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  emptyColBtnText: { fontFamily: FONTS.bodyBold, fontSize: 13, letterSpacing: 0.4 },
   listHeader: { marginBottom: 10 },
   splitsSection: { marginBottom: 20 },
   sectionCopy: { flex: 1 },
@@ -805,6 +1098,36 @@ const styles = StyleSheet.create({
     marginTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  headerIconBtn: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  headerIconBtnGradient: {
+    width: vs(46),
+    height: vs(46),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: s(14),
+  },
+  emptyRestBtn: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    width: '80%',
+    maxWidth: 280,
+  },
+  emptyRestBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 14,
+  },
+  emptyRestBtnText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 14,
+    letterSpacing: 0.5,
   },
 });
 
@@ -1023,5 +1346,108 @@ const xpStyles = StyleSheet.create({
     fontSize: 15,
     color: '#FFF',
     letterSpacing: 1.5,
+  },
+});
+
+const restModalStyles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '88%',
+    minHeight: 400,
+    paddingTop: 10,
+  },
+  modalHandle: {
+    alignItems: 'center',
+    paddingBottom: 6,
+  },
+  modalHandleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 6,
+  },
+  modalHeader: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    paddingTop: 8,
+  },
+  modalTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+  },
+  modalList: {
+    paddingHorizontal: 20,
+    gap: 12,
+    paddingBottom: 16,
+  },
+  restTypeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    padding: 16,
+    gap: 14,
+  },
+  restTypeBadge: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  restTypeBadgeLetter: {
+    fontFamily: FONTS.heading,
+    fontSize: 20,
+    color: '#FFF',
+  },
+  restTypeInfo: {
+    flex: 1,
+  },
+  restTypeLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+    marginBottom: 2,
+  },
+  restTypeSublabel: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  restTypeStreakNote: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    marginTop: 6,
+  },
+  modalFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.08)',
+  },
+  confirmBtn: {
+    borderRadius: 18,
+    height: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  confirmBtnText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 16,
+    color: '#FFF',
+    letterSpacing: 0.5,
   },
 });

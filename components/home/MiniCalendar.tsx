@@ -22,6 +22,18 @@ const MONTHS = [
   "July","August","September","October","November","December",
 ];
 
+const REST_TYPE_CONFIG: Record<string, { letter: string; color: string }> = {
+  fatigue:       { letter: "F", color: "#3B82F6" },
+  sick:          { letter: "S", color: "#F59E0B" },
+  injury:        { letter: "I", color: "#EF4444" },
+  after_workout: { letter: "A", color: "#14B8A6" },
+  late:          { letter: "L", color: "#8B5CF6" },
+  other:         { letter: "O", color: "#6B7280" },
+};
+
+const getRestCfg = (type?: string) =>
+  REST_TYPE_CONFIG[type ?? "fatigue"] ?? REST_TYPE_CONFIG.fatigue;
+
 interface DayEntry {
   date: string;
   count: number;
@@ -37,6 +49,7 @@ export default function MiniCalendar() {
   const todayStr = today.toISOString().split("T")[0];
 
   const [history, setHistory] = useState<DayEntry[]>([]);
+  const [restDays, setRestDays] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -47,6 +60,7 @@ export default function MiniCalendar() {
           headers: { Authorization: `Bearer ${token}` },
         });
         setHistory(res.data.overall || []);
+        setRestDays(res.data.restDays || {});
       } catch (e) {
         console.error("MiniCalendar fetch error", e);
       } finally {
@@ -78,9 +92,15 @@ export default function MiniCalendar() {
   const isFuture = (d: number) => dateStr(d) > todayStr;
   const isTodayCell = (d: number) => dateStr(d) === todayStr;
   const isActive = (d: number) => !isFuture(d) && (dateMap[dateStr(d)] || 0) > 0;
+  const isRest = (d: number) => !isFuture(d) && !!restDays[dateStr(d)];
 
   const activeCount = Array.from({ length: daysInMonth }, (_, i) => i + 1)
     .filter((d) => !isFuture(d) && (dateMap[dateStr(d)] || 0) > 0).length;
+
+  const restCount = Object.keys(restDays).filter((ds) => {
+    const [y, m] = ds.split("-").map(Number);
+    return y === year && m === month + 1;
+  }).length;
 
   return (
     <TouchableOpacity
@@ -132,10 +152,13 @@ export default function MiniCalendar() {
                 return <View key={di} style={{ flex: 1, aspectRatio: 1 }} />;
               }
 
+              const ds = dateStr(day);
               const future = isFuture(day);
               const todayCell = isTodayCell(day);
               const active = isActive(day);
-              const inactivePast = !future && !todayCell && !active;
+              const restDay = isRest(day);
+              const restCfg = restDay ? getRestCfg(restDays[ds]) : null;
+              const inactivePast = !future && !todayCell && !active && !restDay;
 
               return (
                 <View
@@ -144,16 +167,30 @@ export default function MiniCalendar() {
                     styles.cell,
                     todayCell && styles.cellToday,
                     active && styles.cellActive,
+                    restDay && !todayCell && { backgroundColor: "rgba(0,0,0,0.35)", borderWidth: 1, borderColor: restCfg?.color ?? "#3B82F6" },
                     inactivePast && styles.cellInactive,
+                    future && { opacity: 0.2 },
                   ]}
                 >
-                  {active ? (
+                  {/* Workout checkmark badge */}
+                  {active && (
                     <View style={styles.checkCircle}>
                       <Ionicons name="checkmark" size={10} color="#FFFFFF" />
                     </View>
-                  ) : inactivePast ? (
+                  )}
+
+                  {/* Rest day letter badge */}
+                  {restDay && restCfg && (
+                    <View style={[styles.restBadge, { backgroundColor: restCfg.color }]}>
+                      <Text style={styles.restLetter}>{restCfg.letter}</Text>
+                    </View>
+                  )}
+
+                  {/* Missed day X */}
+                  {inactivePast && (
                     <Ionicons name="close" size={10} color="#EF4444" style={styles.crossIcon} />
-                  ) : null}
+                  )}
+
                   <Text
                     style={[
                       styles.dayNum,
@@ -164,8 +201,10 @@ export default function MiniCalendar() {
                           ? "#FFFFFF"
                           : active
                           ? "#FFFFFF"
+                          : restDay
+                          ? restCfg?.color ?? "#FFFFFF"
                           : "rgba(255,255,255,0.70)",
-                        fontFamily: todayCell || active ? FONTS.bodyBold : FONTS.body,
+                        fontFamily: todayCell || active || restDay ? FONTS.bodyBold : FONTS.body,
                       },
                     ]}
                   >
@@ -178,11 +217,22 @@ export default function MiniCalendar() {
         ))}
       </View>
 
+      {/* Legend row */}
+      <View style={styles.legendRow}>
+        {Object.entries(REST_TYPE_CONFIG).map(([key, cfg]) => (
+          <View key={key} style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: cfg.color }]}>
+              <Text style={styles.legendLetter}>{cfg.letter}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
       <View style={styles.footer}>
         <View style={styles.footerDot} />
         <Text style={styles.footerText}>
           {loaded
-            ? `${activeCount} workout${activeCount !== 1 ? "s" : ""} this month`
+            ? `${activeCount} workout${activeCount !== 1 ? "s" : ""}${restCount > 0 ? ` · ${restCount} rest day${restCount !== 1 ? "s" : ""}` : ""} this month`
             : "Loading..."}
         </Text>
       </View>
@@ -279,6 +329,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 1,
   },
+  restBadge: {
+    position: "absolute",
+    top: 1,
+    right: 1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  restLetter: {
+    color: "#FFFFFF",
+    fontFamily: FONTS.bodyBold,
+    fontSize: 7,
+    lineHeight: 14,
+    textAlign: "center",
+  },
   crossIcon: {
     position: "absolute",
     top: 1,
@@ -287,6 +355,31 @@ const styles = StyleSheet.create({
   },
   dayNum: {
     fontSize: scale(11),
+  },
+  legendRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: vs(8),
+    paddingTop: vs(6),
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
+  legendItem: {
+    alignItems: "center",
+  },
+  legendDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  legendLetter: {
+    color: "#FFFFFF",
+    fontFamily: FONTS.bodyBold,
+    fontSize: 8,
+    textAlign: "center",
   },
   footer: {
     flexDirection: "row",

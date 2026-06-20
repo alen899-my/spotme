@@ -8,6 +8,17 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { isSameDay } from '../../utils/datetime';
 
+const REST_TYPE_CONFIG: Record<string, { letter: string; color: string }> = {
+  fatigue:       { letter: 'F', color: '#3B82F6' },
+  sick:          { letter: 'S', color: '#F59E0B' },
+  injury:        { letter: 'I', color: '#EF4444' },
+  after_workout: { letter: 'A', color: '#14B8A6' },
+  late:          { letter: 'L', color: '#8B5CF6' },
+  other:         { letter: 'O', color: '#6B7280' },
+};
+
+const getRestConfig = (type?: string) => REST_TYPE_CONFIG[type ?? 'fatigue'] ?? REST_TYPE_CONFIG.fatigue;
+
 const DAYS_SHOWN = 7;
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
@@ -27,13 +38,14 @@ interface DatePickerProps {
   variant?: 'default' | 'nutrition';
   backgroundImage?: any;
   loggedDates?: string[];
+  restDayMap?: Record<string, string>;
   showStatusMarkers?: boolean;
 }
 
 // ── Mini Calendar Modal ────────────────────────────────────────────────────────
 function CalendarModal({
   visible, baseDate, onClose, onSelect, variant = 'default',
-  loggedDates, showStatusMarkers,
+  loggedDates, restDayMap, showStatusMarkers,
 }: {
   visible: boolean;
   baseDate: Date;
@@ -41,6 +53,7 @@ function CalendarModal({
   onSelect: (d: Date) => void;
   variant?: 'default' | 'nutrition';
   loggedDates?: string[];
+  restDayMap?: Record<string, string>;
   showStatusMarkers?: boolean;
 }) {
   const { colors, isDark } = useTheme();
@@ -160,6 +173,9 @@ function CalendarModal({
 
               const dayStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const isLogged = loggedDates?.includes(dayStr);
+              const restType = restDayMap?.[dayStr];
+              const isRest = restType !== undefined;
+              const restCfg = isRest ? getRestConfig(restType) : null;
               const isPast = !future && !todayC;
 
               return (
@@ -186,7 +202,12 @@ function CalendarModal({
                       <Ionicons name="checkmark" size={8} color="#FFFFFF" />
                     </View>
                   )}
-                  {showStatusMarkers && isPast && !isLogged && (
+                  {showStatusMarkers && isRest && restCfg && (
+                    <View style={[cal.checkCircle, { backgroundColor: restCfg.color }]}>
+                      <Text style={cal.restText}>{restCfg.letter}</Text>
+                    </View>
+                  )}
+                  {showStatusMarkers && isPast && !isLogged && !isRest && (
                     <Ionicons name="close" size={8} color="#EF4444" style={cal.crossIcon} />
                   )}
                   <Text style={[
@@ -251,12 +272,19 @@ const cal = StyleSheet.create({
     right: 1,
     zIndex: 2,
   },
+  restText: {
+    color: '#FFFFFF',
+    fontFamily: FONTS.bodyBold,
+    fontSize: 7.5,
+    lineHeight: 12,
+    textAlign: 'center',
+  },
 });
 
 // ── Main DatePicker ────────────────────────────────────────────────────────────
 export default function DatePicker({
   selectedDate, onSelectDate, variant = 'default', backgroundImage,
-  loggedDates, showStatusMarkers,
+  loggedDates, restDayMap, showStatusMarkers,
 }: DatePickerProps) {
   const { colors, isDark } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
@@ -384,6 +412,9 @@ export default function DatePicker({
         {!inStrip && (() => {
           const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
           const isLogged = loggedDates?.includes(dateStr);
+          const restType = restDayMap?.[dateStr];
+          const isRest = restType !== undefined;
+          const restCfg = isRest ? getRestConfig(restType) : null;
           const future = selectedDate > today();
           const isPast = !future && !isSameDay(selectedDate, today());
 
@@ -398,7 +429,12 @@ export default function DatePicker({
                   <Ionicons name="checkmark" size={8} color="#FFFFFF" />
                 </View>
               )}
-              {showStatusMarkers && isPast && !isLogged && (
+              {showStatusMarkers && isRest && restCfg && (
+                <View style={[styles.checkCircle, { backgroundColor: restCfg.color }]}>
+                  <Text style={styles.restText}>{restCfg.letter}</Text>
+                </View>
+              )}
+              {showStatusMarkers && isPast && !isLogged && !isRest && (
                 <Ionicons name="close" size={8} color="#EF4444" style={styles.crossIcon} />
               )}
               <Text style={[styles.pillDay, { color: isNutrition ? 'rgba(4,40,43,0.72)' : 'rgba(255,255,255,0.8)' }]}>
@@ -416,6 +452,9 @@ export default function DatePicker({
 
           const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
           const isLogged = loggedDates?.includes(dateStr);
+          const restType = restDayMap?.[dateStr];
+          const isRest = restType !== undefined;
+          const restCfg = isRest ? getRestConfig(restType) : null;
           const future = date > today();
           const isPast = !future && !isT;
 
@@ -439,7 +478,12 @@ export default function DatePicker({
                   <Ionicons name="checkmark" size={8} color="#FFFFFF" />
                 </View>
               )}
-              {showStatusMarkers && isPast && !isLogged && (
+              {showStatusMarkers && isRest && restCfg && (
+                <View style={[styles.checkCircle, { backgroundColor: restCfg.color }]}>
+                  <Text style={styles.restText}>{restCfg.letter}</Text>
+                </View>
+              )}
+              {showStatusMarkers && isPast && !isLogged && !isRest && (
                 <Ionicons name="close" size={8} color="#EF4444" style={styles.crossIcon} />
               )}
               <Text style={[styles.pillDay, { color: active ? 'rgba(4,40,43,0.72)' : palette.pillMuted }]}>
@@ -462,6 +506,7 @@ export default function DatePicker({
         onSelect={onSelectDate}
         variant={variant}
         loggedDates={loggedDates}
+        restDayMap={restDayMap}
         showStatusMarkers={showStatusMarkers}
       />
     </>
@@ -556,5 +601,12 @@ const styles = StyleSheet.create({
     top: 4,
     right: 4,
     zIndex: 2,
+  },
+  restText: {
+    color: '#FFFFFF',
+    fontFamily: FONTS.bodyBold,
+    fontSize: 7.5,
+    lineHeight: 12,
+    textAlign: 'center',
   },
 });

@@ -494,6 +494,9 @@ const initDB = async () => {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_physique_analyses_user ON physique_analyses (user_id, created_at DESC);`);
 
+    // ── Rest Day Type Column ─────────────────────────────────────────────────
+    await pool.query(`ALTER TABLE daily_workouts ADD COLUMN IF NOT EXISTS rest_type VARCHAR(20);`);
+
   } catch (error) {
     console.error("Database initialization failed:", error);
   }
