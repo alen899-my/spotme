@@ -22,7 +22,7 @@ const BG_IMAGES: Record<string, any> = {
   reports:   require("../../assets/explore/reports.png"),
   calendar:  require("../../assets/explore/calender.png"),
   followers: require("../../assets/explore/following.png"),
-  physique:  require("../../assets/explore/physique.png"),
+  physique:  require("../../assets/coach/workout1.png"),
 };
 
 interface ExploreItem {
