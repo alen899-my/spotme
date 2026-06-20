@@ -370,21 +370,33 @@ export default function SplitSessionsScreen() {
               </>
             )}
           </View>
-          {!isShared && !clonedFromId && (
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={() => router.push({ pathname: `/splits/${id}/create-session` })}
-            >
-              <LinearGradient
-                colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]}
-                style={styles.addBtnGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+          <View style={styles.headerRight}>
+            {splitDetail && (
+              <SplitRating
+                avgRating={splitDetail.avg_rating}
+                ratingCount={splitDetail.rating_count}
+                userRating={splitDetail.user_rating}
+                canRate={splitDetail.can_rate}
+                onRate={handleRate}
+                size="sm"
+              />
+            )}
+            {!isShared && !clonedFromId && (
+              <TouchableOpacity
+                style={styles.addBtn}
+                onPress={() => router.push({ pathname: `/splits/${id}/create-session` })}
               >
-                <Ionicons name="add" size={24} color="#FFF" />
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
+                <LinearGradient
+                  colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]}
+                  style={styles.addBtnGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Ionicons name="add" size={24} color="#FFF" />
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {loading ? (
@@ -411,36 +423,7 @@ export default function SplitSessionsScreen() {
               { paddingBottom: isShared ? 100 + Math.max(insets.bottom, 12) : 32 + Math.max(insets.bottom, 12) }
             ]}
             showsVerticalScrollIndicator={false}
-            ListFooterComponent={
-              splitDetail ? (
-                <View style={[styles.ratingSection, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
-                  <Text style={[styles.ratingLabel, { color: colors.text }]}>Rate this Program</Text>
-                  <SplitRating
-                    avgRating={splitDetail.avg_rating}
-                    ratingCount={splitDetail.rating_count}
-                    userRating={splitDetail.user_rating}
-                    canRate={splitDetail.can_rate}
-                    onRate={handleRate}
-                    size="md"
-                  />
-                </View>
-              ) : null
-            }
           />
-        )}
-
-        {!loading && sessions.length === 0 && splitDetail && (
-          <View style={[styles.ratingSectionStandalone, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
-            <Text style={[styles.ratingLabel, { color: colors.text }]}>Rate this Program</Text>
-            <SplitRating
-              avgRating={splitDetail.avg_rating}
-              ratingCount={splitDetail.rating_count}
-              userRating={splitDetail.user_rating}
-              canRate={splitDetail.can_rate}
-              onRate={handleRate}
-              size="md"
-            />
-          </View>
         )}
 
         {isShared && (
@@ -526,11 +509,17 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20 },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 24,
     paddingBottom: 8,
   },
   backBtn: { marginLeft: -8 },
+  headerRight: {
+    alignItems: 'flex-end',
+    marginLeft: 8,
+    marginTop: 2,
+    gap: 6,
+  },
   headerTitle: { fontFamily: FONTS.heading, fontSize: 26 },
   headerSub: { fontFamily: FONTS.body, fontSize: 13, marginTop: 2 },
   addBtn: {
@@ -654,24 +643,4 @@ const styles = StyleSheet.create({
   emptyTitle: { fontFamily: FONTS.heading, fontSize: 24, marginBottom: 8 },
   emptySub: { fontFamily: FONTS.body, fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
 
-  // Rating
-  ratingSection: {
-    paddingVertical: 16,
-    paddingHorizontal: 4,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    marginTop: 8,
-  },
-  ratingSectionStandalone: {
-    paddingVertical: 16,
-    paddingHorizontal: 4,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    marginHorizontal: 0,
-  },
-  ratingLabel: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 13,
-    marginBottom: 10,
-  },
 });

@@ -6,28 +6,22 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Dimensions,
-  Image,
   TextInput,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import ActionModal from '../../components/ui/ActionModal';
 import { SplitsSkeleton } from '../../components/ui/Skeleton';
-import SplitRating from '../../components/ui/SplitRating';
 import SplitCard from '../../components/ui/SplitCard';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 
 const TABS = [
   { key: 'my', label: 'My Programs' },
@@ -35,6 +29,14 @@ const TABS = [
 ] as const;
 
 type TabKey = typeof TABS[number]['key'];
+
+const SORT_OPTIONS = [
+  { key: '', label: 'Default' },
+  { key: 'avg_rating', label: 'Top Rated' },
+  { key: 'user_count', label: 'Most Popular' },
+  { key: 'session_count', label: 'Most Sessions' },
+  { key: 'created_at', label: 'Newest' },
+] as const;
 
 export default function SplitsTab() {
   const router = useRouter();
@@ -51,21 +53,16 @@ export default function SplitsTab() {
   const [loadingMore, setLoadingMore] = useState(false);
   const searchTimer = useRef<any>(null);
 
+  // Sort/Filter state
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [minRating, setMinRating] = useState(0);
+  const [minUserCount, setMinUserCount] = useState(0);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
   // Deletion state
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Group shared splits by creator
-  const userGroups = React.useMemo(() => {
-    const map = new Map<number, { id: number; name: string; pic: string; splits: any[] }>();
-    for (const s of sharedSplits) {
-      if (!map.has(s.creator_id)) {
-        map.set(s.creator_id, { id: s.creator_id, name: s.creator_name, pic: s.creator_pic || '', splits: [] });
-      }
-      map.get(s.creator_id)!.splits.push(s);
-    }
-    return Array.from(map.values());
-  }, [sharedSplits]);
 
   const fetchSplits = useCallback(async () => {
     try {
@@ -88,6 +85,9 @@ export default function SplitsTab() {
       const token = await getToken();
       const params: any = { page: pageNum, limit: 10 };
       if (q && q.trim()) params.q = q.trim();
+      if (sortBy) { params.sort = sortBy; params.order = sortOrder; }
+      if (minRating > 0) params.min_rating = minRating;
+      if (minUserCount > 0) params.min_user_count = minUserCount;
       const res = await axios.get(`${API_URL}/workouts/shared-splits`, {
         params,
         headers: { Authorization: `Bearer ${token}` }
@@ -106,7 +106,7 @@ export default function SplitsTab() {
       if (append) setLoadingMore(false);
       else setSharedLoading(false);
     }
-  }, []);
+  }, [sortBy, sortOrder, minRating, minUserCount]);
 
   useFocusEffect(
     useCallback(() => {
@@ -133,6 +133,32 @@ export default function SplitsTab() {
     setDeleteId(id);
   };
 
+  const handleSort = (key: string) => {
+    setSortBy(key);
+    setSortOrder('desc');
+    setPage(1);
+    setSharedSplits([]);
+    fetchSharedSplits(searchQuery, 1, false);
+  };
+
+  const handleApplyFilters = () => {
+    setShowFilterModal(false);
+    setPage(1);
+    setSharedSplits([]);
+    fetchSharedSplits(searchQuery, 1, false);
+  };
+
+  const handleClearFilters = () => {
+    setMinRating(0);
+    setMinUserCount(0);
+    setShowFilterModal(false);
+    setPage(1);
+    setSharedSplits([]);
+    fetchSharedSplits(searchQuery, 1, false);
+  };
+
+  const hasActiveFilters = minRating > 0 || minUserCount > 0;
+
   const onConfirmDelete = async () => {
     if (!deleteId) return;
     setIsDeleting(true);
@@ -156,114 +182,23 @@ export default function SplitsTab() {
     <SplitCard item={item} onDelete={handleDelete} />
   );
 
-  const splitCardWidth = 160;
-
-  const renderHorizontalSplit = (item: any) => {
-    const exImages = item.exercise_images || [];
+  const renderSharedSplit = ({ item }: { item: any }) => {
+    const mappedItem = {
+      ...item,
+      original_creator_name: item.creator_name,
+      original_creator_pic: item.creator_pic,
+      original_creator_id: item.creator_id,
+    };
     return (
-      <TouchableOpacity
-        key={item.id}
-        style={[styles.horiSplitCard, {
-          backgroundColor: colors.card,
-          borderColor: colors.border,
-        }]}
-        activeOpacity={0.85}
+      <SplitCard
+        item={mappedItem}
         onPress={() => router.push({
           pathname: `/splits/${item.id}`,
           params: { shared: '1', creatorName: item.creator_name, creatorPic: item.creator_pic || '', splitName: item.name }
         })}
-      >
-        <View style={styles.horiImageStack}>
-          {exImages.slice(0, 3).map((uri: string, i: number) => (
-            <Image
-              key={i}
-              source={{ uri }}
-              style={[
-                styles.horiStackImg,
-                {
-                  marginLeft: i > 0 ? -14 : 0,
-                  zIndex: 3 - i,
-                  borderColor: colors.card,
-                }
-              ]}
-            />
-          ))}
-          {exImages.length === 0 && (
-            <View style={[styles.horiStackImg, { backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center', marginLeft: 0 }]}>
-              <Ionicons name="barbell-outline" size={14} color={colors.textMuted} />
-            </View>
-          )}
-        </View>
-        <Text style={[styles.horiSplitName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[styles.horiSplitSessions, { color: colors.textMuted }]}>{item.session_count} sessions</Text>
-        {item.user_count > 0 && (
-          <Text style={[styles.horiSplitSessions, { color: colors.textMuted }]}>
-            <Ionicons name="people-outline" size={10} color={colors.textMuted} /> {item.user_count} users
-          </Text>
-        )}
-        {item.avg_rating > 0 && (
-          <SplitRating avgRating={item.avg_rating} ratingCount={item.rating_count} size="sm" />
-        )}
-        {item.is_already_added ? (
-          <View style={[styles.horiBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-            <Ionicons name="checkmark-circle" size={10} color={colors.textMuted} />
-            <Text style={[styles.horiBadgeText, { color: colors.textMuted }]}>Added</Text>
-          </View>
-        ) : (
-          <View style={[styles.horiBadge, { backgroundColor: colors.primary + '20', borderColor: colors.primary + '40' }]}>
-            <Ionicons name="add-circle-outline" size={10} color={colors.primary} />
-            <Text style={[styles.horiBadgeText, { color: colors.primary }]}>Add</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+      />
     );
   };
-
-  const renderUserRow = ({ item }: { item: { id: number; name: string; pic: string; splits: any[] } }) => (
-    <View style={styles.userRow}>
-      <View style={styles.userRowHeader}>
-        <TouchableOpacity
-          style={styles.userRowProfile}
-          activeOpacity={0.7}
-          onPress={() => router.push(`/profile/${item.id}`)}
-        >
-          {item.pic ? (
-            <Image source={{ uri: item.pic }} style={styles.userRowAvatar} />
-          ) : (
-            <View style={[styles.userRowAvatar, { backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center' }]}>
-              <Ionicons name="person" size={14} color={colors.textMuted} />
-            </View>
-          )}
-          <Text style={[styles.userRowName, { color: colors.text }]}>@{item.name?.replace(/\s/g, '') || 'user'}</Text>
-        </TouchableOpacity>
-        <Text style={[styles.userRowCount, { color: colors.textMuted }]}>{item.splits.length} split{item.splits.length > 1 ? 's' : ''}</Text>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.horiScrollContent}
-        decelerationRate="fast"
-        snapToInterval={splitCardWidth + 10}
-        snapToAlignment="start"
-      >
-        {item.splits.map(s => renderHorizontalSplit(s))}
-        {item.splits.length > 2 && (
-          <TouchableOpacity
-            style={[styles.viewAllCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
-            activeOpacity={0.7}
-            onPress={() => router.push({
-              pathname: `/splits/user/${item.id}`,
-              params: { name: item.name, pic: item.pic, count: String(item.splits.length) }
-            })}
-          >
-            <Ionicons name="grid-outline" size={20} color={colors.textMuted} />
-            <Text style={[styles.viewAllLabel, { color: colors.textMuted }]}>View all</Text>
-            <Text style={[styles.viewAllCount, { color: colors.textMuted }]}>{item.splits.length} programs</Text>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
-    </View>
-  );
 
   const renderContent = () => {
     if (activeTab === 'my') {
@@ -303,33 +238,72 @@ export default function SplitsTab() {
     }
 
     // Community tab
-    const showSearch = sharedSplits.length > 0 || searchQuery.length > 0;
-
     if (sharedLoading && sharedSplits.length === 0) return <SplitsSkeleton />;
 
     return (
       <FlatList
-        key="community-rows"
-        data={userGroups}
+        key="community-splits"
+        data={sharedSplits}
         keyExtractor={(item) => String(item.id)}
-        renderItem={renderUserRow}
+        renderItem={renderSharedSplit}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <View style={[styles.searchWrap, { backgroundColor: isDark ? colors.inputBg : '#FFF', borderColor: isDark ? colors.border : 'rgba(37,150,190,0.2)' }]}>
-            <Ionicons name="search" size={16} color={colors.textMuted} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search users..."
-              placeholderTextColor={colors.textMuted}
-              value={searchQuery}
-              onChangeText={handleSearch}
-              returnKeyType="search"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => { setSearchQuery(''); setHasMore(true); fetchSharedSplits('', 1, false); }}>
-                <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+          <View>
+            <View style={[styles.searchWrap, { backgroundColor: isDark ? colors.inputBg : '#FFF', borderColor: isDark ? colors.border : 'rgba(37,150,190,0.2)' }]}>
+              <Ionicons name="search" size={16} color={colors.textMuted} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Search users..."
+                placeholderTextColor={colors.textMuted}
+                value={searchQuery}
+                onChangeText={handleSearch}
+                returnKeyType="search"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => { setSearchQuery(''); setHasMore(true); fetchSharedSplits('', 1, false); }}>
+                  <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortRow}>
+              {SORT_OPTIONS.map((opt) => {
+                const isActive = sortBy === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[
+                      styles.sortChip,
+                      isActive && { backgroundColor: colors.primary, borderColor: colors.primary },
+                    ]}
+                    activeOpacity={0.75}
+                    onPress={() => handleSort(opt.key)}
+                  >
+                    <Text style={[styles.sortChipText, { color: isActive ? '#FFF' : colors.textMuted }]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                style={[styles.filterBtn, { borderColor: colors.border }]}
+                activeOpacity={0.75}
+                onPress={() => setShowFilterModal(true)}
+              >
+                <Ionicons name="options-outline" size={16} color={hasActiveFilters ? colors.primary : colors.textMuted} />
               </TouchableOpacity>
+            </ScrollView>
+            {hasActiveFilters && (
+              <View style={styles.activeFiltersRow}>
+                <Text style={[styles.activeFiltersText, { color: colors.textMuted }]}>
+                  {minRating > 0 && `Min rating: ${minRating}`}
+                  {minRating > 0 && minUserCount > 0 ? ' | ' : ''}
+                  {minUserCount > 0 && `Min users: ${minUserCount}`}
+                </Text>
+                <TouchableOpacity onPress={handleClearFilters}>
+                  <Text style={[styles.clearFiltersBtn, { color: colors.primary }]}>Clear</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         }
@@ -340,11 +314,11 @@ export default function SplitsTab() {
                 <MaterialCommunityIcons name="account-group-outline" size={64} color={colors.border} />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text, fontSize: 22 }]}>
-                {searchQuery ? 'No users found' : 'No Community Splits'}
+                {searchQuery ? 'No programs found' : 'No Community Splits'}
               </Text>
               <Text style={[styles.emptySub, { color: colors.textMuted }]}>
                 {searchQuery
-                  ? `No users matching "${searchQuery}"`
+                  ? `No programs matching "${searchQuery}"`
                   : 'No one has shared their programs yet. Enable sharing in your settings to contribute!'}
               </Text>
             </View>
@@ -436,6 +410,81 @@ export default function SplitsTab() {
           onConfirm={onConfirmDelete}
           onCancel={() => setDeleteId(null)}
         />
+
+        {/* Filter Modal */}
+        <Modal visible={showFilterModal} transparent animationType="fade" onRequestClose={() => setShowFilterModal(false)}>
+          <View style={[styles.filterOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)' }]}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowFilterModal(false)} />
+            <View style={[styles.filterContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.filterHeader}>
+                <Text style={[styles.filterTitle, { color: colors.text }]}>Filters</Text>
+                <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                  <Ionicons name="close" size={22} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.filterSectionLabel, { color: colors.text }]}>Minimum Rating</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterOptionsRow}>
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                  <TouchableOpacity
+                    key={n}
+                    style={[
+                      styles.filterOption,
+                      minRating === n && { backgroundColor: colors.primary, borderColor: colors.primary },
+                    ]}
+                    onPress={() => setMinRating(n)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.filterOptionText, { color: minRating === n ? '#FFF' : colors.textMuted }]}>
+                      {n === 0 ? 'Any' : n}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <Text style={[styles.filterSectionLabel, { color: colors.text }]}>Minimum Users</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterOptionsRow}>
+                {[
+                  { label: 'Any', value: 0 },
+                  { label: '5+', value: 5 },
+                  { label: '10+', value: 10 },
+                  { label: '25+', value: 25 },
+                  { label: '50+', value: 50 },
+                  { label: '100+', value: 100 },
+                ].map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.filterOption,
+                      minUserCount === opt.value && { backgroundColor: colors.primary, borderColor: colors.primary },
+                    ]}
+                    onPress={() => setMinUserCount(opt.value)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.filterOptionText, { color: minUserCount === opt.value ? '#FFF' : colors.textMuted }]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <View style={styles.filterActions}>
+                <TouchableOpacity
+                  style={[styles.filterClearBtn, { borderColor: colors.border }]}
+                  onPress={handleClearFilters}
+                >
+                  <Text style={[styles.filterClearText, { color: colors.textMuted }]}>Clear All</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.filterApplyBtn, { backgroundColor: colors.primary }]}
+                  onPress={handleApplyFilters}
+                >
+                  <Text style={styles.filterApplyText}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </View>
   );
@@ -483,7 +532,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  listContent: { paddingBottom: 130, flexGrow: 1 },
+  listContent: { paddingHorizontal: 16, paddingBottom: 130, flexGrow: 1 },
 
   // Search bar
   searchWrap: {
@@ -504,99 +553,126 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 
-  // User row
-  userRow: {
-    marginBottom: 20,
-  },
-  userRowHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  userRowProfile: {
+  // Sort chips
+  sortRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 12,
+    paddingRight: 16,
   },
-  userRowAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  sortChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(128,128,128,0.1)',
   },
-  userRowName: {
+  sortChipText: {
     fontFamily: FONTS.bodySemiBold,
-    fontSize: 14,
+    fontSize: 12,
   },
-  userRowCount: {
-    fontFamily: FONTS.body,
-    fontSize: 11,
-  },
-  horiScrollContent: {
-    gap: 10,
-    paddingRight: 20,
-  },
-
-  // Horizontal split card
-  horiSplitCard: {
-    width: 160,
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 10,
-    gap: 5,
-  },
-  horiImageStack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 40,
-    marginBottom: 4,
-  },
-  horiStackImg: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    borderWidth: 2,
-  },
-  horiSplitName: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 13,
-  },
-  horiSplitSessions: {
-    fontFamily: FONTS.body,
-    fontSize: 10,
-  },
-  horiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
-  },
-  horiBadgeText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 9,
-  },
-
-  // View all card
-  viewAllCard: {
-    width: 100,
-    borderRadius: 18,
+  filterBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 4,
-    padding: 10,
+    marginLeft: 2,
   },
-  viewAllLabel: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 11,
+  activeFiltersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 2,
   },
-  viewAllCount: {
+  activeFiltersText: {
     fontFamily: FONTS.body,
-    fontSize: 9,
+    fontSize: 12,
+  },
+  clearFiltersBtn: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+  },
+
+  // Filter modal
+  filterOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  filterContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  filterTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 22,
+  },
+  filterSectionLabel: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  filterOptionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 20,
+  },
+  filterOption: {
+    minWidth: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(128,128,128,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  filterOptionText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+  },
+  filterActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  filterClearBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterClearText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 14,
+  },
+  filterApplyBtn: {
+    flex: 2,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterApplyText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 14,
+    color: '#FFF',
   },
 
   // States

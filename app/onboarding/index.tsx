@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import DOBPicker from "../../components/ui/DOBPicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import { P } from "../../constants/homeTheme";
@@ -42,6 +42,7 @@ export default function OnboardingScreen() {
   const { colors, isDark } = useTheme();
 
   const [step, setStep] = useState(0);
+  const [visitedSteps, setVisitedSteps] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savingStep, setSavingStep] = useState(false);
   const [hydrating, setHydrating] = useState(true); // blocks render until profile pre-load done
@@ -49,7 +50,6 @@ export default function OnboardingScreen() {
 
   // Smooth slide + fade transitions with zero flickering
   const fadeAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
 
   // ─── Form State ────────────────────────────────────────────────────────────
   const [gender, setGender] = useState("");
@@ -60,6 +60,7 @@ export default function OnboardingScreen() {
   const [heightVal, setHeightVal] = useState("");
   const [weightVal, setWeightVal] = useState("");
   const [bodyFat, setBodyFat] = useState("");
+  const [editingBodyFat, setEditingBodyFat] = useState(false);
   const [units, setUnits] = useState({
     height: "cm", weight: "kg", neck: "cm", waist: "cm",
     hip: "cm", chest: "cm", arm: "cm", thigh: "cm",
@@ -152,6 +153,7 @@ export default function OnboardingScreen() {
 
         // Pre-populate photos from DB (remote URLs)
         if (u.profile_pic_url) setPhotos(prev => ({ ...prev, profile: u.profile_pic_url }));
+        if (u.completed_steps) setVisitedSteps(u.completed_steps);
         if (u.front_photo_url) setPhotos(prev => ({ ...prev, front: u.front_photo_url }));
         if (u.back_photo_url)  setPhotos(prev => ({ ...prev, back:  u.back_photo_url }));
         if (u.side_photo_url)  setPhotos(prev => ({ ...prev, side:  u.side_photo_url }));
@@ -209,35 +211,62 @@ export default function OnboardingScreen() {
     return `${date.getDate().toString().padStart(2, "0")} / ${(date.getMonth() + 1).toString().padStart(2, "0")} / ${date.getFullYear()}`;
   };
 
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === "ios");
-    if (selectedDate) {
-      const dobStr = selectedDate.toISOString().split("T")[0];
-      setDob(dobStr);
-      setAge(calculateAge(dobStr));
+  // ─── Body Fat Calculation ──────────────────────────────────────────────────
+  const calcBodyFat = useCallback(() => {
+    if (!gender || !heightVal || !neck) return null;
+
+    const toCm = (val: string, unit: string) => {
+      const num = parseFloat(val);
+      return isNaN(num) || !val ? null : unit === "in" ? num * 2.54 : num;
+    };
+
+    const h = toCm(heightVal, units.height);
+    const n = toCm(neck, units.neck);
+    const w = toCm(waist, units.waist);
+    if (h === null || n === null || w === null) return null;
+
+    const waistMinusNeck = w - n;
+    if (waistMinusNeck <= 0) return null;
+
+    if (gender === "Male") {
+      return 495 / (1.0324 - 0.19077 * Math.log10(waistMinusNeck) + 0.15456 * Math.log10(h)) - 450;
+    } else {
+      const hp = toCm(hip, units.hip);
+      if (hp === null) return null;
+      const sum = w + hp - n;
+      if (sum <= 0) return null;
+      return 495 / (1.29579 - 0.35004 * Math.log10(sum) + 0.22100 * Math.log10(h)) - 450;
     }
-  };
+  }, [gender, heightVal, units.height, neck, units.neck, waist, units.waist, hip, units.hip]);
+
+  useEffect(() => {
+    if (editingBodyFat) return;
+    const bf = calcBodyFat();
+    if (bf !== null) setBodyFat(bf.toFixed(1));
+  }, [calcBodyFat, editingBodyFat]);
 
   // ─── Transition ────────────────────────────────────────────────────────────
   const animateToStep = (nextStep: number) => {
-    // 1. Fast fade-out and slide-down
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 110, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 12, duration: 110, useNativeDriver: true }),
-    ]).start(() => {
-      // 2. Perform step layout swap instantly
+    Animated.timing(fadeAnim, {
+      toValue: 0, duration: 100, useNativeDriver: true,
+    }).start(() => {
       setStep(nextStep);
-      // 3. Position below view boundary for upcoming fade-in
-      slideAnim.setValue(-12);
-      // 4. Smooth slide-up and fade-in
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 170, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 0, duration: 170, useNativeDriver: true }),
-      ]).start();
+      requestAnimationFrame(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 1, duration: 150, useNativeDriver: true,
+        }).start();
+      });
     });
   };
 
-  const nextStep = () => { if (step < 11) animateToStep(step + 1); };
+  const nextStep = () => {
+    if (step < 11) {
+      const updated = [...new Set([...visitedSteps, step])];
+      setVisitedSteps(updated);
+      saveStepToBackend({ completedSteps: updated });
+      animateToStep(step + 1);
+    }
+  };
   const prevStep = () => { if (step > 0) animateToStep(step - 1); else router.back(); };
   const goHome = async () => { await saveStepToBackend(); router.replace("/(tabs)"); };
 
@@ -479,8 +508,7 @@ export default function OnboardingScreen() {
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => {
             const stepNum = i + 1;
             const isActive = stepNum === step;
-            const isOptional = stepNum === 6 || stepNum === 7;
-            const completed = isStepCompleted(stepNum) || isOptional;
+            const completed = visitedSteps.includes(stepNum) || isStepCompleted(stepNum);
             
             return (
               <TouchableOpacity
@@ -492,7 +520,7 @@ export default function OnboardingScreen() {
                       ? colors.primary
                       : completed
                         ? colors.primary
-                        : "#EF4444" // Not completed is marked as red
+                        : "#EF4444"
                   }
                 ]}
                 onPress={() => animateToStep(stepNum)}
@@ -553,7 +581,7 @@ export default function OnboardingScreen() {
       // ── GENDER ─────────────────────────────────────────────────────────────
       case 1:
         return (
-          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepTitleWrap}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>What's your gender?</Text>
               <Text style={[styles.stepSub, { color: colors.textMuted }]}>
@@ -611,7 +639,7 @@ export default function OnboardingScreen() {
 
             <PrimaryBtn
               label="Continue"
-              onPress={async () => { await saveStepToBackend(); nextStep(); }}
+              onPress={async () => { nextStep(); }}
               disabled={!gender}
             />
             <TouchableOpacity onPress={goHome} style={styles.skipLinkBtn}>
@@ -623,7 +651,7 @@ export default function OnboardingScreen() {
       // ── BASIC INFO ─────────────────────────────────────────────────────────
       case 2:
         return (
-          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepTitleWrap}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>Basic Information</Text>
               <Text style={[styles.stepSub, { color: colors.textMuted }]}>Tell us the basics so we can calculate your metrics.</Text>
@@ -658,15 +686,17 @@ export default function OnboardingScreen() {
               />
             )}
 
-            {Platform.OS !== "web" && showDatePicker && (
-              <DateTimePicker
-                value={dob ? new Date(dob) : new Date(new Date().getFullYear() - 20, 0, 1)}
-                mode="date"
-                display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={onDateChange}
-                maximumDate={new Date()}
-              />
-            )}
+            <DOBPicker
+              visible={showDatePicker && Platform.OS !== "web"}
+              selectedDate={dob ? new Date(dob) : new Date(new Date().getFullYear() - 18, 0, 1)}
+              onSelect={(date) => {
+                const dobStr = date.toISOString().split("T")[0];
+                setDob(dobStr);
+                setAge(calculateAge(dobStr));
+                setShowDatePicker(false);
+              }}
+              onClose={() => setShowDatePicker(false)}
+            />
 
             {/* Display Calculated Age inside a subtle card if DOB selected */}
             {age !== "" && (
@@ -688,14 +718,10 @@ export default function OnboardingScreen() {
               rightElement={<UnitToggle options={["kg", "lbs"]} value={units.weight} onChange={u => updateUnit("weight", u)} />}
             />
 
-            <ThemedInput label="Body Fat % (Optional)" placeholder="e.g. 18" value={bodyFat} onChangeText={setBodyFat}
-              keyboardType="numeric"
-              rightElement={<Text style={[styles.unitLabel, { color: colors.primary }]}>%</Text>}
-            />
 
             <PrimaryBtn
               label="Continue"
-              onPress={async () => { await saveStepToBackend(); nextStep(); }}
+              onPress={async () => { nextStep(); }}
               disabled={!dob || !heightVal || !weightVal}
             />
             <TouchableOpacity onPress={goHome} style={styles.skipLinkBtn}>
@@ -707,7 +733,7 @@ export default function OnboardingScreen() {
       // ── FITNESS GOAL ───────────────────────────────────────────────────────
       case 3:
         return (
-          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepTitleWrap}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>What's your main goal?</Text>
               <Text style={[styles.stepSub, { color: colors.textMuted }]}>We'll design your entire program around this.</Text>
@@ -720,6 +746,7 @@ export default function OnboardingScreen() {
                 { value: "Improve Endurance", icon: "bicycle-outline", desc: "Boost cardio & stamina",       color: "#10B981", bg: "rgba(16,185,129,0.14)" },
                 { value: "Maintain Health",   icon: "heart-outline",   desc: "Stay fit & feel great",        color: "#E060A0", bg: "rgba(224,96,160,0.14)" },
                 { value: "Rehab",             icon: "bandage-outline", desc: "Recover safely",               color: "#9B59B6", bg: "rgba(155,89,182,0.14)" },
+                { value: "Gain Weight",       icon: "arrow-up-outline", desc: "Add healthy weight & mass",    color: "#F59E0B", bg: "rgba(245,158,11,0.14)" },
               ].map(item => {
                 const selected = fitnessGoal === item.value;
                 return (
@@ -750,7 +777,7 @@ export default function OnboardingScreen() {
 
             <PrimaryBtn
               label="Continue"
-              onPress={async () => { await saveStepToBackend(); nextStep(); }}
+              onPress={async () => { nextStep(); }}
               disabled={!fitnessGoal}
             />
             <TouchableOpacity onPress={goHome} style={styles.skipLinkBtn}>
@@ -762,7 +789,7 @@ export default function OnboardingScreen() {
       // ── EXPERIENCE LEVEL ───────────────────────────────────────────────────
       case 4:
         return (
-          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepTitleWrap}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>Experience Level</Text>
               <Text style={[styles.stepSub, { color: colors.textMuted }]}>How long have you been training?</Text>
@@ -803,7 +830,7 @@ export default function OnboardingScreen() {
 
             <PrimaryBtn
               label="Continue"
-              onPress={async () => { await saveStepToBackend(); nextStep(); }}
+              onPress={async () => { nextStep(); }}
               disabled={!experienceLevel}
             />
             <TouchableOpacity onPress={goHome} style={styles.skipLinkBtn}>
@@ -815,7 +842,7 @@ export default function OnboardingScreen() {
       // ── ACTIVITY LEVEL ─────────────────────────────────────────────────────
       case 5:
         return (
-          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepTitleWrap}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>How active are you?</Text>
               <Text style={[styles.stepSub, { color: colors.textMuted }]}>Outside of structured workouts, how much do you move?</Text>
@@ -853,7 +880,7 @@ export default function OnboardingScreen() {
 
             <PrimaryBtn
               label="Continue"
-              onPress={async () => { await saveStepToBackend(); nextStep(); }}
+              onPress={async () => { nextStep(); }}
               disabled={!activityLevel}
             />
             <TouchableOpacity onPress={goHome} style={styles.skipLinkBtn}>
@@ -865,16 +892,13 @@ export default function OnboardingScreen() {
       // ── BODY MEASUREMENTS ──────────────────────────────────────────────────
       case 6:
         return (
-          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepTitleWrap}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>Body Measurements</Text>
-              <Text style={[styles.stepSub, { color: colors.textMuted }]}>Optional — helps track your physical progress over time.</Text>
+              <Text style={[styles.stepSub, { color: colors.textMuted }]}>Optional — helps track your physical progress and estimate body fat.</Text>
             </View>
 
-            <View style={[styles.optionalBadge, { backgroundColor: "rgba(247,203,22,0.10)" }]}>
-              <Ionicons name="information-circle-outline" size={14} color={P.sun} />
-              <Text style={[styles.optionalText, { color: P.sun }]}>All fields are optional</Text>
-            </View>
+          
 
             <ThemedInput label="Neck" placeholder="Neck circumference" value={neck} onChangeText={setNeck} keyboardType="numeric"
               rightElement={<UnitToggle options={["cm", "in"]} value={units.neck} onChange={u => updateUnit("neck", u)} />} />
@@ -889,7 +913,41 @@ export default function OnboardingScreen() {
             <ThemedInput label="Thigh" placeholder="Thigh circumference" value={thigh} onChangeText={setThigh} keyboardType="numeric"
               rightElement={<UnitToggle options={["cm", "in"]} value={units.thigh} onChange={u => updateUnit("thigh", u)} />} />
 
-            <PrimaryBtn label="Continue" onPress={async () => { await saveStepToBackend(); nextStep(); }} />
+            {neck && waist && (hip || gender === "Male") && !editingBodyFat && (
+              <View style={[subStyles.bodyFatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={subStyles.bodyFatRow}>
+                  <Text style={[subStyles.bodyFatValue, { color: colors.primary }]}>
+                    {bodyFat || "—"}%
+                  </Text>
+                  <Text style={[subStyles.bodyFatLabel, { color: colors.textMuted }]}>Estimated Body Fat</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setEditingBodyFat(true)}
+                  style={subStyles.bodyFatEditBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="create-outline" size={14} color={colors.textMuted} />
+                  <Text style={[subStyles.bodyFatEditText, { color: colors.textMuted }]}>Edit</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {editingBodyFat && (
+              <ThemedInput
+                label="Body Fat % (Manual)"
+                placeholder={calcBodyFat() ? `${calcBodyFat()!.toFixed(1)} (calculated)` : "e.g. 18"}
+                value={bodyFat}
+                onChangeText={setBodyFat}
+                keyboardType="numeric"
+                rightElement={
+                  <TouchableOpacity onPress={() => { setEditingBodyFat(false); }} style={{ paddingHorizontal: 8 }}>
+                    <Text style={[subStyles.bodyFatEditText, { color: colors.primary }]}>Done</Text>
+                  </TouchableOpacity>
+                }
+              />
+            )}
+
+            <PrimaryBtn label="Continue" onPress={async () => { nextStep(); }} />
             <TouchableOpacity onPress={goHome} style={styles.skipLinkBtn}>
               <Text style={[styles.skipLinkText, { color: colors.textDim }]}>Back to Home</Text>
             </TouchableOpacity>
@@ -899,7 +957,7 @@ export default function OnboardingScreen() {
       // ── HEALTH INFO ────────────────────────────────────────────────────────
       case 7:
         return (
-          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepTitleWrap}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>Health Information</Text>
               <Text style={[styles.stepSub, { color: colors.textMuted }]}>Your safety is our top priority.</Text>
@@ -956,7 +1014,7 @@ export default function OnboardingScreen() {
               />
             </View>
 
-            <PrimaryBtn label="Continue" onPress={async () => { await saveStepToBackend(); nextStep(); }} />
+            <PrimaryBtn label="Continue" onPress={async () => { nextStep(); }} />
             <TouchableOpacity onPress={goHome} style={styles.skipLinkBtn}>
               <Text style={[styles.skipLinkText, { color: colors.textDim }]}>Back to Home</Text>
             </TouchableOpacity>
@@ -966,65 +1024,125 @@ export default function OnboardingScreen() {
       // ── NUTRITION ──────────────────────────────────────────────────────────
       case 8:
         return (
-          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepTitleWrap}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>Nutrition Preferences</Text>
               <Text style={[styles.stepSub, { color: colors.textMuted }]}>Personalise your meal plan to match your lifestyle.</Text>
             </View>
 
-            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Diet Type</Text>
-            <View style={styles.chipGrid}>
-              {["Standard", "Vegetarian", "Vegan", "Keto", "Paleo"].map(opt => (
-                <TouchableOpacity
-                  key={opt}
-                  style={[
-                    styles.chip,
-                    { borderColor: dietType === opt ? colors.primary : colors.border },
-                    dietType === opt && { backgroundColor: colors.primary },
-                  ]}
-                  onPress={() => setDietType(opt)}
-                >
-                  <Text style={[styles.chipText, { color: dietType === opt ? "#FFF" : colors.textMuted }]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
+            <Text style={[subStyles.nutriLabel, { color: colors.text }]}>Diet Type</Text>
+            <View style={subStyles.nutriGrid}>
+              {[
+                { value: "Standard",    icon: "restaurant-outline" },
+                { value: "Vegetarian",  icon: "leaf-outline" },
+                { value: "Vegan",       icon: "happy-outline" },
+                { value: "Keto",        icon: "flame-outline" },
+                { value: "Paleo",       icon: "fish-outline" },
+              ].map(item => {
+                const selected = dietType === item.value;
+                return (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={[
+                      subStyles.nutriCard,
+                      { borderColor: selected ? colors.primary : colors.border, backgroundColor: colors.card },
+                      selected && { backgroundColor: isDark ? "rgba(37,150,190,0.14)" : "rgba(37,150,190,0.08)" },
+                    ]}
+                    onPress={() => setDietType(item.value)}
+                    activeOpacity={0.82}
+                  >
+                    <View style={[subStyles.nutriIconWrap, { backgroundColor: selected ? "rgba(37,150,190,0.15)" : colors.inputBg }]}>
+                      <Ionicons name={item.icon as any} size={22} color={selected ? colors.primary : colors.textMuted} />
+                    </View>
+                    <Text style={[subStyles.nutriCardText, { color: selected ? colors.text : colors.textMuted }]}>
+                      {item.value}
+                    </Text>
+                    {selected && (
+                      <View style={[subStyles.nutriCheck, { backgroundColor: colors.primary }]}>
+                        <Ionicons name="checkmark" size={11} color="#FFF" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 20 }]}>Food Preference</Text>
-            <View style={styles.chipGrid}>
-              {["No Preference", "High Protein", "Low Carb", "Low Fat"].map(opt => (
-                <TouchableOpacity
-                  key={opt}
-                  style={[
-                    styles.chip,
-                    { borderColor: foodPref === opt ? colors.primary : colors.border },
-                    foodPref === opt && { backgroundColor: colors.primary },
-                  ]}
-                  onPress={() => setFoodPref(opt)}
-                >
-                  <Text style={[styles.chipText, { color: foodPref === opt ? "#FFF" : colors.textMuted }]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
+            <Text style={[subStyles.nutriLabel, { color: colors.text }]}>Food Preference</Text>
+            <View style={subStyles.nutriGrid}>
+              {[
+                { value: "No Preference", icon: "remove-outline" },
+                { value: "High Protein",  icon: "barbell-outline" },
+                { value: "Low Carb",      icon: "caret-down-outline" },
+                { value: "Low Fat",       icon: "water-outline" },
+              ].map(item => {
+                const selected = foodPref === item.value;
+                return (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={[
+                      subStyles.nutriCard,
+                      { borderColor: selected ? colors.primary : colors.border, backgroundColor: colors.card },
+                      selected && { backgroundColor: isDark ? "rgba(37,150,190,0.14)" : "rgba(37,150,190,0.08)" },
+                    ]}
+                    onPress={() => setFoodPref(item.value)}
+                    activeOpacity={0.82}
+                  >
+                    <View style={[subStyles.nutriIconWrap, { backgroundColor: selected ? "rgba(37,150,190,0.15)" : colors.inputBg }]}>
+                      <Ionicons name={item.icon as any} size={22} color={selected ? colors.primary : colors.textMuted} />
+                    </View>
+                    <Text style={[subStyles.nutriCardText, { color: selected ? colors.text : colors.textMuted }]}>
+                      {item.value}
+                    </Text>
+                    {selected && (
+                      <View style={[subStyles.nutriCheck, { backgroundColor: colors.primary }]}>
+                        <Ionicons name="checkmark" size={11} color="#FFF" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 20 }]}>Daily Water Intake</Text>
-            <View style={styles.chipGrid}>
-              {["Less than 1L", "1-2L", "2-3L", "More than 3L"].map(opt => (
-                <TouchableOpacity
-                  key={opt}
-                  style={[
-                    styles.chip,
-                    { borderColor: waterIntake === opt ? colors.primary : colors.border },
-                    waterIntake === opt && { backgroundColor: colors.primary },
-                  ]}
-                  onPress={() => setWaterIntake(opt)}
-                >
-                  <Ionicons name="water-outline" size={13} color={waterIntake === opt ? "#FFF" : colors.textMuted} style={{ marginRight: 4 }} />
-                  <Text style={[styles.chipText, { color: waterIntake === opt ? "#FFF" : colors.textMuted }]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
+            <Text style={[subStyles.nutriLabel, { color: colors.text }]}>Daily Water Intake</Text>
+            <View style={subStyles.nutriGrid}>
+              {[
+                { value: "Less than 1L", icon: "water-outline", sub: "Minimal" },
+                { value: "1-2L",         icon: "water-outline", sub: "Moderate" },
+                { value: "2-3L",         icon: "water-outline", sub: "Active" },
+                { value: "More than 3L", icon: "water-outline", sub: "Very Active" },
+              ].map(item => {
+                const selected = waterIntake === item.value;
+                return (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={[
+                      subStyles.nutriCard,
+                      { borderColor: selected ? colors.primary : colors.border, backgroundColor: colors.card },
+                      selected && { backgroundColor: isDark ? "rgba(37,150,190,0.14)" : "rgba(37,150,190,0.08)" },
+                    ]}
+                    onPress={() => setWaterIntake(item.value)}
+                    activeOpacity={0.82}
+                  >
+                    <View style={[subStyles.nutriIconWrap, { backgroundColor: selected ? "rgba(37,150,190,0.15)" : colors.inputBg }]}>
+                      <Ionicons name={item.icon as any} size={22} color={selected ? colors.primary : colors.textMuted} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[subStyles.nutriCardText, { color: selected ? colors.text : colors.textMuted }]}>
+                        {item.value}
+                      </Text>
+                      <Text style={[subStyles.nutriCardSub, { color: colors.textDim }]}>{item.sub}</Text>
+                    </View>
+                    {selected && (
+                      <View style={[subStyles.nutriCheck, { backgroundColor: colors.primary }]}>
+                        <Ionicons name="checkmark" size={11} color="#FFF" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            <Text style={[styles.fieldLabel, { color: colors.textMuted, marginTop: 20 }]}>Food Allergies (Optional)</Text>
+            <Text style={[subStyles.nutriLabel, { color: colors.text }]}>Food Allergies (Optional)</Text>
             <View style={[styles.textAreaWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
               <TextInput
                 style={[styles.textArea, { color: colors.text }]}
@@ -1040,7 +1158,7 @@ export default function OnboardingScreen() {
 
             <PrimaryBtn
               label="Continue"
-              onPress={async () => { await saveStepToBackend(); nextStep(); }}
+              onPress={async () => { nextStep(); }}
               disabled={!dietType || !foodPref || !waterIntake}
             />
             <TouchableOpacity onPress={goHome} style={styles.skipLinkBtn}>
@@ -1052,7 +1170,7 @@ export default function OnboardingScreen() {
       // ── PHOTOS ─────────────────────────────────────────────────────────────
       case 9:
         return (
-          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepTitleWrap}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>Progress Photos</Text>
               <Text style={[styles.stepSub, { color: colors.textMuted }]}>Visualise your transformation over time.</Text>
@@ -1124,7 +1242,7 @@ export default function OnboardingScreen() {
               ))}
             </ScrollView>
 
-            <PrimaryBtn label="Continue" onPress={async () => { await saveStepToBackend(); nextStep(); }} />
+            <PrimaryBtn label="Continue" onPress={async () => { nextStep(); }} />
             <TouchableOpacity onPress={goHome} style={styles.skipLinkBtn}>
               <Text style={[styles.skipLinkText, { color: colors.textDim }]}>Back to Home</Text>
             </TouchableOpacity>
@@ -1145,7 +1263,7 @@ export default function OnboardingScreen() {
           { name: "Photos",            step: 9 },
         ];
         return (
-          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepTitleWrap}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>Almost There!</Text>
               <Text style={[styles.stepSub, { color: colors.textMuted }]}>Review your information before finalising.</Text>
@@ -1216,18 +1334,10 @@ export default function OnboardingScreen() {
       {step === 0 || step === 11 ? (
         renderContent()
       ) : (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={insets.top}>
           {renderHeader()}
           {renderProgress()}
-          <Animated.View 
-            style={[
-              { flex: 1 }, 
-              { 
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }]
-              }
-            ]}
-          >
+          <Animated.View style={[{ flex: 1 }, { opacity: fadeAnim }]}>
             {renderContent()}
           </Animated.View>
         </KeyboardAvoidingView>
@@ -1402,7 +1512,7 @@ const styles = StyleSheet.create({
 
   // Step
   stepScroll: { flex: 1 },
-  stepContent: { paddingHorizontal: 22, paddingBottom: 50 },
+  stepContent: { paddingHorizontal: 22, paddingBottom: 120 },
   stepTitleWrap: { marginBottom: 28, marginTop: 10 },
   stepTitle: { fontFamily: FONTS.heading, fontSize: 30, marginBottom: 8 },
   stepSub: { fontFamily: FONTS.body, fontSize: 14, lineHeight: 21 },
@@ -1479,15 +1589,6 @@ const styles = StyleSheet.create({
   // Text area
   textAreaWrap: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 20, minHeight: 100 },
   textArea: { fontFamily: FONTS.body, fontSize: 14, minHeight: 80 },
-
-  // Chip (nutrition)
-  chipGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    flexDirection: "row", alignItems: "center",
-    borderRadius: 20, borderWidth: 1.5,
-    paddingVertical: 9, paddingHorizontal: 14,
-  },
-  chipText: { fontFamily: FONTS.bodySemiBold, fontSize: 13 },
 
   // Photos
   photoCard: { borderRadius: 18, padding: 18, marginBottom: 16, borderWidth: 1 },
@@ -1633,6 +1734,40 @@ const subStyles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
+  // Body Fat Card
+  bodyFatCard: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+  bodyFatRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+  },
+  bodyFatValue: {
+    fontFamily: FONTS.heading,
+    fontSize: 22,
+  },
+  bodyFatLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 13,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  bodyFatEditBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  bodyFatEditText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+  },
+
   // ThemedInput
   inputWrap: { marginBottom: 18 },
   inputLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 13, marginBottom: 8, letterSpacing: 0.3 },
@@ -1671,4 +1806,36 @@ const subStyles = StyleSheet.create({
   successBtn: { borderRadius: 16, overflow: "hidden" },
   successBtnInner: { flexDirection: "row", justifyContent: "center", alignItems: "center", paddingVertical: 17, gap: 10 },
   successBtnText: { fontFamily: FONTS.bodyBold, fontSize: 16, color: "#FFF" },
+
+  // Nutrition card grid
+  nutriLabel: {
+    fontFamily: FONTS.bodySemiBold, fontSize: 13, letterSpacing: 0.3,
+    marginBottom: 10,
+  },
+  nutriGrid: {
+    flexDirection: "row", flexWrap: "wrap", gap: 10,
+    marginBottom: 24,
+  },
+  nutriCard: {
+    width: (width - 44 - 10) / 2,
+    borderRadius: 16, borderWidth: 1.5,
+    padding: 12, paddingTop: 16, paddingBottom: 14,
+    flexDirection: "row", alignItems: "center", gap: 10,
+    position: "relative",
+  },
+  nutriIconWrap: {
+    width: 38, height: 38, borderRadius: 10,
+    justifyContent: "center", alignItems: "center",
+  },
+  nutriCardText: {
+    fontFamily: FONTS.bodyBold, fontSize: 13, flex: 1,
+  },
+  nutriCardSub: {
+    fontFamily: FONTS.body, fontSize: 10, marginTop: 1,
+  },
+  nutriCheck: {
+    position: "absolute", top: 6, right: 6,
+    width: 18, height: 18, borderRadius: 9,
+    justifyContent: "center", alignItems: "center",
+  },
 });

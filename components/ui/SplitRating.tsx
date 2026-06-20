@@ -156,7 +156,7 @@ export default function SplitRating({
           >
             <Ionicons name="star" size={15} color={accentColor} />
             <Text style={[styles.headerTitle, { color: accentColor }]}>
-              RATE THIS PROGRAM
+              rating
             </Text>
             {localRating ? (
               <View

@@ -10,6 +10,7 @@ import {
   Modal,
   Image,
   FlatList,
+  ImageBackground,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -23,7 +24,7 @@ import { API_URL } from "../../utils/api";
 import { getToken } from "../../utils/tokenStorage";
 import { formatDuration, formatDateLabel } from "../../utils/datetime";
 
-
+const bgImage = require("../../assets/coach/workout3.jpg");
 
 interface PartEntry {
   slug: string;
@@ -184,16 +185,22 @@ export default function CalendarScreen() {
         </ScrollView>
 
         {/* ── Heatmap ── */}
-        <View style={[styles.card, { backgroundColor: isDark ? "#151515" : "#FFF" }]}>
+        <ImageBackground
+          source={bgImage}
+          style={[styles.card, { overflow: "hidden" }]}
+          imageStyle={{ borderRadius: 16 }}
+        >
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.78)", borderRadius: 16 }]} />
           <WorkoutCalendarHeatmap
             history={history}
-            accentColor={activeSlug ? "#FF4B4B" : colors.primary}
+            accentColor={activeSlug ? "#FF4B4B" : "#2596BE"}
             title={activeSlug ? (parts.find(p => p.slug === activeSlug)?.label || "") : "All Workouts"}
             controlledYear={viewYear}
             onViewChange={(y) => setViewYear(y)}
             onDayPress={handleDayPress}
+            vibrant
           />
-        </View>
+        </ImageBackground>
 
         {!activeSlug && (
           <View style={styles.summary}>

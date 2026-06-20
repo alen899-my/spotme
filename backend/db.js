@@ -40,6 +40,8 @@ const initDB = async () => {
       ADD COLUMN IF NOT EXISTS share_splits BOOLEAN DEFAULT FALSE;
     `);
 
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS completed_steps JSONB DEFAULT '[]'::jsonb;`);
+
     // Create exercises table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS exercises (

@@ -400,6 +400,8 @@ export default function WaterTracker({ selectedDate }: Props) {
   const fillAnim = useRef(new Animated.Value(0)).current;
   const waveAnim = useRef(new Animated.Value(0)).current;
   const blinkAnim = useRef(new Animated.Value(0)).current;
+  const isLogging = useRef(false);
+  const tempIdCounter = useRef(0);
 
   useEffect(() => {
     AsyncStorage.getItem('userData').then((d) => {
@@ -513,8 +515,36 @@ export default function WaterTracker({ selectedDate }: Props) {
   }, [totalWater, maxSafe, blinkAnim]);
 
   const handleLog = async (amount: number) => {
+    if (isLogging.current) return;
+    isLogging.current = true;
+
     const exceeds = totalWater + amount > maxSafe;
     if (exceeds) showToast('Overhydration warning. Logging anyway.', 'error');
+
+    const prevTotal = totalWater;
+    const prevLogs = waterLogs;
+    const tempId = --tempIdCounter.current;
+    const optimisticLog = {
+      id: tempId,
+      amount_ml: amount,
+      logged_at: new Date().toISOString(),
+      _clientLoggedAt: Date.now(),
+    };
+
+    // Optimistic update
+    setTotalWater(prevTotal + amount);
+    setWaterLogs([optimisticLog, ...prevLogs]);
+
+    // Animate immediately
+    Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1.05, duration: 180, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
+    ]).start();
+    Animated.sequence([
+      Animated.timing(waveAnim, { toValue: 1, duration: 300, useNativeDriver: false }),
+      Animated.timing(waveAnim, { toValue: 0, duration: 600, useNativeDriver: false }),
+    ]).start();
+
     try {
       const token = await getToken();
       const res = await axios.post(
@@ -523,19 +553,22 @@ export default function WaterTracker({ selectedDate }: Props) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      // Replace optimistic entry with real one
+      setWaterLogs((p) =>
+        p.map((log) =>
+          log.id === tempId
+            ? { ...res.data, _clientLoggedAt: Date.now() }
+            : log
+        )
+      );
+
       if (!exceeds) showToast(`+${amount} ml logged!`);
-      setTotalWater((p) => p + amount);
-      setWaterLogs((p) => [{ ...res.data, _clientLoggedAt: Date.now() }, ...p]);
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.05, duration: 180, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
-      ]).start();
-      Animated.sequence([
-        Animated.timing(waveAnim, { toValue: 1, duration: 300, useNativeDriver: false }),
-        Animated.timing(waveAnim, { toValue: 0, duration: 600, useNativeDriver: false }),
-      ]).start();
     } catch (e) {
+      setTotalWater(prevTotal);
+      setWaterLogs(prevLogs);
       showToast('Failed to log water', 'error');
+    } finally {
+      isLogging.current = false;
     }
   };
 

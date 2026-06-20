@@ -119,9 +119,7 @@ export default function RecommendationCard({ rec, onPress, onBrowsePress }: Prop
 
         <View style={styles.tagsRow}>
           {rec.target ? (
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>{rec.target}</Text>
-            </View>
+            <Text style={styles.targetText}>{rec.target}</Text>
           ) : null}
           {rec.difficulty ? (
             <View style={[styles.tag, styles.tagBlue]}>
@@ -239,6 +237,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(9),
     paddingVertical: vs(3),
   },
+  targetText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(9),
+    color: "#FFFFFF",
+    letterSpacing: 0.3,
+  },
   tagText: {
     fontFamily: FONTS.bodyBold,
     fontSize: scale(9),
@@ -256,7 +260,7 @@ const styles = StyleSheet.create({
   // ── Arrow button — bottom-right ──
   arrowBtn: {
     position: "absolute",
-    bottom: scale(10),
+    bottom: scale(6),
     right: scale(14),
     width: scale(34),
     height: scale(34),

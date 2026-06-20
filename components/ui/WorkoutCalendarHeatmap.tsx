@@ -15,6 +15,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
 
+const GREEN = "#10B981";
+
 const SCREEN_W  = Dimensions.get("window").width;
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = [
@@ -44,6 +46,8 @@ interface Props {
   onDayPress?: (date: string, count: number) => void;
   /** Show a red cross on past days with no workouts. */
   showInactiveCross?: boolean;
+  /** Vibrant mode — bolder cell colours, white text, green checkmark on active days. Use inside dark image-background cards. */
+  vibrant?: boolean;
 }
 
 export default function WorkoutCalendarHeatmap({
@@ -55,6 +59,7 @@ export default function WorkoutCalendarHeatmap({
   onViewChange,
   onDayPress,
   showInactiveCross = true,
+  vibrant,
 }: Props) {
   const { colors, isDark } = useTheme();
 
@@ -132,6 +137,13 @@ export default function WorkoutCalendarHeatmap({
     if (day === null) return "transparent";
     if (isFutureDay(day)) return "transparent";
     const count = dateMap[dateString(day)] || 0;
+    if (vibrant) {
+      if (count === 0) return "rgba(255,255,255,0.06)";
+      if (count === 1) return `${accentColor}60`;
+      if (count <= 3)  return `${accentColor}A0`;
+      if (count <= 6)  return `${accentColor}D0`;
+      return `${accentColor}F0`;
+    }
     if (count === 0) return isDark ? "#252525" : "rgba(0,0,0,0.06)";
     if (count === 1) return `${accentColor}45`;
     if (count <= 3)  return `${accentColor}80`;
@@ -156,17 +168,17 @@ export default function WorkoutCalendarHeatmap({
     <View style={styles.root}>
       {/* ── Optional title ────────────────────────────────────────────────────── */}
       {title && (
-        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.title, { color: vibrant ? "#FFFFFF" : colors.text }]}>{title}</Text>
       )}
 
       {/* ── Navigation bar ───────────────────────────────────────────────────── */}
-      <View style={[styles.navBar, { backgroundColor: isDark ? "#1c1c1c" : "#f2f2f2", borderColor: colors.border }]}>
+      <View style={[styles.navBar, { backgroundColor: vibrant ? "rgba(255,255,255,0.08)" : (isDark ? "#1c1c1c" : "#f2f2f2"), borderColor: vibrant ? "rgba(255,255,255,0.10)" : colors.border }]}>
         <TouchableOpacity onPress={goPrev} style={styles.navArrow} activeOpacity={0.6}>
-          <Ionicons name="chevron-back" size={18} color={colors.text} />
+          <Ionicons name="chevron-back" size={18} color={vibrant ? "#FFFFFF" : colors.text} />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={goToday} activeOpacity={0.7} style={styles.monthPill}>
-          <Text style={[styles.monthText, { color: colors.text }]}>
+          <Text style={[styles.monthText, { color: vibrant ? "#FFFFFF" : colors.text }]}>
             {MONTH_NAMES[viewMonth]} {viewYear}
           </Text>
           {!isAtCurrentMonth && (
@@ -180,7 +192,7 @@ export default function WorkoutCalendarHeatmap({
           activeOpacity={0.6}
           disabled={isAtCurrentMonth}
         >
-          <Ionicons name="chevron-forward" size={18} color={colors.text} />
+          <Ionicons name="chevron-forward" size={18} color={vibrant ? "#FFFFFF" : colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -188,10 +200,10 @@ export default function WorkoutCalendarHeatmap({
 
       {/* ── Day-of-week headers ───────────────────────────────────────────────── */}
       <View style={[styles.dayRow, { gap: GAP }]}>
-        {DAY_NAMES.map(d => (
+        {DAY_NAMES.map((d, i) => (
           <Text
-            key={d}
-            style={[styles.dayHeader, { width: CELL_W, color: colors.textMuted }]}
+            key={i}
+            style={[styles.dayHeader, { width: CELL_W, color: vibrant ? "rgba(255,255,255,0.45)" : colors.textMuted }]}
           >
             {d.slice(0, 1)}
           </Text>
@@ -224,32 +236,31 @@ export default function WorkoutCalendarHeatmap({
                     {
                       width:           CELL_W,
                       height:          CELL_W,
-                      backgroundColor: cellBg(day),
+                      backgroundColor: vibrant && todayCell
+                        ? accentColor
+                        : cellBg(day),
                       borderRadius:    6,
-                      borderWidth:     todayCell ? 1.5 : 0,
-                      borderColor:     todayCell ? accentColor : "transparent",
+                      borderWidth:     todayCell ? 1.5 : (vibrant && activeCell ? 1 : 0),
+                      borderColor:     todayCell
+                        ? accentColor
+                        : (vibrant && activeCell ? `${GREEN}50` : "transparent"),
                       opacity:         futureCell ? 0 : 1,
                     },
                   ]}
                 >
                   {day !== null && (
                     <View style={styles.cellInner}>
-                      <Text
-                        style={[
-                          styles.dayNum,
-                          {
-                            color: todayCell
-                              ? accentColor
-                              : activeCell
-                              ? isDark ? "#ffffff" : "#111111"
-                              : colors.textMuted,
-                            fontFamily: todayCell ? FONTS.bodyBold : FONTS.body,
-                          },
-                        ]}
-                      >
-                        {day}
-                      </Text>
-                      {showInactiveCross && inactivePast && (
+                      {vibrant && activeCell && (
+                        <View style={styles.checkCircle}>
+                          <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                        </View>
+                      )}
+                      {vibrant && inactivePast && (
+                        <View style={styles.crossCircle}>
+                          <Ionicons name="close" size={9} color="#EF4444" />
+                        </View>
+                      )}
+                      {!vibrant && showInactiveCross && inactivePast && (
                         <Ionicons
                           name="close"
                           size={10}
@@ -257,6 +268,26 @@ export default function WorkoutCalendarHeatmap({
                           style={styles.crossIcon}
                         />
                       )}
+                      <Text
+                        style={[
+                          styles.dayNum,
+                          {
+                            color: vibrant
+                              ? (futureCell ? "rgba(255,255,255,0.20)"
+                                : todayCell ? "#FFFFFF"
+                                : activeCell ? "#FFFFFF"
+                                : "rgba(255,255,255,0.65)")
+                              : (todayCell
+                                ? accentColor
+                                : activeCell
+                                ? isDark ? "#ffffff" : "#111111"
+                                : colors.textMuted),
+                            fontFamily: todayCell ? FONTS.bodyBold : FONTS.body,
+                          },
+                        ]}
+                      >
+                        {day}
+                      </Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -268,14 +299,17 @@ export default function WorkoutCalendarHeatmap({
 
       {/* ── Legend ───────────────────────────────────────────────────────────── */}
       <View style={styles.legend}>
-        <Text style={[styles.legendTxt, { color: colors.textMuted }]}>None</Text>
-        {(["#252525", `${accentColor}45`, `${accentColor}80`, `${accentColor}B0`, `${accentColor}E0`] as string[]).map((bg, i) => (
+        <Text style={[styles.legendTxt, { color: vibrant ? "rgba(255,255,255,0.45)" : colors.textMuted }]}>None</Text>
+        {(vibrant
+          ? ["rgba(255,255,255,0.06)", `${accentColor}60`, `${accentColor}A0`, `${accentColor}D0`, `${accentColor}F0`]
+          : ["#252525", `${accentColor}45`, `${accentColor}80`, `${accentColor}B0`, `${accentColor}E0`]
+        ).map((bg, i) => (
           <View
             key={i}
             style={[
               styles.legendCell,
               {
-                backgroundColor: i === 0
+                backgroundColor: i === 0 && !vibrant
                   ? isDark ? "#252525" : "rgba(0,0,0,0.06)"
                   : bg,
                 borderRadius: 3,
@@ -283,7 +317,7 @@ export default function WorkoutCalendarHeatmap({
             ]}
           />
         ))}
-        <Text style={[styles.legendTxt, { color: colors.textMuted }]}>Heavy</Text>
+        <Text style={[styles.legendTxt, { color: vibrant ? "rgba(255,255,255,0.45)" : colors.textMuted }]}>Heavy</Text>
       </View>
     </View>
   );
@@ -371,6 +405,7 @@ const styles = StyleSheet.create({
   cell: {
     alignItems:     "center",
     justifyContent: "center",
+    position:       "relative",
   },
   cellInner: {
     width:          "100%",
@@ -382,6 +417,30 @@ const styles = StyleSheet.create({
     position: "absolute",
     top:      1,
     right:    1,
+  },
+  checkCircle: {
+    position: "absolute",
+    top: 1,
+    right: 1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: GREEN,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  crossCircle: {
+    position: "absolute",
+    top: 1,
+    right: 1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "rgba(239,68,68,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
   },
   dayNum: {
     fontSize: 11,

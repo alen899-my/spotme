@@ -90,10 +90,11 @@ function pickSplitCoverImage(split, usedImages, usedCategories) {
 // GET /workouts/shared-splits — list splits from users with share_splits enabled
 router.get('/shared-splits', authenticateToken, async (req, res) => {
   try {
-    const { q, creator_id, page = '1', limit = '10' } = req.query;
+    const { q, creator_id, sort, order, min_rating, min_user_count, page = '1', limit = '10' } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
     const offset = (pageNum - 1) * limitNum;
+    const sortOrder = (order || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
     let whereExtra = '';
     const viewerId = req.user.id;
@@ -117,6 +118,18 @@ router.get('/shared-splits', authenticateToken, async (req, res) => {
         paramIdx++;
       }
     }
+    const mRating = parseFloat(min_rating);
+    if (!isNaN(mRating) && mRating > 0) {
+      whereExtra += ` AND s.avg_rating >= $${paramIdx}`;
+      params.push(mRating);
+      paramIdx++;
+    }
+    const mUserCount = parseInt(min_user_count, 10);
+    if (!isNaN(mUserCount) && mUserCount > 0) {
+      whereExtra += ` AND (SELECT COUNT(DISTINCT user_id) FROM workout_splits WHERE cloned_from_id = s.id) >= $${paramIdx}`;
+      params.push(mUserCount);
+      paramIdx++;
+    }
     const commonWhere = `u.share_splits = true${whereExtra}`;
     const countResult = await pool.query(`
       SELECT COUNT(*) AS total
@@ -127,33 +140,57 @@ router.get('/shared-splits', authenticateToken, async (req, res) => {
     const total = parseInt(countResult.rows[0].total, 10);
     const totalPages = Math.ceil(total / limitNum);
 
-    // Add viewerId for is_already_added subquery
+    // Build dynamic ORDER BY
+    let orderBy;
+    switch (sort) {
+      case 'avg_rating':
+        orderBy = `sub.avg_rating ${sortOrder} NULLS LAST`;
+        break;
+      case 'user_count':
+        orderBy = `sub.user_count ${sortOrder} NULLS LAST`;
+        break;
+      case 'session_count':
+        orderBy = `sub.session_count ${sortOrder} NULLS LAST`;
+        break;
+      case 'created_at':
+        orderBy = `sub.created_at ${sortOrder} NULLS LAST`;
+        break;
+      case 'name':
+        orderBy = `sub.name ${sortOrder} NULLS LAST`;
+        break;
+      default:
+        orderBy = `sub.creator_name ASC, sub.created_at DESC`;
+        break;
+    }
+
     params.push(viewerId);
     const subIdx = paramIdx;
     paramIdx++;
     params.push(limitNum, offset);
     const result = await pool.query(`
-      SELECT s.*,
-        COALESCE(u.username, u.full_name) AS creator_name,
-        u.profile_pic_url AS creator_pic,
-        u.id AS creator_id,
-        (SELECT COUNT(*) FROM workout_sessions WHERE split_id = s.id) as session_count,
-        (
-          SELECT json_agg(image_url) FROM (
-            SELECT DISTINCT e.image_url 
-            FROM workout_sessions ws
-            JOIN workout_session_exercises wse ON ws.id = wse.session_id
-            JOIN exercises e ON wse.exercise_id = e.id
-            WHERE ws.split_id = s.id AND e.image_url IS NOT NULL
-            LIMIT 5
-          ) sub
-        ) as exercise_images,
-        EXISTS (SELECT 1 FROM workout_splits WHERE user_id = $${subIdx} AND name = s.name) AS is_already_added,
-        (SELECT COUNT(DISTINCT dw.user_id) FROM daily_workouts dw WHERE dw.split_id = s.id AND dw.status = 'completed') as user_count
-      FROM workout_splits s
-      JOIN users u ON s.user_id = u.id
-      WHERE ${commonWhere}
-      ORDER BY u.username ASC, s.created_at DESC
+      SELECT * FROM (
+        SELECT s.*,
+          COALESCE(u.username, u.full_name) AS creator_name,
+          u.profile_pic_url AS creator_pic,
+          u.id AS creator_id,
+          (SELECT COUNT(*) FROM workout_sessions WHERE split_id = s.id) as session_count,
+          (
+            SELECT json_agg(image_url) FROM (
+              SELECT DISTINCT e.image_url 
+              FROM workout_sessions ws
+              JOIN workout_session_exercises wse ON ws.id = wse.session_id
+              JOIN exercises e ON wse.exercise_id = e.id
+              WHERE ws.split_id = s.id AND e.image_url IS NOT NULL
+              LIMIT 5
+            ) sub
+          ) as exercise_images,
+          EXISTS (SELECT 1 FROM workout_splits WHERE user_id = $${subIdx} AND name = s.name) AS is_already_added,
+          (SELECT COUNT(DISTINCT user_id) FROM workout_splits WHERE cloned_from_id = s.id) as user_count
+        FROM workout_splits s
+        JOIN users u ON s.user_id = u.id
+        WHERE ${commonWhere}
+      ) sub
+      ORDER BY ${orderBy}
       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
     `, params);
 
@@ -171,7 +208,7 @@ router.get('/shared-splits/:id', authenticateToken, async (req, res) => {
       SELECT s.*, COALESCE(u.username, u.full_name) AS creator_name, u.profile_pic_url AS creator_pic,
         (SELECT rating FROM split_ratings WHERE split_id = s.id AND user_id = $2) AS user_rating,
         EXISTS(SELECT 1 FROM daily_workouts WHERE split_id = s.id AND user_id = $2 AND status = 'completed') AS can_rate,
-        (SELECT COUNT(DISTINCT dw.user_id) FROM daily_workouts dw WHERE dw.split_id = s.id AND dw.status = 'completed') as user_count
+        (SELECT COUNT(DISTINCT user_id) FROM workout_splits WHERE cloned_from_id = s.id) as user_count
       FROM workout_splits s
       JOIN users u ON s.user_id = u.id
       WHERE s.id = $1 AND u.share_splits = true
@@ -237,9 +274,9 @@ router.post('/shared-splits/:id/clone', authenticateToken, async (req, res) => {
     const src = shared.rows[0];
 
     const newSplit = await client.query(
-      `      INSERT INTO workout_splits (user_id, name, description, cloned_from_id)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.user.id, src.name, src.description, src.id]
+      `      INSERT INTO workout_splits (user_id, name, description, cloned_from_id, avg_rating, rating_count)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [req.user.id, src.name, src.description, src.id, src.avg_rating, src.rating_count]
     );
     const newSplitId = newSplit.rows[0].id;
 
@@ -290,7 +327,7 @@ router.get('/splits', authenticateToken, async (req, res) => {
         ou.profile_pic_url AS original_creator_pic,
         ou.id AS original_creator_id,
         (SELECT rating FROM split_ratings WHERE split_id = s.id AND user_id = $1) AS user_rating,
-        (SELECT COUNT(DISTINCT dw.user_id) FROM daily_workouts dw WHERE dw.split_id = s.id AND dw.status = 'completed') as user_count,
+        (SELECT COUNT(DISTINCT user_id) FROM workout_splits WHERE cloned_from_id = s.id) as user_count,
         (SELECT COUNT(*) FROM workout_sessions WHERE split_id = s.id) as session_count,
         (
           SELECT e.image_url
@@ -360,7 +397,7 @@ router.get('/splits/:id', authenticateToken, async (req, res) => {
               ou.id AS original_creator_id,
         (SELECT rating FROM split_ratings WHERE split_id = s.id AND user_id = $2) AS user_rating,
         EXISTS(SELECT 1 FROM daily_workouts WHERE split_id = s.id AND user_id = $2 AND status = 'completed') AS can_rate,
-        (SELECT COUNT(DISTINCT dw.user_id) FROM daily_workouts dw WHERE dw.split_id = s.id AND dw.status = 'completed') as user_count
+        (SELECT COUNT(DISTINCT user_id) FROM workout_splits WHERE cloned_from_id = s.id) as user_count
        FROM workout_splits s
        LEFT JOIN workout_splits os ON s.cloned_from_id = os.id
        LEFT JOIN users ou ON os.user_id = ou.id
@@ -583,7 +620,7 @@ router.delete('/sessions/:id', authenticateToken, async (req, res) => {
 router.get('/sessions/:id/exercises', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT wse.*, e.name, e.category, e.image_url, e.target, e.equipment, e.instructions_en, e.instruction_steps_en,
+      `SELECT wse.*, e.name, e.category, e.image_url, e.gif_url, e.target, e.equipment, e.instructions_en, e.instruction_steps_en,
               e.avg_rating::float8 AS avg_rating, e.rating_count
        FROM workout_session_exercises wse 
        JOIN exercises e ON wse.exercise_id = e.id 

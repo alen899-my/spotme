@@ -15,9 +15,10 @@ import SplitRating from './SplitRating';
 interface SplitCardProps {
   item: any;
   onDelete?: (id: number) => void;
+  onPress?: () => void;
 }
 
-export default function SplitCard({ item, onDelete }: SplitCardProps) {
+export default function SplitCard({ item, onDelete, onPress }: SplitCardProps) {
   const router = useRouter();
   const { colors, isDark } = useTheme();
 
@@ -39,7 +40,7 @@ export default function SplitCard({ item, onDelete }: SplitCardProps) {
         },
       ]}
       activeOpacity={0.9}
-      onPress={() => router.push(`/splits/${item.id}`)}
+      onPress={() => (onPress ? onPress() : router.push(`/splits/${item.id}`))}
     >
       <View style={styles.topRow}>
         <View style={styles.imageStack}>
@@ -101,13 +102,13 @@ export default function SplitCard({ item, onDelete }: SplitCardProps) {
       <View style={styles.bottomRow}>
         <View style={styles.statsLeft}>
           <View style={[styles.statPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.15)' }]}>
-            <Ionicons name="flash" size={10} color={isDark ? colors.primary : '#FFF'} />
-            <Text style={[styles.statText, { color: isDark ? colors.textMuted : '#FFF' }]}>{item.session_count}</Text>
+            <Text style={[styles.statNumber, { color: isDark ? colors.textMuted : '#FFF' }]}>{item.session_count}</Text>
+            <Text style={[styles.statLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.7)' }]}>sessions</Text>
           </View>
           {item.user_count > 0 && (
             <View style={[styles.statPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.15)' }]}>
-              <Ionicons name="people-outline" size={10} color={isDark ? colors.primary : '#FFF'} />
-              <Text style={[styles.statText, { color: isDark ? colors.textMuted : '#FFF' }]}>{item.user_count}</Text>
+              <Text style={[styles.statNumber, { color: isDark ? colors.textMuted : '#FFF' }]}>{item.user_count}</Text>
+              <Text style={[styles.statLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.7)' }]}>users added</Text>
             </View>
           )}
         </View>
@@ -193,15 +194,21 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statPill: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 8,
   },
-  statText: {
+  statNumber: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 11,
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  statLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 8,
+    lineHeight: 10,
+    marginTop: 1,
   },
 });

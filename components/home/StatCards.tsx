@@ -6,6 +6,7 @@ import {
   Animated,
   Easing,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
@@ -19,6 +20,70 @@ export interface StatCardsProps {
   waterMl: number;
   caloriesConsumed: number;
 }
+
+// ─── Glass card wrapper ─────────────────────────────────────────────────────
+
+function GlassCard({ gradient, children }: { gradient: [string, string]; children: React.ReactNode }) {
+  const { isDark } = useTheme();
+
+  return (
+    <View
+      style={[
+        styles.cardWrapper,
+        {
+          borderColor: isDark
+            ? "rgba(255,255,255,0.10)"
+            : "rgba(0,0,0,0.06)",
+        },
+      ]}
+    >
+      {/* Frosted glass backdrop */}
+      <BlurView
+        intensity={50}
+        tint={isDark ? "dark" : "light"}
+        style={[StyleSheet.absoluteFill, styles.cardRadius]}
+      />
+      {/* Diagonal gradient tint — gives each card its colour identity */}
+      <LinearGradient
+        colors={gradient}
+        style={[StyleSheet.absoluteFill, styles.cardRadius]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        pointerEvents="none"
+      />
+      {/* Subtle diagonal glass reflection (light catch) */}
+      <LinearGradient
+        colors={["rgba(255,255,255,0.07)", "transparent"] as [string, string]}
+        style={[StyleSheet.absoluteFill, styles.cardRadius]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.25, y: 0.5 }}
+        pointerEvents="none"
+      />
+      {children}
+    </View>
+  );
+}
+
+// ─── Gradient tints — diagonal direction for natural light feel ────────────
+
+const CARD_GRADIENTS = {
+  burned: {
+    dark:  ["rgba(192,57,43,0.22)",   "rgba(192,57,43,0.04)"] as [string, string],
+    light: ["rgba(192,57,43,0.10)",   "rgba(192,57,43,0.02)"] as [string, string],
+  },
+  streak: {
+    dark:  ["rgba(39,174,96,0.22)",   "rgba(39,174,96,0.04)"] as [string, string],
+    light: ["rgba(39,174,96,0.10)",   "rgba(39,174,96,0.02)"] as [string, string],
+  },
+  water: {
+    dark:  ["rgba(26,111,186,0.22)",  "rgba(26,111,186,0.04)"] as [string, string],
+    light: ["rgba(26,111,186,0.10)",  "rgba(26,111,186,0.02)"] as [string, string],
+  },
+  eaten: {
+    dark:  ["rgba(212,160,23,0.22)",  "rgba(212,160,23,0.04)"] as [string, string],
+    light: ["rgba(212,160,23,0.10)",  "rgba(212,160,23,0.02)"] as [string, string],
+  },
+} as const;
 
 // ─── Individual animations ────────────────────────────────────────────────────
 
@@ -87,98 +152,54 @@ function useForkAnim() {
   return { transform: [{ rotate }, { scale: scaleVal }] };
 }
 
-// ─── Card configs matching the image ─────────────────────────────────────────
-// Image shows: red card (flame), green card (egg), blue card (water), gold card (fork+plate)
-
-const CARDS = {
-  burned: {
-    gradient: ["#c0392b", "#922b21"] as [string, string],
-    iconColor: "#ffffff",
-    valColor: "#ffffff",
-    lblColor: "rgba(255,255,255,0.75)",
-  },
-  streak: {
-    gradient: ["#27ae60", "#1e8449"] as [string, string],
-    iconColor: "#ffffff",
-    valColor: "#ffffff",
-    lblColor: "rgba(255,255,255,0.75)",
-  },
-  water: {
-    gradient: ["#1a6fba", "#1558a0"] as [string, string],
-    iconColor: "#ffffff",
-    valColor: "#ffffff",
-    lblColor: "rgba(255,255,255,0.75)",
-  },
-  eaten: {
-    gradient: ["#d4a017", "#b8860b"] as [string, string],
-    iconColor: "#ffffff",
-    valColor: "#ffffff",
-    lblColor: "rgba(255,255,255,0.75)",
-  },
-} as const;
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function FireCard({ value, label }: { value: string; label: string }) {
-  const cfg = CARDS.burned;
+  const { isDark, colors } = useTheme();
   const fireStyle = useFireAnim();
+  const gradient = isDark ? CARD_GRADIENTS.burned.dark : CARD_GRADIENTS.burned.light;
 
   return (
-    <View style={styles.cardWrapper}>
-      <LinearGradient
-        colors={cfg.gradient}
-        style={[StyleSheet.absoluteFill, styles.cardRadius]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-      />
+    <GlassCard gradient={gradient}>
       <Animated.Text style={[styles.iconEmoji, fireStyle]}>🔥</Animated.Text>
-      <Text style={[styles.val, { color: cfg.valColor }]}>{value}</Text>
-      <Text style={[styles.lbl, { color: cfg.lblColor }]}>{label}</Text>
-    </View>
+      <Text style={[styles.val, { color: isDark ? "#FFFFFF" : colors.text }]}>{value}</Text>
+      <Text style={[styles.lbl, { color: isDark ? "rgba(255,255,255,0.75)" : colors.textMuted }]}>{label}</Text>
+    </GlassCard>
   );
 }
 
 function StreakCard({ value, label }: { value: string; label: string }) {
-  const cfg = CARDS.streak;
+  const { isDark, colors } = useTheme();
   const eggStyle = useEggAnim();
+  const gradient = isDark ? CARD_GRADIENTS.streak.dark : CARD_GRADIENTS.streak.light;
 
   return (
-    <View style={styles.cardWrapper}>
-      <LinearGradient
-        colors={cfg.gradient}
-        style={[StyleSheet.absoluteFill, styles.cardRadius]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-      />
+    <GlassCard gradient={gradient}>
       <Animated.Text style={[styles.iconEmoji, eggStyle]}>🥚</Animated.Text>
-      <Text style={[styles.val, { color: cfg.valColor }]}>{value}</Text>
-      <Text style={[styles.lbl, { color: cfg.lblColor }]}>{label}</Text>
-    </View>
+      <Text style={[styles.val, { color: isDark ? "#FFFFFF" : colors.text }]}>{value}</Text>
+      <Text style={[styles.lbl, { color: isDark ? "rgba(255,255,255,0.75)" : colors.textMuted }]}>{label}</Text>
+    </GlassCard>
   );
 }
 
 function WaterCard({ value, label }: { value: string; label: string }) {
-  const cfg = CARDS.water;
+  const { isDark, colors } = useTheme();
   const dropStyle = useDropletAnim();
+  const gradient = isDark ? CARD_GRADIENTS.water.dark : CARD_GRADIENTS.water.light;
 
   return (
-    <View style={styles.cardWrapper}>
-      <LinearGradient
-        colors={cfg.gradient}
-        style={[StyleSheet.absoluteFill, styles.cardRadius]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-      />
+    <GlassCard gradient={gradient}>
       <Animated.Text style={[styles.iconEmoji, dropStyle]}>💧</Animated.Text>
-      <Text style={[styles.val, { color: cfg.valColor }]}>{value}</Text>
-      <Text style={[styles.lbl, { color: cfg.lblColor }]}>{label}</Text>
-    </View>
+      <Text style={[styles.val, { color: isDark ? "#FFFFFF" : colors.text }]}>{value}</Text>
+      <Text style={[styles.lbl, { color: isDark ? "rgba(255,255,255,0.75)" : colors.textMuted }]}>{label}</Text>
+    </GlassCard>
   );
 }
 
 function EatenCard({ value, label }: { value: string; label: string }) {
-  const cfg = CARDS.eaten;
+  const { isDark, colors } = useTheme();
   const forkStyle = useForkAnim();
+  const gradient = isDark ? CARD_GRADIENTS.eaten.dark : CARD_GRADIENTS.eaten.light;
 
   // Shimmer sweep
   const shimmer = useRef(new Animated.Value(-1)).current;
@@ -194,21 +215,14 @@ function EatenCard({ value, label }: { value: string; label: string }) {
   const shimmerX = shimmer.interpolate({ inputRange: [-1, 2], outputRange: ["-100%", "300%"] as any });
 
   return (
-    <View style={styles.cardWrapper}>
-      <LinearGradient
-        colors={cfg.gradient}
-        style={[StyleSheet.absoluteFill, styles.cardRadius]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-      />
-
+    <GlassCard gradient={gradient}>
       {/* Subtle shimmer */}
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
           {
             transform: [{ translateX: shimmerX }, { rotate: "25deg" }],
-            backgroundColor: "rgba(255,255,255,0.06)",
+            backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
             width: "35%",
           },
         ]}
@@ -216,9 +230,9 @@ function EatenCard({ value, label }: { value: string; label: string }) {
       />
 
       <Animated.Text style={[styles.iconEmoji, forkStyle]}>🍽️</Animated.Text>
-      <Text style={[styles.val, { color: cfg.valColor }]}>{value}</Text>
-      <Text style={[styles.lbl, { color: cfg.lblColor }]}>{label}</Text>
-    </View>
+      <Text style={[styles.val, { color: isDark ? "#FFFFFF" : colors.text }]}>{value}</Text>
+      <Text style={[styles.lbl, { color: isDark ? "rgba(255,255,255,0.75)" : colors.textMuted }]}>{label}</Text>
+    </GlassCard>
   );
 }
 
@@ -264,6 +278,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
     minHeight: vs(120),
+    borderWidth: 1,
+    // Glass shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
   },
   cardRadius: {
     borderRadius: scale(16),

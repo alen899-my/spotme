@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Animated } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
-import { P, scale, vs, getXPProgress, TIER_COLORS } from "../../constants/homeTheme";
+import { scale, vs, getXPProgress, TIER_COLORS } from "../../constants/homeTheme";
+import { useTheme } from "../../contexts/ThemeContext";
 
 interface Props {
   tier: string;
@@ -11,30 +13,17 @@ interface Props {
   totalXP: number;
 }
 
-const CARD_GRADIENTS: Record<string, [string, string]> = {
-  Bronze:      ["#543620", "#201108"],
-  Silver:      ["#3E4C5E", "#16202C"],
-  Gold:        ["#856006", "#2E1E00"],
-  Platinum:    ["#086F83", "#02242D"],
-  Diamond:     ["#0D6191", "#031E33"],
-  Master:      ["#6D28D9", "#2E0665"],
-  Grandmaster: ["#B91C1C", "#450616"],
-  Elite:       ["#C2410C", "#431407"],
-  Champion:    ["#991B1B", "#380202"],
-  Legend:      ["#D97706", "#4C0519"],
-};
-
 export default function XPCard({ tier, level, totalXP }: Props) {
-  const gradient = CARD_GRADIENTS[tier] || CARD_GRADIENTS.Bronze;
-  const barColors = TIER_COLORS[tier] || TIER_COLORS.Bronze;
+  const { isDark, colors } = useTheme();
+  const tierColors = TIER_COLORS[tier] || TIER_COLORS.Bronze;
+  const accent = tierColors[0];
   const { progress, nextTier, xpToNext } = getXPProgress(tier, totalXP);
 
   const animatedWidth = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     Animated.timing(animatedWidth, {
       toValue: progress,
-      duration: 1200,
+      duration: 800,
       useNativeDriver: false,
     }).start();
   }, [progress]);
@@ -45,115 +34,193 @@ export default function XPCard({ tier, level, totalXP }: Props) {
   });
 
   return (
-    <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.xpCard}>
-      <View style={styles.xpTop}>
-        <View style={styles.tierRow}>
-          <View style={[styles.tierDot, { backgroundColor: barColors[0] }]} />
-          <View>
-            <Text style={styles.xpTierLabel}>{tier}</Text>
-            <Text style={styles.xpLevel}>Level {level}</Text>
-          </View>
+    <View
+      style={[
+        styles.card,
+        {
+          borderColor: isDark
+            ? "rgba(255,255,255,0.10)"
+            : "rgba(0,0,0,0.06)",
+        },
+      ]}
+    >
+      <BlurView
+        intensity={50}
+        tint={isDark ? "dark" : "light"}
+        style={[StyleSheet.absoluteFill, styles.cardRadius]}
+      />
+      <LinearGradient
+        colors={[`${accent}22`, `${accent}04`]}
+        style={[StyleSheet.absoluteFill, styles.cardRadius]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={["rgba(255,255,255,0.07)", "transparent"] as [string, string]}
+        style={[StyleSheet.absoluteFill, styles.cardRadius]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.25, y: 0.5 }}
+        pointerEvents="none"
+      />
+
+      <View style={styles.row1}>
+        <View style={styles.tierGroup}>
+          <Text style={styles.trophyEmoji}>🏆</Text>
+          <View style={[styles.tierDot, { backgroundColor: accent }]} />
+          <Text style={[styles.tierName, { color: accent }]}>{tier}</Text>
+          <Text
+            style={[
+              styles.divider,
+              { color: isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)" },
+            ]}
+          >
+            ·
+          </Text>
+          <Text
+            style={[
+              styles.levelNum,
+              { color: isDark ? colors.text : "#0F1923" },
+            ]}
+          >
+            Lv.{level}
+          </Text>
         </View>
-        <View style={styles.xpBadge}>
-          <Ionicons name="trophy" size={scale(12)} color={P.sun} />
-          <Text style={styles.xpBadgeText}>{totalXP.toLocaleString()} XP</Text>
-        </View>
-      </View>
-      <View style={styles.xpBarBg}>
-        <Animated.View style={[styles.xpBarFill, { width: widthInterpolation }]}>
-          <LinearGradient
-            colors={barColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
+
+        <View style={styles.xpGroup}>
+          <Text
+            style={[
+              styles.xpText,
+              { color: isDark ? colors.textMuted : "rgba(0,0,0,0.4)" },
+            ]}
+          >
+            {totalXP.toLocaleString()} XP
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={14}
+            color={isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)"}
           />
-          <View style={styles.glow} />
-        </Animated.View>
+        </View>
       </View>
-      <View style={styles.xpBottom}>
-        <Text style={styles.xpSubText}>{xpToNext.toLocaleString()} XP to {nextTier}</Text>
-        <Text style={styles.xpSubText}>{Math.round(progress * 100)}%</Text>
+
+      <View style={styles.row2}>
+        <View
+          style={[
+            styles.barBg,
+            {
+              backgroundColor: isDark
+                ? "rgba(255,255,255,0.08)"
+                : "rgba(0,0,0,0.06)",
+            },
+          ]}
+        >
+          <Animated.View
+            style={[styles.barFill, { width: widthInterpolation }]}
+          >
+            <LinearGradient
+              colors={tierColors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
+        </View>
+        <Text
+          style={[
+            styles.barLabel,
+            { color: isDark ? colors.textMuted : "rgba(0,0,0,0.4)" },
+          ]}
+          numberOfLines={1}
+        >
+          {Math.round(progress * 100)}% · {xpToNext.toLocaleString()} XP to{" "}
+          {nextTier}
+        </Text>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  xpCard: {
+  card: {
     borderRadius: scale(16),
-    padding: scale(12),
+    paddingVertical: vs(10),
+    paddingHorizontal: scale(12),
     marginBottom: vs(16),
     overflow: "hidden",
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  xpTop: {
+  cardRadius: {
+    borderRadius: scale(16),
+  },
+  row1: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: vs(8),
+    marginBottom: vs(6),
   },
-  tierRow: {
+  tierGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(4),
+  },
+  trophyEmoji: {
+    fontSize: scale(16),
+    marginRight: scale(2),
+  },
+  tierDot: {
+    width: scale(8),
+    height: scale(8),
+    borderRadius: scale(4),
+  },
+  tierName: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(13),
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  divider: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: scale(16),
+    marginHorizontal: scale(2),
+  },
+  levelNum: {
+    fontFamily: FONTS.heading,
+    fontSize: scale(15),
+    letterSpacing: -0.3,
+  },
+  xpGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(2),
+  },
+  xpText: {
+    fontFamily: FONTS.body,
+    fontSize: scale(11),
+  },
+  row2: {
     flexDirection: "row",
     alignItems: "center",
     gap: scale(8),
   },
-  tierDot: {
-    width: scale(10),
-    height: scale(10),
-    borderRadius: scale(5),
-  },
-  xpTierLabel: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: scale(10),
-    color: "rgba(255,255,255,0.75)",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  xpLevel: {
-    fontFamily: FONTS.heading,
-    fontSize: scale(18),
-    color: P.white,
-    marginTop: -2,
-  },
-  xpBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: scale(4),
-    backgroundColor: "rgba(0,0,0,0.28)",
-    borderRadius: 20,
-    paddingHorizontal: scale(10),
-    paddingVertical: vs(4),
-  },
-  xpBadgeText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: scale(11),
-    color: P.sun,
-  },
-  xpBarBg: {
-    height: vs(16),
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.2)",
+  barBg: {
+    flex: 1,
+    height: vs(6),
+    borderRadius: 3,
     overflow: "hidden",
   },
-  xpBarFill: {
+  barFill: {
     height: "100%",
-    borderRadius: 8,
+    borderRadius: 3,
   },
-  glow: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: 20,
-    backgroundColor: "rgba(255,255,255,0.25)",
-  },
-  xpBottom: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: vs(4),
-  },
-  xpSubText: {
+  barLabel: {
     fontFamily: FONTS.body,
-    fontSize: scale(10),
-    color: "rgba(255,255,255,0.7)",
+    fontSize: scale(9),
+    flexShrink: 0,
   },
 });

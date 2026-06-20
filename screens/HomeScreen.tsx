@@ -17,11 +17,11 @@ import { P, scale, vs } from "../constants/homeTheme";
 import { FONTS } from "../constants/theme";
 import { useTheme } from "../contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
+import MiniCalendar from "../components/home/MiniCalendar";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 import GreetingCard       from "../components/ui/GreetingCard";
-import XPCard             from "../components/home/XPCard";
-import { StatCards }      from "../components/home/StatCards";
+
 import RecommendationCard from "../components/home/RecommendationCard";
 import { HomeSkeleton } from "../components/ui/Skeleton";
 import BodyStatusCard     from "../components/home/BodyStatusCard";
@@ -141,14 +141,6 @@ export default function HomeScreen() {
   ].filter(Boolean).length;
   const TOTAL_ONBOARDING = 7;
 
-  const getBannerColor = (done: number) => {
-    if (done <= 1) return "#EF4444";   // red
-    if (done <= 2) return "#F97316";   // orange
-    if (done <= 4) return "#F59E0B";   // amber
-    if (done <= 5) return "#84CC16";   // yellow-green
-    return "#10B981";                  // green
-  };
-  const bannerColor = getBannerColor(stepsDone);
   const progressPct = stepsDone / TOTAL_ONBOARDING;
 
   const isProfileComplete = profileComplete || (stepsDone >= TOTAL_ONBOARDING);
@@ -160,40 +152,35 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* ── Greeting ─────────────────────────────────────────────────────── */}
-      <GreetingCard firstName={firstName} fitnessGoal={u.fitness_goal} />
+      <GreetingCard firstName={firstName} />
 
       {/* ── Profile Incomplete Banner ────────────────────────────────────── */}
       {!isProfileComplete && (
         <TouchableOpacity
-          style={[styles.bannerCard, { backgroundColor: bannerColor }]}
+          style={[styles.bannerCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => router.push("/onboarding")}
-          activeOpacity={0.88}
+          activeOpacity={0.82}
         >
-          {/* Top row: title + steps badge */}
-          <View style={styles.bannerTopRow}>
-            <Text style={styles.bannerTitle}>Complete Your Profile</Text>
-            <View style={styles.bannerBadge}>
-              <Text style={styles.bannerBadgeText}>{stepsDone}/{TOTAL_ONBOARDING}</Text>
-            </View>
+          <View style={styles.bannerHeader}>
+            <Text style={[styles.bannerTitle, { color: colors.text }]}>Complete Your Profile</Text>
+            <Text style={[styles.bannerCount, { color: colors.textMuted }]}>{stepsDone}/{TOTAL_ONBOARDING}</Text>
           </View>
 
-          {/* Progress bar */}
-          <View style={styles.bannerTrack}>
-            <View style={[styles.bannerFill, { width: `${progressPct * 100}%` as any }]} />
+          <View style={[styles.bannerTrack, { backgroundColor: colors.border }]}>
+            <View style={[styles.bannerFill, { width: `${progressPct * 100}%` as any, backgroundColor: colors.primary }]} />
           </View>
 
-          {/* Sub text */}
-          <Text style={styles.bannerSub}>
+          <Text style={[styles.bannerSub, { color: colors.textMuted }]}>
             {stepsDone === 0
-              ? "Let's get started — set up your profile to unlock spotME."
-              : `${TOTAL_ONBOARDING - stepsDone} step${TOTAL_ONBOARDING - stepsDone !== 1 ? "s" : ""} left to complete your profile.`}
+              ? "Set up your profile to get started."
+              : `${TOTAL_ONBOARDING - stepsDone} step${TOTAL_ONBOARDING - stepsDone !== 1 ? "s" : ""} left.`}
           </Text>
 
-          {/* CTA pill */}
           <View style={styles.bannerCTA}>
-            <Text style={[styles.bannerCTAText, { color: bannerColor }]}>
+            <Text style={[styles.bannerCTAText, { color: colors.primary }]}>
               {stepsDone === 0 ? "Get Started" : "Continue Setup"}
             </Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.primary} />
           </View>
         </TouchableOpacity>
       )}
@@ -249,6 +236,26 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* ── Workout Calendar ──────────────────────────────────────────────── */}
+          <MiniCalendar />
+          {/* ── Hydration ────────────────────────────────────────────────────── */}
+          <HydrationCard
+            waterMl={today.water_ml || 0}
+            onLogWaterPress={() => router.push("/(tabs)/meals")}
+            onWaterLogged={(amount: number) => {
+              setDashboard((prev: any) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  today: {
+                    ...prev.today,
+                    water_ml: (prev.today.water_ml || 0) + amount,
+                  },
+                };
+              });
+            }}
+          />
+
           {/* ── Resume Workout Banner ───────────────────────────────────────── */}
           {resumeWorkout && (
             <TouchableOpacity
@@ -268,21 +275,6 @@ export default function HomeScreen() {
               </View>
             </TouchableOpacity>
           )}
-
-          {/* ── XP / Level ───────────────────────────────────────────────────── */}
-          <XPCard
-            tier={u.league_tier || "Bronze"}
-            level={u.level || 1}
-            totalXP={u.total_xp || 0}
-          />
-
-          {/* ── Today stats ──────────────────────────────────────────────────── */}
-          <StatCards
-            caloriesBurned={today.calories_burned || 0}
-            currentStreak={u.current_streak || 0}
-            waterMl={today.water_ml || 0}
-            caloriesConsumed={today.calories_consumed || 0}
-          />
 
           {/* ── Exercises to Try ──────────────────────────────────────────── */}
           <View style={styles.sectionHeaderRow}>
@@ -323,23 +315,7 @@ export default function HomeScreen() {
 
           {/* ── Weekly Activity ──────────────────────────────────────────────── */}
 
-          {/* ── Hydration ────────────────────────────────────────────────────── */}
-          <HydrationCard
-            waterMl={today.water_ml || 0}
-            onLogWaterPress={() => router.push("/(tabs)/meals")}
-            onWaterLogged={(amount: number) => {
-              setDashboard((prev: any) => {
-                if (!prev) return prev;
-                return {
-                  ...prev,
-                  today: {
-                    ...prev.today,
-                    water_ml: (prev.today.water_ml || 0) + amount,
-                  },
-                };
-              });
-            }}
-          />
+          
         </>
       )}
 
@@ -372,68 +348,51 @@ const styles = StyleSheet.create({
 
   // ── Banner card ────────────────────────────────────────────────────────────
   bannerCard: {
-    borderRadius: 20,
-    padding: scale(18),
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: scale(16),
     marginBottom: vs(20),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 6,
   },
-  bannerTopRow: {
+  bannerHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: vs(10),
+    marginBottom: vs(12),
   },
   bannerTitle: {
     fontFamily: FONTS.heading,
     fontSize: scale(16),
-    color: "#FFFFFF",
     flex: 1,
   },
-  bannerBadge: {
-    backgroundColor: "rgba(255,255,255,0.25)",
-    borderRadius: 20,
-    paddingHorizontal: scale(10),
-    paddingVertical: vs(3),
+  bannerCount: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: scale(12),
     marginLeft: scale(8),
   },
-  bannerBadgeText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: scale(12),
-    color: "#FFFFFF",
-  },
   bannerTrack: {
-    height: 5,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.3)",
+    height: 4,
+    borderRadius: 2,
     marginBottom: vs(10),
     overflow: "hidden",
   },
   bannerFill: {
     height: "100%" as any,
-    borderRadius: 4,
-    backgroundColor: "#FFFFFF",
+    borderRadius: 2,
   },
   bannerSub: {
     fontFamily: FONTS.body,
     fontSize: scale(12),
-    color: "rgba(255,255,255,0.85)",
     lineHeight: scale(17),
-    marginBottom: vs(14),
+    marginBottom: vs(12),
   },
   bannerCTA: {
-    alignSelf: "flex-start",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    paddingHorizontal: scale(16),
-    paddingVertical: vs(7),
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   bannerCTAText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: scale(12),
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: scale(13),
   },
   // ── Quick Logger ───────────────────────────────────────────────────────────
   quickLoggerRow: {
@@ -517,4 +476,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+});

@@ -154,7 +154,7 @@ router.post('/update-profile', async (req, res) => {
       neck, waist, hip, chest, arm, thigh,
       medicalConditions, medication, allergies,
       dietType, foodPreference, waterIntake, foodAllergies,
-      full_name, email, gender, dob
+      full_name, email, gender, dob, completedSteps
     } = req.body;
 
     if (!userId) return res.status(400).json({ error: "User ID required" });
@@ -169,7 +169,8 @@ router.post('/update-profile', async (req, res) => {
         neck = $8, waist = $9, hip = $10, chest = $11, arm = $12, thigh = $13,
         medical_conditions = $14, medication = $15, allergies = $16,
         diet_type = $17, food_preference = $18, water_intake = $19, food_allergies = $20,
-        full_name = COALESCE($21, full_name), email = COALESCE($22, email), gender = $23, dob = COALESCE($25, dob)
+        full_name = COALESCE($21, full_name), email = COALESCE($22, email), gender = $23, dob = COALESCE($25, dob),
+        completed_steps = COALESCE($26, completed_steps)
       WHERE id = $24
     `, [
       age || null, height || null, weight || null, bodyFat || null,
@@ -179,7 +180,8 @@ router.post('/update-profile', async (req, res) => {
       dietType || null, foodPreference || null, waterIntake || null, foodAllergies || null,
       full_name || null, email || null, gender || null,
       parsedUserId,
-      dob || null
+      dob || null,
+      completedSteps ? JSON.stringify(completedSteps) : null
     ]);
 
     if (result.rowCount === 0) {

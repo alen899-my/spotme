@@ -6,9 +6,9 @@ import {
   StyleSheet,
   Animated,
   Easing,
-  ActivityIndicator,
+  ImageBackground,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { FONTS } from "../../constants/theme";
@@ -18,7 +18,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { API_URL } from "../../utils/api";
 import { getToken } from "../../utils/tokenStorage";
 
-
+const drinkBg = require("../../assets/coach/drink.jpg");
 
 // ── Theme Palette ────────────────────────────────────────────────────────────
 const C = {
@@ -59,7 +59,7 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
   const [totalWater, setTotalWater] = useState(waterMl);
   const [target, setTarget] = useState(2500);
   const [maxSafe, setMaxSafe] = useState(4000);
-  const [loggingAmount, setLoggingAmount] = useState<number | null>(null);
+  const isLogging = useRef(false);
 
   // ── Animations ─────────────────────────────────────────────────────────────
   const fillAnim  = useRef(new Animated.Value(0)).current;
@@ -117,8 +117,13 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleQuickLog = async (amount: number) => {
-    if (loggingAmount !== null) return;
-    setLoggingAmount(amount);
+    if (isLogging.current) return;
+    isLogging.current = true;
+
+    const prevTotal = totalWater;
+
+    // Optimistic update
+    setTotalWater(prevTotal + amount);
 
     // Bounce animation on click
     Animated.sequence([
@@ -128,15 +133,13 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
 
     try {
       const token = await getToken();
-      const res = await axios.post(
+      await axios.post(
         `${API_URL}/water`,
         { amount_ml: amount },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const newTotal = totalWater + amount;
-      setTotalWater(newTotal);
-
+      const newTotal = prevTotal + amount;
       if (newTotal > maxSafe) {
         showToast("Logged! Overhydration warning.", "error");
       } else {
@@ -147,9 +150,10 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
         onWaterLogged(amount);
       }
     } catch (err) {
+      setTotalWater(prevTotal);
       showToast("Failed to log water", "error");
     } finally {
-      setLoggingAmount(null);
+      isLogging.current = false;
     }
   };
 
@@ -178,9 +182,9 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
 
   // Render quick presets
   const PRESETS = [
-    { label: "Glass", amount: 250, icon: "cafe" as const, color: "#64B5F6" },
-    { label: "Bottle", amount: 500, icon: "flask" as const, color: "#4FC3F7" },
-    { label: "Jug", amount: 750, icon: "water" as const, color: "#4DD0E1" },
+    { label: "Glass", amount: 250, icon: "glass-mug-variant" as const, color: "#64B5F6" },
+    { label: "Bottle", amount: 500, icon: "bottle-tonic-outline" as const, color: "#4FC3F7" },
+    { label: "Jug", amount: 750, icon: "kettle" as const, color: "#4DD0E1" },
   ];
 
   return (
@@ -188,21 +192,28 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
       style={[
         styles.card,
         {
-          backgroundColor: isDark ? colors.card : C.cardBg,
           borderWidth: 1,
           borderColor: isDark ? colors.border : C.cardBorder,
         },
       ]}
     >
+      <ImageBackground
+        source={drinkBg}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+        imageStyle={{ borderRadius: scale(24) }}
+      />
+      <View style={[StyleSheet.absoluteFill, styles.imageOverlay]} />
+
       {/* ── Header Row ──────────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={[styles.iconWrap, { backgroundColor: isDark ? "#1A1A1A" : C.iconBg }]}>
+          <View style={[styles.iconWrap, { backgroundColor: "rgba(0,0,0,0.4)" }]}>
             <Ionicons name="water" size={scale(18)} color={C.sun} />
           </View>
           <View>
             <Text style={[styles.title, { color: isDark ? colors.text : C.white }]}>Hydration</Text>
-            <Text style={[styles.subtitle, { color: isDark ? colors.textMuted : C.lightText }]}>
+            <Text style={[styles.subtitle, { color: "rgba(255,255,255,0.65)" }]}>
               Fast water logging
             </Text>
           </View>
@@ -256,38 +267,34 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
 
         {/* Right Column: Preset Quick buttons */}
         <View style={styles.logButtonsWrap}>
-          <Text style={[styles.logTitle, { color: isDark ? colors.text : C.white }]}>Quick Log</Text>
+          <Text style={[styles.logTitle, { color: "#FFFFFF" }]}>Quick Log</Text>
           <View style={styles.presetsColumn}>
             {PRESETS.map((p) => (
               <TouchableOpacity
                 key={p.amount}
-                  style={[
-                    styles.presetRow,
-                    {
-                      backgroundColor: isDark ? colors.inputBg : C.fillBg,
-                      borderColor: isDark ? colors.border : "rgba(255,255,255,0.08)",
-                    },
-                  ]}
+                style={[
+                  styles.presetRow,
+                  {
+                    backgroundColor: `${p.color}${p.amount <= 250 ? "20" : p.amount <= 500 ? "30" : "40"}`,
+                    borderColor: `${p.color}${p.amount <= 250 ? "40" : p.amount <= 500 ? "50" : "60"}`,
+                  },
+                ]}
                 onPress={() => handleQuickLog(p.amount)}
                 activeOpacity={0.75}
-                disabled={loggingAmount !== null}
+                disabled={isLogging.current}
               >
-                <View style={[styles.presetIconWrap, { backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.06)" }]}> 
-                  <Ionicons name={p.icon} size={16} color={p.color} />
+                <View style={[styles.presetIconWrap, { backgroundColor: `${p.color}30` }]}> 
+                  <MaterialCommunityIcons name={p.icon} size={16} color={p.color} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.presetLabel, { color: isDark ? colors.text : C.white }]}>
+                  <Text style={[styles.presetLabel, { color: "#FFFFFF" }]}>
                     {p.label}
                   </Text>
-                  <Text style={[styles.presetAmt, { color: isDark ? colors.textMuted : C.lightText }]}>
+                  <Text style={[styles.presetAmt, { color: "rgba(255,255,255,0.6)" }]}>
                     +{p.amount} ml
                   </Text>
                 </View>
-                {loggingAmount === p.amount ? (
-                  <ActivityIndicator size="small" color={isDark ? colors.primary : C.white} />
-                ) : (
-                  <Ionicons name="add-circle" size={22} color={isDark ? colors.primary : C.white} />
-                )}
+                <Ionicons name="add-circle" size={22} color="#FFFFFF" />
               </TouchableOpacity>
             ))}
           </View>
@@ -295,12 +302,12 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
       </View>
 
       {/* ── Footer ───────────────────────────────────────────────────────────── */}
-      <View style={[styles.divider, { backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.06)" }]} />
+      <View style={[styles.divider, { backgroundColor: "rgba(255,255,255,0.10)" }]} />
 
       <View style={styles.footer}>
         <Text style={[
           styles.footerHint, 
-          { color: isOverLimit ? "#EF4444" : (isDark ? colors.textMuted : C.lightText) },
+          { color: isOverLimit ? "#EF4444" : "rgba(255,255,255,0.6)" },
           isOverLimit && { fontFamily: FONTS.bodyBold }
         ]}>
           {isOverLimit
@@ -314,9 +321,9 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
           style={styles.moreBtn}
           activeOpacity={0.75}
         >
-          <Text style={[styles.moreBtnText, { color: isDark ? colors.primary : C.sun }]}>
-            More Options
-          </Text>
+            <Text style={[styles.moreBtnText, { color: C.sun }]}>
+              More Options
+            </Text>
           <Ionicons name="chevron-forward" size={14} color={isDark ? colors.primary : C.sun} />
         </TouchableOpacity>
       </View>
@@ -329,6 +336,10 @@ const styles = StyleSheet.create({
     borderRadius: scale(24),
     padding: scale(18),
     marginBottom: vs(20),
+    overflow: "hidden",
+  },
+  imageOverlay: {
+    backgroundColor: "rgba(0,0,0,0.7)",
   },
   header: {
     flexDirection: "row",
