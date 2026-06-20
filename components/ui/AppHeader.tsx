@@ -50,6 +50,8 @@ interface AppHeaderProps {
   onActionPress?: () => void;
   actionIcon?: string;
   actionBadge?: number;
+  currentMode?: 'spotme' | 'spotgym';
+  onModeChange?: (mode: 'spotme' | 'spotgym') => void;
 }
 
 export default function AppHeader({
@@ -58,6 +60,8 @@ export default function AppHeader({
   onActionPress,
   actionIcon = "notifications-outline",
   actionBadge,
+  currentMode = 'spotme',
+  onModeChange,
 }: AppHeaderProps) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -126,9 +130,52 @@ export default function AppHeader({
           </TouchableOpacity>
         </Animated.View>
 
-        <View style={styles.wordmarkWrap} pointerEvents="none">
-          <Text style={styles.wordmarkSpot} allowFontScaling={false}>spot</Text>
-          <Text style={styles.wordmarkMe} allowFontScaling={false}>ME</Text>
+        <View style={styles.centerContainer}>
+          <View style={[styles.switcherContainer, isDark ? { backgroundColor: 'rgba(255,255,255,0.06)' } : { backgroundColor: 'rgba(0,0,0,0.12)' }]}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => onModeChange && onModeChange('spotme')}
+              style={[
+                styles.switcherTab,
+                currentMode === 'spotme' && [styles.switcherTabActive, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]
+              ]}
+            >
+              <View style={styles.logoRow}>
+                <Text style={[
+                  styles.wordmarkSpot,
+                  { fontSize: scale(14), letterSpacing: -0.5 },
+                  currentMode !== 'spotme' && { color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)' }
+                ]} allowFontScaling={false}>spot</Text>
+                <Text style={[
+                  styles.wordmarkMe,
+                  { fontSize: scale(14), letterSpacing: -0.5 },
+                  currentMode !== 'spotme' && { color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)', opacity: 0.6 }
+                ]} allowFontScaling={false}>ME</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => onModeChange && onModeChange('spotgym')}
+              style={[
+                styles.switcherTab,
+                currentMode === 'spotgym' && [styles.switcherTabActive, { backgroundColor: isDark ? '#1A1A1A' : '#FFFFFF' }]
+              ]}
+            >
+              <View style={styles.logoRow}>
+                <Text style={[
+                  styles.wordmarkSpot,
+                  { fontSize: scale(14), letterSpacing: -0.5 },
+                  currentMode !== 'spotgym' && { color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)' }
+                ]} allowFontScaling={false}>spot</Text>
+                <Text style={[
+                  styles.wordmarkGym,
+                  { fontSize: scale(14), color: '#2596BE', letterSpacing: -0.5 },
+                  currentMode !== 'spotgym' && { color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)' }
+                ]} allowFontScaling={false}>GYM</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.rightSlot}>
@@ -271,5 +318,41 @@ const styles = StyleSheet.create({
     fontSize: scale(9),
     color: P.ink,
     letterSpacing: 0.2,
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switcherContainer: {
+    flexDirection: 'row',
+    borderRadius: scale(8),
+    padding: scale(2),
+    width: '100%',
+    maxWidth: scale(180),
+  },
+  switcherTab: {
+    flex: 1,
+    paddingVertical: scale(6),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: scale(6),
+  },
+  switcherTabActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  wordmarkGym: {
+    fontFamily: "Outfit_900Black",
+    fontSize: scale(21),
+    letterSpacing: -0.8,
+    includeFontPadding: false,
   },
 });

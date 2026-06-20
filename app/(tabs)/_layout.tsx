@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Text, ScrollView, useWindowDimensions } from "react-native";
 import { Tabs, usePathname, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppHeader from "../../components/ui/AppHeader";
@@ -12,6 +12,10 @@ import { FONTS } from "../../constants/theme";
 import axios from "axios";
 import { API_URL } from "../../utils/api";
 import { getToken } from "../../utils/tokenStorage";
+import GymHome from "../../components/spotgym/GymHome";
+import GymMembers from "../../components/spotgym/GymMembers";
+import GymStaff from "../../components/spotgym/GymStaff";
+import GymRemainders from "../../components/spotgym/GymRemainders";
 
 const BLUE = "#2596BE";
 const INK = "#04282B";
@@ -25,13 +29,28 @@ const TABS = [
   { name: "leaderboard", icon: "trophy",         label: "Leaderboard" },
 ] as const;
 
+const SPOTGYM_TABS = [
+  { name: "gym-home",       icon: "business",   label: "Home" },
+  { name: "gym-members",    icon: "people",     label: "Members" },
+  { name: "gym-staff",      icon: "shield-checkmark",    label: "Staff" },
+  { name: "gym-remainders", icon: "alarm",      label: "Remainders" },
+] as const;
+
 function isActiveTab(tabName: string, pathname: string) {
   if (tabName === "index")
     return pathname === "/" || pathname === "/(tabs)" || pathname === "/(tabs)/";
   return pathname.includes(tabName);
 }
 
-function BottomTabBar() {
+function BottomTabBar({
+  appMode,
+  spotGymTab,
+  onSpotGymTabPress,
+}: {
+  appMode: 'spotme' | 'spotgym';
+  spotGymTab: string;
+  onSpotGymTabPress: (tab: string) => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { colors, isDark } = useTheme();
@@ -40,6 +59,56 @@ function BottomTabBar() {
 
   const pillMargin = 20;
   const pillPadding = 12;
+
+  if (appMode === 'spotgym') {
+    const tabWidth = Math.floor((screenWidth - pillMargin * 2 - pillPadding) / SPOTGYM_TABS.length);
+    return (
+      <View style={[styles.bottomBarWrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+        <View style={[
+          styles.bottomBar,
+          {
+            backgroundColor: isDark ? "#0D0D0D" : "#FFFFFF",
+          },
+        ]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[styles.tabsScroll, { minWidth: screenWidth - pillMargin * 2 - pillPadding * 2 }]}
+            bounces={false}
+          >
+            {SPOTGYM_TABS.map((tab) => {
+              const active = spotGymTab === tab.name;
+              return (
+                <TouchableOpacity
+                  key={tab.name}
+                  onPress={() => onSpotGymTabPress(tab.name)}
+                  activeOpacity={0.7}
+                  style={[styles.tabItem, { width: tabWidth }]}
+                >
+                  <Ionicons
+                    name={active ? (tab.icon as any) : (`${tab.icon}-outline` as any)}
+                    size={22}
+                    color={active ? BLUE : (isDark ? "rgba(255,255,255,0.35)" : "#78909C")}
+                  />
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      { color: active ? BLUE : (isDark ? "rgba(255,255,255,0.35)" : "#78909C") },
+                      active && styles.tabLabelActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
+    );
+  }
+
   const tabWidth = Math.floor((screenWidth - pillMargin * 2 - pillPadding) / TABS.length);
 
   return (
@@ -97,6 +166,20 @@ export default function TabsLayout() {
   const pathname = usePathname();
   const router = useRouter();
 
+  const [appMode, setAppMode] = useState<'spotme' | 'spotgym'>('spotme');
+  const [spotGymTab, setSpotGymTab] = useState<string>('gym-home');
+
+  useEffect(() => {
+    AsyncStorage.getItem("app_mode").then((val) => {
+      if (val === "spotgym") setAppMode("spotgym");
+    });
+  }, []);
+
+  const handleModeChange = (mode: 'spotme' | 'spotgym') => {
+    setAppMode(mode);
+    AsyncStorage.setItem("app_mode", mode);
+  };
+
   const loadUser = async () => {
     try {
       const token = await getToken();
@@ -144,21 +227,39 @@ export default function TabsLayout() {
           onProfilePress={() => setSidebarOpen(true)}
           onActionPress={() => router.push("/notifications" as any)}
           actionBadge={unreadCount}
+          currentMode={appMode}
+          onModeChange={handleModeChange}
         />
-        <Tabs screenOptions={{ headerShown: false }} tabBar={() => null}>
-          <Tabs.Screen name="index" />
-          <Tabs.Screen name="meals" />
-          <Tabs.Screen name="explore" />
-          <Tabs.Screen name="daily" />
-          <Tabs.Screen name="leaderboard" />
-          <Tabs.Screen name="exercises" />
-          <Tabs.Screen name="splits" />
-          <Tabs.Screen name="weight" />
-          <Tabs.Screen name="workout" />
-          <Tabs.Screen name="profile" />
-        </Tabs>
+        {appMode === 'spotgym' ? (
+          spotGymTab === 'gym-home' ? (
+            <GymHome />
+          ) : spotGymTab === 'gym-members' ? (
+            <GymMembers />
+          ) : spotGymTab === 'gym-staff' ? (
+            <GymStaff />
+          ) : (
+            <GymRemainders />
+          )
+        ) : (
+          <Tabs screenOptions={{ headerShown: false }} tabBar={() => null}>
+            <Tabs.Screen name="index" />
+            <Tabs.Screen name="meals" />
+            <Tabs.Screen name="explore" />
+            <Tabs.Screen name="daily" />
+            <Tabs.Screen name="leaderboard" />
+            <Tabs.Screen name="exercises" />
+            <Tabs.Screen name="splits" />
+            <Tabs.Screen name="weight" />
+            <Tabs.Screen name="workout" />
+            <Tabs.Screen name="profile" />
+          </Tabs>
+        )}
       </View>
-      <BottomTabBar />
+      <BottomTabBar
+        appMode={appMode}
+        spotGymTab={spotGymTab}
+        onSpotGymTabPress={(tab) => setSpotGymTab(tab)}
+      />
       <FloatingTimerBar />
       <ProfileSidebar
         visible={sidebarOpen}

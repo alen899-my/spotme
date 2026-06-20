@@ -497,6 +497,33 @@ const initDB = async () => {
     // ── Rest Day Type Column ─────────────────────────────────────────────────
     await pool.query(`ALTER TABLE daily_workouts ADD COLUMN IF NOT EXISTS rest_type VARCHAR(20);`);
 
+    // ── SpotGym — Gyms Table ─────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS gyms (
+        id SERIAL PRIMARY KEY,
+        owner_id INT REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+        name VARCHAR(255) NOT NULL,
+        tagline VARCHAR(255),
+        address VARCHAR(500),
+        city VARCHAR(100) NOT NULL,
+        state VARCHAR(100),
+        country VARCHAR(100) NOT NULL,
+        capacity INT DEFAULT 0,
+        member_count INT DEFAULT 0,
+        gym_type VARCHAR(100) DEFAULT 'Commercial',
+        opening_time VARCHAR(10) DEFAULT '06:00',
+        closing_time VARCHAR(10) DEFAULT '22:00',
+        open_days JSONB DEFAULT '["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]'::jsonb,
+        phone VARCHAR(50),
+        website VARCHAR(255),
+        contact_email VARCHAR(255),
+        logo_url VARCHAR(500),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_gyms_owner ON gyms (owner_id);`);
+
   } catch (error) {
     console.error("Database initialization failed:", error);
   }
