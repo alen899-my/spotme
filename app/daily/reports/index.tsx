@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity, ActivityIndicator,
+  TouchableOpacity, ActivityIndicator, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -14,6 +14,8 @@ import { useToast } from '../../../contexts/ToastContext';
 import ActionModal from '../../../components/ui/ActionModal';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
+
+const coachAvatarSource = require('../../../assets/coach/fit-cartoon-character-training.png');
 
 
 
@@ -156,13 +158,13 @@ export default function ReportsListScreen() {
                 activeOpacity={0.7}
               >
                 <View style={s.cardTop}>
-                  <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(37,150,190,0.1)' }]}>
-                    {isGenerating ? (
+                  {isGenerating ? (
+                    <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(37,150,190,0.1)' }]}>
                       <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <MaterialCommunityIcons name="clipboard-text" size={20} color={colors.primary} />
-                    )}
-                  </View>
+                    </View>
+                  ) : (
+                    <Image source={coachAvatarSource} style={s.coachAvatar} />
+                  )}
                   <View style={s.cardInfo}>
                     <Text style={[s.cardDate, { color: colors.textMuted }]}>{item.workout_date}</Text>
                     <Text style={[s.cardSummary, { color: colors.text }]} numberOfLines={2}>
@@ -188,7 +190,7 @@ export default function ReportsListScreen() {
                 </View>
                 <View style={s.actionsRow}>
                   <TouchableOpacity
-                    style={[s.actionBtn, { backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(37,150,190,0.08)', borderColor: isDark ? 'rgba(37,150,190,0.25)' : 'rgba(37,150,190,0.18)' }]}
+                    style={[s.actionBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
                     onPress={() => handleRetry(item)}
                     disabled={Boolean(actionId)}
                     activeOpacity={0.75}
@@ -196,14 +198,17 @@ export default function ReportsListScreen() {
                     {retrying ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
-                      <Ionicons name="refresh-outline" size={16} color={colors.primary} />
+                      <Ionicons name="refresh-outline" size={15} color={colors.primary} />
                     )}
                     <Text style={[s.actionText, { color: colors.primary }]}>
                       {isGenerating ? 'Retry' : 'Regenerate'}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[s.actionBtn, { backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)', borderColor: isDark ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.18)' }]}
+                    style={[s.actionBtn, { 
+                      backgroundColor: isDark ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.04)', 
+                      borderColor: isDark ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)' 
+                    }]}
                     onPress={() => setDeleteTarget(item)}
                     disabled={Boolean(actionId)}
                     activeOpacity={0.75}
@@ -211,7 +216,7 @@ export default function ReportsListScreen() {
                     {deleting ? (
                       <ActivityIndicator size="small" color="#EF4444" />
                     ) : (
-                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                      <Ionicons name="trash-outline" size={15} color="#EF4444" />
                     )}
                     <Text style={[s.actionText, { color: '#EF4444' }]}>Delete</Text>
                   </TouchableOpacity>
@@ -273,6 +278,10 @@ const makeStyles = (colors: any) => StyleSheet.create({
     width: 40, height: 40, borderRadius: 12,
     justifyContent: 'center', alignItems: 'center',
   },
+  coachAvatar: {
+    width: 40, height: 40, borderRadius: 20,
+    borderWidth: 1.5, borderColor: colors.border,
+  },
   cardInfo: { flex: 1, gap: 2 },
   cardDate: { fontFamily: FONTS.body, fontSize: 11 },
   cardSummary: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 18 },
@@ -290,7 +299,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,

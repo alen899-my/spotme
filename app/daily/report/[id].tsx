@@ -1,37 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Image,
+  Dimensions, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { useToast } from '../../../contexts/ToastContext';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
 import { formatDateWithWeekday as formatDate } from '../../../utils/datetime';
 
-
 const coachAvatarSource = require('../../../assets/coach/fit-cartoon-character-training.png');
-
-type ReportSection = {
-  title: string;
-  eyebrow: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-  body?: string;
-};
-
-const sectionAccent = {
-  summary: '#2596BE',
-  wins: '#10B981',
-  improve: '#F59E0B',
-  plan: '#8B5CF6',
-};
 
 const cleanText = (value?: string) => {
   if (!value) return '';
@@ -59,88 +44,36 @@ const splitAdvice = (value?: string) => {
     .filter(Boolean);
 };
 
-function StatTile({
-  icon,
-  label,
-  value,
-  color,
-  colors,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: string;
-  color: string;
-  colors: any;
-}) {
-  return (
-    <View style={[styles.statTile, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.statIcon, { backgroundColor: `${color}1A` }]}>
-        <Ionicons name={icon} size={17} color={color} />
-      </View>
-      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
-      <Text style={[styles.statValue, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function AdviceSection({
-  section,
-  colors,
-  isDark,
-}: {
-  section: ReportSection;
-  colors: any;
-  isDark: boolean;
-}) {
-  const items = splitAdvice(section.body);
-
-  return (
-    <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={styles.sectionHeader}>
-        <View style={[styles.sectionIcon, { backgroundColor: `${section.color}1A` }]}>
-          <Ionicons name={section.icon} size={19} color={section.color} />
-        </View>
-        <View style={styles.sectionTitleWrap}>
-          <Text style={[styles.sectionEyebrow, { color: section.color }]}>{section.eyebrow}</Text>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{section.title}</Text>
-        </View>
-      </View>
-
-      {items.length > 0 ? (
-        <View style={styles.adviceList}>
-          {items.map((item, index) => (
-            <View
-              key={`${section.title}-${index}-${item.slice(0, 12)}`}
-              style={[
-                styles.adviceItem,
-                {
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.035)' : '#F8FAFC',
-                  borderColor: isDark ? 'rgba(255,255,255,0.05)' : '#EEF2F7',
-                },
-              ]}
-            >
-              <View style={[styles.adviceBullet, { backgroundColor: section.color }]} />
-              <Text style={[styles.adviceText, { color: colors.text }]}>{item}</Text>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <Text style={[styles.emptySectionText, { color: colors.textMuted }]}>No notes available yet.</Text>
-      )}
-    </View>
-  );
-}
-
 export default function WorkoutReportScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  
+  const scrollRef = useRef<ScrollView>(null);
+  const typingOpacity = useRef(new Animated.Value(0.4)).current;
+
+  // Typist animation for coaching simulation
+  useEffect(() => {
+    let animation: Animated.CompositeAnimation | null = null;
+    if (isTyping) {
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(typingOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+          Animated.timing(typingOpacity, { toValue: 0.4, duration: 600, useNativeDriver: true }),
+        ])
+      );
+      animation.start();
+    } else {
+      typingOpacity.setValue(0.4);
+    }
+    return () => animation?.stop();
+  }, [isTyping]);
 
   useEffect(() => {
     const fetch = async () => {
@@ -171,7 +104,7 @@ export default function WorkoutReportScreen() {
     return (
       <View style={[styles.center, { backgroundColor: colors.bg }]}>
         <MaterialCommunityIcons name="file-document-outline" size={64} color={colors.textDim} />
-        <Text style={[styles.emptyText, { color: colors.textMuted }]}>Report not found</Text>
+        <Text style={{ fontFamily: FONTS.body, fontSize: 15, color: colors.textMuted }}>Report not found</Text>
       </View>
     );
   }
@@ -184,336 +117,503 @@ export default function WorkoutReportScreen() {
   const displayDate = formatDate(report.workout_date);
   const summary = cleanText(report.summary);
 
-  const sections: ReportSection[] = [
-    {
-      title: 'What went well',
-      eyebrow: 'Wins',
-      icon: 'checkmark-circle-outline',
-      color: sectionAccent.wins,
-      body: report.good_things,
-    },
-    {
-      title: 'Where to improve',
-      eyebrow: 'Focus',
-      icon: 'trending-up-outline',
-      color: sectionAccent.improve,
-      body: report.areas_to_improve,
-    },
-    {
-      title: 'Coach recommendations',
-      eyebrow: 'Next session',
-      icon: 'bulb-outline',
-      color: sectionAccent.plan,
-      body: report.recommendations,
-    },
-  ];
+  const wins = splitAdvice(report.good_things);
+  const improve = splitAdvice(report.areas_to_improve);
+  const recommendations = splitAdvice(report.recommendations);
+
+  const handleRegenerate = async () => {
+    if (regenerating) return;
+    setRegenerating(true);
+    setIsTyping(true);
+    try {
+      const token = await getToken();
+      await axios.post(`${API_URL}/daily/workouts/${report.daily_workout_id}/generate-report`, { force: true }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      // Fetch fresh report details
+      setTimeout(async () => {
+        try {
+          const token2 = await getToken();
+          const res = await axios.get(`${API_URL}/daily/reports/${id}`, {
+            headers: { Authorization: `Bearer ${token2}` },
+          });
+          setReport(res.data);
+          showToast('Report updated by Coach Spotty! 🏋️');
+        } catch (_) {}
+        setRegenerating(false);
+        setIsTyping(false);
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+      }, 3500);
+    } catch (err) {
+      console.error('Failed to regenerate report:', err);
+      setRegenerating(false);
+      setIsTyping(false);
+    }
+  };
+
+
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.bg }]}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      {/* Header Styled like a Chat Conversation Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity
           onPress={() => router.back()}
-          style={[
-            styles.backBtn,
-            {
-              backgroundColor: isDark ? colors.inputBg : '#FFFFFF',
-              borderColor: colors.border,
-            },
-          ]}
+          style={[styles.headerBtn, { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }]}
+          activeOpacity={0.75}
         >
           <Ionicons name="chevron-back" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Workout Analysis</Text>
+
+        <View style={styles.coachHeaderProfile}>
+          <View style={styles.avatarWrapper}>
+            <Image source={coachAvatarSource} style={styles.headerCoachAvatar} />
+            <View style={styles.onlineIndicator} />
+          </View>
+          <View style={styles.headerInfoBlock}>
+            <Text style={[styles.coachHeaderName, { color: colors.text }]}>Coach Spotty</Text>
+            <Text style={[styles.coachHeaderStatus, { color: colors.textMuted }]}>AI Advisor · Active</Text>
+          </View>
+        </View>
+
         <TouchableOpacity
           onPress={() => router.push(`/daily/view/${report.daily_workout_id}`)}
-          style={[
-            styles.viewWorkoutBtn,
-            {
-              backgroundColor: isDark ? colors.inputBg : '#FFFFFF',
-              borderColor: colors.border,
-            },
-          ]}
+          style={[styles.headerBtn, { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }]}
+          activeOpacity={0.75}
         >
           <Ionicons name="open-outline" size={18} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroStage}>
-          <LinearGradient
-            colors={isDark ? ['#092532', '#0D0D0D'] : ['#D9F4FF', '#FFFFFF']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.hero, { borderColor: colors.border }]}
-          >
-            <View style={styles.heroContent}>
-              <View style={styles.heroCopy}>
-                <Text style={[styles.heroKicker, { color: isDark ? '#87D9F3' : colors.primary }]}>Workout report</Text>
-                <Text style={[styles.heroTitle, { color: colors.text }]}>Coach analysis</Text>
-              </View>
+      {/* Conversation Thread */}
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.chatContent, { paddingBottom: Math.max(insets.bottom, 16) + 32 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Date / Separator Kicker */}
+        <View style={styles.chatDivider}>
+          <View style={[styles.chatDividerLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]} />
+          <View style={[styles.chatDividerTextWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name="barbell-outline" size={11} color={colors.textDim} style={{ marginRight: 4 }} />
+            <Text style={[styles.chatDividerText, { color: colors.textDim }]}>{displayDate}</Text>
+          </View>
+          <View style={[styles.chatDividerLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]} />
+        </View>
 
-              <Text style={[styles.heroSummary, { color: isDark ? 'rgba(241,245,249,0.78)' : '#334155' }]}>
-                {summary || 'No summary available for this report.'}
+        {/* Message 1: Welcome & Summary */}
+        <View style={styles.messageRow}>
+          <Image source={coachAvatarSource} style={styles.chatAvatar} />
+          <View style={styles.bubbleCol}>
+            <Text style={[styles.senderName, { color: colors.textMuted }]}>Coach Spotty</Text>
+            <View style={[styles.bubble, styles.blueBubble, { backgroundColor: isDark ? 'rgba(37,150,190,0.08)' : '#F0F9FF', borderColor: isDark ? 'rgba(37,150,190,0.18)' : '#E0F2FE' }]}>
+              <Text style={[styles.bubbleText, { color: colors.text }]}>
+                Hey! Here is my detailed coaching analysis for your session. You worked hard today.
               </Text>
-
-              <TouchableOpacity
-                onPress={() => router.push(`/daily/view/${report.daily_workout_id}`)}
-                style={[styles.sessionLink, { backgroundColor: isDark ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.72)' }]}
-                activeOpacity={0.75}
-              >
-                <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-                <Text style={[styles.sessionDate, { color: colors.text }]}>{displayDate}</Text>
-                <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
-              </TouchableOpacity>
             </View>
-            <Image source={coachAvatarSource} style={styles.coachCharacter} />
-          </LinearGradient>
+            
+            <View style={[styles.bubble, styles.bubbleFollowUp, { backgroundColor: isDark ? colors.card : '#F8FAFC', borderColor: colors.border }]}>
+              <Text style={[styles.bubbleLabel, { color: colors.primary }]}>Overall Session Summary</Text>
+              <Text style={[styles.bubbleText, { color: colors.text, marginTop: 4, lineHeight: 20 }]}>
+                {summary || 'No summary available.'}
+              </Text>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.statsGrid}>
-          <StatTile icon="time-outline" label="Duration" value={durationMin} color={colors.primary} colors={colors} />
-          <StatTile icon="barbell-outline" label="Volume" value={volumeKg} color="#10B981" colors={colors} />
-          <StatTile icon="flame-outline" label="Energy" value={cals} color="#EF4444" colors={colors} />
+        {/* Message 2: Rich Stats Card Attachment */}
+        <View style={styles.messageRowGrouped}>
+          <View style={styles.bubbleCol}>
+            <View style={[styles.attachmentCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#F8FAFC', borderColor: colors.border }]}>
+              <View style={styles.attachmentHeader}>
+                <Ionicons name="stats-chart" size={14} color={colors.primary} />
+                <Text style={[styles.attachmentTitle, { color: colors.textMuted }]}>Workout Stats Attachment</Text>
+              </View>
+              
+              <View style={styles.statsHorizontalRow}>
+                <View style={styles.statCell}>
+                  <Ionicons name="time" size={15} color={colors.primary} style={{ marginBottom: 4 }} />
+                  <Text style={[styles.statCellVal, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{durationMin}</Text>
+                  <Text style={[styles.statCellLbl, { color: colors.textMuted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Duration</Text>
+                </View>
+                <View style={[styles.cellDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.statCell}>
+                  <Ionicons name="barbell" size={15} color="#10B981" style={{ marginBottom: 4 }} />
+                  <Text style={[styles.statCellVal, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{volumeKg}</Text>
+                  <Text style={[styles.statCellLbl, { color: colors.textMuted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Volume</Text>
+                </View>
+                <View style={[styles.cellDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.statCell}>
+                  <Ionicons name="flame" size={15} color="#EF4444" style={{ marginBottom: 4 }} />
+                  <Text style={[styles.statCellVal, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{cals}</Text>
+                  <Text style={[styles.statCellLbl, { color: colors.textMuted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Burned</Text>
+                </View>
+              </View>
+            </View>
+          </View>
         </View>
 
-        {sections.map(section => (
-          <AdviceSection key={section.title} section={section} colors={colors} isDark={isDark} />
-        ))}
+        {/* Message 3: Wins */}
+        {wins.length > 0 && (
+          <View style={styles.messageRow}>
+            <Image source={coachAvatarSource} style={styles.chatAvatar} />
+            <View style={styles.bubbleCol}>
+              <Text style={[styles.senderName, { color: colors.textMuted }]}>Coach Spotty</Text>
+              <View style={[styles.bubble, styles.greenBubble, { backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : '#F0FDF4', borderColor: isDark ? 'rgba(16,185,129,0.18)' : '#DCFCE7' }]}>
+                <View style={styles.bubbleHeaderRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                  <Text style={[styles.bubbleCategoryTitle, { color: '#10B981' }]}>Wins (What went well)</Text>
+                </View>
+                <View style={{ gap: 8, marginTop: 10 }}>
+                  {wins.map((w, idx) => (
+                    <View key={idx} style={styles.listLine}>
+                      <View style={[styles.listDot, { backgroundColor: '#10B981' }]} />
+                      <Text style={[styles.listText, { color: colors.text }]}>{w}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
 
-        {/* Regenerate button */}
-        <TouchableOpacity
-          style={[styles.regenerateBtn, { opacity: regenerating ? 0.6 : 1, borderColor: colors.border, backgroundColor: colors.card }]}
-          onPress={async () => {
-            if (regenerating) return;
-            setRegenerating(true);
-            try {
-              const token = await getToken();
-              await axios.post(`${API_URL}/daily/workouts/${report.daily_workout_id}/generate-report`, { force: true }, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              // Re-fetch after a short delay
-              setTimeout(async () => {
-                try {
-                  const token2 = await getToken();
-                  const res = await axios.get(`${API_URL}/daily/reports/${id}`, {
-                    headers: { Authorization: `Bearer ${token2}` },
-                  });
-                  setReport(res.data);
-                } catch (_) {}
-                setRegenerating(false);
-              }, 3000);
-            } catch (err) {
-              console.error('Failed to regenerate report:', err);
-              setRegenerating(false);
-            }
-          }}
-          disabled={regenerating}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="refresh" size={18} color={colors.primary} />
-          <Text style={[styles.regenerateBtnText, { color: colors.primary }]}>
-            {regenerating ? 'REGENERATING...' : 'REGENERATE REPORT'}
-          </Text>
-          {regenerating && <ActivityIndicator size="small" color={colors.primary} />}
-        </TouchableOpacity>
+        {/* Message 4: Areas to Improve */}
+        {improve.length > 0 && (
+          <View style={styles.messageRowGrouped}>
+            <View style={styles.bubbleCol}>
+              <View style={[styles.bubble, styles.amberBubble, { backgroundColor: isDark ? 'rgba(245,158,11,0.08)' : '#FFFBEB', borderColor: isDark ? 'rgba(245,158,11,0.18)' : '#FEF3C7' }]}>
+                <View style={styles.bubbleHeaderRow}>
+                  <Ionicons name="trending-up" size={16} color="#F59E0B" />
+                  <Text style={[styles.bubbleCategoryTitle, { color: '#F59E0B' }]}>Focus (Where to improve)</Text>
+                </View>
+                <View style={{ gap: 8, marginTop: 10 }}>
+                  {improve.map((i, idx) => (
+                    <View key={idx} style={styles.listLine}>
+                      <View style={[styles.listDot, { backgroundColor: '#F59E0B' }]} />
+                      <Text style={[styles.listText, { color: colors.text }]}>{i}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Message 5: Recommendations */}
+        {recommendations.length > 0 && (
+          <View style={styles.messageRow}>
+            <Image source={coachAvatarSource} style={styles.chatAvatar} />
+            <View style={styles.bubbleCol}>
+              <Text style={[styles.senderName, { color: colors.textMuted }]}>Coach Spotty</Text>
+              <View style={[styles.bubble, styles.purpleBubble, { backgroundColor: isDark ? 'rgba(139,92,246,0.08)' : '#FAF5FF', borderColor: isDark ? 'rgba(139,92,246,0.18)' : '#F3E8FF' }]}>
+                <View style={styles.bubbleHeaderRow}>
+                  <Ionicons name="bulb" size={16} color="#8B5CF6" />
+                  <Text style={[styles.bubbleCategoryTitle, { color: '#8B5CF6' }]}>Next Session Advice</Text>
+                </View>
+                <View style={{ gap: 8, marginTop: 10 }}>
+                  {recommendations.map((r, idx) => (
+                    <View key={idx} style={styles.listLine}>
+                      <View style={[styles.listDot, { backgroundColor: '#8B5CF6' }]} />
+                      <Text style={[styles.listText, { color: colors.text }]}>{r}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Typing / Regenerating Indicator */}
+        {isTyping && (
+          <View style={styles.messageRow}>
+            <Image source={coachAvatarSource} style={styles.chatAvatar} />
+            <View style={styles.bubbleCol}>
+              <Text style={[styles.senderName, { color: colors.textMuted }]}>Coach Spotty</Text>
+              <Animated.View style={[styles.bubble, styles.typingBubble, { backgroundColor: isDark ? colors.card : '#F1F5F9', borderColor: colors.border, opacity: typingOpacity, alignSelf: 'flex-start' }]}>
+                <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 12, color: colors.textDim }}>
+                  {regenerating ? 'Coach is analyzing workout details...' : 'Coach is writing...'}
+                </Text>
+              </Animated.View>
+            </View>
+          </View>
+        )}
+
+        {/* Regenerate Action Link in chat thread */}
+        {!isTyping && (
+          <View style={styles.regenerateContainer}>
+            <TouchableOpacity
+              onPress={handleRegenerate}
+              style={[styles.regenerateChatBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderColor: colors.border }]}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh-outline" size={15} color={colors.primary} />
+              <Text style={[styles.regenerateChatText, { color: colors.primary }]}>Ask Coach to Re-analyze workout</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  emptyText: { fontFamily: FONTS.body, fontSize: 15 },
+  
+  // Header Custom Styles
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 10,
-    gap: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
   },
-  backBtn: {
+  headerBtn: {
     width: 38,
     height: 38,
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
+  coachHeaderProfile: {
     flex: 1,
-    fontFamily: FONTS.heading,
-    fontSize: 22,
-    letterSpacing: 0,
-  },
-  viewWorkoutBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    borderWidth: 1,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    marginHorizontal: 12,
   },
-  scroll: { padding: 16, paddingTop: 6, paddingBottom: 40, flexGrow: 1 },
-  heroStage: {
+  avatarWrapper: {
     position: 'relative',
-    minHeight: 214,
-    marginBottom: 2,
-    overflow: 'visible',
   },
-  hero: {
-    width: '100%',
+  headerCoachAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#FFF',
+  },
+  headerInfoBlock: {
+    marginLeft: 10,
+  },
+  coachHeaderName: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+  },
+  coachHeaderStatus: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    marginTop: 1,
+  },
+
+  // Chat Feed Layout
+  chatContent: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    flexGrow: 1,
+    paddingBottom: 32,
+  },
+  chatDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 18,
+    paddingHorizontal: 10,
+  },
+  chatDividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  chatDividerTextWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginHorizontal: 10,
+  },
+  chatDividerText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11.5,
+  },
+
+  // Message Row Styles
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  messageRowGrouped: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    paddingLeft: 46, // Aligns content exactly underneath the avatar space
+  },
+  chatAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    marginRight: 12,
+    marginTop: 4,
+  },
+  bubbleCol: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  senderName: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    marginBottom: 4,
+    marginLeft: 4,
+  },
+
+  // Speech Bubble Core
+  bubble: {
     borderRadius: 18,
     borderWidth: 1,
-    padding: 18,
-    minHeight: 196,
-    overflow: 'visible',
+    padding: 14,
+    maxWidth: '92%',
+    alignSelf: 'stretch',
+    borderTopLeftRadius: 3, // speech bubble tail style
   },
-  heroContent: {
-    width: '100%',
-    minHeight: 160,
-    justifyContent: 'space-between',
+  bubbleFollowUp: {
+    marginTop: 6,
+    borderTopLeftRadius: 18, // grouped bubbles don't get tail style
   },
-  coachCharacter: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    width: 120,
-    height: 150,
-    resizeMode: 'contain',
-    zIndex: 5,
+  bubbleText: {
+    fontFamily: FONTS.body,
+    fontSize: 13.5,
+    lineHeight: 19,
   },
-  heroCopy: { flex: 1 },
-  heroKicker: {
+  bubbleLabel: {
     fontFamily: FONTS.bodyBold,
     fontSize: 11,
     textTransform: 'uppercase',
-    letterSpacing: 0,
-    marginBottom: 2,
+    letterSpacing: 0.5,
   },
-  heroTitle: {
-    fontFamily: FONTS.heading,
-    fontSize: 26,
-    letterSpacing: 0,
-    lineHeight: 29,
+  typingBubble: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
-  heroSummary: {
-    fontFamily: FONTS.body,
-    fontSize: 14,
-    lineHeight: 22,
-    marginTop: 16,
+
+  // Speec Bubble Variations
+  blueBubble: {
+    borderTopLeftRadius: 3,
   },
-  sessionLink: {
-    alignSelf: 'flex-start',
+  greenBubble: {
+    borderTopLeftRadius: 3,
+    maxWidth: '96%',
+  },
+  amberBubble: {
+    borderTopLeftRadius: 18,
+    maxWidth: '96%',
+  },
+  purpleBubble: {
+    borderTopLeftRadius: 3,
+    maxWidth: '96%',
+  },
+  bubbleHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderRadius: 999,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    marginTop: 16,
   },
-  sessionDate: { fontFamily: FONTS.bodySemiBold, fontSize: 12.5 },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
-    marginBottom: 14,
+  bubbleCategoryTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 13,
   },
-  statTile: {
-    flex: 1,
-    minHeight: 102,
-    borderRadius: 14,
+
+  // Stats Attachment Card
+  attachmentCard: {
+    borderRadius: 18,
     borderWidth: 1,
-    padding: 12,
+    padding: 14,
+    gap: 12,
+    alignSelf: 'stretch',
   },
-  statIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    justifyContent: 'center',
+  attachmentHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    gap: 6,
   },
-  statLabel: {
+  attachmentTitle: {
     fontFamily: FONTS.bodyBold,
     fontSize: 10.5,
     textTransform: 'uppercase',
-    letterSpacing: 0,
-    marginBottom: 3,
-  },
-  statValue: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 14,
-  },
-  section: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 12,
-  },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  sectionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sectionTitleWrap: { flex: 1 },
-  sectionEyebrow: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0,
-    marginBottom: 1,
-  },
-  sectionTitle: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 16,
-  },
-  adviceList: { gap: 8 },
-  adviceItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-  },
-  adviceBullet: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    marginTop: 7,
-  },
-  adviceText: {
-    flex: 1,
-    fontFamily: FONTS.body,
-    fontSize: 13.5,
-    lineHeight: 21,
-  },
-  emptySectionText: {
-    fontFamily: FONTS.body,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  regenerateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  regenerateBtnText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 13,
     letterSpacing: 0.5,
   },
+  statsHorizontalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  statCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statCellVal: {
+    fontFamily: FONTS.heading,
+    fontSize: 14,
+  },
+  statCellLbl: {
+    fontFamily: FONTS.body,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  cellDivider: {
+    width: 1,
+    height: 32,
+  },
+
+  // Bullet Lists inside Bubble
+  listLine: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  listDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 7,
+  },
+  listText: {
+    flex: 1,
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+
+  // Regenerate Button Row
+  regenerateContainer: {
+    alignItems: 'center',
+    marginVertical: 18,
+  },
+  regenerateChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  regenerateChatText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12.5,
+  },
+
 });
