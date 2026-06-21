@@ -15,6 +15,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import OptimizedImage from "../../components/ui/OptimizedImage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { FONTS } from "../../constants/theme";
@@ -354,7 +355,7 @@ export default function CalendarScreen() {
                       <View style={styles.workoutCardInner}>
                         <View style={[styles.workoutImgWrap, { borderColor: colors.border }]}>
                           {hasPhoto ? (
-                            <Image source={{ uri: w.cover_photo_url || w.completion_photo_url }} style={styles.workoutImg} />
+                            <OptimizedImage uri={w.cover_photo_url || w.completion_photo_url} style={styles.workoutImg} />
                           ) : (
                             <View style={[styles.workoutImgPlaceholder, { backgroundColor: colors.inputBg }]}>
                               <MaterialCommunityIcons name="arm-flex" size={26} color={tier.color} />

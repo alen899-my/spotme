@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -256,7 +257,7 @@ export default function NewDailyWorkout() {
                           {split.original_creator_name && (
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                               {split.original_creator_pic ? (
-                                <Image source={{ uri: split.original_creator_pic }} style={{ width: 14, height: 14, borderRadius: 7 }} />
+                                <OptimizedImage uri={split.original_creator_pic} style={{ width: 14, height: 14, borderRadius: 7 }} />
                               ) : (
                                 <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
                                   <Ionicons name="person" size={8} color="#FFF" />

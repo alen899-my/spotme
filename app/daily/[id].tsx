@@ -23,6 +23,8 @@ import ExerciseFilterModal, { ExerciseFilters } from '../../components/exercises
 import ExerciseBrowser from '../../components/exercises/ExerciseBrowser';
 import { ActiveWorkoutSkeleton } from '../../components/ui/Skeleton';
 import * as ImagePicker from 'expo-image-picker';
+import OptimizedImage from '../../components/ui/OptimizedImage';
+import { optimizeImage } from '../../utils/imageOptimizer';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { API_URL } from '../../utils/api';
@@ -94,7 +96,7 @@ const ExerciseCard = React.memo(({
         onPress={() => setExpanded(v => !v)}
         activeOpacity={0.8}
       >
-        <Image source={{ uri: item.image_url }} style={styles.exImage} />
+        <OptimizedImage uri={item.image_url} style={styles.exImage} />
         <View style={{ flex: 1 }}>
           {/* ── 3. Title wraps, no truncation ── */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap' }}>
@@ -903,7 +905,7 @@ export default function ActiveWorkoutScreen() {
         const token = await getToken();
         const formData = new FormData();
         for (const [index, asset] of result.assets.entries()) {
-          const uri = asset.uri;
+          const uri = await optimizeImage(asset.uri, 'workout');
           if (Platform.OS === 'web') {
             const response = await fetch(uri);
             const blob = await response.blob();
@@ -1085,7 +1087,7 @@ export default function ActiveWorkoutScreen() {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 10 }}>
                     {workout?.photos?.map((p: any) => (
                       <TouchableOpacity key={p.id} style={styles.photoThumbWrap} onPress={() => { setViewerUri(p.photo_url); setViewerVisible(true); }}>
-                        <Image source={{ uri: p.photo_url }} style={styles.photoThumb} />
+                        <OptimizedImage uri={p.photo_url} style={styles.photoThumb} />
                         <TouchableOpacity style={styles.removePhotoBtn} onPress={() => handleDeletePhoto(p.id)}>
                           <Ionicons name="close" size={14} color="#FFF" />
                         </TouchableOpacity>
@@ -1093,7 +1095,7 @@ export default function ActiveWorkoutScreen() {
                     ))}
                     {uploadingPhotos.map((uri, idx) => (
                       <View key={`uploading-${idx}`} style={[styles.photoThumbWrap, { opacity: 0.6 }]}>
-                        <Image source={{ uri }} style={styles.photoThumb} />
+                        <OptimizedImage uri={uri} style={styles.photoThumb} />
                         <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
                           <ActivityIndicator size="small" color="#FFF" />
                         </View>
@@ -1248,7 +1250,7 @@ export default function ActiveWorkoutScreen() {
           </TouchableOpacity>
           {viewerUri && (
             <>
-              <Image source={{ uri: viewerUri }} style={styles.viewerImage} resizeMode="contain" />
+              <OptimizedImage uri={viewerUri} style={styles.viewerImage} contentFit="contain" />
               <TouchableOpacity style={styles.downloadBtn} onPress={() => handleDownload(viewerUri)}>
                 <LinearGradient colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)']} style={styles.downloadBtnGrad}>
                   <Ionicons name="download-outline" size={24} color="#FFF" />

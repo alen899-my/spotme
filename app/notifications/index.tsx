@@ -6,6 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -244,7 +245,7 @@ export default function NotificationsScreen() {
               {/* Icon / Avatar Box */}
               <View style={s.avatarContainer}>
                 {item.from_user_pic ? (
-                  <Image source={{ uri: item.from_user_pic }} style={s.avatar} />
+                  <OptimizedImage uri={item.from_user_pic} style={s.avatar} />
                 ) : (
                   <LinearGradient
                     colors={isDark ? ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.03)'] : ['#E2E8F0', '#CBD5E1']}

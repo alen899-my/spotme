@@ -4,6 +4,7 @@ import {
   ScrollView, ActivityIndicator, Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import OptimizedImage from '../components/ui/OptimizedImage';
 import { FONTS } from '../constants/theme';
 import { P } from '../constants/homeTheme';
 import { useTheme } from '../contexts/ThemeContext';
@@ -69,7 +70,7 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
     >
       {/* Header */}
       <View style={styles.exHeader}>
-        <Image source={{ uri: ex.image_url }} style={styles.exImage} />
+        <OptimizedImage uri={ex.image_url} style={styles.exImage} />
         <View style={styles.exMeta}>
           <Text style={[styles.exName, { color: colors.text }]} numberOfLines={2}>{ex.name}</Text>
           <Text style={[styles.exSetsSub, { color: colors.textMuted }]}>
@@ -318,7 +319,7 @@ export default function WorkoutSummary({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
             {workout?.photos?.map((p: any) => (
               <TouchableOpacity key={p.id} style={styles.photoThumbWrap} onPress={() => onOpenViewer?.(p.photo_url)}>
-                <Image source={{ uri: p.photo_url }} style={styles.photoThumb} />
+                <OptimizedImage uri={p.photo_url} style={styles.photoThumb} />
                 {onDeletePhoto && (
                   <TouchableOpacity style={styles.removePhotoBtn} onPress={() => onDeletePhoto(p.id)}>
                     <Ionicons name="close" size={14} color="#FFF" />
@@ -328,7 +329,7 @@ export default function WorkoutSummary({
             ))}
             {uploadingPhotos.map((uri, idx) => (
               <View key={`uploading-${idx}`} style={[styles.photoThumbWrap, { opacity: 0.6 }]}>
-                <Image source={{ uri }} style={styles.photoThumb} />
+                <OptimizedImage uri={uri} style={styles.photoThumb} />
                 <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
                   <ActivityIndicator size="small" color="#FFF" />
                 </View>

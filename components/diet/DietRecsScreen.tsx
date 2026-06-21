@@ -5,6 +5,7 @@ import {
   Modal, KeyboardAvoidingView, Platform, Dimensions, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import OptimizedImage from '../ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -376,7 +377,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
       >
         <View style={styles.foodCardTop}>
           {item.image_url || item.image_small_url ? (
-            <Image source={{ uri: item.image_url || item.image_small_url }} style={styles.foodCardImg} />
+            <OptimizedImage uri={item.image_url || item.image_small_url} style={styles.foodCardImg} />
           ) : (
             <View style={[styles.foodCardImgPlaceholder, { backgroundColor: colors.inputBg }]}>
               <Ionicons name="nutrition-outline" size={22} color={colors.textMuted} />
@@ -490,7 +491,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
                   return (
                     <View key={i} style={[styles.ingredientRow, { borderBottomColor: isDark ? colors.border : 'rgba(255,255,255,0.15)' }]}>
                       {imgUrl ? (
-                        <Image source={{ uri: imgUrl }} style={styles.ingredientImg} />
+                        <OptimizedImage uri={imgUrl} style={styles.ingredientImg} />
                       ) : (
                         <View style={[styles.ingredientImgPlaceholder, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)' }]}>
                           <Ionicons name="nutrition-outline" size={14} color={isDark ? colors.textMuted : '#FFFFFF'} />
@@ -1120,7 +1121,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     {item.image_url || item.image_small_url ? (
-                      <Image source={{ uri: item.image_url || item.image_small_url }} style={styles.selectorFoodImage} resizeMode="cover" />
+                      <OptimizedImage uri={item.image_url || item.image_small_url} style={styles.selectorFoodImage} contentFit="cover" />
                     ) : (
                       <View style={[styles.selectorFoodImagePlaceholder, { backgroundColor: colors.inputBg }]}>
                         <Ionicons name="nutrition-outline" size={24} color={colors.textMuted} />

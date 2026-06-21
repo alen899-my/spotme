@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import OptimizedImage from '../../../../components/ui/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../../../constants/theme';
@@ -129,7 +130,7 @@ export default function UserSplitsScreen() {
           </TouchableOpacity>
           <View style={styles.headerCenter}>
             {pic ? (
-              <Image source={{ uri: pic as string }} style={styles.headerAvatar} />
+              <OptimizedImage uri={pic as string} style={styles.headerAvatar} />
             ) : (
               <View style={[styles.headerAvatar, { backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center' }]}>
                 <Ionicons name="person" size={16} color={colors.textMuted} />

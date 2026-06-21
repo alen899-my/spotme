@@ -757,6 +757,16 @@ router.patch(
       invalidateCache(`calendar-stats:${userId}`);
       invalidateCache(`dashboard:${userId}`);
 
+      // ── Pre-warm dashboard cache in background ──────────────────────
+      setImmediate(async () => {
+        try {
+          const freshData = await buildDashboardData(userId);
+          setCache(`dashboard:${userId}`, freshData);
+        } catch (e) {
+          // Silently ignore — next request will cold-fill the cache
+        }
+      });
+
       // ── Heavy analytics + streak + XP in background ──────────────────
       if (!wasAlreadyCompleted) {
         setImmediate(() => completeWorkoutBackground(workoutId, userId));
@@ -785,6 +795,13 @@ router.delete('/workouts/:id', authenticateToken, async (req, res) => {
 
     invalidateCache(`calendar-stats:${userId}`);
     invalidateCache(`dashboard:${userId}`);
+
+    setImmediate(async () => {
+      try {
+        const freshData = await buildDashboardData(userId);
+        setCache(`dashboard:${userId}`, freshData);
+      } catch (e) {}
+    });
 
     res.json({ success: true, message: 'Workout and associated photos deleted' });
   } catch (err) {
@@ -1284,23 +1301,15 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
   }
 });
 
-// ── GET /daily/dashboard — Home screen aggregate data ─────────────────────────
-router.get('/dashboard', authenticateToken, async (req, res) => {
-  const userId = req.user.id;
+// ── Reusable dashboard data builder (for route + cache pre-warm) ──────────
+async function buildDashboardData(userId) {
   const now = new Date();
   const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
   const todayEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
   const todayISO = todayStart.toISOString();
   const todayEndISO = todayEnd.toISOString();
 
-  const cacheKey = `dashboard:${userId}`;
-  const cachedDashboard = getCached(cacheKey);
-  if (cachedDashboard) return res.json(cachedDashboard);
-
-  try {
-    // ── Combined query: user + today stats + weekly + weight progress ──────
-    // Uses CTEs to fetch everything in 1 round-trip
-    const mainRes = await pool.query(`
+  const mainRes = await pool.query(`
       WITH
       u AS (
         SELECT full_name, fitness_goal, experience_level, total_xp, level, league_tier,
@@ -1565,6 +1574,18 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       total_workouts: parseInt(r?.total_workouts) || 0,
     };
 
+    return responseData;
+}
+
+// ── GET /daily/dashboard — Home screen aggregate data ─────────────────────────
+router.get('/dashboard', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const cacheKey = `dashboard:${userId}`;
+  const cachedDashboard = getCached(cacheKey);
+  if (cachedDashboard) return res.json(cachedDashboard);
+
+  try {
+    const responseData = await buildDashboardData(userId);
     setCache(cacheKey, responseData);
     res.json(responseData);
   } catch (err) {

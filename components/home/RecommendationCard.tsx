@@ -7,6 +7,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import OptimizedImage from "../ui/OptimizedImage";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -82,10 +83,10 @@ const RecommendationCard = React.memo(function RecommendationCard({ rec, onPress
       {/* ── 3D stacked GIF — top-right corner ── */}
       {displayUri ? (
         <View style={styles.gifStack}>
-          <Image
-            source={{ uri: displayUri }}
+          <OptimizedImage
+            uri={displayUri}
             style={styles.gifImage}
-            resizeMode="contain"
+            contentFit="contain"
           />
         </View>
       ) : (

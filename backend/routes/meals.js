@@ -166,12 +166,35 @@ router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => 
   }
 });
 
-// ── GET /meals — List user meals ─────────────────────────────────────────────
+// ── GET /meals — List user meals (paginated, optional date filter) ─────────
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.id;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+    const dateFilter = req.query.date || null;
+
+    let whereClause = 'WHERE user_id = $1';
+    const params = [userId];
+    let paramIdx = 2;
+
+    if (dateFilter) {
+      whereClause += ` AND logged_at::date = $${paramIdx}::date`;
+      params.push(dateFilter);
+      paramIdx++;
+    }
+
+    const countRes = await pool.query(
+      `SELECT COUNT(*) AS total FROM meals ${whereClause}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0]?.total) || 0;
+
+    params.push(limit, offset);
     const meals = await pool.query(
-      `SELECT * FROM meals WHERE user_id = $1 ORDER BY logged_at DESC`,
-      [req.user.id]
+      `SELECT * FROM meals ${whereClause} ORDER BY logged_at DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      params
     );
 
     const mealIds = meals.rows.map(m => m.id);
@@ -193,7 +216,7 @@ router.get('/', authenticateToken, async (req, res) => {
       items: itemsByMealId[meal.id] || [],
     }));
 
-    res.json(results);
+    res.json({ meals: results, total, page, limit });
   } catch (err) {
     console.error('Error fetching meals:', err);
     res.status(500).json({ error: err.message });

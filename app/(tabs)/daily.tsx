@@ -8,6 +8,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
@@ -422,7 +423,7 @@ export default function DailyTab() {
           <View style={styles.cardRow}>
             <View style={styles.imageContainer}>
               {hasPhoto ? (
-                <Image source={{ uri: item.cover_photo_url || item.completion_photo_url }} style={styles.workoutImg} />
+                <OptimizedImage uri={item.cover_photo_url || item.completion_photo_url} style={styles.workoutImg} />
               ) : (
                 <LinearGradient 
                   colors={isDark ? [colors.inputBg, '#000000'] : [P.ctaDark, P.ctaDeep]} 
@@ -569,10 +570,10 @@ export default function DailyTab() {
                         <View style={styles.splitMenuImageWrap}>
                           <View style={styles.splitMenuImageFrame}>
                             {getSplitPreviewImage(split) ? (
-                              <Image
-                                source={{ uri: getSplitPreviewImage(split) as string }}
+                              <OptimizedImage
+                                uri={getSplitPreviewImage(split) as string}
                                 style={styles.splitMenuImage}
-                                resizeMode="contain"
+                                contentFit="contain"
                               />
                             ) : (
                               <LinearGradient 
@@ -593,7 +594,7 @@ export default function DailyTab() {
                           {split.original_creator_name && (
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
                               {split.original_creator_pic ? (
-                                <Image source={{ uri: split.original_creator_pic }} style={{ width: 14, height: 14, borderRadius: 7 }} />
+                                <OptimizedImage uri={split.original_creator_pic} style={{ width: 14, height: 14, borderRadius: 7 }} />
                               ) : (
                                 <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: isDark ? colors.primary : 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center' }}>
                                   <Ionicons name="person" size={8} color="#FFF" />

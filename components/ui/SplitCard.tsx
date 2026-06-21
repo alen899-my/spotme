@@ -10,6 +10,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
+import OptimizedImage from './OptimizedImage';
 import SplitRating from './SplitRating';
 
 interface SplitCardProps {
@@ -45,9 +46,9 @@ export default function SplitCard({ item, onDelete, onPress }: SplitCardProps) {
       <View style={styles.topRow}>
         <View style={styles.imageStack}>
           {exImages.slice(0, 3).map((uri: string, i: number) => (
-            <Image
+            <OptimizedImage
               key={i}
-              source={{ uri }}
+              uri={uri}
               style={[
                 styles.stackImg,
                 {
@@ -72,7 +73,7 @@ export default function SplitCard({ item, onDelete, onPress }: SplitCardProps) {
               onPress={() => router.push(`/profile/${item.original_creator_id}`)}
             >
               {item.original_creator_pic ? (
-                <Image source={{ uri: item.original_creator_pic }} style={styles.creatorAvatar} />
+                <OptimizedImage uri={item.original_creator_pic} style={styles.creatorAvatar} />
               ) : (
                 <View style={[styles.creatorAvatar, { backgroundColor: colors.primary }]}>
                   <Ionicons name="person" size={9} color="#FFF" />

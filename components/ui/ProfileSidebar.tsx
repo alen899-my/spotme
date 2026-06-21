@@ -16,6 +16,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import OptimizedImage from "./OptimizedImage";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -326,7 +327,7 @@ export default function ProfileSidebar({ visible, user, onClose }: ProfileSideba
             <View style={[styles.avatarRow, { marginBottom: vs(14) }]}>
               <View style={styles.avatarWrap}>
                 {user?.profile_pic_url ? (
-                  <Image source={{ uri: user.profile_pic_url }} style={[styles.avatar, { borderColor: getTierColor(user?.league_tier) }]} />
+                  <OptimizedImage uri={user.profile_pic_url} style={[styles.avatar, { borderColor: getTierColor(user?.league_tier) }]} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.inputBg, borderColor: getTierColor(user?.league_tier) }]}>
                     <Ionicons name="person" size={scale(30)} color={colors.primary} />

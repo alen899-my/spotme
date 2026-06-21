@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 import Body, { ExtendedBodyPart, Slug } from 'react-native-body-highlighter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
@@ -99,7 +100,7 @@ const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => 
         <View style={[styles.mediaGlow, { backgroundColor: theme.glow }]} />
         <View style={styles.imageContainer}>
           {item.image_url && !imgError ? (
-            <Image source={{ uri: item.image_url }} style={styles.floatingImage} resizeMode="contain" onError={() => setImgError(true)} />
+            <OptimizedImage uri={item.image_url} style={styles.floatingImage} contentFit="contain" onError={() => setImgError(true)} />
           ) : (
             <Ionicons name="fitness-outline" size={64} color={isDark ? colors.primary : P.cta} />
           )}

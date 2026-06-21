@@ -6,6 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -289,7 +290,7 @@ export default function PublicProfileScreen() {
               <View style={styles.heroAvatarWrap}>
                 <View style={[styles.avatarRing, { borderColor: tier.color }]}>
                   {user.profile_pic_url ? (
-                    <Image source={{ uri: user.profile_pic_url }} style={styles.avatarImg} />
+                    <OptimizedImage uri={user.profile_pic_url} style={styles.avatarImg} />
                   ) : (
                     <View style={[styles.avatarPlaceholder, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
                       <Ionicons name="person" size={36} color="#FFF" />
@@ -447,7 +448,7 @@ export default function PublicProfileScreen() {
                         <View style={styles.splitImages}>
                           {images.length > 0 ? (
                             images.slice(0, 3).map((img: string, i: number) => (
-                              <Image key={i} source={{ uri: img }} style={[styles.splitImg, { borderColor: colors.border }]} />
+                              <OptimizedImage key={i} uri={img} style={[styles.splitImg, { borderColor: colors.border }]} />
                             ))
                           ) : (
                             <View style={[styles.splitImgPlaceholder, { backgroundColor: colors.inputBg }]}>
@@ -525,7 +526,7 @@ export default function PublicProfileScreen() {
                         <View style={styles.wCardRow}>
                           <View style={[styles.wImgWrap, { borderColor: colors.border }]}>
                             {hasPhoto ? (
-                              <Image source={{ uri: w.cover_photo_url || w.completion_photo_url }} style={styles.wImg} />
+                              <OptimizedImage uri={w.cover_photo_url || w.completion_photo_url} style={styles.wImg} />
                             ) : (
                               <View style={[styles.wImgPlaceholder, { backgroundColor: colors.inputBg }]}>
                                 <MaterialCommunityIcons name="arm-flex" size={28} color={tier.color} />
@@ -583,7 +584,7 @@ export default function PublicProfileScreen() {
                 <View style={styles.modalUserRowCentered}>
                   <View style={[styles.avatarRingSmall, { borderColor: tier.color }]}>
                     {user.profile_pic_url ? (
-                      <Image source={{ uri: user.profile_pic_url }} style={styles.avatarImgSmall} />
+                      <OptimizedImage uri={user.profile_pic_url} style={styles.avatarImgSmall} />
                     ) : (
                       <View style={[styles.avatarPlaceholderSmall, { backgroundColor: colors.inputBg }]}>
                         <Ionicons name="person" size={18} color={colors.textMuted} />
@@ -606,7 +607,7 @@ export default function PublicProfileScreen() {
                 <View style={styles.modalUserRowCentered}>
                   <View style={[styles.avatarRingSmall, { borderColor: tier.color }]}>
                     {user.profile_pic_url ? (
-                      <Image source={{ uri: user.profile_pic_url }} style={styles.avatarImgSmall} />
+                      <OptimizedImage uri={user.profile_pic_url} style={styles.avatarImgSmall} />
                     ) : (
                       <View style={[styles.avatarPlaceholderSmall, { backgroundColor: colors.inputBg }]}>
                         <Ionicons name="person" size={18} color={colors.textMuted} />

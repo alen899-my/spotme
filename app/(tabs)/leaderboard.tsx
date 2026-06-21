@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -88,7 +89,7 @@ function Avatar({ uri, size, border }: { uri?: string; size: number; border: str
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2.5, borderColor: border, overflow: 'hidden', backgroundColor: colors.inputBg }}>
       {uri && !err
-        ? <Image source={{ uri }} style={{ width: '100%', height: '100%' }} onError={() => setErr(true)} />
+        ? <OptimizedImage uri={uri} style={{ width: '100%', height: '100%' }} onError={() => setErr(true)} />
         : <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <Ionicons name="person" size={size * 0.5} color={border} />
           </View>

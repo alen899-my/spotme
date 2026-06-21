@@ -8,6 +8,7 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import OptimizedImage from '../ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
@@ -90,8 +91,8 @@ function CardMedia({ uri, gifUri, isFocused, style, fallbackStyle, fallbackIcon,
     <View style={style}>
       {/* Static image always rendered as base */}
       {uri && (
-        <Image
-          source={{ uri }}
+        <OptimizedImage
+          uri={uri}
           style={[StyleSheet.absoluteFill, { borderRadius: style.borderRadius || 0 }]}
           onError={onError}
         />

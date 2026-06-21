@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import OptimizedImage from '../ui/OptimizedImage';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS } from '../../constants/theme';
@@ -191,7 +192,7 @@ export default function PhysiqueUploadModal({
                 ]}
               >
                 {deleteItem?.photo_url ? (
-                  <Image source={{ uri: deleteItem.photo_url }} style={styles.deleteThumb} />
+                  <OptimizedImage uri={deleteItem.photo_url} style={styles.deleteThumb} />
                 ) : (
                   <View style={[styles.deleteThumbPlaceholder, { backgroundColor: isDark ? '#2A2A2A' : '#EEF2F6' }]}>
                     <Ionicons name="person-outline" size={20} color={isDark ? 'rgba(255,255,255,0.3)' : '#B0BEC5'} />

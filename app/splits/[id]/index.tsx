@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import OptimizedImage from '../../../components/ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -247,8 +248,8 @@ export default function SplitSessionsScreen() {
     >
       <View style={styles.cardMain}>
         <View style={styles.sessionImageContainer}>
-          <Image
-            source={{ uri: item.sample_image || 'https://images.unsplash.com/photo-1517836357463-d25dfeac00ad?q=80&w=200&auto=format&fit=crop' }}
+          <OptimizedImage
+            uri={item.sample_image || 'https://images.unsplash.com/photo-1517836357463-d25dfeac00ad?q=80&w=200&auto=format&fit=crop'}
             style={styles.sessionImage}
           />
           <View style={styles.sessionOverlay} />
@@ -318,8 +319,8 @@ export default function SplitSessionsScreen() {
                   }}
                 >
                   {splitDetail?.creator_pic || creatorPic ? (
-                    <Image
-                      source={{ uri: splitDetail?.creator_pic || (creatorPic as string) }}
+                    <OptimizedImage
+                      uri={splitDetail?.creator_pic || (creatorPic as string)}
                       style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.inputBg }}
                     />
                   ) : (
@@ -355,8 +356,8 @@ export default function SplitSessionsScreen() {
                     }}
                   >
                     {splitDetail?.original_creator_pic ? (
-                      <Image
-                        source={{ uri: splitDetail.original_creator_pic }}
+                      <OptimizedImage
+                        uri={splitDetail.original_creator_pic}
                         style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: colors.inputBg }}
                       />
                     ) : (

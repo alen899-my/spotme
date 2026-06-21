@@ -17,6 +17,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { optimizeImage } from "../../utils/imageOptimizer";
 import DOBPicker from "../../components/ui/DOBPicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
@@ -378,8 +379,9 @@ export default function OnboardingScreen() {
 
       const appendImage = async (photoKey: keyof typeof photos, fieldName: string) => {
         try {
-          const uri = photos[photoKey];
-          if (!uri) return;
+          const rawUri = photos[photoKey];
+          if (!rawUri) return;
+          const uri = await optimizeImage(rawUri, 'profile');
           const ext = uri.split(".").pop()?.toLowerCase() || "jpg";
           formData.append(fieldName, { uri, name: `${fieldName}.${ext}`, type: `image/${ext === "png" ? "png" : "jpeg"}` } as any);
         } catch (e) { console.error(`Image error ${fieldName}:`, e); }
