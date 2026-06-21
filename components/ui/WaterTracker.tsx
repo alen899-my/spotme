@@ -564,7 +564,6 @@ export default function WaterTracker({ selectedDate, onLogChange }: Props) {
         )
       );
 
-      if (!exceeds) showToast(`+${amount} ml logged!`);
       onLogChange?.();
     } catch (e) {
       setTotalWater(prevTotal);

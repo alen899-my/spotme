@@ -52,7 +52,7 @@ function getWaterTarget(userData: any): { target: number; maxSafe: number } {
   return { target, maxSafe: Math.round(target * 1.6) };
 }
 
-export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged }: Props) {
+const HydrationCard = React.memo(function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged }: Props) {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
 
@@ -142,8 +142,6 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
       const newTotal = prevTotal + amount;
       if (newTotal > maxSafe) {
         showToast("Logged! Overhydration warning.", "error");
-      } else {
-        showToast(`+${amount}ml logged!`);
       }
 
       if (onWaterLogged) {
@@ -329,7 +327,7 @@ export default function HydrationCard({ waterMl, onLogWaterPress, onWaterLogged 
       </View>
     </View>
   );
-}
+})
 
 const styles = StyleSheet.create({
   card: {
@@ -519,3 +517,5 @@ const styles = StyleSheet.create({
     fontSize: scale(12),
   },
 });
+
+export default HydrationCard;

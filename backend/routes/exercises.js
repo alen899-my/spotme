@@ -94,6 +94,8 @@ router.get('/', async (req, res) => {
       muscle_group,
       q,           // search term (name)
       min_rating,
+      sort_by  = 'name',
+      sort_order = 'asc',
       page  = 1,
       limit = 20,
     } = req.query;
@@ -102,31 +104,36 @@ router.get('/', async (req, res) => {
     const params     = [];
     let   idx        = 1;
 
-    function addArrayFilter(col, vals) {
+    function addExactFilter(col, vals) {
       if (!vals) return;
       const parts = String(vals).split(',').map(s => s.trim()).filter(Boolean);
       if (parts.length === 0) return;
       if (parts.length === 1) {
-        conditions.push(`${col} ILIKE $${idx++}`);
-        params.push(`%${parts[0]}%`);
+        conditions.push(`${col} = $${idx++}`);
+        params.push(parts[0]);
       } else {
-        const orClauses = parts.map(() => `${col} ILIKE $${idx++}`);
+        const orClauses = parts.map(() => `${col} = $${idx++}`);
         conditions.push(`(${orClauses.join(' OR ')})`);
-        params.push(...parts.map(p => `%${p}%`));
+        params.push(...parts);
       }
     }
 
-    addArrayFilter('category',    category);
-    addArrayFilter('body_part',   body_part);
-    addArrayFilter('equipment',   equipment);
-    addArrayFilter('target',      target);
-    addArrayFilter('muscle_group', muscle_group);
-    if (q)            { conditions.push(`name        ILIKE $${idx++}`); params.push(`%${q}%`); }
+    addExactFilter('category',    category);
+    addExactFilter('body_part',   body_part);
+    addExactFilter('equipment',   equipment);
+    addExactFilter('target',      target);
+    addExactFilter('muscle_group', muscle_group);
+    if (q)            { conditions.push(`name ILIKE $${idx++}`); params.push(`%${q}%`); }
     if (min_rating)   { conditions.push(`avg_rating >= $${idx++}::float8`); params.push(Number(min_rating)); }
 
     const where   = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const offset  = (Number(page) - 1) * Number(limit);
     const pgLimit = Number(limit);
+
+    const allowedSorts = ['name', 'avg_rating'];
+    const sortCol = allowedSorts.includes(sort_by) ? sort_by : 'name';
+    const sortDir = sort_order?.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const orderClause = `ORDER BY e.${sortCol} ${sortDir}`;
 
     const selectQuery = 
       `SELECT e.id, e.name, e.category, e.body_part, e.equipment,
@@ -134,7 +141,7 @@ router.get('/', async (req, res) => {
               e.image_url, e.gif_url, e.instructions_en,
               e.avg_rating::float8 AS avg_rating, e.rating_count
        FROM exercises e ${where}
-       ORDER BY e.name ASC
+       ${orderClause}
        LIMIT $${idx} OFFSET $${idx + 1}`;
 
     const queryParams = [...params, pgLimit, offset];

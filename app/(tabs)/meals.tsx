@@ -618,7 +618,7 @@ export default function MealsScreen() {
         const imageUrl = res.data.imageUrl;
 
         // Auto-save immediately — no second confirmation modal
-        await axios.post(`${API_URL}/meals`, {
+        const saveRes = await axios.post(`${API_URL}/meals`, {
           image_url: imageUrl,
           meal_type: autoMealType,
           ...analysis,
@@ -631,6 +631,8 @@ export default function MealsScreen() {
           });
         }
 
+        setMeals(prev => [saveRes.data, ...prev]);
+
         const cals = Math.round(analysis?.total_calories || 0);
         showToast(`Meal logged! 🎉 ~${cals} kcal detected`);
       } else {
@@ -640,7 +642,7 @@ export default function MealsScreen() {
           .map(i => i.name)
           .join(', ');
 
-        await axios.post(`${API_URL}/meals`, {
+        const saveRes = await axios.post(`${API_URL}/meals`, {
           image_url: '',
           meal_type: autoMealType,
           total_calories: 0,
@@ -665,10 +667,9 @@ export default function MealsScreen() {
           });
         }
 
+        setMeals(prev => [saveRes.data, ...prev]);
         showToast(`Meal logged! 🥗`);
       }
-
-      fetchMeals();
     } catch (err) {
       console.error('Meal log error:', err);
       showToast('Failed to log meal', 'error');

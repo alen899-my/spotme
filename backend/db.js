@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const pool = new Pool({
@@ -496,6 +497,29 @@ const initDB = async () => {
 
     // ── Rest Day Type Column ─────────────────────────────────────────────────
     await pool.query(`ALTER TABLE daily_workouts ADD COLUMN IF NOT EXISTS rest_type VARCHAR(20);`);
+
+    // -- Admin columns for users ---------------------------------------------
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user'`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(50) DEFAULT 'Free'`);
+
+    // -- Admin Panel ---------------------------------------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS admins (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    const adminHash = await bcrypt.hash('alenadmin123', 10);
+    await pool.query(`
+      INSERT INTO admins (email, password, name)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (email) DO NOTHING
+    `, ['alenjames899@gmail.com', adminHash, 'Admin']);
 
   } catch (error) {
     console.error("Database initialization failed:", error);

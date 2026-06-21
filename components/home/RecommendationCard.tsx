@@ -61,7 +61,7 @@ function EmptyCard({
 }
 
 // ── Main card ─────────────────────────────────────────────────────────────────
-export default function RecommendationCard({ rec, onPress, onBrowsePress }: Props) {
+const RecommendationCard = React.memo(function RecommendationCard({ rec, onPress, onBrowsePress }: Props) {
   const { isDark } = useTheme();
 
   if (!rec) {
@@ -141,7 +141,7 @@ export default function RecommendationCard({ rec, onPress, onBrowsePress }: Prop
       </TouchableOpacity>
     </TouchableOpacity>
   );
-}
+})
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
@@ -302,3 +302,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
+export default RecommendationCard;

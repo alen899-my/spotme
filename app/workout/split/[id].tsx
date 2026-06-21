@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
 import { useTheme } from '../../../contexts/ThemeContext';
+import ExerciseCard from '../../../components/exercises/ExerciseCard';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
 
@@ -66,40 +67,19 @@ export default function SplitDetailScreen() {
   };
 
   const renderExercise = ({ item }: { item: any }) => (
-    <View style={[styles.exerciseCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={styles.exInfo}>
-        <Image source={{ uri: item.image_url }} style={styles.exImage} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.exName, { color: colors.text }]}>{item.name}</Text>
-          <Text style={[styles.exMeta, { color: colors.textMuted }]}>{item.target} • {item.equipment}</Text>
-        </View>
-        <TouchableOpacity style={styles.removeIcon} onPress={() => handleRemoveExercise(item.id)}>
-          <Ionicons name="close-circle-outline" size={24} color={colors.textDim} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={[styles.exControls, { backgroundColor: colors.inputBg }]}>
-        <View style={styles.controlItem}>
-          <Text style={[styles.controlLabel, { color: colors.textMuted }]}>SETS</Text>
-          <Text style={[styles.controlValue, { color: colors.text }]}>{item.sets}</Text>
-        </View>
-        <View style={styles.vDivider} />
-        <View style={styles.controlItem}>
-          <Text style={[styles.controlLabel, { color: colors.textMuted }]}>REPS</Text>
-          <Text style={[styles.controlValue, { color: colors.text }]}>{item.reps}</Text>
-        </View>
-        <View style={styles.vDivider} />
-        <View style={styles.controlItem}>
-          <Text style={[styles.controlLabel, { color: colors.textMuted }]}>REST</Text>
-          <Text style={[styles.controlValue, { color: colors.text }]}>{item.rest_time}</Text>
-        </View>
-        <TouchableOpacity 
-          style={styles.editStatsBtn}
-          onPress={() => alert('Edit sets/reps coming soon!')}
-        >
-          <Ionicons name="create-outline" size={18} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
+    <View style={{ paddingHorizontal: 16 }}>
+      <ExerciseCard
+        exercise={item}
+        variant="session"
+        sessionData={{
+          sets: item.sets,
+          reps: item.reps,
+          weight: item.weight,
+          rest_time: item.rest_time,
+        }}
+        onDelete={item.id ? () => handleRemoveExercise(item.id) : undefined}
+        isShared={false}
+      />
     </View>
   );
 

@@ -9,7 +9,6 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -18,7 +17,7 @@ import { useWorkoutTimer } from '../../contexts/WorkoutTimerContext';
 import ActionModal from '../../components/ui/ActionModal';
 import DatePicker from '../../components/ui/DatePicker';
 import { DailySkeleton } from '../../components/ui/Skeleton';
-import { API_URL } from '../../utils/api';
+import { api } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import { formatDuration, formatDateTime, isSameDay, isToday, parseUTC } from '../../utils/datetime';
 
@@ -176,7 +175,7 @@ export default function DailyTab() {
     setLoggingRest(true);
     try {
       const token = await getToken();
-      await axios.post(`${API_URL}/daily/rest-day`, { rest_type: restType }, {
+      await api.post('/daily/rest-day', { rest_type: restType }, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setShowRestModal(false);
@@ -280,7 +279,7 @@ export default function DailyTab() {
       // Otherwise hit the API for fresh data
       const token = await getToken();
       if (!token) { setProfileComplete(false); return; }
-      const res = await axios.get(`${API_URL}/auth/me`, {
+      const res = await api.get('/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const completed = !!res.data.onboarding_completed;
@@ -296,7 +295,7 @@ export default function DailyTab() {
   const fetchSplits = useCallback(async () => {
     try {
       const token = await getToken();
-      const res = await axios.get(`${API_URL}/workouts/splits`, {
+      const res = await api.get('/workouts/splits', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSplits(res.data);
@@ -310,7 +309,7 @@ export default function DailyTab() {
   const fetchWorkouts = useCallback(async () => {
     try {
       const token = await getToken();
-      const res = await axios.get(`${API_URL}/daily/workouts`, {
+      const res = await api.get('/daily/workouts', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setWorkouts(res.data);
@@ -322,9 +321,7 @@ export default function DailyTab() {
   }, []);
 
   useFocusEffect(useCallback(() => {
-    checkProfileCompletion();
-    fetchWorkouts();
-    fetchSplits();
+    Promise.all([checkProfileCompletion(), fetchWorkouts(), fetchSplits()]);
   }, [checkProfileCompletion, fetchWorkouts, fetchSplits]));
 
   const handleDeleteWorkout = async () => {
@@ -332,7 +329,7 @@ export default function DailyTab() {
     setIsDeleting(true);
     try {
       const token = await getToken();
-      await axios.delete(`${API_URL}/daily/workouts/${deletingId}`, {
+      await api.delete(`/daily/workouts/${deletingId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (activeWorkoutId === String(deletingId)) {

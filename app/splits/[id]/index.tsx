@@ -25,6 +25,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
 import SplitRating from '../../../components/ui/SplitRating';
+import RatingModal from '../../../components/ui/RatingModal';
 import ActionModal from '../../../components/ui/ActionModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -96,6 +97,7 @@ export default function SplitSessionsScreen() {
   const [showSplitRename, setShowSplitRename] = useState(false);
   const [renameSession, setRenameSession] = useState<any>(null);
   const [deleteSessionId, setDeleteSessionId] = useState<number | null>(null);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
 
   const isShared = shared === '1';
   const clonedFromId = splitDetail?.cloned_from_id;
@@ -376,8 +378,6 @@ export default function SplitSessionsScreen() {
                 avgRating={splitDetail.avg_rating}
                 ratingCount={splitDetail.rating_count}
                 userRating={splitDetail.user_rating}
-                canRate={splitDetail.can_rate}
-                onRate={handleRate}
                 size="sm"
               />
             )}
@@ -420,13 +420,18 @@ export default function SplitSessionsScreen() {
             renderItem={renderSession}
             contentContainerStyle={[
               styles.listContent,
-              { paddingBottom: isShared ? 100 + Math.max(insets.bottom, 12) : 32 + Math.max(insets.bottom, 12) }
+              {
+                paddingBottom: (splitDetail?.can_rate ? 60 : 0)
+                  + (isShared ? 60 : 0)
+                  + Math.max(insets.bottom, 12)
+                  + 24
+              }
             ]}
             showsVerticalScrollIndicator={false}
           />
         )}
 
-        {isShared && (
+        {(splitDetail?.can_rate || isShared) && (
           <View
             style={[
               styles.bottomBar,
@@ -437,34 +442,54 @@ export default function SplitSessionsScreen() {
               }
             ]}
           >
-            {alreadyAdded ? (
-              <View style={[styles.alreadyAddedBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                <Text style={[styles.alreadyAddedText, { color: colors.textMuted }]}>Already Added</Text>
-              </View>
-            ) : (
+            {splitDetail?.can_rate && (
               <TouchableOpacity
-                style={styles.cloneBtnBottom}
-                onPress={handleClone}
-                disabled={cloning}
+                style={styles.rateBtnBottom}
+                onPress={() => setRatingModalVisible(true)}
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={[colors.primary, colors.primaryDark || colors.primary]}
-                  style={styles.cloneBtnBottomGrad}
+                  colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]}
+                  style={styles.rateBtnBottomGrad}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                 >
-                  {cloning ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <>
-                      <Ionicons name="add-circle-outline" size={20} color="#FFF" />
-                      <Text style={styles.cloneBtnBottomText}>Add to My Programs</Text>
-                    </>
-                  )}
+                  <Ionicons name="star" size={18} color="#FFF" />
+                  <Text style={styles.rateBtnBottomText}>Rate this Program</Text>
                 </LinearGradient>
               </TouchableOpacity>
+            )}
+            {splitDetail?.can_rate && isShared && <View style={{ height: 8 }} />}
+            {isShared && (
+              alreadyAdded ? (
+                <View style={[styles.alreadyAddedBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                  <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                  <Text style={[styles.alreadyAddedText, { color: colors.textMuted }]}>Already Added</Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.cloneBtnBottom}
+                  onPress={handleClone}
+                  disabled={cloning}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={[colors.primary, colors.primaryDark || colors.primary]}
+                    style={styles.cloneBtnBottomGrad}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    {cloning ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="add-circle-outline" size={20} color="#FFF" />
+                        <Text style={styles.cloneBtnBottomText}>Add to My Programs</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              )
             )}
           </View>
         )}
@@ -500,6 +525,16 @@ export default function SplitSessionsScreen() {
         confirmText="DELETE"
         onConfirm={confirmDeleteSession}
         onCancel={() => setDeleteSessionId(null)}
+      />
+
+      <RatingModal
+        visible={ratingModalVisible}
+        onClose={() => setRatingModalVisible(false)}
+        currentRating={splitDetail?.user_rating}
+        onRate={handleRate}
+        colors={colors}
+        isDark={isDark}
+        insets={insets}
       />
     </SafeAreaView>
   );
@@ -545,6 +580,23 @@ const styles = StyleSheet.create({
   cloneBtnBottom: {
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  rateBtnBottom: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  rateBtnBottomGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 14,
+  },
+  rateBtnBottomText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+    color: '#FFF',
+    letterSpacing: 0.5,
   },
   cloneBtnBottomGrad: {
     flexDirection: 'row',

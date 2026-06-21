@@ -27,6 +27,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import ActionModal from '../../../components/ui/ActionModal';
 import ExercisePreviewModal from '../../../components/modals/ExercisePreviewModal';
+import ExerciseCard from '../../../components/exercises/ExerciseCard';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
 
@@ -152,102 +153,20 @@ export default function SessionDetailScreen() {
   };
 
   const renderExercise = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={[
-        styles.exerciseCard, 
-        isDark ? { 
-          backgroundColor: colors.card, 
-          borderColor: colors.border, 
-          borderWidth: 1 
-        } : { 
-          backgroundColor: P.cta, 
-          borderColor: P.cta, 
-          borderWidth: 1 
-        }
-      ]}
-      activeOpacity={0.8}
+    <ExerciseCard
+      exercise={item}
+      variant="session"
       onPress={() => setPreviewEx(item)}
-    >
-      <View style={styles.exInfo}>
-        <Image source={{ uri: item.image_url }} style={styles.exImage} />
-        <View style={styles.exTextBlock}>
-          <View style={styles.exTopRow}>
-            <Text style={[styles.exName, { color: isDark ? colors.text : '#FFF' }]}>{item.name}</Text>
-            {item.avg_rating !== undefined && item.avg_rating !== null && (
-              <View style={styles.avgRatingBadge}>
-                <Ionicons name="star" size={10} color={P.sun} />
-                <Text style={styles.avgRatingText}>{item.avg_rating}</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[
-            styles.exMeta, 
-            { 
-              color: isDark ? colors.text : P.ink, 
-              backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.88)' 
-            }
-          ]}>
-            {item.target} • {item.equipment}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.exControls}>
-        <View style={styles.controlItem}>
-          <Text style={styles.controlLabel}>SETS</Text>
-          <Text style={styles.controlValue}>{item.sets}</Text>
-        </View>
-        <View style={styles.vDivider} />
-        <View style={styles.controlItem}>
-          <Text style={styles.controlLabel}>REPS</Text>
-          <Text style={styles.controlValue}>{item.reps}</Text>
-        </View>
-        <View style={styles.vDivider} />
-        <View style={styles.controlItem}>
-          <Text style={styles.controlLabel}>WEIGHT</Text>
-          <Text style={styles.controlValue}>{item.weight || 0}kg</Text>
-        </View>
-        <View style={styles.vDivider} />
-        <View style={styles.controlItem}>
-          <Text style={styles.controlLabel}>REST</Text>
-          <Text style={styles.controlValue}>{item.rest_time}</Text>
-        </View>
-      </View>
-
-      {!isShared && !clonedFromId && (
-      <View style={styles.actionRow}>
-        <TouchableOpacity 
-          style={[
-            styles.editStatsBtn,
-            {
-              backgroundColor: isDark ? colors.primary + '15' : 'rgba(255, 255, 255, 0.15)',
-              borderColor: isDark ? colors.primary + '30' : 'rgba(255, 255, 255, 0.3)',
-              borderWidth: 1,
-            }
-          ]}
-          onPress={() => openEditModal(item)}
-        >
-          <Ionicons name="create-outline" size={18} color={isDark ? colors.primary : '#FFF'} />
-          <Text style={[styles.editStatsText, { color: isDark ? colors.primary : '#FFF' }]}>Edit</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[
-            styles.deleteActionBtn,
-            {
-              backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-              borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.18)',
-              borderWidth: 1,
-            }
-          ]}
-          onPress={() => handleRemoveExercise(item.id)}
-        >
-          <Ionicons name="trash-outline" size={18} color={isDark ? '#EF4444' : '#FFF'} />
-          <Text style={[styles.deleteActionText, { color: isDark ? '#EF4444' : '#FFF' }]}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-      )}
-    </TouchableOpacity>
+      onEdit={!isShared && !clonedFromId ? () => openEditModal(item) : undefined}
+      onDelete={!isShared && !clonedFromId ? () => handleRemoveExercise(item.id) : undefined}
+      sessionData={{
+        sets: item.sets,
+        reps: item.reps,
+        weight: item.weight,
+        rest_time: item.rest_time,
+      }}
+      isShared={!!isShared || !!clonedFromId}
+    />
   );
 
   return (

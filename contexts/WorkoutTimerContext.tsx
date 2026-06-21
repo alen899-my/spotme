@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import { API_URL } from '../utils/api';
+import { api } from '../utils/api';
 import { getToken } from '../utils/tokenStorage';
 
 interface WorkoutTimerContextType {
@@ -56,7 +55,7 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
         const currentPeriod = Math.floor((Date.now() - idlePeriodStartRef.current) / 1000);
         setIdleAccumulated(idleAccumulatedRef.current + currentPeriod);
       }
-    }, 1000);
+      }, 5000);
   }, []);
 
   const stopWorkoutTimer = useCallback(() => {
@@ -222,7 +221,7 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
       try {
         const token = await getToken();
         const totalIdle = getCurrentIdle();
-        await axios.patch(`${API_URL}/daily/workouts/${activeWorkoutId}/metrics`, {
+        await api.patch(`/daily/workouts/${activeWorkoutId}/metrics`, {
           total_duration_seconds: Math.floor((Date.now() - workoutStartedAtRef.current) / 1000),
           total_rest_seconds: totalIdle,
         }, { headers: { Authorization: `Bearer ${token}` } });

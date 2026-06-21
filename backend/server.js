@@ -16,12 +16,13 @@ const leaderboardRoutes = require('./routes/leaderboard');
 const weightRoutes = require('./routes/weight');
 const notificationRoutes = require('./routes/notifications');
 const physiqueRoutes = require('./routes/physique');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
 const allowedOrigins = ['https://spotme-gym.vercel.app'];
 if (!isProduction) {
-  allowedOrigins.push('http://localhost:19006', 'http://localhost:8081', 'http://localhost:5173');
+  allowedOrigins.push('http://localhost:19006', 'http://localhost:8081', 'http://localhost:5173', 'http://localhost:3000');
 }
 app.use(cors({
   origin: allowedOrigins,
@@ -47,6 +48,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/weight', weightRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/physique', physiqueRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Global error-handling middleware
 app.use((err, req, res, _next) => {

@@ -140,12 +140,19 @@ router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => 
       );
     }
 
+    // Fetch back the items we just inserted
+    const savedItems = await client.query(
+      'SELECT * FROM meal_items WHERE meal_id = $1 ORDER BY id',
+      [mealId]
+    );
+
     // Award XP for logging a meal
     const awardRes = await awardXP(client, req.user.id, XP_VALUES.LOG_MEAL, 'Logged a meal');
 
     await client.query('COMMIT');
     res.status(201).json({
       ...mealResult.rows[0],
+      items: savedItems.rows,
       xp_awarded: XP_VALUES.LOG_MEAL,
       new_tier: awardRes.tier,
       leveled_up: awardRes.leveledUp
@@ -167,14 +174,24 @@ router.get('/', authenticateToken, async (req, res) => {
       [req.user.id]
     );
 
-    const results = [];
-    for (const meal of meals.rows) {
-      const items = await pool.query(
-        'SELECT * FROM meal_items WHERE meal_id = $1',
-        [meal.id]
+    const mealIds = meals.rows.map(m => m.id);
+    const itemsByMealId = {};
+
+    if (mealIds.length > 0) {
+      const itemsResult = await pool.query(
+        'SELECT * FROM meal_items WHERE meal_id = ANY($1::int[]) ORDER BY id',
+        [mealIds]
       );
-      results.push({ ...meal, items: items.rows });
+      for (const item of itemsResult.rows) {
+        if (!itemsByMealId[item.meal_id]) itemsByMealId[item.meal_id] = [];
+        itemsByMealId[item.meal_id].push(item);
+      }
     }
+
+    const results = meals.rows.map(meal => ({
+      ...meal,
+      items: itemsByMealId[meal.id] || [],
+    }));
 
     res.json(results);
   } catch (err) {
