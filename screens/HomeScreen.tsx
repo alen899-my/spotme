@@ -58,7 +58,7 @@ export default function HomeScreen() {
 
   const fetchDashboard = async (force = false) => {
     if (!force) {
-      const cached = getCached(CACHE_KEY_DASHBOARD);
+      const cached = getCached<any>(CACHE_KEY_DASHBOARD);
       if (cached) {
         setDashboard(cached);
         setProfileComplete(!!cached.user?.onboarding_completed);
@@ -106,7 +106,7 @@ export default function HomeScreen() {
         const res = await api.get('/daily/workouts', {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const active = res.data.find((w: any) => w.status === 'active');
+        const active = res.data.workouts.find((w: any) => w.status === 'active');
         setApiActiveWorkout(active || null);
       } catch {}
     })();

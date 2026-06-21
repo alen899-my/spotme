@@ -21,6 +21,7 @@ import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import ExerciseFilterModal, { ExerciseFilters } from './ExerciseFilterModal';
 import ExerciseCard from './ExerciseCard';
+import Skeleton from '../ui/Skeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PADDING = 16;
@@ -197,7 +198,7 @@ export default function ExerciseBrowser({
 
   useEffect(() => {
     doFetch(1, false, debouncedQuery, selectedCategory, sortOption);
-  }, [debouncedQuery, selectedCategory, sortOption]);
+  }, [debouncedQuery, selectedCategory, sortOption, filters]);
 
   const handleCategoryPress = (cat: string) => {
     setSelectedCategory(prev => (prev === cat ? null : cat));
@@ -343,7 +344,55 @@ export default function ExerciseBrowser({
 
       {loading && exercises.length === 0 ? (
         <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color={P.cta} />
+          {variant === 'compact' ? (
+            <>
+              {[1,2,3,4,5].map(i => (
+                <View key={i} style={[styles.skelCompactCard, { backgroundColor: isDark ? '#000000' : P.cta }]}>
+                  <Skeleton width={52} height={52} borderRadius={10} />
+                  <View style={{ flex: 1, gap: 5 }}>
+                    <Skeleton width={140} height={14} borderRadius={6} />
+                    <Skeleton width={90} height={11} borderRadius={5} />
+                  </View>
+                  <Skeleton width={26} height={26} borderRadius={13} />
+                </View>
+              ))}
+            </>
+          ) : variant === 'add' ? (
+            <>
+              {[1,2,3,4,5].map(i => (
+                <View key={i} style={[styles.skelAddCard, { backgroundColor: isDark ? '#000000' : P.cta }]}>
+                  <Skeleton width={64} height={64} borderRadius={14} />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <Skeleton width={160} height={16} borderRadius={6} />
+                    <Skeleton width={100} height={12} borderRadius={5} />
+                  </View>
+                  <Skeleton width={44} height={44} borderRadius={12} />
+                </View>
+              ))}
+            </>
+          ) : (
+            <>
+              {[1,2,3,4].map(i => (
+                <View key={i} style={[styles.skelBrowseCard, { backgroundColor: isDark ? colors.bg : P.cta }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <Skeleton width={80} height={18} borderRadius={9} />
+                    <Skeleton width={50} height={18} borderRadius={9} />
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 14 }}>
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <Skeleton width={140} height={20} borderRadius={8} />
+                      <Skeleton width="100%" height={12} borderRadius={6} />
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <Skeleton width={60} height={18} borderRadius={8} />
+                        <Skeleton width={60} height={18} borderRadius={8} />
+                      </View>
+                    </View>
+                    <Skeleton width={120} height={120} borderRadius={16} />
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
         </View>
       ) : (
         <FlatList
@@ -477,9 +526,34 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   loadingState: {
-    flex: 1,
-    justifyContent: 'center',
+    paddingTop: 20,
+    paddingHorizontal: H_PADDING,
+    gap: 12,
+  },
+  skelCompactCard: {
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
+    borderRadius: 14,
+    gap: 12,
+  },
+  skelAddCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 18,
+    marginBottom: 12,
+    gap: 14,
+  },
+  skelBrowseCard: {
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 12,
+    shadowColor: P.ctaDeep,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 9,
   },
   emptyState: {
     flex: 1,

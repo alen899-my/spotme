@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Image,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -69,6 +70,48 @@ const ACCENTS: Record<string, { gradient: [string, string]; glow: string }> = {
 const accentFor = (category?: string | null) =>
   ACCENTS[category?.toLowerCase() ?? ''] ?? { gradient: [P.cta, P.ctaDark] as [string, string], glow: 'rgba(247,203,22,0.14)' };
 
+function CardMedia({ uri, gifUri, isFocused, style, fallbackStyle, fallbackIcon, error, onError }: any) {
+  const gifOpacity = useRef(new Animated.Value(0)).current;
+  const [gifLoaded, setGifLoaded] = useState(false);
+
+  useEffect(() => {
+    if (isFocused && gifUri && gifLoaded) {
+      Animated.timing(gifOpacity, { toValue: 1, duration: 250, useNativeDriver: true }).start();
+    } else if (!isFocused) {
+      gifOpacity.setValue(0);
+    }
+  }, [isFocused, gifUri, gifLoaded]);
+
+  if (error) {
+    return <View style={[style, fallbackStyle]}>{fallbackIcon}</View>;
+  }
+
+  return (
+    <View style={style}>
+      {/* Static image always rendered as base */}
+      {uri && (
+        <Image
+          source={{ uri }}
+          style={[StyleSheet.absoluteFill, { borderRadius: style.borderRadius || 0 }]}
+          onError={onError}
+        />
+      )}
+      {/* GIF overlaid on top when focused */}
+      {isFocused && gifUri && (
+        <Animated.Image
+          source={{ uri: gifUri }}
+          style={[StyleSheet.absoluteFill, { borderRadius: style.borderRadius || 0, opacity: gifOpacity }]}
+          onLoad={() => {
+            setGifLoaded(true);
+            Animated.timing(gifOpacity, { toValue: 1, duration: 250, useNativeDriver: true }).start();
+          }}
+          onError={onError}
+        />
+      )}
+    </View>
+  );
+}
+
 function ExerciseCard({
   exercise,
   variant = 'browse',
@@ -86,8 +129,8 @@ function ExerciseCard({
   const [imgError, setImgError] = useState(false);
   const theme = accentFor(exercise.category);
 
-  const imageUri = exercise.image_url || exercise.gif_url;
-  const displayUri = isFocused && exercise.gif_url ? exercise.gif_url : imageUri;
+  const staticUri = exercise.image_url || exercise.gif_url;
+  const gifUri = exercise.gif_url;
 
   if (variant === 'add') {
     return (
@@ -96,17 +139,16 @@ function ExerciseCard({
         activeOpacity={0.7}
         onPress={() => onPress?.(exercise)}
       >
-        {displayUri && !imgError ? (
-          <Image
-            source={{ uri: displayUri }}
-            style={styles.addImage}
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <View style={[styles.addImage, styles.addImageFallback]}>
-            <Ionicons name="barbell-outline" size={28} color="#999" />
-          </View>
-        )}
+        <CardMedia
+          uri={staticUri}
+          gifUri={gifUri}
+          isFocused={isFocused}
+          style={styles.addImage}
+          fallbackStyle={styles.addImageFallback}
+          fallbackIcon={<Ionicons name="barbell-outline" size={28} color="#999" />}
+          error={imgError}
+          onError={() => setImgError(true)}
+        />
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <Text style={styles.addName} numberOfLines={1}>
@@ -143,17 +185,16 @@ function ExerciseCard({
         activeOpacity={0.7}
         onPress={() => onPress?.(exercise)}
       >
-        {displayUri && !imgError ? (
-          <Image
-            source={{ uri: displayUri }}
-            style={styles.compactImage}
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <View style={[styles.compactImage, styles.compactImageFallback]}>
-            <Ionicons name="barbell-outline" size={18} color="#999" />
-          </View>
-        )}
+        <CardMedia
+          uri={staticUri}
+          gifUri={gifUri}
+          isFocused={isFocused}
+          style={styles.compactImage}
+          fallbackStyle={styles.compactImageFallback}
+          fallbackIcon={<Ionicons name="barbell-outline" size={18} color="#999" />}
+          error={imgError}
+          onError={() => setImgError(true)}
+        />
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <Text style={styles.compactName} numberOfLines={1}>{exercise.name}</Text>
@@ -194,17 +235,16 @@ function ExerciseCard({
         onPress={() => onPress?.(exercise)}
       >
         <View style={styles.sessionInfoRow}>
-          {displayUri && !imgError ? (
-            <Image
-              source={{ uri: displayUri }}
-              style={styles.sessionImage}
-              onError={() => setImgError(true)}
-            />
-          ) : (
-            <View style={[styles.sessionImage, styles.sessionImageFallback]}>
-              <Ionicons name="barbell-outline" size={32} color="#999" />
-            </View>
-          )}
+          <CardMedia
+            uri={staticUri}
+            gifUri={gifUri}
+            isFocused={isFocused}
+            style={styles.sessionImage}
+            fallbackStyle={styles.sessionImageFallback}
+            fallbackIcon={<Ionicons name="barbell-outline" size={32} color="#999" />}
+            error={imgError}
+            onError={() => setImgError(true)}
+          />
           <View style={styles.sessionTextBlock}>
             <View style={styles.sessionTopRow}>
               <Text style={[styles.sessionName, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1}>
@@ -328,24 +368,27 @@ function ExerciseCard({
           ) : null}
         </View>
 
-        {displayUri && !imgError ? (
-          <Image
-            source={{ uri: displayUri }}
-            style={styles.browseThumb}
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <View style={[styles.browseThumb, styles.browseThumbPlaceholder]}>
-            <LinearGradient
-              colors={isDark ? ['#000000', '#000000'] : [P.ctaDark, P.ctaDeep]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <View style={[styles.browseThumbGlow, { backgroundColor: theme.glow }]} />
-            <Ionicons name="barbell-outline" size={40} color={P.sun} />
-          </View>
-        )}
+        <CardMedia
+          uri={staticUri}
+          gifUri={gifUri}
+          isFocused={isFocused}
+          style={styles.browseThumb}
+          fallbackStyle={styles.browseThumbPlaceholder}
+          fallbackIcon={
+            <>
+              <LinearGradient
+                colors={isDark ? ['#000000', '#000000'] : [P.ctaDark, P.ctaDeep]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View style={[styles.browseThumbGlow, { backgroundColor: theme.glow }]} />
+              <Ionicons name="barbell-outline" size={40} color={P.sun} />
+            </>
+          }
+          error={imgError}
+          onError={() => setImgError(true)}
+        />
       </View>
     </TouchableOpacity>
   );
@@ -472,6 +515,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginRight: 14,
     backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
   },
   addImageFallback: {
     justifyContent: 'center',

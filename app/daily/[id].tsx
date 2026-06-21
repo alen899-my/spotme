@@ -1414,7 +1414,7 @@ const styles = StyleSheet.create({
   // Modals
   modalOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   timerModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  modalContent:      { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+  modalContent:      { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 0, paddingTop: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
   modalHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
   modalTitle:        { fontFamily: FONTS.heading, fontSize: 20, marginBottom: 2 },
   modalSub:          { fontFamily: FONTS.body, fontSize: 13 },

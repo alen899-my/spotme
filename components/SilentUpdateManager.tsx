@@ -12,10 +12,13 @@ import * as Updates from 'expo-updates';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../constants/theme';
 
+const MIN_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour between update checks
+
 export default function SilentUpdateManager() {
   const [updateReady, setUpdateReady] = useState(false);
-  const slideAnim = useRef(new Animated.Value(150)).current; // Start off-screen (below bottom)
+  const slideAnim = useRef(new Animated.Value(150)).current;
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  const lastCheckRef = useRef(0);
 
   // Pulse animation for the "update ready" indicator dot
   useEffect(() => {
@@ -42,6 +45,13 @@ export default function SilentUpdateManager() {
     if (__DEV__ || !Updates.isEnabled) {
       return;
     }
+
+    // Throttle: skip if checked within the last hour
+    const now = Date.now();
+    if (now - lastCheckRef.current < MIN_CHECK_INTERVAL_MS) {
+      return;
+    }
+    lastCheckRef.current = now;
 
     try {
       const check = await Updates.checkForUpdateAsync();

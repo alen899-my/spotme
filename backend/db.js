@@ -498,6 +498,26 @@ const initDB = async () => {
     // ── Rest Day Type Column ─────────────────────────────────────────────────
     await pool.query(`ALTER TABLE daily_workouts ADD COLUMN IF NOT EXISTS rest_type VARCHAR(20);`);
 
+    // ── Missing Indexes for query performance ──────────────────────────────────
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_user_status_completed
+      ON daily_workouts (user_id, status, completed_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_user_post_weight
+      ON daily_workouts (user_id, post_workout_weight) WHERE post_workout_weight IS NOT NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dwe_daily_workout
+      ON daily_workout_exercises (daily_workout_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dwe_exercise
+      ON daily_workout_exercises (exercise_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dws_daily_exercise
+      ON daily_workout_sets (daily_exercise_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_water_logs_user_logged
+      ON water_logs (user_id, logged_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_meals_user_logged
+      ON meals (user_id, logged_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_photos_workout
+      ON daily_workout_photos (daily_workout_id, created_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_workout_reports_lookup
+      ON workout_reports (daily_workout_id, user_id, status)`);
+
     // -- Admin columns for users ---------------------------------------------
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user'`);

@@ -312,7 +312,7 @@ export default function DailyTab() {
       const res = await api.get('/daily/workouts', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setWorkouts(res.data);
+      setWorkouts(res.data.workouts);
     } catch (err) {
       console.error('Error fetching daily workouts:', err);
     } finally {
