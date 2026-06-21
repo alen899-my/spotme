@@ -583,6 +583,21 @@ export default function SettingsScreen() {
 
         <Text style={s.sectionLabel}>ACCOUNT</Text>
         <View style={s.card}>
+          <TouchableOpacity
+            onPress={() => router.push("/profile/change-password")}
+            activeOpacity={0.6}
+          >
+            <View style={s.settingRow}>
+              <View style={s.settingLeft}>
+                <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,150,190,0.1)' }]}>
+                  <Ionicons name="lock-closed-outline" size={20} color={colors.primary} />
+                </View>
+                <Text style={s.settingTitle}>Change Password</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+          </TouchableOpacity>
+
           <TouchableOpacity onPress={handleDeleteAccount} activeOpacity={0.6}>
             <View style={[s.settingRow, { borderBottomWidth: 0 }]}>
               <View style={s.settingLeft}>
