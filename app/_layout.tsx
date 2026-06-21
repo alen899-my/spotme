@@ -18,9 +18,8 @@ import { ToastProvider } from "../contexts/ToastContext";
 import { WorkoutTimerProvider } from "../contexts/WorkoutTimerContext";
 import SilentUpdateManager from "../components/SilentUpdateManager";
 import AnimatedSplash from "../components/ui/AnimatedSplash";
-import { API_URL } from "../utils/api";
+import { API_URL, api } from "../utils/api";
 import { getToken } from "../utils/tokenStorage";
-import axios from "axios";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -50,8 +49,8 @@ async function registerForPushNotifications() {
 
     const userToken = await getToken();
     if (userToken && token) {
-      await axios.post(
-        `${API_URL}/notifications/push-token`,
+      await api.post(
+        '/notifications/push-token',
         { token },
         { headers: { Authorization: `Bearer ${userToken}` } }
       );

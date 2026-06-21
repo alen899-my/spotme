@@ -14,6 +14,30 @@ const {
 } = require('../utils/workoutAnalytics');
 const { callAI } = require('../utils/ai');
 
+// ── Simple TTL-based route cache ─────────────────────────────────────────────
+const routeCache = new Map();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function getCached(key) {
+  const entry = routeCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) {
+    routeCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache(key, data) {
+  routeCache.set(key, { data, ts: Date.now() });
+}
+
+function invalidateCache(pattern) {
+  for (const key of routeCache.keys()) {
+    if (key.startsWith(pattern)) routeCache.delete(key);
+  }
+}
+
 async function syncWorkoutCompletionAnalytics(client, workoutId, userId) {
   const userRes = await client.query(
     'SELECT weight FROM users WHERE id = $1',
@@ -265,9 +289,20 @@ async function syncWorkoutCompletionAnalytics(client, workoutId, userId) {
   return { calorieSummary, exercisePrs };
 }
 
-// ── GET /daily/workouts — list past workouts for user ─────────────────────────
+// ── GET /daily/workouts — list past workouts for user (paginated) ──────────
 router.get('/workouts', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.id;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    const countRes = await pool.query(
+      `SELECT COUNT(*) AS total FROM daily_workouts WHERE user_id = $1`,
+      [userId]
+    );
+    const total = parseInt(countRes.rows[0]?.total) || 0;
+
     const result = await pool.query(
       `SELECT dw.*,
         ws.name AS split_name,
@@ -283,10 +318,12 @@ router.get('/workouts', authenticateToken, async (req, res) => {
        LEFT JOIN workout_splits ws ON dw.split_id = ws.id
        LEFT JOIN workout_sessions wsess ON dw.session_id = wsess.id
        WHERE dw.user_id = $1
-       ORDER BY dw.started_at DESC`,
-      [req.user.id]
+       ORDER BY dw.started_at DESC
+       LIMIT $2 OFFSET $3`,
+      [userId, limit, offset]
     );
-    res.json(result.rows);
+
+    res.json({ workouts: result.rows, total, page, limit });
   } catch (err) {
     console.error('GET /daily/workouts error:', err);
     res.status(500).json({ error: err.message });
@@ -540,19 +577,104 @@ router.patch('/exercises/:id/complete', authenticateToken, async (req, res) => {
   }
 });
 
+async function completeWorkoutBackground(workoutId, userId) {
+  try {
+    const analytics = await syncWorkoutCompletionAnalytics(pool, workoutId, userId);
+
+    // ── Streak + XP ──────────────────────────────────────────────────────
+    const wasAlreadyCompleted = false; // fresh DB read
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    const skippedCheck = await pool.query(
+      'SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = $1 AND is_skipped = true',
+      [workoutId]
+    );
+    const hasSkips = parseInt(skippedCheck.rows[0].count) > 0;
+
+    const userRes = await pool.query(
+      'SELECT current_streak, last_workout_date FROM users WHERE id = $1',
+      [userId]
+    );
+    const { current_streak, last_workout_date } = userRes.rows[0];
+    let newStreak = current_streak || 0;
+
+    if (hasSkips) {
+      newStreak = 0;
+    } else {
+      if (!last_workout_date) {
+        newStreak = 1;
+      } else {
+        const lastDateStr = new Date(last_workout_date).toISOString().split('T')[0];
+        if (lastDateStr === today) {
+          // no change
+        } else if (lastDateStr === yesterday) {
+          newStreak += 1;
+        } else {
+          newStreak = 1;
+        }
+      }
+    }
+
+    await pool.query(
+      'UPDATE users SET current_streak = $1, last_workout_date = $2 WHERE id = $3',
+      [newStreak, today, userId]
+    );
+
+    // XP calculation
+    const workoutStats = await pool.query(`
+      SELECT
+        COUNT(dws.id) as total_sets,
+        SUM(dws.reps) as total_reps,
+        dw.total_duration_seconds,
+        dw.total_volume
+      FROM daily_workouts dw
+      LEFT JOIN daily_workout_exercises dwe ON dw.id = dwe.daily_workout_id
+      LEFT JOIN daily_workout_sets dws ON dwe.id = dws.daily_exercise_id
+      WHERE dw.id = $1 AND COALESCE(dws.is_skipped, false) = false
+      GROUP BY dw.id
+    `, [workoutId]);
+
+    if (workoutStats.rows.length > 0) {
+      const stats = workoutStats.rows[0];
+      const baseSetsXP = (parseInt(stats.total_sets) || 0) * 10;
+      const baseRepsXP = (parseInt(stats.total_reps) || 0) * 1;
+      const durationXP = Math.floor((parseInt(stats.total_duration_seconds) || 0) / 10);
+      const volumeXP = Math.floor((parseFloat(stats.total_volume) || 0) / 100);
+      const perfectBonus = hasSkips ? 0 : 150;
+
+      let earnedXP = baseSetsXP + baseRepsXP + durationXP + volumeXP + perfectBonus;
+      const streakMultiplier = 1 + Math.min((newStreak * 0.05), 0.5);
+      earnedXP = Math.round(earnedXP * streakMultiplier);
+
+      await awardXP(pool, userId, earnedXP, 'Completed workout');
+    }
+
+    await pool.query(
+      'UPDATE daily_workouts SET streak_at_completion = $1 WHERE id = $2',
+      [newStreak, workoutId]
+    );
+
+    sendRandomMotivation(userId).catch(() => {});
+  } catch (err) {
+    console.error('[Background] Post-workout analytics failed:', err);
+  }
+}
+
 // ── PATCH /daily/workouts/:id/complete — finish the workout ──────────────────
 router.patch(
   '/workouts/:id/complete',
   authenticateToken,
   validate(schemas.completeWorkout),
   async (req, res) => {
-    const { total_duration_seconds, total_volume, notes, completion_photo_url } = req.body;
     const { id } = req.params;
     const workoutId = parseInt(id);
     const userId = req.user.id;
 
     try {
-      const { water_intake_liters, post_workout_weight, photos, total_rest_seconds } = req.body;
+      const { total_duration_seconds, total_volume, notes, completion_photo_url,
+              water_intake_liters, post_workout_weight, photos, total_rest_seconds } = req.body;
+
       const existingWorkoutRes = await pool.query(
         'SELECT status FROM daily_workouts WHERE id = $1 AND user_id = $2',
         [workoutId, userId]
@@ -563,15 +685,7 @@ router.patch(
       }
 
       const wasAlreadyCompleted = existingWorkoutRes.rows[0].status === 'completed';
-      
-      // Check if all exercises are done or skipped
-      const exercisesCheck = await pool.query(
-        'SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = $1 AND is_completed = false',
-        [workoutId]
-      );
-      const remainingCount = parseInt(exercisesCheck.rows[0].count);
 
-      // Build dynamic update query
       let updateFields = [];
       let queryParams = [];
       let paramIdx = 1;
@@ -603,16 +717,15 @@ router.patch(
 
       queryParams.push(workoutId, userId);
       const query = `UPDATE daily_workouts SET ${updateFields.join(', ')} WHERE id = $${paramIdx} AND user_id = $${paramIdx + 1} RETURNING *`;
-      
+
       const result = await pool.query(query, queryParams);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Workout not found or unauthorized' });
       }
 
-      // Handle multi-photos if provided
+      // Handle multi-photos if provided (lightweight, keep synchronous)
       if (Array.isArray(photos)) {
-        // Clear old ones first (if any)
         await pool.query('DELETE FROM daily_workout_photos WHERE daily_workout_id = $1', [workoutId]);
         for (const photoUrl of photos) {
           await pool.query(
@@ -622,7 +735,7 @@ router.patch(
         }
       }
 
-      // Sync post-workout weight to weight_logs for weight tracker
+      // Sync post-workout weight to weight_logs
       if (post_workout_weight && parseFloat(post_workout_weight) > 0) {
         await pool.query(
           'INSERT INTO weight_logs (user_id, weight, notes) VALUES ($1, $2, $3)',
@@ -630,107 +743,34 @@ router.patch(
         );
       }
 
-      const analytics = await syncWorkoutCompletionAnalytics(pool, workoutId, userId);
-      result.rows[0].calories_burned = analytics.calorieSummary.caloriesBurned;
-      result.rows[0].workout_met = analytics.calorieSummary.workoutMet;
-      result.rows[0].calories_burned_method = analytics.calorieSummary.method;
-      result.rows[0].exercise_prs = analytics.exercisePrs;
+      // ── Respond immediately ───────────────────────────────────────────
+      res.json({
+        ...result.rows[0],
+        photos: photos || [],
+        earned_xp: 0,
+        new_streak: 0,
+        leveled_up: false,
+        exercise_prs: [],
+      });
 
-      // ─── STREAK CALCULATION ───
-      try {
-        if (!wasAlreadyCompleted) {
-        const today = new Date().toISOString().split('T')[0];
-        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      // Invalidate route cache
+      invalidateCache(`calendar-stats:${userId}`);
+      invalidateCache(`dashboard:${userId}`);
 
-        // 1. Check for any skips in this workout
-        const skippedCheck = await pool.query(
-          'SELECT COUNT(*) FROM daily_workout_exercises WHERE daily_workout_id = $1 AND is_skipped = true',
-          [workoutId]
-        );
-        const hasSkips = parseInt(skippedCheck.rows[0].count) > 0;
-
-        // 2. Get user's current streak
-        const userRes = await pool.query('SELECT current_streak, last_workout_date FROM users WHERE id = $1', [userId]);
-        const { current_streak, last_workout_date } = userRes.rows[0];
-        let newStreak = current_streak || 0;
-
-        if (hasSkips) {
-          // Rule: Skip any exercise = Streak Gone
-          newStreak = 0;
-        } else {
-          if (!last_workout_date) {
-            newStreak = 1;
-          } else {
-            const lastDateStr = new Date(last_workout_date).toISOString().split('T')[0];
-            if (lastDateStr === today) {
-              // Already counted today, no change
-            } else if (lastDateStr === yesterday) {
-              newStreak += 1;
-            } else {
-              // Missed at least one day = Streak Gone (Restart at 1)
-              newStreak = 1;
-            }
-          }
+      // ── Pre-warm dashboard cache in background ──────────────────────
+      setImmediate(async () => {
+        try {
+          const freshData = await buildDashboardData(userId);
+          setCache(`dashboard:${userId}`, freshData);
+        } catch (e) {
+          // Silently ignore — next request will cold-fill the cache
         }
+      });
 
-        await pool.query(
-          'UPDATE users SET current_streak = $1, last_workout_date = $2 WHERE id = $3',
-          [newStreak, today, userId]
-        );
-        
-        // ─── XP & LEVEL CALCULATION ───
-        const workoutStats = await pool.query(`
-          SELECT 
-            COUNT(dws.id) as total_sets,
-            SUM(dws.reps) as total_reps,
-            dw.total_duration_seconds,
-            dw.total_volume
-          FROM daily_workouts dw
-          LEFT JOIN daily_workout_exercises dwe ON dw.id = dwe.daily_workout_id
-          LEFT JOIN daily_workout_sets dws ON dwe.id = dws.daily_exercise_id
-          WHERE dw.id = $1 AND COALESCE(dws.is_skipped, false) = false
-          GROUP BY dw.id
-        `, [workoutId]);
-
-        if (workoutStats.rows.length > 0) {
-          const stats = workoutStats.rows[0];
-          const baseSetsXP = (parseInt(stats.total_sets) || 0) * 10;
-          const baseRepsXP = (parseInt(stats.total_reps) || 0) * 1;
-          const durationXP = Math.floor((parseInt(stats.total_duration_seconds) || 0) / 10);
-          const volumeXP = Math.floor((parseFloat(stats.total_volume) || 0) / 100);
-          const perfectBonus = hasSkips ? 0 : 150;
-          
-          let earnedXP = baseSetsXP + baseRepsXP + durationXP + volumeXP + perfectBonus;
-          
-          // Streak Multiplier: +5% per day, max 50%
-          const streakMultiplier = 1 + Math.min((newStreak * 0.05), 0.5);
-          earnedXP = Math.round(earnedXP * streakMultiplier);
-
-          // Delegate unified XP and Tier update
-          const awardRes = await awardXP(pool, userId, earnedXP, 'Completed workout');
-          
-          result.rows[0].earned_xp = earnedXP;
-          result.rows[0].new_level = awardRes.level;
-          result.rows[0].leveled_up = awardRes.leveledUp;
-          result.rows[0].total_xp = awardRes.newXP;
-          result.rows[0].league_tier = awardRes.tier;
-        }
-
-        result.rows[0].new_streak = newStreak;
-        await pool.query('UPDATE daily_workouts SET streak_at_completion = $1 WHERE id = $2', [newStreak, workoutId]);
-        } else {
-          const streakRes = await pool.query('SELECT current_streak FROM users WHERE id = $1', [userId]);
-          const currentStreak = parseInt(streakRes.rows[0]?.current_streak) || 0;
-          result.rows[0].new_streak = currentStreak;
-          await pool.query('UPDATE daily_workouts SET streak_at_completion = $1 WHERE id = $2', [currentStreak, workoutId]);
-        }
-      } catch (streakErr) {
-        console.error('[XP/Streak] Failed to update metrics:', streakErr);
+      // ── Heavy analytics + streak + XP in background ──────────────────
+      if (!wasAlreadyCompleted) {
+        setImmediate(() => completeWorkoutBackground(workoutId, userId));
       }
-
-      sendRandomMotivation(userId).catch(() => {});
-
-      res.json({ ...result.rows[0], photos: photos || [] });
     } catch (err) {
       console.error('[Daily] PATCH /complete error:', err);
       res.status(500).json({ error: 'Database update failed', details: err.message });
@@ -752,6 +792,16 @@ router.delete('/workouts/:id', authenticateToken, async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Workout not found or unauthorized' });
     }
+
+    invalidateCache(`calendar-stats:${userId}`);
+    invalidateCache(`dashboard:${userId}`);
+
+    setImmediate(async () => {
+      try {
+        const freshData = await buildDashboardData(userId);
+        setCache(`dashboard:${userId}`, freshData);
+      } catch (e) {}
+    });
 
     res.json({ success: true, message: 'Workout and associated photos deleted' });
   } catch (err) {
@@ -1251,118 +1301,114 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
   }
 });
 
-// ── GET /daily/dashboard — Home screen aggregate data ─────────────────────────
-router.get('/dashboard', authenticateToken, async (req, res) => {
-  const userId = req.user.id;
+// ── Reusable dashboard data builder (for route + cache pre-warm) ──────────
+async function buildDashboardData(userId) {
   const now = new Date();
   const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
   const todayEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+  const todayISO = todayStart.toISOString();
+  const todayEndISO = todayEnd.toISOString();
 
-  try {
-    // ── 1. User stats ─────────────────────────────────────────────────────────
-    const userRes = await pool.query(
-      `SELECT full_name, fitness_goal, experience_level, total_xp, level, league_tier,
-              current_streak, weight, profile_pic_url, gender, height, body_fat, water_intake,
-              dob, onboarding_completed, activity_level, neck, waist, chest, medication,
-              diet_type, food_preference
-       FROM users WHERE id = $1`,
-      [userId]
-    );
-    const user = userRes.rows[0] || {};
+  const mainRes = await pool.query(`
+      WITH
+      u AS (
+        SELECT full_name, fitness_goal, experience_level, total_xp, level, league_tier,
+               current_streak, weight, profile_pic_url, gender, height, body_fat, water_intake,
+               dob, onboarding_completed, activity_level, neck, waist, chest, medication,
+               diet_type, food_preference
+        FROM users WHERE id = $1
+      ),
+      latest_weight AS (
+        SELECT post_workout_weight FROM daily_workouts
+        WHERE user_id = $1 AND post_workout_weight IS NOT NULL AND status = 'completed'
+        ORDER BY completed_at DESC LIMIT 1
+      ),
+      today_workouts AS (
+        SELECT COALESCE(SUM(calories_burned), 0) AS total_calories,
+               COALESCE(SUM(total_duration_seconds), 0) AS total_duration,
+               COALESCE(SUM(total_volume), 0) AS total_vol,
+               COUNT(*) AS w_count
+        FROM daily_workouts
+        WHERE user_id = $1 AND status = 'completed'
+          AND completed_at >= $2 AND completed_at <= $3
+      ),
+      today_water AS (
+        SELECT COALESCE(SUM(amount_ml), 0) AS total_ml
+        FROM water_logs
+        WHERE user_id = $1 AND logged_at >= $2 AND logged_at <= $3
+      ),
+      today_cals AS (
+        SELECT COALESCE(SUM(total_calories), 0) AS total_cals
+        FROM meals
+        WHERE user_id = $1 AND logged_at >= $2 AND logged_at <= $3
+      ),
+      weekly_raw AS (
+        SELECT DATE(completed_at) AS day,
+               COUNT(*) AS workouts,
+               COALESCE(SUM(total_duration_seconds), 0) AS total_seconds,
+               COALESCE(SUM(total_volume), 0) AS total_vol
+        FROM daily_workouts
+        WHERE user_id = $1 AND status = 'completed'
+          AND completed_at >= NOW() - INTERVAL '7 days'
+        GROUP BY DATE(completed_at)
+        ORDER BY day ASC
+      ),
+      weight_progress AS (
+        SELECT post_workout_weight AS weight, DATE(completed_at) AS day
+        FROM daily_workouts
+        WHERE user_id = $1 AND post_workout_weight IS NOT NULL AND status = 'completed'
+        ORDER BY completed_at DESC LIMIT 7
+      ),
+      total_count AS (
+        SELECT COUNT(*) AS total FROM daily_workouts WHERE user_id = $1 AND status = 'completed'
+      )
+      SELECT
+        (SELECT row_to_json(u) FROM u) AS user_data,
+        (SELECT post_workout_weight FROM latest_weight) AS latest_weight,
+        (SELECT total_calories FROM today_workouts) AS today_calories,
+        (SELECT total_duration FROM today_workouts) AS today_duration,
+        (SELECT total_vol FROM today_workouts) AS today_volume,
+        (SELECT w_count FROM today_workouts) AS today_count,
+        (SELECT total_ml FROM today_water) AS water_ml,
+        (SELECT total_cals FROM today_cals) AS cals_consumed,
+        (SELECT json_agg(weekly_raw ORDER BY day ASC) FROM weekly_raw) AS weekly,
+        (SELECT json_agg(wp ORDER BY wp.day ASC) FROM weight_progress wp) AS weight_prog,
+        (SELECT total FROM total_count) AS total_workouts
+    `, [userId, todayISO, todayEndISO]);
+
+    const r = mainRes.rows[0];
+    const user = r?.user_data || {
+      full_name: null, fitness_goal: null, experience_level: null, total_xp: 0,
+      level: 1, league_tier: 'Bronze', current_streak: 0, weight: null,
+      profile_pic_url: null, gender: null, height: null, body_fat: null,
+      water_intake: null, dob: null, onboarding_completed: null,
+      activity_level: null, neck: null, waist: null, chest: null,
+      medication: null, diet_type: null, food_preference: null,
+    };
+    const latestLogWeight = r?.latest_weight;
     const profileWeightKg = parseFloat(user.weight) || 70;
-
-    // ── 1b. Latest post-workout weight (fallback to profile weight) ──────────
-    const latestWeightRes = await pool.query(
-      `SELECT post_workout_weight FROM daily_workouts
-       WHERE user_id = $1 AND post_workout_weight IS NOT NULL AND status = 'completed'
-       ORDER BY completed_at DESC LIMIT 1`,
-      [userId]
-    );
-    const latestLogWeight = latestWeightRes.rows[0]?.post_workout_weight;
     const weightKg = latestLogWeight ? parseFloat(latestLogWeight) : profileWeightKg;
 
-    // ── 2. Today's completed workouts ─────────────────────────────────────────
-    const todayWorkoutsRes = await pool.query(
-      `SELECT id, title, total_duration_seconds, total_volume, status, completed_at, post_workout_weight, calories_burned
-       FROM daily_workouts
-       WHERE user_id = $1 AND status = 'completed'
-         AND completed_at BETWEEN $2 AND $3
-       ORDER BY completed_at DESC`,
-      [userId, todayStart.toISOString(), todayEnd.toISOString()]
-    );
-
-    // Calories burned using MET formula: kcal = MET × weight_kg × duration_hours
-    // MET 5 = vigorous weight training
-    let totalCaloriesBurned = 0;
-    let totalDurationToday = 0;
-    let totalVolumeToday = 0;
-    todayWorkoutsRes.rows.forEach(w => {
-      const kcal = parseInt(w.calories_burned) || 0;
-      totalCaloriesBurned += kcal;
-      totalDurationToday += parseInt(w.total_duration_seconds) || 0;
-      totalVolumeToday += parseFloat(w.total_volume) || 0;
-    });
-
-    // ── 3. Today's water intake ───────────────────────────────────────────────
-    const waterRes = await pool.query(
-      `SELECT COALESCE(SUM(amount_ml), 0) AS total_ml
-       FROM water_logs
-       WHERE user_id = $1 AND logged_at BETWEEN $2 AND $3`,
-      [userId, todayStart.toISOString(), todayEnd.toISOString()]
-    );
-    const waterMl = parseInt(waterRes.rows[0]?.total_ml) || 0;
-
-    // ── 4. Today's calories consumed ──────────────────────────────────────────
-    const mealsRes = await pool.query(
-      `SELECT COALESCE(SUM(total_calories), 0) AS total_cals
-       FROM meals
-       WHERE user_id = $1 AND logged_at BETWEEN $2 AND $3`,
-      [userId, todayStart.toISOString(), todayEnd.toISOString()]
-    );
-    const caloriesConsumed = Math.round(parseFloat(mealsRes.rows[0]?.total_cals) || 0);
-
-    // ── 5. Weekly workout stats (last 7 days) ─────────────────────────────────
-    const weeklyRes = await pool.query(
-      `SELECT
-         DATE(completed_at) AS day,
-         COUNT(*) AS workouts,
-         COALESCE(SUM(total_duration_seconds), 0) AS total_seconds,
-         COALESCE(SUM(total_volume), 0) AS total_volume
-       FROM daily_workouts
-       WHERE user_id = $1 AND status = 'completed'
-         AND completed_at >= NOW() - INTERVAL '7 days'
-       GROUP BY DATE(completed_at)
-       ORDER BY day ASC`,
-      [userId]
-    );
-
     // Build 7-day grid (fill missing days with 0)
+    const weeklyDb = r?.weekly || [];
     const weeklyStats = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
       const dayStr = d.toISOString().split('T')[0];
-      const found = weeklyRes.rows.find(r => r.day === dayStr);
+      const found = weeklyDb.find(r => r.day === dayStr);
       weeklyStats.push({
         date: dayStr,
         label: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()],
         workouts: parseInt(found?.workouts) || 0,
         duration_seconds: parseInt(found?.total_seconds) || 0,
-        volume: parseFloat(found?.total_volume) || 0,
+        volume: parseFloat(found?.total_vol) || 0,
       });
     }
 
-    // ── 6. Weight progress (last 7 post_workout weights) ──────────────────────
-    const weightRes = await pool.query(
-      `SELECT post_workout_weight AS weight, DATE(completed_at) AS day
-       FROM daily_workouts
-       WHERE user_id = $1 AND post_workout_weight IS NOT NULL AND status = 'completed'
-       ORDER BY completed_at DESC LIMIT 7`,
-      [userId]
-    );
-    const weightProgress = weightRes.rows.reverse();
+    const weightProgress = r?.weight_prog || [];
 
-    // ── 7. Top recommended exercises ───────────────────────────────────────────
+    // ── Top recommended exercises (cached on client) ───────────────────────
     const topExerciseRes = await pool.query(
       `SELECT e.id AS exercise_id, e.name AS exercise_name, e.target, e.category, e.image_url, e.gif_url, e.equipment,
               e.avg_rating::float8 AS rating
@@ -1371,36 +1417,26 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
        ORDER BY e.avg_rating DESC, e.rating_count DESC
        LIMIT 5`
     );
-    
     const topRecs = topExerciseRes.rows.map(r => ({
       ...r,
       scoreTag: r.rating >= 8.0 ? 'Highly Rated' : r.rating > 0 ? 'Recommended' : 'Try This',
     }));
 
-    // ── 8. Muscle Activity — decay-weighted, date-aware ──────────────────────
-    // Pull target + body_part + category so we get the widest possible coverage
-    // across all exercises, regardless of which column was populated.
+    // ── Muscle Activity — decay-weighted, date-aware ──────────────────────
     const muscleRes = await pool.query(
       `SELECT e.target,
               e.body_part,
               e.category,
               DATE(dw.completed_at) AS workout_date,
-              COUNT(*)::int                             AS count
+              COUNT(*)::int AS count
        FROM daily_workout_exercises dwe
        JOIN daily_workouts dw ON dwe.daily_workout_id = dw.id
-       JOIN exercises e       ON dwe.exercise_id      = e.id
+       JOIN exercises e ON dwe.exercise_id = e.id
        WHERE dw.user_id = $1 AND dw.status = 'completed'
        GROUP BY e.target, e.body_part, e.category,
                 DATE(dw.completed_at)`,
       [userId]
     );
-
-    // ── 8b. Total completed workouts (all-time) ────────────────────────────────
-    const totalWorkoutsRes = await pool.query(
-      `SELECT COUNT(*) AS total FROM daily_workouts WHERE user_id = $1 AND status = 'completed'`,
-      [userId]
-    );
-    const totalWorkoutsAllTime = parseInt(totalWorkoutsRes.rows[0]?.total) || 0;
 
     // ── Exhaustive slug map ────────────────────────────────────────────────────
     // Covers every distinct value found in exercises.json across the
@@ -1498,7 +1534,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         return { slug, intensity };
       })
       .filter(m => m.intensity > 0);
-    res.json({
+    const responseData = {
       user: {
         full_name: user.full_name,
         fitness_goal: user.fitness_goal,
@@ -1524,19 +1560,34 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         food_preference: user.food_preference,
       },
       today: {
-        workouts_completed: todayWorkoutsRes.rows.length,
-        calories_burned: totalCaloriesBurned,
-        duration_seconds: totalDurationToday,
-        volume: totalVolumeToday,
-        water_ml: waterMl,
-        calories_consumed: caloriesConsumed,
+        workouts_completed: parseInt(r?.today_count) || 0,
+        calories_burned: parseInt(r?.today_calories) || 0,
+        duration_seconds: parseInt(r?.today_duration) || 0,
+        volume: parseFloat(r?.today_volume) || 0,
+        water_ml: parseInt(r?.water_ml) || 0,
+        calories_consumed: parseInt(r?.cals_consumed) || 0,
       },
       weekly_stats: weeklyStats,
       weight_progress: weightProgress,
       top_recommendations: topRecs,
       muscle_activity: muscleActivity,
-      total_workouts: totalWorkoutsAllTime,
-    });
+      total_workouts: parseInt(r?.total_workouts) || 0,
+    };
+
+    return responseData;
+}
+
+// ── GET /daily/dashboard — Home screen aggregate data ─────────────────────────
+router.get('/dashboard', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const cacheKey = `dashboard:${userId}`;
+  const cachedDashboard = getCached(cacheKey);
+  if (cachedDashboard) return res.json(cachedDashboard);
+
+  try {
+    const responseData = await buildDashboardData(userId);
+    setCache(cacheKey, responseData);
+    res.json(responseData);
   } catch (err) {
     console.error('GET /daily/dashboard error:', err);
     res.status(500).json({ error: err.message });
@@ -2000,6 +2051,10 @@ router.get('/muscle-detail/:slug', authenticateToken, async (req, res) => {
 // ── GET /daily/calendar-stats — overall + per-slug daily counts ────────────
 router.get('/calendar-stats', authenticateToken, async (req, res) => {
   const userId = req.user.id;
+  const cacheKey = `calendar-stats:${userId}`;
+
+  const cached = getCached(cacheKey);
+  if (cached) return res.json(cached);
 
   try {
     // ── 1. Overall: count of distinct workout days ────────────────────────────
@@ -2157,6 +2212,7 @@ router.get('/calendar-stats', authenticateToken, async (req, res) => {
       return acc;
     }, {});
 
+    setCache(cacheKey, { overall, parts, restDays });
     res.json({ overall, parts, restDays });
   } catch (err) {
     console.error('GET /daily/calendar-stats error:', err);

@@ -6,6 +6,8 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import OptimizedImage from '../../components/ui/OptimizedImage';
+import { optimizeImage } from '../../utils/imageOptimizer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
@@ -154,7 +156,7 @@ function AnalysisCard({
       {/* Card header row */}
       <View style={styles.cardHeader}>
         {item.photo_url ? (
-          <Image source={{ uri: item.photo_url }} style={styles.cardThumb} />
+          <OptimizedImage uri={item.photo_url} style={styles.cardThumb} />
         ) : (
           <View
             style={[
@@ -459,8 +461,9 @@ export default function PhysiqueScreen() {
         showToast('Analyzing your physique…', 'info');
 
         const token = await getToken();
+        const optimizedUri = await optimizeImage(imageUri, 'physique');
         const formData = new FormData();
-        formData.append('photo', { uri: imageUri, type: 'image/jpeg', name: 'physique.jpg' } as any);
+        formData.append('photo', { uri: optimizedUri, type: 'image/jpeg', name: 'physique.jpg' } as any);
 
         const { data } = await axios.post(`${API_URL}/physique/analyze`, formData, {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },

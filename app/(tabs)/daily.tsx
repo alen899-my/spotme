@@ -8,8 +8,8 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -18,7 +18,7 @@ import { useWorkoutTimer } from '../../contexts/WorkoutTimerContext';
 import ActionModal from '../../components/ui/ActionModal';
 import DatePicker from '../../components/ui/DatePicker';
 import { DailySkeleton } from '../../components/ui/Skeleton';
-import { API_URL } from '../../utils/api';
+import { api } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import { formatDuration, formatDateTime, isSameDay, isToday, parseUTC } from '../../utils/datetime';
 
@@ -176,7 +176,7 @@ export default function DailyTab() {
     setLoggingRest(true);
     try {
       const token = await getToken();
-      await axios.post(`${API_URL}/daily/rest-day`, { rest_type: restType }, {
+      await api.post('/daily/rest-day', { rest_type: restType }, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setShowRestModal(false);
@@ -280,7 +280,7 @@ export default function DailyTab() {
       // Otherwise hit the API for fresh data
       const token = await getToken();
       if (!token) { setProfileComplete(false); return; }
-      const res = await axios.get(`${API_URL}/auth/me`, {
+      const res = await api.get('/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const completed = !!res.data.onboarding_completed;
@@ -296,7 +296,7 @@ export default function DailyTab() {
   const fetchSplits = useCallback(async () => {
     try {
       const token = await getToken();
-      const res = await axios.get(`${API_URL}/workouts/splits`, {
+      const res = await api.get('/workouts/splits', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSplits(res.data);
@@ -310,10 +310,10 @@ export default function DailyTab() {
   const fetchWorkouts = useCallback(async () => {
     try {
       const token = await getToken();
-      const res = await axios.get(`${API_URL}/daily/workouts`, {
+      const res = await api.get('/daily/workouts', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setWorkouts(res.data);
+      setWorkouts(res.data.workouts);
     } catch (err) {
       console.error('Error fetching daily workouts:', err);
     } finally {
@@ -322,9 +322,7 @@ export default function DailyTab() {
   }, []);
 
   useFocusEffect(useCallback(() => {
-    checkProfileCompletion();
-    fetchWorkouts();
-    fetchSplits();
+    Promise.all([checkProfileCompletion(), fetchWorkouts(), fetchSplits()]);
   }, [checkProfileCompletion, fetchWorkouts, fetchSplits]));
 
   const handleDeleteWorkout = async () => {
@@ -332,7 +330,7 @@ export default function DailyTab() {
     setIsDeleting(true);
     try {
       const token = await getToken();
-      await axios.delete(`${API_URL}/daily/workouts/${deletingId}`, {
+      await api.delete(`/daily/workouts/${deletingId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (activeWorkoutId === String(deletingId)) {
@@ -425,7 +423,7 @@ export default function DailyTab() {
           <View style={styles.cardRow}>
             <View style={styles.imageContainer}>
               {hasPhoto ? (
-                <Image source={{ uri: item.cover_photo_url || item.completion_photo_url }} style={styles.workoutImg} />
+                <OptimizedImage uri={item.cover_photo_url || item.completion_photo_url} style={styles.workoutImg} />
               ) : (
                 <LinearGradient 
                   colors={isDark ? [colors.inputBg, '#000000'] : [P.ctaDark, P.ctaDeep]} 
@@ -572,10 +570,10 @@ export default function DailyTab() {
                         <View style={styles.splitMenuImageWrap}>
                           <View style={styles.splitMenuImageFrame}>
                             {getSplitPreviewImage(split) ? (
-                              <Image
-                                source={{ uri: getSplitPreviewImage(split) as string }}
+                              <OptimizedImage
+                                uri={getSplitPreviewImage(split) as string}
                                 style={styles.splitMenuImage}
-                                resizeMode="contain"
+                                contentFit="contain"
                               />
                             ) : (
                               <LinearGradient 
@@ -596,7 +594,7 @@ export default function DailyTab() {
                           {split.original_creator_name && (
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
                               {split.original_creator_pic ? (
-                                <Image source={{ uri: split.original_creator_pic }} style={{ width: 14, height: 14, borderRadius: 7 }} />
+                                <OptimizedImage uri={split.original_creator_pic} style={{ width: 14, height: 14, borderRadius: 7 }} />
                               ) : (
                                 <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: isDark ? colors.primary : 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center' }}>
                                   <Ionicons name="person" size={8} color="#FFF" />

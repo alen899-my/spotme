@@ -140,12 +140,19 @@ router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => 
       );
     }
 
+    // Fetch back the items we just inserted
+    const savedItems = await client.query(
+      'SELECT * FROM meal_items WHERE meal_id = $1 ORDER BY id',
+      [mealId]
+    );
+
     // Award XP for logging a meal
     const awardRes = await awardXP(client, req.user.id, XP_VALUES.LOG_MEAL, 'Logged a meal');
 
     await client.query('COMMIT');
     res.status(201).json({
       ...mealResult.rows[0],
+      items: savedItems.rows,
       xp_awarded: XP_VALUES.LOG_MEAL,
       new_tier: awardRes.tier,
       leveled_up: awardRes.leveledUp
@@ -159,24 +166,57 @@ router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => 
   }
 });
 
-// ── GET /meals — List user meals ─────────────────────────────────────────────
+// ── GET /meals — List user meals (paginated, optional date filter) ─────────
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const meals = await pool.query(
-      `SELECT * FROM meals WHERE user_id = $1 ORDER BY logged_at DESC`,
-      [req.user.id]
-    );
+    const userId = req.user.id;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+    const dateFilter = req.query.date || null;
 
-    const results = [];
-    for (const meal of meals.rows) {
-      const items = await pool.query(
-        'SELECT * FROM meal_items WHERE meal_id = $1',
-        [meal.id]
-      );
-      results.push({ ...meal, items: items.rows });
+    let whereClause = 'WHERE user_id = $1';
+    const params = [userId];
+    let paramIdx = 2;
+
+    if (dateFilter) {
+      whereClause += ` AND logged_at::date = $${paramIdx}::date`;
+      params.push(dateFilter);
+      paramIdx++;
     }
 
-    res.json(results);
+    const countRes = await pool.query(
+      `SELECT COUNT(*) AS total FROM meals ${whereClause}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0]?.total) || 0;
+
+    params.push(limit, offset);
+    const meals = await pool.query(
+      `SELECT * FROM meals ${whereClause} ORDER BY logged_at DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      params
+    );
+
+    const mealIds = meals.rows.map(m => m.id);
+    const itemsByMealId = {};
+
+    if (mealIds.length > 0) {
+      const itemsResult = await pool.query(
+        'SELECT * FROM meal_items WHERE meal_id = ANY($1::int[]) ORDER BY id',
+        [mealIds]
+      );
+      for (const item of itemsResult.rows) {
+        if (!itemsByMealId[item.meal_id]) itemsByMealId[item.meal_id] = [];
+        itemsByMealId[item.meal_id].push(item);
+      }
+    }
+
+    const results = meals.rows.map(meal => ({
+      ...meal,
+      items: itemsByMealId[meal.id] || [],
+    }));
+
+    res.json({ meals: results, total, page, limit });
   } catch (err) {
     console.error('Error fetching meals:', err);
     res.status(500).json({ error: err.message });

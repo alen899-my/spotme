@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
+import { api } from "../utils/api";
+import { getCached, setCache } from "../utils/cache";
 
 import { P, scale, vs } from "../constants/homeTheme";
 import { FONTS } from "../constants/theme";
@@ -26,10 +27,12 @@ import RecommendationCard from "../components/home/RecommendationCard";
 import { HomeSkeleton } from "../components/ui/Skeleton";
 import BodyStatusCard     from "../components/home/BodyStatusCard";
 import HydrationCard      from "../components/home/HydrationCard";
-import { API_URL } from "../utils/api";
+
 import { getToken } from "../utils/tokenStorage";
 import { useWorkoutTimer } from "../contexts/WorkoutTimerContext";
 import { formatDurationFull as formatDuration } from "../utils/datetime";
+
+const CACHE_KEY_DASHBOARD = "dashboard";
 
 const workoutBg = require("../assets/coach/workoutlog.jpg");
 const foodBg    = require("../assets/coach/foodlog.jpg");
@@ -53,13 +56,23 @@ export default function HomeScreen() {
     }
   }, [dashboard?.user?.gender]);
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = async (force = false) => {
+    if (!force) {
+      const cached = getCached<any>(CACHE_KEY_DASHBOARD);
+      if (cached) {
+        setDashboard(cached);
+        setProfileComplete(!!cached.user?.onboarding_completed);
+        setLoading(false);
+        return;
+      }
+    }
     try {
       const token = await getToken();
       if (!token) { router.replace("/"); return; }
-      const res = await axios.get(`${API_URL}/daily/dashboard`, {
+      const res = await api.get('/daily/dashboard', {
         headers: { Authorization: `Bearer ${token}` },
       });
+      setCache(CACHE_KEY_DASHBOARD, res.data);
       setDashboard(res.data);
       
       const completed = !!res.data.user?.onboarding_completed;
@@ -90,10 +103,10 @@ export default function HomeScreen() {
     (async () => {
       try {
         const token = await getToken();
-        const res = await axios.get(`${API_URL}/daily/workouts`, {
+        const res = await api.get('/daily/workouts', {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const active = res.data.find((w: any) => w.status === 'active');
+        const active = res.data.workouts.find((w: any) => w.status === 'active');
         setApiActiveWorkout(active || null);
       } catch {}
     })();
@@ -256,25 +269,7 @@ export default function HomeScreen() {
             }}
           />
 
-          {/* ── Resume Workout Banner ───────────────────────────────────────── */}
-          {resumeWorkout && (
-            <TouchableOpacity
-              style={[styles.resumeBanner, { backgroundColor: isDark ? '#0A2A2E' : '#E0F2FE', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(37,150,190,0.25)', borderWidth: 1 }]}
-              onPress={() => router.push(`/daily/${activeWorkoutId || apiActiveWorkout?.id}`)}
-              activeOpacity={0.85}
-            >
-              <View style={[styles.resumeDot, { backgroundColor: '#10B981' }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.resumeTitle, { color: colors.text }]}>Workout in Progress</Text>
-                <Text style={[styles.resumeSub, { color: colors.textMuted }]}>
-                  Tap to resume • {formatDuration(workoutElapsed || apiActiveWorkout?.total_duration_seconds || 0)}
-                </Text>
-              </View>
-              <View style={[styles.resumeArrowWrap, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : '#2596BE' }]}>
-                <Ionicons name="play" size={16} color="#FFF" />
-              </View>
-            </TouchableOpacity>
-          )}
+         
 
           {/* ── Exercises to Try ──────────────────────────────────────────── */}
           <View style={styles.sectionHeaderRow}>

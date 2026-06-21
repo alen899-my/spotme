@@ -7,6 +7,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import OptimizedImage from "../ui/OptimizedImage";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -61,7 +62,7 @@ function EmptyCard({
 }
 
 // ── Main card ─────────────────────────────────────────────────────────────────
-export default function RecommendationCard({ rec, onPress, onBrowsePress }: Props) {
+const RecommendationCard = React.memo(function RecommendationCard({ rec, onPress, onBrowsePress }: Props) {
   const { isDark } = useTheme();
 
   if (!rec) {
@@ -82,10 +83,10 @@ export default function RecommendationCard({ rec, onPress, onBrowsePress }: Prop
       {/* ── 3D stacked GIF — top-right corner ── */}
       {displayUri ? (
         <View style={styles.gifStack}>
-          <Image
-            source={{ uri: displayUri }}
+          <OptimizedImage
+            uri={displayUri}
             style={styles.gifImage}
-            resizeMode="contain"
+            contentFit="contain"
           />
         </View>
       ) : (
@@ -141,7 +142,7 @@ export default function RecommendationCard({ rec, onPress, onBrowsePress }: Prop
       </TouchableOpacity>
     </TouchableOpacity>
   );
-}
+})
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
@@ -302,3 +303,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
+export default RecommendationCard;

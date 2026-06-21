@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import OptimizedImage from "../../components/ui/OptimizedImage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -95,7 +96,7 @@ export default function ProfileScreen() {
         <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <View style={styles.avatarContainer}>
             {u.profile_pic_url ? (
-              <Image source={{ uri: u.profile_pic_url }} style={[styles.avatar, { borderColor: colors.card }]} />
+              <OptimizedImage uri={u.profile_pic_url} style={[styles.avatar, { borderColor: colors.card }]} />
             ) : (
               <View style={[styles.avatar, styles.placeholderAvatar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
                 <Ionicons name="person" size={40} color={colors.border} />

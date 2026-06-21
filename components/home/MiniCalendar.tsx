@@ -8,11 +8,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import axios from "axios";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
-import { API_URL } from "../../utils/api";
+import { api } from "../../utils/api";
 import { getToken } from "../../utils/tokenStorage";
 
 const bgImage = require("../../assets/coach/workout3.jpg");
@@ -39,7 +38,7 @@ interface DayEntry {
   count: number;
 }
 
-export default function MiniCalendar() {
+const MiniCalendar = React.memo(function MiniCalendar() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
 
@@ -56,7 +55,7 @@ export default function MiniCalendar() {
     (async () => {
       try {
         const token = await getToken();
-        const res = await axios.get(`${API_URL}/daily/calendar-stats`, {
+        const res = await api.get('/daily/calendar-stats', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setHistory(res.data.overall || []);
@@ -229,7 +228,7 @@ export default function MiniCalendar() {
       </View>
     </TouchableOpacity>
   );
-}
+})
 
 const styles = StyleSheet.create({
   card: {
@@ -393,3 +392,5 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.65)",
   },
 });
+
+export default MiniCalendar;

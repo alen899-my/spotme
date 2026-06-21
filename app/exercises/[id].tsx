@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -133,7 +134,7 @@ export default function ExerciseDetailScreen() {
                   activeOpacity={0.92}
                   onPress={() => setPreviewVisible(true)}
                 >
-                  <Image source={{ uri: imageUri }} style={styles.heroImage} resizeMode="contain" />
+                  <OptimizedImage uri={imageUri} style={styles.heroImage} contentFit="contain" />
                 </TouchableOpacity>
               ) : (
                 <View style={styles.heroMedia}>
@@ -246,11 +247,10 @@ export default function ExerciseDetailScreen() {
 
           {imageUri ? (
             <View style={styles.previewImageWrap}>
-              <Image
-                source={{ uri: imageUri }}
+              <OptimizedImage
+                uri={imageUri}
                 style={styles.previewImage}
-                resizeMode="contain"
-                fadeDuration={0}
+                contentFit="contain"
               />
             </View>
           ) : null}

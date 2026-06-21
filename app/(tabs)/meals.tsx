@@ -6,6 +6,8 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import OptimizedImage from '../../components/ui/OptimizedImage';
+import { optimizeImage } from '../../utils/imageOptimizer';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -32,6 +34,9 @@ export default function MealsScreen() {
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const [meals, setMeals] = useState<any[]>([]);
+  const [mealsPage, setMealsPage] = useState(1);
+  const [mealsTotal, setMealsTotal] = useState(0);
+  const [mealsLoadingMore, setMealsLoadingMore] = useState(false);
   const [loggedWaterDates, setLoggedWaterDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -109,10 +114,14 @@ export default function MealsScreen() {
     fetchLoggedWaterDates();
   }, []);
 
+  useEffect(() => {
+    fetchMeals(1);
+    fetchLoggedWaterDates();
+  }, [selectedDate]);
+
   useFocusEffect(
     useCallback(() => {
-      fetchMeals();
-      fetchLoggedWaterDates();
+      fetchMeals(mealsPage === 1 ? 1 : mealsPage);
     }, [])
   );
 
@@ -540,18 +549,29 @@ export default function MealsScreen() {
     }
   };
 
-  const fetchMeals = async () => {
+  const fetchMeals = async (page = 1, append = false) => {
     try {
+      if (append) setMealsLoadingMore(true);
       const token = await getToken();
+      const dateStr = selectedDate.toISOString().split('T')[0];
       const res = await axios.get(`${API_URL}/meals`, {
+        params: { page, limit: 20, date: dateStr },
         headers: { Authorization: `Bearer ${token}` }
       });
-      setMeals(res.data);
+      const { meals: newMeals, total } = res.data;
+      if (append) {
+        setMeals(prev => [...prev, ...newMeals]);
+      } else {
+        setMeals(newMeals);
+      }
+      setMealsTotal(total);
+      setMealsPage(page);
     } catch (err) {
       console.error('Error fetching meals:', err);
       showToast('Failed to load meals', 'error');
     } finally {
       setLoading(false);
+      setMealsLoadingMore(false);
     }
   };
 
@@ -596,18 +616,19 @@ export default function MealsScreen() {
           .map((i, idx) => `${idx + 1}. ${i.name}${i.quantity ? ` - ${i.quantity}` : ''}`)
           .join('\n');
 
+        const optimizedUri = await optimizeImage(imageUri, 'meal');
         const formData = new FormData();
         if (description) formData.append('description', `Ingredients:\n${description}`);
 
         if (Platform.OS === 'web') {
-          const response = await fetch(imageUri);
+          const response = await fetch(optimizedUri);
           const blob = await response.blob();
           formData.append('photo', blob, 'meal.jpg');
         } else {
-          const name = imageUri.split('/').pop();
+          const name = optimizedUri.split('/').pop();
           const match = /\.(\w+)$/.exec(name || '');
           const type = match ? `image/${match[1]}` : 'image';
-          formData.append('photo', { uri: imageUri, name, type } as any);
+          formData.append('photo', { uri: optimizedUri, name, type } as any);
         }
 
         const res = await axios.post(`${API_URL}/meals/analyze`, formData, {
@@ -618,7 +639,7 @@ export default function MealsScreen() {
         const imageUrl = res.data.imageUrl;
 
         // Auto-save immediately — no second confirmation modal
-        await axios.post(`${API_URL}/meals`, {
+        const saveRes = await axios.post(`${API_URL}/meals`, {
           image_url: imageUrl,
           meal_type: autoMealType,
           ...analysis,
@@ -631,6 +652,8 @@ export default function MealsScreen() {
           });
         }
 
+        setMeals(prev => [saveRes.data, ...prev]);
+
         const cals = Math.round(analysis?.total_calories || 0);
         showToast(`Meal logged! 🎉 ~${cals} kcal detected`);
       } else {
@@ -640,7 +663,7 @@ export default function MealsScreen() {
           .map(i => i.name)
           .join(', ');
 
-        await axios.post(`${API_URL}/meals`, {
+        const saveRes = await axios.post(`${API_URL}/meals`, {
           image_url: '',
           meal_type: autoMealType,
           total_calories: 0,
@@ -665,10 +688,9 @@ export default function MealsScreen() {
           });
         }
 
+        setMeals(prev => [saveRes.data, ...prev]);
         showToast(`Meal logged! 🥗`);
       }
-
-      fetchMeals();
     } catch (err) {
       console.error('Meal log error:', err);
       showToast('Failed to log meal', 'error');
@@ -678,6 +700,11 @@ export default function MealsScreen() {
       setInitialImageUri(null);
       setInitialIngredients([]);
     }
+  };
+
+  const handleLoadMoreMeals = () => {
+    if (mealsLoadingMore || meals.length >= mealsTotal) return;
+    fetchMeals(mealsPage + 1, true);
   };
 
   const deleteMeal = async (id: number) => {
@@ -744,7 +771,7 @@ export default function MealsScreen() {
         <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
           <View style={styles.cardHeaderRow}>
             {item.image_url ? (
-              <Image source={{ uri: item.image_url }} style={styles.mealThumbImage} />
+              <OptimizedImage uri={item.image_url} style={styles.mealThumbImage} />
             ) : (
               <View style={[styles.mealIconBox, { backgroundColor: isDark ? colors.inputBg : iconInfo.bg }, isDark && { borderWidth: 1, borderColor: iconInfo.color + '30' }]}>
                 <Ionicons name={iconInfo.icon as any} size={23} color={iconInfo.color} />
@@ -954,7 +981,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     return (
       <View style={[styles.accCard, styles.recMealCardShell, isDark && { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
         <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
-          <Image source={{ uri: visual.image }} style={styles.recommendedMealHero} />
+          <OptimizedImage uri={visual.image} style={styles.recommendedMealHero} />
           <LinearGradient colors={isDark ? ['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)'] : ['rgba(6,78,120,0.06)', 'rgba(37,150,190,0.24)']} style={styles.recommendedMealHeroOverlay} />
           <View style={styles.cardHeaderRow}>
             <View style={[styles.mealIconBox, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.16)' }, isDark && { borderWidth: 1, borderColor: colors.border }]}>
@@ -1567,6 +1594,9 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
             }}
             contentContainerStyle={[styles.listContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]}
             showsVerticalScrollIndicator={false}
+            onEndReached={handleLoadMoreMeals}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={mealsLoadingMore ? <ActivityIndicator size="small" color="#2596BE" style={{ paddingVertical: 16 }} /> : null}
             ListEmptyComponent={
               uploading ? null : (
                 <View style={styles.trackerItemWrap}>
@@ -1662,10 +1692,10 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     {/* Food Image */}
                     {item.image_url || item.image_small_url ? (
-                      <Image
-                        source={{ uri: item.image_url || item.image_small_url }}
+                      <OptimizedImage
+                        uri={item.image_url || item.image_small_url}
                         style={styles.selectorFoodImage}
-                        resizeMode="cover"
+                        contentFit="cover"
                       />
                     ) : (
                       <View style={[styles.selectorFoodImagePlaceholder, { backgroundColor: colors.inputBg }]}>

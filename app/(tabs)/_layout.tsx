@@ -9,8 +9,7 @@ import ProfileSidebar from "../../components/ui/ProfileSidebar";
 import FloatingTimerBar from "../../components/ui/FloatingTimerBar";
 import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
-import axios from "axios";
-import { API_URL } from "../../utils/api";
+import { api } from "../../utils/api";
 import { getToken } from "../../utils/tokenStorage";
 import GymHome from "../../components/spotgym/GymHome";
 import GymMembers from "../../components/spotgym/GymMembers";
@@ -163,7 +162,6 @@ export default function TabsLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const pathname = usePathname();
   const router = useRouter();
 
   const [appMode, setAppMode] = useState<'spotme' | 'spotgym'>('spotme');
@@ -184,7 +182,7 @@ export default function TabsLayout() {
     try {
       const token = await getToken();
       if (token) {
-        const res = await axios.get(`${API_URL}/profile`, {
+        const res = await api.get('/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
         setUser(res.data);
@@ -202,7 +200,7 @@ export default function TabsLayout() {
     try {
       const token = await getToken();
       if (!token) return;
-      const res = await axios.get(`${API_URL}/notifications`, {
+      const res = await api.get('/notifications', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUnreadCount(res.data.unread_count || 0);
@@ -211,7 +209,7 @@ export default function TabsLayout() {
 
   useEffect(() => {
     loadUser();
-  }, [pathname]);
+  }, []);
 
   useEffect(() => {
     fetchUnreadCount();

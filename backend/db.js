@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const pool = new Pool({
@@ -523,6 +524,61 @@ const initDB = async () => {
       );
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_gyms_owner ON gyms (owner_id);`);
+
+    // ── Missing Indexes for query performance ──────────────────────────────────
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_user_status_completed
+      ON daily_workouts (user_id, status, completed_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_user_post_weight
+      ON daily_workouts (user_id, post_workout_weight) WHERE post_workout_weight IS NOT NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dwe_daily_workout
+      ON daily_workout_exercises (daily_workout_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dwe_exercise
+      ON daily_workout_exercises (exercise_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dws_daily_exercise
+      ON daily_workout_sets (daily_exercise_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_water_logs_user_logged
+      ON water_logs (user_id, logged_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_meals_user_logged
+      ON meals (user_id, logged_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_photos_workout
+      ON daily_workout_photos (daily_workout_id, created_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_workout_reports_lookup
+      ON workout_reports (daily_workout_id, user_id, status)`);
+
+    // -- Admin columns for users ---------------------------------------------
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user'`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(50) DEFAULT 'Free'`);
+
+    // -- Password Reset Tokens ------------------------------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // -- Admin Panel ---------------------------------------------------------
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS admins (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    const adminHash = await bcrypt.hash('alenadmin123', 10);
+    await pool.query(`
+      INSERT INTO admins (email, password, name)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (email) DO NOTHING
+    `, ['alenjames899@gmail.com', adminHash, 'Admin']);
 
   } catch (error) {
     console.error("Database initialization failed:", error);

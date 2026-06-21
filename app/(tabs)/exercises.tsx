@@ -1,22 +1,20 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  FlatList,
   TouchableOpacity,
   Image,
   ImageBackground,
   ActivityIndicator,
-  TextInput,
-  Dimensions,
   Modal,
-  Platform,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 import Body, { ExtendedBodyPart, Slug } from 'react-native-body-highlighter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
@@ -27,23 +25,17 @@ import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
-import ExerciseFilterModal, { ExerciseFilters } from '../../components/exercises/ExerciseFilterModal';
+import ExerciseBrowser from '../../components/exercises/ExerciseBrowser';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PADDING = 16;
 const CARD_GAP = 12;
 const CARD_WIDTH = (SCREEN_WIDTH - H_PADDING * 2 - CARD_GAP) / 2;
 const CARD_HEIGHT = CARD_WIDTH * 1.2;
-const PAGE_SIZE = 20;
 
 const HEADER_IMAGE = require('../../assets/home/firstscreenbg.png');
 
-type AccentTheme = {
-  gradient: [string, string];
-  glow: string;
-};
-
-const ACCENTS: Record<string, AccentTheme> = {
+const ACCENTS: Record<string, { gradient: [string, string]; glow: string }> = {
   back: { gradient: [P.ctaDeep, P.ctaDark], glow: 'rgba(247,203,22,0.18)' },
   chest: { gradient: [P.cta, P.ctaDark], glow: 'rgba(255,255,255,0.10)' },
   waist: { gradient: [P.ctaDark, P.ctaDeep], glow: 'rgba(247,203,22,0.14)' },
@@ -56,8 +48,8 @@ const ACCENTS: Record<string, AccentTheme> = {
   cardio: { gradient: [P.cta, P.ctaDeep], glow: 'rgba(255,255,255,0.08)' },
 };
 
-const accentFor = (category?: string | null): AccentTheme =>
-  ACCENTS[category?.toLowerCase() ?? ''] ?? { gradient: [P.cta, P.ctaDark], glow: 'rgba(247,203,22,0.14)' };
+const accentFor = (category?: string | null) =>
+  ACCENTS[category?.toLowerCase() ?? ''] ?? { gradient: [P.cta, P.ctaDark] as [string, string], glow: 'rgba(247,203,22,0.14)' };
 
 const BODY_CATEGORY_MAP: Record<string, { label: string; categories: string[] }> = {
   chest: { label: 'Chest', categories: ['chest'] },
@@ -85,30 +77,8 @@ const formatLabel = (value?: string | null) =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
-const getExerciseDescription = (item: any) => {
-  const raw = typeof item?.instructions_en === 'string'
-    ? item.instructions_en.replace(/\s+/g, ' ').trim()
-    : '';
-
-  if (!raw) return '';
-
-  const firstSentence = raw.match(/.*?[.!?](\s|$)/)?.[0]?.trim() || raw;
-  return firstSentence.length > 118
-    ? `${firstSentence.slice(0, 115).trim()}...`
-    : firstSentence;
-};
-
 const SkeletonCard = ({ tall = true }: { tall?: boolean }) => (
-  <View
-    style={[
-      styles.card,
-      styles.skeletonCard,
-      {
-        width: CARD_WIDTH,
-        height: tall ? CARD_HEIGHT : CARD_WIDTH,
-      },
-    ]}
-  >
+  <View style={[styles.card, styles.skeletonCard, { width: CARD_WIDTH, height: tall ? CARD_HEIGHT : CARD_WIDTH }]}>
     <View style={styles.skeletonGlow} />
   </View>
 );
@@ -123,41 +93,21 @@ const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => 
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={onPress}
-      style={[
-        styles.card,
-        styles.categoryCard,
-        {
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-          borderWidth: isDark ? 1 : 0,
-          borderColor: isDark ? colors.border : 'transparent',
-        },
-      ]}
+      style={[styles.card, styles.categoryCard, { width: CARD_WIDTH, height: CARD_HEIGHT, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}
     >
       <View style={styles.cardMedia}>
-        <LinearGradient
-          colors={isDark ? ['#000000', '#000000'] : [P.offWhite, P.ctaLight]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
+        <LinearGradient colors={isDark ? ['#000000', '#000000'] : [P.offWhite, P.ctaLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
         <View style={[styles.mediaGlow, { backgroundColor: theme.glow }]} />
-
         <View style={styles.imageContainer}>
           {item.image_url && !imgError ? (
-            <Image
-              source={{ uri: item.image_url }}
-              style={styles.floatingImage}
-              resizeMode="contain"
-              onError={() => setImgError(true)}
-            />
+            <OptimizedImage uri={item.image_url} style={styles.floatingImage} contentFit="contain" onError={() => setImgError(true)} />
           ) : (
             <Ionicons name="fitness-outline" size={64} color={isDark ? colors.primary : P.cta} />
           )}
         </View>
       </View>
 
-<View style={[styles.cardFooter, { backgroundColor: isDark ? '#000000' : P.ctaDeep }]}>
+      <View style={[styles.cardFooter, { backgroundColor: isDark ? '#000000' : P.ctaDeep }]}>
         <Text style={styles.cardLabel}>{label}</Text>
         <View style={styles.cardInfoRow}>
           <Text style={[styles.cardCountText, { color: isDark ? colors.textMuted : P.sunLight }]}>{item.exercise_count || 0} exercises</Text>
@@ -170,132 +120,22 @@ const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => 
   );
 });
 
-const ExerciseCard = React.memo(({ item }: { item: any }) => {
-  const { colors, isDark } = useTheme();
-  const router = useRouter();
-  const [imgError, setImgError] = useState(false);
-  const theme = accentFor(item.category);
-  const description = getExerciseDescription(item);
-  const tagItems = [item.target, item.equipment]
-    .filter(Boolean)
-    .map((value) => formatLabel(value));
-  const imageUri = item.image_url || item.gif_url || null;
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.86}
-      onPress={() => router.push(`/exercises/${item.id}`)}
-      style={[
-        styles.card,
-        styles.exerciseTryCard,
-        {
-          backgroundColor: isDark ? colors.bg : P.cta,
-          borderWidth: isDark ? 1 : 0,
-          borderColor: isDark ? colors.border : 'transparent',
-        },
-      ]}
-    >
-      <View style={styles.exercisePillRow}>
-        {item.category ? (
-          <View style={[styles.exerciseScorePill, { backgroundColor: isDark ? colors.inputBg : P.ctaDark, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}>
-            <Ionicons name="fitness-outline" size={11} color={P.sun} />
-            <Text style={[styles.exerciseScorePillText, { color: isDark ? colors.primary : '#D6EEF7' }]}>{formatLabel(item.category)}</Text>
-          </View>
-        ) : (
-          <View />
-        )}
-
-        {item.avg_rating !== undefined && item.avg_rating !== null && (
-          <View style={[styles.exerciseRatingPill, { backgroundColor: isDark ? colors.inputBg : P.ctaDark, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}>
-            <Ionicons name="star" size={11} color={P.sun} />
-            <Text style={[styles.exerciseRatingPillText, { color: P.sun }]}>{item.avg_rating}</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.exerciseBodyRow}>
-        <View style={styles.exerciseTextBlock}>
-          <Text style={[styles.exName, { color: isDark ? colors.text : P.white }]} numberOfLines={2}>
-            {item.name}
-          </Text>
-
-          {description ? (
-            <Text style={[styles.exerciseDescription, { color: isDark ? colors.textMuted : '#D6EEF7' }]} numberOfLines={2}>
-              {description}
-            </Text>
-          ) : null}
-
-          {tagItems.length > 0 ? (
-            <View style={styles.exerciseTagsRow}>
-              {tagItems.map((tag) => (
-                <View key={`${item.id}-${tag}`} style={[styles.exerciseTag, { backgroundColor: isDark ? colors.inputBg : P.ctaDark, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}>
-                  <Text style={[styles.exerciseTagText, { color: isDark ? colors.primary : '#D6EEF7' }]}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        {imageUri && !imgError ? (
-          <Image
-            source={{ uri: imageUri }}
-            style={styles.exerciseThumb}
-            onError={() => setImgError(true)}
-          />
-        ) : null}
-        {!imageUri || imgError ? (
-          <View style={[styles.exerciseThumb, styles.exerciseThumbPlaceholder]}>
-            <LinearGradient
-              colors={isDark ? ['#000000', '#000000'] : [P.ctaDark, P.ctaDeep]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <View style={[styles.exerciseThumbGlow, { backgroundColor: theme.glow }]} />
-            <Ionicons name="barbell-outline" size={30} color={P.sun} />
-          </View>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
-});
-
 export default function ExercisesScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { colors, isDark } = useTheme();
+
   const [viewMode, setViewMode] = useState<'categories' | 'exercises'>('categories');
   const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
-
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCats, setLoadingCats] = useState(true);
   const [catError, setCatError] = useState(false);
-
-  const [query, setQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [searchPage, setSearchPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [searchTotal, setSearchTotal] = useState(0);
   const [bodySide, setBodySide] = useState<'front' | 'back'>('front');
-  const [filterVisible, setFilterVisible] = useState(false);
-  const [filters, setFilters] = useState<ExerciseFilters>({
-    categories: [], bodyParts: [], equipment: [], targets: [], minRating: 0,
-  });
-  const filtersRef = useRef(filters);
-  useEffect(() => { filtersRef.current = filters; }, [filters]);
-
-  const activeFilterCount = (f: ExerciseFilters) => {
-    let c = f.categories.length + f.bodyParts.length + f.equipment.length + f.targets.length;
-    if (f.minRating > 0) c++;
-    return c;
-  };
   const [bodyGender, setBodyGender] = useState<'male' | 'female'>('male');
   const [selectedMuscles, setSelectedMuscles] = useState<Slug[]>([]);
   const [selectedRegion, setSelectedRegion] = useState<{ slug: Slug; label: string; categories: string[] } | null>(null);
   const [regionModalVisible, setRegionModalVisible] = useState(false);
-
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [query, setQuery] = useState('');
 
   const fetchCategories = useCallback(async () => {
     setLoadingCats(true);
@@ -310,161 +150,48 @@ export default function ExercisesScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+  useEffect(() => { fetchCategories(); }, [fetchCategories]);
 
   useEffect(() => {
     const fetchBodyProfile = async () => {
       try {
         const token = await getToken();
         if (!token) return;
-        const res = await axios.get(`${API_URL}/daily/dashboard`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await axios.get(`${API_URL}/daily/dashboard`, { headers: { Authorization: `Bearer ${token}` } });
         const gender = String(res.data?.user?.gender || '').toLowerCase();
-        if (gender === 'male' || gender === 'female') {
-          setBodyGender(gender);
-        }
+        if (gender === 'male' || gender === 'female') setBodyGender(gender);
       } catch {}
     };
-
     fetchBodyProfile();
   }, []);
-
-  const doFetchExercises = useCallback(async (q: string, cat: string | null, pg: number, append: boolean) => {
-    if (pg === 1) setSearching(true);
-    else setLoadingMore(true);
-
-    try {
-      const f = filtersRef.current;
-      const params: any = { page: pg, limit: PAGE_SIZE };
-      if (q.trim()) params.q = q.trim();
-      if (cat) params.category = cat;
-      if (f.categories.length) params.category = f.categories.join(',');
-      if (f.bodyParts.length) params.body_part = f.bodyParts.join(',');
-      if (f.equipment.length) params.equipment = f.equipment.join(',');
-      if (f.targets.length) params.target = f.targets.join(',');
-      if (f.minRating > 0) params.min_rating = f.minRating;
-
-      const token = await getToken();
-      const res = await axios.get(`${API_URL}/exercises`, {
-        params,
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      const { data, pagination } = res.data;
-      setSearchTotal(pagination.total);
-      setHasMore(pg < pagination.totalPages);
-      if (append) setSearchResults((prev) => [...prev, ...data]);
-      else setSearchResults(data);
-    } catch (err) {
-      console.error('Fetch error:', err);
-    } finally {
-      setSearching(false);
-      setLoadingMore(false);
-    }
-  }, []);
-
-  const handleQueryChange = (text: string) => {
-    setQuery(text);
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-
-    if (!text.trim()) {
-      if (viewMode === 'exercises' && drilldownCategory) {
-        doFetchExercises('', drilldownCategory, 1, false);
-      } else {
-        setSearchResults([]);
-      }
-      setSearchPage(1);
-      return;
-    }
-
-    debounceTimer.current = setTimeout(() => {
-      setSearchPage(1);
-      setHasMore(true);
-      doFetchExercises(text, drilldownCategory, 1, false);
-    }, 380);
-  };
-
-  const handleClearSearch = () => {
-    setQuery('');
-    setSearchPage(1);
-    if (viewMode === 'exercises' && drilldownCategory) {
-      doFetchExercises('', drilldownCategory, 1, false);
-    } else {
-      setSearchResults([]);
-    }
-  };
-
-  const handleLoadMore = () => {
-    if (loadingMore || !hasMore || searching) return;
-    const next = searchPage + 1;
-    setSearchPage(next);
-    doFetchExercises(query, drilldownCategory, next, true);
-  };
 
   const handleCategoryPress = (category: string) => {
     setViewMode('exercises');
     setDrilldownCategory(category);
-    setQuery('');
-    setSearchPage(1);
-    setHasMore(true);
     setRegionModalVisible(false);
-    doFetchExercises('', category, 1, false);
   };
 
   const handleBack = () => {
     setViewMode('categories');
     setDrilldownCategory(null);
     setQuery('');
-    setSearchResults([]);
-    setSearchPage(1);
-    setHasMore(true);
   };
 
   const handleBodyPartPress = (part: ExtendedBodyPart) => {
     const slug = part.slug as Slug | undefined;
     if (!slug) return;
-
     const region = BODY_CATEGORY_MAP[String(slug)];
     if (!region) return;
-
     setSelectedMuscles([slug]);
-    setSelectedRegion({
-      slug,
-      label: region.label,
-      categories: Array.from(new Set(region.categories)),
-    });
+    setSelectedRegion({ slug, label: region.label, categories: Array.from(new Set(region.categories)) });
     setRegionModalVisible(true);
   };
 
-  const highlightedBodyParts: ExtendedBodyPart[] = selectedMuscles.map((slug) => ({
-    slug,
-    intensity: 3 as const,
-  }));
-
+  const highlightedBodyParts: ExtendedBodyPart[] = selectedMuscles.map((slug) => ({ slug, intensity: 3 as const }));
   const modalCategories = (selectedRegion?.categories || []).map((category) => {
     const match = categories.find((item) => item.category?.toLowerCase() === category.toLowerCase());
-    return {
-      key: category,
-      label: formatLabel(category),
-      count: match?.exercise_count ?? null,
-    };
+    return { key: category, label: formatLabel(category), count: match?.exercise_count ?? null };
   });
-
-  const renderExercise = useCallback(
-    ({ item }: any) => (
-      <View style={styles.exerciseItemWrap}>
-        <ExerciseCard item={item} />
-      </View>
-    ),
-    []
-  );
-
-  const renderSearchFooter = () => {
-    if (!loadingMore) return null;
-    return <ActivityIndicator size="small" color={P.cta} style={{ paddingVertical: 20 }} />;
-  };
 
   const renderBodyExplorer = () => (
     <View style={styles.bodySection}>
@@ -473,25 +200,10 @@ export default function ExercisesScreen() {
           <Text style={[styles.bodySectionTitle, { color: colors.text }]}>Browse by body area</Text>
           <Text style={[styles.bodySectionSub, { color: colors.textMuted }]}>Tap a muscle, see the mapped category, then jump into exercises.</Text>
         </View>
-
         <View style={[styles.toggleTrack, { backgroundColor: isDark ? '#1A1A1A' : P.ctaDeep }]}>
           {(['front', 'back'] as const).map((side) => (
-            <TouchableOpacity
-              key={side}
-              onPress={() => setBodySide(side)}
-              style={[
-                styles.toggleBtn,
-                bodySide === side && { backgroundColor: isDark ? colors.primary : P.sun },
-              ]}
-              activeOpacity={0.85}
-            >
-              <Text
-                style={[
-                  styles.toggleTxt,
-                  { color: isDark ? colors.textMuted : '#A8DFF0' },
-                  bodySide === side && { color: isDark ? '#FFFFFF' : P.ink },
-                ]}
-              >
+            <TouchableOpacity key={side} onPress={() => setBodySide(side)} style={[styles.toggleBtn, bodySide === side && { backgroundColor: isDark ? colors.primary : P.sun }]} activeOpacity={0.85}>
+              <Text style={[styles.toggleTxt, { color: isDark ? colors.textMuted : '#A8DFF0' }, bodySide === side && { color: isDark ? '#FFFFFF' : P.ink }]}>
                 {side.charAt(0).toUpperCase() + side.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -501,88 +213,10 @@ export default function ExercisesScreen() {
 
       <View style={styles.bodyExplorerCard}>
         <View style={styles.bodyWrap} onStartShouldSetResponder={() => true}>
-          <Body
-            data={highlightedBodyParts}
-            gender={bodyGender}
-            side={bodySide}
-            scale={1.15}
-            colors={['#F7CB1644', '#F7CB16AA', '#F7CB16']}
-            defaultFill={isDark ? '#222222' : '#1a3a45'}
-            defaultStroke={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.2)'}
-            defaultStrokeWidth={0.5}
-            onBodyPartPress={handleBodyPartPress}
-          />
+          <Body data={highlightedBodyParts} gender={bodyGender} side={bodySide} scale={1.15} colors={['#F7CB1644', '#F7CB16AA', '#F7CB16']} defaultFill={isDark ? '#222222' : '#1a3a45'} defaultStroke={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.2)'} defaultStrokeWidth={0.5} onBodyPartPress={handleBodyPartPress} />
         </View>
-
-        <Text style={[styles.bodyHint, { color: colors.textMuted }]}>
-          Selected muscles glow yellow. Tap again on another area to open the linked exercise category.
-        </Text>
+        <Text style={[styles.bodyHint, { color: colors.textMuted }]}>Selected muscles glow yellow. Tap again on another area to open the linked exercise category.</Text>
       </View>
-    </View>
-  );
-
-  const renderTopChrome = () => (
-    <View>
-      <ImageBackground
-        source={HEADER_IMAGE}
-        style={[styles.hero, { paddingTop: heroTopPadding }]}
-        imageStyle={styles.heroImage}
-      >
-        <View style={styles.heroOverlay} />
-        <View style={styles.header}>
-          <View style={styles.headerTitleRow}>
-            {viewMode === 'exercises' && (
-              <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-                <Ionicons name="chevron-back" size={22} color={P.sun} />
-              </TouchableOpacity>
-            )}
-            <View style={styles.headerTextWrap}>
-              <Text style={styles.headerTitle}>{title}</Text>
-              <Text style={styles.headerSub}>{subtitle}</Text>
-            </View>
-          </View>
-
-          <View style={styles.headerIcon}>
-            <Ionicons name="fitness" size={24} color={P.ink} />
-          </View>
-        </View>
-      </ImageBackground>
-
-      {viewMode === 'exercises' && (
-        <View style={styles.searchFilterRow}>
-          <View style={[styles.searchWrap, { backgroundColor: isDark ? '#1A1A1A' : P.white, borderColor: isDark ? 'rgba(255,255,255,0.08)' : P.border, flex: 1 }]}>
-            <View style={[styles.searchIconWrap, { backgroundColor: isDark ? 'rgba(37,150,190,0.2)' : P.ctaLight }]}>
-              <Ionicons name="search-outline" size={16} color={P.ctaDark} />
-            </View>
-            <TextInput
-              style={[styles.searchInput, { color: isDark ? '#F1F5F9' : P.ink }]}
-              placeholder="Search exercises..."
-              placeholderTextColor={isDark ? 'rgba(241,245,249,0.4)' : P.muted}
-              value={query}
-              onChangeText={handleQueryChange}
-              returnKeyType="search"
-              autoCorrect={false}
-            />
-            {query.length > 0 && (
-              <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={18} color={P.cta} />
-              </TouchableOpacity>
-            )}
-          </View>
-          <TouchableOpacity
-            style={[styles.exFilterBtn, { backgroundColor: activeFilterCount(filters) > 0 ? '#2596BE' : isDark ? '#1A1A1A' : P.white, borderColor: isDark ? 'rgba(255,255,255,0.08)' : P.border }]}
-            onPress={() => setFilterVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="funnel" size={18} color={activeFilterCount(filters) > 0 ? '#FFF' : isDark ? '#F1F5F9' : P.ink} />
-            {activeFilterCount(filters) > 0 && (
-              <View style={styles.exFilterBadge}>
-                <Text style={styles.exFilterBadgeText}>{activeFilterCount(filters)}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 
@@ -600,122 +234,96 @@ export default function ExercisesScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        renderBodyExplorer()
-      )}
-    </View>
-  );
-
-  const renderSearchEmptyState = () => (
-    <View style={styles.sectionContent}>
-      {searching ? (
-        <View style={styles.centeredMsg}>
-          <ActivityIndicator size="large" color={isDark ? colors.primary : P.cta} />
-          <Text style={[styles.msgText, { color: isDark ? colors.textMuted : P.muted }]}>Loading exercises...</Text>
-        </View>
-      ) : (
-        <View style={styles.centeredMsg}>
-          <View style={[styles.messageIconWrap, { backgroundColor: isDark ? colors.inputBg : P.sunLight, borderColor: isDark ? colors.border : 'rgba(37,150,190,0.16)' }]}>
-            <Ionicons name="search-outline" size={30} color={isDark ? colors.primary : P.ctaDark} />
+        <View>
+          {renderBodyExplorer()}
+          <View style={styles.catGrid}>
+            {loadingCats ? (
+              [...Array(4)].map((_, i) => <SkeletonCard key={i} />)
+            ) : (
+              categories.map((item) => (
+                <CategoryCard key={item.category} item={item} onPress={() => handleCategoryPress(item.category)} />
+              ))
+            )}
           </View>
-          <Text style={[styles.msgTitle, { color: isDark ? colors.text : P.ink }]}>No exercises found</Text>
-          <Text style={[styles.msgText, { color: isDark ? colors.textMuted : P.muted }]}>Try a different keyword or browse one of the blue library cards.</Text>
         </View>
       )}
     </View>
   );
 
-  const inSearchMode = query.length > 0;
   const title = viewMode === 'exercises' ? formatLabel(drilldownCategory) : 'Exercises';
   const appHeaderTopPad = insets.top;
   const appHeaderHeight = appHeaderTopPad + Math.round((SCREEN_WIDTH / 390) * 52);
   const heroTopPadding = appHeaderHeight - appHeaderTopPad + 12;
-  const subtitle =
-    inSearchMode && !searching
-      ? `${searchTotal.toLocaleString()} results`
-      : viewMode === 'exercises' && !searching
-        ? `${searchTotal.toLocaleString()} movements`
-        : !loadingCats
-          ? `${categories.length} categories`
-          : 'Loading your library';
+  const subtitle = !loadingCats ? `${categories.length} categories` : 'Loading your library';
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      {!inSearchMode && viewMode === 'categories' && (
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, { flexGrow: 1, paddingBottom: Math.max(insets.bottom + 24, 64) }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {renderTopChrome()}
+      {viewMode === 'categories' && (
+        <ScrollView contentContainerStyle={[styles.scrollContent, { flexGrow: 1, paddingBottom: Math.max(insets.bottom + 24, 64) }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <View>
+            <ImageBackground source={HEADER_IMAGE} style={[styles.hero, { paddingTop: heroTopPadding }]} imageStyle={styles.heroImage}>
+              <View style={styles.heroOverlay} />
+              <View style={styles.header}>
+                <View style={styles.headerTitleRow}>
+                  <View style={styles.headerTextWrap}>
+                    <Text style={styles.headerTitle}>{title}</Text>
+                    <Text style={styles.headerSub}>{subtitle}</Text>
+                  </View>
+                </View>
+                <View style={styles.headerIcon}>
+                  <Ionicons name="fitness" size={24} color={P.ink} />
+                </View>
+              </View>
+            </ImageBackground>
+          </View>
           {renderCategoryState()}
         </ScrollView>
       )}
 
-      {(inSearchMode || viewMode === 'exercises') && (
-        <FlatList
-          data={searchResults}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderExercise}
-          ListHeaderComponent={renderTopChrome}
-          ListEmptyComponent={renderSearchEmptyState}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 24, 64) }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.4}
-          ListFooterComponent={renderSearchFooter}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          removeClippedSubviews
-          maxToRenderPerBatch={10}
-          windowSize={5}
-        />
+      {viewMode === 'exercises' && (
+        <View style={{ flex: 1 }}>
+          <View>
+            <ImageBackground source={HEADER_IMAGE} style={[styles.hero, { paddingTop: heroTopPadding }]} imageStyle={styles.heroImage}>
+              <View style={styles.heroOverlay} />
+              <View style={styles.header}>
+                <View style={styles.headerTitleRow}>
+                  {viewMode === 'exercises' && (
+                    <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
+                      <Ionicons name="chevron-back" size={22} color={P.sun} />
+                    </TouchableOpacity>
+                  )}
+                  <View style={styles.headerTextWrap}>
+                    <Text style={styles.headerTitle}>{title}</Text>
+                    <Text style={styles.headerSub}>{subtitle}</Text>
+                  </View>
+                </View>
+                <View style={styles.headerIcon}>
+                  <Ionicons name="fitness" size={24} color={P.ink} />
+                </View>
+              </View>
+            </ImageBackground>
+          </View>
+          <ExerciseBrowser
+            apiEndpoint="/exercises"
+            variant="browse"
+            drilldownCategory={drilldownCategory}
+            onSelectExercise={(exercise) => router.push(`/exercises/${exercise.id}`)}
+          />
+        </View>
       )}
 
-      <Modal
-        visible={regionModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setRegionModalVisible(false)}
-      >
+      <Modal visible={regionModalVisible} transparent animationType="fade" onRequestClose={() => setRegionModalVisible(false)}>
         <View style={styles.modalBackdrop}>
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => setRegionModalVisible(false)}
-            style={StyleSheet.absoluteFillObject}
-          />
-
-          <View
-            style={[
-              styles.modalCard,
-              {
-                backgroundColor: isDark ? colors.card : P.white,
-                borderWidth: isDark ? 1 : 0,
-                borderColor: isDark ? colors.border : 'transparent',
-              },
-            ]}
-          >
+          <TouchableOpacity activeOpacity={1} onPress={() => setRegionModalVisible(false)} style={StyleSheet.absoluteFillObject} />
+          <View style={[styles.modalCard, { backgroundColor: isDark ? colors.card : P.white, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}>
             <View style={[styles.modalHandle, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)' }]} />
             <Text style={[styles.modalTitle, { color: isDark ? colors.text : P.ink }]}>{selectedRegion?.label || 'Muscle Group'}</Text>
             <Text style={[styles.modalSub, { color: isDark ? colors.textMuted : P.muted }]}>Choose a mapped category to open its exercises.</Text>
-
             {modalCategories.map((item) => (
-              <TouchableOpacity
-                key={item.key}
-                style={[
-                  styles.modalCategoryBtn,
-                  {
-                    backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)',
-                    borderColor: isDark ? colors.border : 'rgba(255,255,255,0.16)',
-                  },
-                ]}
-                activeOpacity={0.86}
-                onPress={() => handleCategoryPress(item.key)}
-              >
+              <TouchableOpacity key={item.key} style={[styles.modalCategoryBtn, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)', borderColor: isDark ? colors.border : 'rgba(255,255,255,0.16)' }]} activeOpacity={0.86} onPress={() => handleCategoryPress(item.key)}>
                 <View>
                   <Text style={[styles.modalCategoryTitle, { color: isDark ? colors.text : P.white }]}>{item.label}</Text>
-                  <Text style={[styles.modalCategoryCount, { color: isDark ? colors.textMuted : P.sunLight }]}>
-                    {item.count !== null ? `${item.count} exercises` : 'Open category'}
-                  </Text>
+                  <Text style={[styles.modalCategoryCount, { color: isDark ? colors.textMuted : P.sunLight }]}>{item.count !== null ? `${item.count} exercises` : 'Open category'}</Text>
                 </View>
                 <View style={styles.modalArrow}>
                   <Ionicons name="arrow-forward" size={15} color={P.ink} />
@@ -725,569 +333,67 @@ export default function ExercisesScreen() {
           </View>
         </View>
       </Modal>
-      <ExerciseFilterModal
-        visible={filterVisible}
-        onClose={() => setFilterVisible(false)}
-        filters={filters}
-        drilldownCategory={drilldownCategory}
-        onApply={(newFilters) => {
-          const updated = drilldownCategory
-            ? { ...newFilters, bodyParts: [] }
-            : newFilters;
-          setFilters(updated);
-          setFilterVisible(false);
-          setSearchPage(1);
-          setSearchResults([]);
-          doFetchExercises('', drilldownCategory, 1, false);
-        }}
-        onClear={() => {
-          setFilters({ categories: [], bodyParts: [], equipment: [], targets: [], minRating: 0 });
-          setFilterVisible(false);
-          setSearchPage(1);
-          setSearchResults([]);
-          doFetchExercises('', drilldownCategory, 1, false);
-        }}
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
+  screen: { flex: 1 },
+  hero: { paddingHorizontal: H_PADDING, paddingTop: 10, paddingBottom: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden' },
+  heroImage: { borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4,40,43,0.56)' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, zIndex: 2 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  headerTextWrap: { flexShrink: 1 },
+  headerTitle: { fontFamily: FONTS.heading, fontSize: 30, color: P.white, letterSpacing: 0.4 },
+  headerSub: { fontFamily: FONTS.body, fontSize: 12, color: 'rgba(214,238,247,0.92)', marginTop: 2, textTransform: 'capitalize' },
+  headerIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: P.sun, alignItems: 'center', justifyContent: 'center', shadowColor: P.ctaDeep, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 8 },
+  backBtn: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(247,203,22,0.35)' },
 
-  hero: {
-    paddingHorizontal: H_PADDING,
-    paddingTop: 10,
-    paddingBottom: 28,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    overflow: 'hidden',
-  },
-  heroImage: {
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-  },
-  heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(4,40,43,0.56)',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    zIndex: 2,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  headerTextWrap: {
-    flexShrink: 1,
-  },
-  headerTitle: {
-    fontFamily: FONTS.heading,
-    fontSize: 30,
-    color: P.white,
-    letterSpacing: 0.4,
-  },
-  headerSub: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    color: 'rgba(214,238,247,0.92)',
-    marginTop: 2,
-    textTransform: 'capitalize',
-  },
-  headerIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    backgroundColor: P.sun,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: P.ctaDeep,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(247,203,22,0.35)',
-  },
+  bodySection: { marginBottom: 18 },
+  bodySectionHeader: { width: '100%', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+  bodySectionTitle: { fontFamily: FONTS.heading, fontSize: 24, color: P.ink, letterSpacing: 0.3 },
+  bodySectionSub: { fontFamily: FONTS.body, fontSize: 12, color: P.muted, marginTop: 2, maxWidth: '100%', lineHeight: 18 },
+  toggleTrack: { flexDirection: 'row', backgroundColor: P.ctaDeep, borderRadius: 20, padding: 3, gap: 2, alignSelf: 'flex-start', maxWidth: '100%' },
+  toggleBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16 },
+  toggleTxt: { fontFamily: FONTS.bodyBold, fontSize: 12, color: '#A8DFF0' },
+  bodyExplorerCard: { paddingTop: 4 },
+  bodyWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 4 },
+  bodyHint: { fontFamily: FONTS.body, fontSize: 12, lineHeight: 18, color: P.muted, textAlign: 'center', opacity: 0.9 },
 
-  bodySection: {
-    marginBottom: 18,
-  },
-  bodySectionHeader: {
-    width: '100%',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 12,
-  },
-  bodySectionTitle: {
-    fontFamily: FONTS.heading,
-    fontSize: 24,
-    color: P.ink,
-    letterSpacing: 0.3,
-  },
-  bodySectionSub: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    color: P.muted,
-    marginTop: 2,
-    maxWidth: '100%',
-    lineHeight: 18,
-  },
-  toggleTrack: {
-    flexDirection: 'row',
-    backgroundColor: P.ctaDeep,
-    borderRadius: 20,
-    padding: 3,
-    gap: 2,
-    alignSelf: 'flex-start',
-    maxWidth: '100%',
-  },
-  toggleBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  toggleBtnActive: {
-    backgroundColor: P.sun,
-  },
-  toggleTxt: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 12,
-    color: '#A8DFF0',
-  },
-  toggleTxtActive: {
-    color: P.ink,
-  },
-  bodyExplorerCard: {
-    paddingTop: 4,
-  },
-  bodyWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  bodyHint: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    lineHeight: 18,
-    color: P.muted,
-    textAlign: 'center',
-    opacity: 0.9,
-  },
+  scrollContent: { paddingBottom: 40, flexGrow: 1 },
+  sectionContent: { paddingHorizontal: H_PADDING, paddingTop: 18 },
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: CARD_GAP, justifyContent: 'space-between' },
 
-  searchFilterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: H_PADDING,
-    marginTop: -18,
-    marginBottom: 4,
-    gap: 10,
-    zIndex: 3,
-  },
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    height: 52,
-    borderRadius: 18,
-    borderWidth: 1,
-    gap: 10,
-    shadowColor: P.ctaDeep,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  searchIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: P.ctaLight,
-  },
-  exFilterBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  exFilterBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  exFilterBadgeText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 10,
-    color: '#FFF',
-  },
-  searchInput: {
-    flex: 1,
-    fontFamily: FONTS.body,
-    fontSize: 14,
-    color: P.ink,
-    height: '100%',
-    paddingVertical: 0,
-  },
+  card: { borderRadius: 24, overflow: 'hidden', shadowColor: P.ctaDeep, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.16, shadowRadius: 16, elevation: 9 },
+  skeletonCard: { backgroundColor: P.ctaLight, borderWidth: 1, borderColor: P.border },
+  skeletonGlow: { position: 'absolute', top: -20, right: -10, width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(247,203,22,0.22)' },
 
-  scrollContent: {
-    paddingBottom: 40,
-    flexGrow: 1,
-  },
-  sectionContent: {
-    paddingHorizontal: H_PADDING,
-    paddingTop: 18,
-  },
-  exerciseItemWrap: {
-    paddingHorizontal: H_PADDING,
-  },
-  row: {
-    justifyContent: 'space-between',
-    marginBottom: CARD_GAP,
-  },
+  categoryCard: { borderWidth: 1, borderColor: P.border },
+  cardMedia: { flex: 0.6, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  mediaGlow: { position: 'absolute', top: -18, right: -12, width: 110, height: 110, borderRadius: 55 },
+  cardFooter: { flex: 0.4, backgroundColor: P.ctaDeep, paddingHorizontal: 14, paddingVertical: 14, justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
+  categoryArrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: P.sun, shadowColor: P.ctaDeep, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8 },
+  imageContainer: { width: '100%', height: '100%', justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: 10, paddingTop: 14, paddingBottom: 8 },
+  floatingImage: { width: '88%', height: '88%', opacity: 0.96 },
+  cardLabel: { fontFamily: FONTS.heading, fontSize: 22, color: P.sun, letterSpacing: 0.5, textShadowColor: 'rgba(0,0,0,0.18)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  cardInfoRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardCountText: { fontFamily: FONTS.bodyBold, fontSize: 12, color: P.sunLight, letterSpacing: 0.2 },
 
-  card: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: P.ctaDeep,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.16,
-    shadowRadius: 16,
-    elevation: 9,
-  },
-  skeletonCard: {
-    backgroundColor: P.ctaLight,
-    borderWidth: 1,
-    borderColor: P.border,
-  },
-  skeletonGlow: {
-    position: 'absolute',
-    top: -20,
-    right: -10,
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: 'rgba(247,203,22,0.22)',
-  },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(4,40,43,0.45)', justifyContent: 'center', paddingHorizontal: 22 },
+  modalCard: { backgroundColor: P.cta, borderRadius: 24, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  modalHandle: { alignSelf: 'center', width: 46, height: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.38)', marginBottom: 14 },
+  modalTitle: { fontFamily: FONTS.heading, fontSize: 28, color: P.sun, textAlign: 'center' },
+  modalSub: { fontFamily: FONTS.body, fontSize: 13, color: P.sunLight, textAlign: 'center', marginTop: 4, marginBottom: 16 },
+  modalCategoryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', paddingHorizontal: 14, paddingVertical: 14, marginBottom: 10 },
+  modalCategoryTitle: { fontFamily: FONTS.bodyBold, fontSize: 15, color: P.white },
+  modalCategoryCount: { fontFamily: FONTS.body, fontSize: 12, color: P.sunLight, marginTop: 3 },
+  modalArrow: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: P.sun },
 
-  categoryCard: {
-    borderWidth: 1,
-    borderColor: P.border,
-  },
-  cardMedia: {
-    flex: 0.6,
-    position: 'relative',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mediaGlow: {
-    position: 'absolute',
-    top: -18,
-    right: -12,
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-  },
-  cardFooter: {
-    flex: 0.4,
-    backgroundColor: P.ctaDeep,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-  },
-  categoryArrow: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: P.sun,
-    shadowColor: P.ctaDeep,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-  },
-  imageContainer: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingTop: 14,
-    paddingBottom: 8,
-  },
-  floatingImage: {
-    width: '88%',
-    height: '88%',
-    opacity: 0.96,
-  },
-  cardLabel: {
-    fontFamily: FONTS.heading,
-    fontSize: 22,
-    color: P.sun,
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(0,0,0,0.18)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  cardInfoRow: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardCountText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 12,
-    color: P.sunLight,
-    letterSpacing: 0.2,
-  },
-
-  exerciseTryCard: {
-    width: '100%',
-    backgroundColor: P.cta,
-    borderWidth: 0,
-    padding: 18,
-  },
-  exercisePillRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  exerciseScorePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: P.ctaDark,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    maxWidth: '72%',
-  },
-  exerciseScorePillText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 10,
-    color: '#D6EEF7',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  exerciseRatingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: P.sun,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  exerciseRatingPillText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 11,
-    color: P.ink,
-  },
-  exerciseBodyRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  exerciseTextBlock: {
-    flex: 1,
-  },
-  exerciseThumb: {
-    width: 88,
-    height: 88,
-    borderRadius: 14,
-    resizeMode: 'cover',
-    flexShrink: 0,
-  },
-  exerciseThumbPlaceholder: {
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exerciseThumbGlow: {
-    position: 'absolute',
-    top: -14,
-    right: -12,
-    width: 86,
-    height: 86,
-    borderRadius: 43,
-  },
-  exerciseTagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 10,
-  },
-  exerciseTag: {
-    backgroundColor: P.ctaDark,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  exerciseTagText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 10,
-    color: '#D6EEF7',
-    letterSpacing: 0.3,
-    textTransform: 'capitalize',
-  },
-  exName: {
-    fontFamily: FONTS.heading,
-    fontSize: 20,
-    color: P.white,
-    letterSpacing: -0.4,
-    lineHeight: 24,
-    marginBottom: 2,
-  },
-  exerciseDescription: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#D6EEF7',
-    marginTop: 6,
-  },
-
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(4,40,43,0.45)',
-    justifyContent: 'center',
-    paddingHorizontal: 22,
-  },
-  modalCard: {
-    backgroundColor: P.cta,
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  modalHandle: {
-    alignSelf: 'center',
-    width: 46,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.38)',
-    marginBottom: 14,
-  },
-  modalTitle: {
-    fontFamily: FONTS.heading,
-    fontSize: 28,
-    color: P.sun,
-    textAlign: 'center',
-  },
-  modalSub: {
-    fontFamily: FONTS.body,
-    fontSize: 13,
-    color: P.sunLight,
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  modalCategoryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 10,
-  },
-  modalCategoryTitle: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 15,
-    color: P.white,
-  },
-  modalCategoryCount: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    color: P.sunLight,
-    marginTop: 3,
-  },
-  modalArrow: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: P.sun,
-  },
-
-  centeredMsg: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-    gap: 10,
-  },
-  messageIconWrap: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
-    backgroundColor: P.sunLight,
-    borderWidth: 1,
-    borderColor: 'rgba(37,150,190,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  msgTitle: {
-    fontFamily: FONTS.heading,
-    fontSize: 24,
-    color: P.ink,
-    textAlign: 'center',
-    letterSpacing: 0.3,
-  },
-  msgText: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 14,
-    color: P.muted,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  retryBtn: {
-    marginTop: 6,
-    paddingHorizontal: 26,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: P.cta,
-  },
-  retryText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 14,
-    color: P.white,
-  },
+  centeredMsg: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 10 },
+  messageIconWrap: { width: 62, height: 62, borderRadius: 20, backgroundColor: P.sunLight, borderWidth: 1, borderColor: 'rgba(37,150,190,0.16)', alignItems: 'center', justifyContent: 'center' },
+  msgTitle: { fontFamily: FONTS.heading, fontSize: 24, color: P.ink, textAlign: 'center', letterSpacing: 0.3 },
+  msgText: { fontFamily: FONTS.bodySemiBold, fontSize: 14, color: P.muted, textAlign: 'center', lineHeight: 20 },
+  retryBtn: { marginTop: 6, paddingHorizontal: 26, paddingVertical: 12, borderRadius: 14, backgroundColor: P.cta },
+  retryText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: P.white },
 });

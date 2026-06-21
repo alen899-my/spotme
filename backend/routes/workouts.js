@@ -724,11 +724,25 @@ router.get('/exercises/by-category/:category', authenticateToken, async (req, re
 });
 
 router.get('/exercises/search', authenticateToken, async (req, res) => {
-  const { q, category, body_part, equipment, target, min_rating, limit = 20, offset = 0 } = req.query;
+  const { q, category, body_part, equipment, target, min_rating, sort_by = 'name', sort_order = 'asc', limit = 20, offset = 0 } = req.query;
   try {
     const conditions = [];
     const params = [];
     let idx = 1;
+
+    function addExactFilter(col, vals) {
+      if (!vals) return;
+      const parts = String(vals).split(',').map(s => s.trim()).filter(Boolean);
+      if (parts.length === 0) return;
+      if (parts.length === 1) {
+        conditions.push(`${col} = $${idx++}`);
+        params.push(parts[0]);
+      } else {
+        const orClauses = parts.map(() => `${col} = $${idx++}`);
+        conditions.push(`(${orClauses.join(' OR ')})`);
+        params.push(...parts);
+      }
+    }
 
     if (q && q.trim()) {
       conditions.push(`(name ILIKE $${idx} OR target ILIKE $${idx})`);
@@ -736,29 +750,10 @@ router.get('/exercises/search', authenticateToken, async (req, res) => {
       idx++;
     }
 
-    if (category && category.trim()) {
-      conditions.push(`category ILIKE $${idx}`);
-      params.push(category.trim());
-      idx++;
-    }
-
-    if (body_part && body_part.trim()) {
-      conditions.push(`body_part ILIKE $${idx}`);
-      params.push(body_part.trim());
-      idx++;
-    }
-
-    if (equipment && equipment.trim()) {
-      conditions.push(`equipment ILIKE $${idx}`);
-      params.push(equipment.trim());
-      idx++;
-    }
-
-    if (target && target.trim()) {
-      conditions.push(`target ILIKE $${idx}`);
-      params.push(target.trim());
-      idx++;
-    }
+    addExactFilter('category', category);
+    addExactFilter('body_part', body_part);
+    addExactFilter('equipment', equipment);
+    addExactFilter('target', target);
 
     if (min_rating) {
       conditions.push(`avg_rating >= $${idx}`);
@@ -768,11 +763,16 @@ router.get('/exercises/search', authenticateToken, async (req, res) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
+    const allowedSorts = ['name', 'avg_rating'];
+    const sortCol = allowedSorts.includes(sort_by) ? sort_by : 'name';
+    const sortDir = sort_order?.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const orderClause = `ORDER BY e.${sortCol} ${sortDir}`;
+
     const queryText = `
       SELECT e.*
       FROM exercises e
       ${where}
-      ORDER BY e.name ASC 
+      ${orderClause}
       LIMIT $${idx} OFFSET $${idx + 1}
     `;
     params.push(parseInt(limit), parseInt(offset));

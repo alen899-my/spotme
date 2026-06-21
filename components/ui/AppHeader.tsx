@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import OptimizedImage from "./OptimizedImage";
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -108,7 +109,7 @@ export default function AppHeader({
           >
             <View style={[styles.avatarBtn, { borderColor: tierColor }]}>
               {hasPhoto ? (
-                <Image source={{ uri: photoUri }} style={styles.avatarImg} />
+                <OptimizedImage uri={photoUri} style={styles.avatarImg} />
               ) : (
                 <View style={[styles.avatarFallback, isDark && { backgroundColor: colors.inputBg }]}>
                   <Ionicons name="person" size={scale(16)} color={isDark ? colors.textMuted : P.cta} />

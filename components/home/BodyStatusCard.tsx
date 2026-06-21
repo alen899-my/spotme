@@ -94,7 +94,7 @@ interface Props {
   dbMuscleActivity: Array<{ slug: Slug; intensity: number }>;
 }
 
-export default function BodyStatusCard({
+const BodyStatusCard = React.memo(function BodyStatusCard({
   gender,
   weightKg,
   heightCm,
@@ -422,7 +422,9 @@ export default function BodyStatusCard({
       </Modal>
     </>
   );
-}
+})
+
+export default BodyStatusCard;
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const CELL_SIZE = Math.floor((SCREEN_W - 64) / 12); // 12 columns (weeks)

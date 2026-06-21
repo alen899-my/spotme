@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import OptimizedImage from '../../../components/ui/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
@@ -88,7 +89,7 @@ export default function UserWorkoutsScreen() {
         <View style={styles.cardInner}>
           <View style={[styles.imgWrap, { borderColor: colors.border }]}>
             {hasPhoto ? (
-              <Image source={{ uri: w.cover_photo_url || w.completion_photo_url }} style={styles.img} />
+              <OptimizedImage uri={w.cover_photo_url || w.completion_photo_url} style={styles.img} />
             ) : (
               <View style={[styles.imgPlaceholder, { backgroundColor: colors.inputBg }]}>
                 <MaterialCommunityIcons name="arm-flex" size={26} color={tier.color} />
@@ -150,7 +151,7 @@ export default function UserWorkoutsScreen() {
           </TouchableOpacity>
           <View style={styles.headerCenter}>
             {user?.profile_pic_url ? (
-              <Image source={{ uri: user.profile_pic_url }} style={styles.headerAvatar} />
+              <OptimizedImage uri={user.profile_pic_url} style={styles.headerAvatar} />
             ) : (
               <View style={[styles.headerAvatar, { backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center' }]}>
                 <Ionicons name="person" size={16} color={colors.textMuted} />

@@ -363,6 +363,16 @@ export default function AuthScreen() {
             {fieldErrors.password && <Text style={s.fieldErr}>{fieldErrors.password}</Text>}
           </View>
 
+          {isLogin && (
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/forgot-password")}
+              style={{ alignSelf: "flex-end", marginBottom: 18, marginTop: -6 }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={{ fontFamily: F.reg, fontSize: 13, color: C.blue }}>Forgot password?</Text>
+            </TouchableOpacity>
+          )}
+
           {!isLogin && (
             <View style={s.fieldWrap}>
               <Text style={s.label}>Confirm password</Text>

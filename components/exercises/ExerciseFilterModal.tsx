@@ -29,6 +29,19 @@ export interface ExerciseFilters {
   minRating: number;
 }
 
+export interface SortOption {
+  sort_by: string;
+  sort_order: 'asc' | 'desc';
+  label: string;
+}
+
+const SORT_OPTIONS: SortOption[] = [
+  { sort_by: 'name', sort_order: 'asc', label: 'Name A-Z' },
+  { sort_by: 'name', sort_order: 'desc', label: 'Name Z-A' },
+  { sort_by: 'avg_rating', sort_order: 'desc', label: 'Rating (High)' },
+  { sort_by: 'avg_rating', sort_order: 'asc', label: 'Rating (Low)' },
+];
+
 interface FilterMeta {
   categories: string[];
   body_parts: string[];
@@ -44,9 +57,10 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   filters: ExerciseFilters;
-  onApply: (filters: ExerciseFilters) => void;
+  onApply: (filters: ExerciseFilters, sortOption?: SortOption) => void;
   onClear: () => void;
   drilldownCategory?: string | null;
+  sortOption?: SortOption;
 }
 
 const SECTIONS = [
@@ -54,13 +68,14 @@ const SECTIONS = [
   { key: 'equipment', label: 'Equipment' },
   { key: 'targets', label: 'Target Muscle' },
   { key: 'rating', label: 'Minimum Rating' },
+  { key: 'sort', label: 'Sort By' },
 ];
 
 function s(size: number, width: number) {
   return Math.round(size * Math.min(width / BASE_WIDTH, 1.4));
 }
 
-export default function ExerciseFilterModal({ visible, onClose, filters, onApply, onClear, drilldownCategory }: Props) {
+export default function ExerciseFilterModal({ visible, onClose, filters, onApply, onClear, drilldownCategory, sortOption }: Props) {
   const { isDark } = useTheme();
   const { width: winW, height: winH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -68,6 +83,7 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
   const [meta, setMeta] = useState<FilterMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [local, setLocal] = useState<ExerciseFilters>(filters);
+  const [localSort, setLocalSort] = useState<SortOption>(sortOption || SORT_OPTIONS[0]);
   const [expanded, setExpanded] = useState<SectionState>({ bodyParts: true });
 
   const scrollRef = useRef<ScrollView>(null);
@@ -295,6 +311,49 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
                   );
                 }
 
+                if (section.key === 'sort') {
+                  return (
+                    <View key={section.key} style={[st.section, { marginBottom: s(14, winW) }]}>
+                      <TouchableOpacity
+                        style={[st.sectionHeader, { paddingVertical: s(16, winW), paddingHorizontal: s(16, winW), minHeight: s(MIN_TOUCH, winW) }]}
+                        onPress={() => toggleSection(section.key)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[st.sectionHeaderLeft, { gap: s(12, winW) }]}>
+                          <Text style={[st.sectionLabel, { fontSize: s(16, winW), color: isDark ? '#FFF' : '#111' }]}>{section.label}</Text>
+                          <View style={[st.sectionBadge, { minWidth: s(22, winW), height: s(22, winW), borderRadius: s(11, winW), paddingHorizontal: s(6, winW) }]}>
+                            <Text style={[st.sectionBadgeText, { fontSize: s(11, winW) }]}>{localSort.label}</Text>
+                          </View>
+                        </View>
+                        <Ionicons
+                          name={expanded[section.key] ? 'chevron-up' : 'chevron-down'}
+                          size={s(20, winW)}
+                          color={isDark ? '#888' : '#999'}
+                        />
+                      </TouchableOpacity>
+                      {expanded[section.key] && (
+                        <View style={{ paddingHorizontal: s(4, winW) }}>
+                          {SORT_OPTIONS.map(opt => (
+                            <TouchableOpacity
+                              key={opt.label}
+                              style={[st.optionRow, { minHeight: s(50, winW), backgroundColor: isDark ? '#0A0A0A' : '#FFF' }]}
+                              onPress={() => setLocalSort(opt)}
+                              activeOpacity={0.6}
+                            >
+                              <Text style={[st.optionText, { fontSize: s(15, winW), color: isDark ? '#DDD' : '#333' }, localSort.label === opt.label && { fontFamily: FONTS.bodySemiBold }]} numberOfLines={1}>
+                                {opt.label}
+                              </Text>
+                              <View style={[st.checkbox, { width: s(24, winW), height: s(24, winW), borderRadius: s(7, winW), borderWidth: Math.max(2, s(2.5, winW)), borderColor: localSort.label === opt.label ? '#2596BE' : (isDark ? 'rgba(255,255,255,0.25)' : '#CCC'), backgroundColor: localSort.label === opt.label ? '#2596BE' : 'transparent' }]}>
+                                {localSort.label === opt.label && <Ionicons name="checkmark" size={s(15, winW)} color="#FFF" />}
+                              </View>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                }
+
                 const metaKey = section.key === 'bodyParts' ? 'body_parts' : section.key;
                 const items = meta ? (meta as any)[metaKey] as string[] : [];
                 const selected = local[section.key as keyof ExerciseFilters] as string[];
@@ -346,7 +405,7 @@ export default function ExerciseFilterModal({ visible, onClose, filters, onApply
           }]}>
             <TouchableOpacity
               style={[st.applyBtn, { height: s(52, winW), borderRadius: s(16, winW), backgroundColor: '#2596BE' }]}
-              onPress={() => onApply(local)}
+              onPress={() => onApply(local, localSort)}
             >
               <Text style={[st.applyBtnText, { fontSize: s(16, winW) }]}>
                 Show Results{activeCount(local) > 0 ? ` (${activeCount(local)})` : ''}

@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
@@ -141,7 +142,7 @@ export default function XPGuideScreen() {
             <View style={styles.userCardHeader}>
               <View style={styles.userAvatarContainer}>
                 {user.profile_pic_url ? (
-                  <Image source={{ uri: user.profile_pic_url }} style={styles.userAvatar} />
+                  <OptimizedImage uri={user.profile_pic_url} style={styles.userAvatar} />
                 ) : (
                   <View style={[styles.userAvatarPlaceholder, { backgroundColor: colors.inputBg }]}>
                     <Ionicons name="person" size={24} color={colors.textMuted} />

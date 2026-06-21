@@ -7,9 +7,7 @@ import {
   Switch,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Modal,
-  Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from "react-native";
@@ -24,93 +22,7 @@ import { FONTS } from "../../constants/theme";
 import { API_URL } from "../../utils/api";
 import ActionModal from "../../components/ui/ActionModal";
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.inputBg,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontFamily: FONTS.heading,
-    fontSize: 22,
-    color: colors.text,
-    letterSpacing: 1,
-  },
-  scrollContent: {
-      padding: 20,
-      paddingBottom: 60,
-      flexGrow: 1,
-    },
-  sectionLabel: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 11,
-    color: colors.textDim,
-    letterSpacing: 1.5,
-    marginBottom: 10,
-    marginTop: 24,
-    marginLeft: 4,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
-  },
-  settingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  settingLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    flex: 1,
-    marginRight: 12,
-  },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  settingTitle: {
-    fontFamily: FONTS.bodySemiBold,
-    fontSize: 15,
-    color: colors.text,
-  },
-  settingSubtitle: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-});
-
 const ITEM_H = 44;
-const { width: WIN_W } = Dimensions.get('window');
 
 function WheelPicker({
   items,
@@ -252,18 +164,14 @@ function PushReminderSettings() {
 
   if (loading) return null;
 
-  const s = makeStyles(colors);
-
   return (
-    <View style={s.card}>
-      <View style={[s.settingRow, { borderBottomWidth: enabled ? 1 : 0 }]}>
-        <View style={s.settingLeft}>
-          <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,150,190,0.1)' }]}>
-            <Ionicons name="notifications-outline" size={20} color={colors.primary} />
-          </View>
+    <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[cardStyles.row, { borderBottomWidth: enabled ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border }]}>
+        <View style={cardStyles.left}>
+          <Ionicons name="notifications-outline" size={20} color={colors.textMuted} style={{ width: 28 }} />
           <View style={{ flex: 1 }}>
-            <Text style={s.settingTitle}>Push reminders</Text>
-            <Text style={s.settingSubtitle}>Get notified when it's time to hydrate</Text>
+            <Text style={[cardStyles.title, { color: colors.text }]}>Push Reminders</Text>
+            <Text style={[cardStyles.subtitle, { color: colors.textDim }]}>Get notified when it's time to hydrate</Text>
           </View>
         </View>
         <Switch
@@ -277,20 +185,18 @@ function PushReminderSettings() {
       {enabled && (
         <TouchableOpacity
           onPress={openPicker}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingBottom: 16,
-            paddingLeft: 70,
-          }}
+          style={cardStyles.intervalRow}
           activeOpacity={0.7}
         >
-          <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 14, color: colors.primary }}>
-            Every {fmt(interval)}
+          <Text style={{ fontFamily: FONTS.body, fontSize: 14, color: colors.textMuted }}>
+            Remind me every
           </Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 14, color: colors.primary }}>
+              {fmt(interval)}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
+          </View>
         </TouchableOpacity>
       )}
 
@@ -311,22 +217,22 @@ function PushReminderSettings() {
             }}
             onStartShouldSetResponder={() => true}
           >
-            <Text style={{ fontFamily: FONTS.heading, fontSize: 18, color: colors.text, textAlign: 'center', marginBottom: 20 }}>
+            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 18, color: colors.text, textAlign: 'center', marginBottom: 20 }}>
               Remind me every
             </Text>
 
             <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 24 }}>
               <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textMuted, marginBottom: 4 }}>Hours</Text>
+                <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim, marginBottom: 4 }}>Hours</Text>
                 <WheelPicker items={hours} selected={pickH} onSelect={setPickH} />
               </View>
               <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textMuted, marginBottom: 4 }}>Minutes</Text>
+                <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim, marginBottom: 4 }}>Minutes</Text>
                 <WheelPicker items={minutes} selected={pickM} onSelect={setPickM} />
               </View>
             </View>
 
-            <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: colors.textMuted, textAlign: 'center', marginTop: 16 }}>
+            <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: colors.textDim, textAlign: 'center', marginTop: 16 }}>
               Every {pickH}h {pickM}m
             </Text>
 
@@ -349,8 +255,6 @@ function PushReminderSettings() {
     </View>
   );
 }
-
-
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -392,7 +296,6 @@ export default function SettingsScreen() {
         { is_private: value },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Update local storage user data
       const userDataStr = await AsyncStorage.getItem('userData');
       if (userDataStr) {
         const userData = JSON.parse(userDataStr);
@@ -453,71 +356,46 @@ export default function SettingsScreen() {
     }
   };
 
-  const s = makeStyles(colors);
-
   if (loading) {
     return (
-      <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={s.container}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={[
-        s.header,
+        headerStyles.container,
         {
-          backgroundColor: isDark ? colors.bg : colors.primary,
-          paddingTop: Math.max(insets.top, 12),
-          borderBottomWidth: isDark ? 1 : 0,
+          backgroundColor: colors.bg,
+          paddingTop: insets.top,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.border,
         }
       ]}>
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          style={[s.backBtn, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.15)' }]}
-        >
-          <Ionicons name="chevron-back" size={24} color={isDark ? colors.text : '#FFF'} />
+        <TouchableOpacity onPress={() => router.back()} style={headerStyles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[s.headerTitle, { color: isDark ? colors.text : '#FFF' }]}>Settings</Text>
+        <Text style={[headerStyles.title, { color: colors.text }]}>Settings</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={s.sectionLabel}>APPEARANCE</Text>
-        <View style={s.card}>
-          <View style={s.settingRow}>
-            <View style={s.settingLeft}>
-              <View style={[s.iconCircle, { backgroundColor: isDark ? colors.iconCircle : 'rgba(37,150,190,0.1)' }]}>
-                <Ionicons name={isDark ? "moon" : "sunny"} size={20} color={colors.primary} />
-              </View>
-           
-            </View>
-            <Switch
-              value={isDark}
-              onValueChange={toggleTheme}
-              trackColor={{ false: "#E0E0E0", true: colors.primary }}
-              thumbColor="#FFFFFF"
-              ios_backgroundColor="#E0E0E0"
-            />
-          </View>
-        </View>
-
-        <Text style={s.sectionLabel}>PRIVACY</Text>
-        <View style={s.card}>
-          <View style={[s.settingRow, { borderBottomWidth: 0 }]}>
-            <View style={s.settingLeft}>
-              <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,150,190,0.1)' }]}>
-                <Ionicons
-                  name={isPrivate ? "lock-closed" : "lock-open"}
-                  size={20}
-                  color={colors.primary}
-                />
-              </View>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        <Text style={[sectionStyles.label, { color: colors.textDim }]}>PRIVACY</Text>
+        <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={cardStyles.row}>
+            <View style={cardStyles.left}>
+              <Ionicons
+                name={isPrivate ? "lock-closed" : "lock-open"}
+                size={20}
+                color={colors.textMuted}
+                style={{ width: 28 }}
+              />
               <View style={{ flex: 1 }}>
-                <Text style={s.settingTitle}>Private Profile</Text>
-                <Text style={s.settingSubtitle}>
+                <Text style={[cardStyles.title, { color: colors.text }]}>Private Profile</Text>
+                <Text style={[cardStyles.subtitle, { color: colors.textDim }]}>
                   {isPrivate
                     ? "Only approved followers can see your full profile"
                     : "Everyone can see your full profile"}
@@ -535,23 +413,22 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={s.sectionLabel}>NOTIFICATIONS</Text>
+        <Text style={[sectionStyles.label, { color: colors.textDim }]}>NOTIFICATIONS</Text>
         <PushReminderSettings />
 
-        <Text style={s.sectionLabel}>SHARING</Text>
-        <View style={s.card}>
-          <View style={[s.settingRow, { borderBottomWidth: 0 }]}>
-            <View style={s.settingLeft}>
-              <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(37,150,190,0.1)' }]}>
-                <Ionicons
-                  name={shareSplits ? "share" : "share-outline"}
-                  size={20}
-                  color={colors.primary}
-                />
-              </View>
+        <Text style={[sectionStyles.label, { color: colors.textDim }]}>SHARING</Text>
+        <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={cardStyles.row}>
+            <View style={cardStyles.left}>
+              <Ionicons
+                name={shareSplits ? "share" : "share-outline"}
+                size={20}
+                color={colors.textMuted}
+                style={{ width: 28 }}
+              />
               <View style={{ flex: 1 }}>
-                <Text style={s.settingTitle}>Shared Splits</Text>
-                <Text style={s.settingSubtitle}>
+                <Text style={[cardStyles.title, { color: colors.text }]}>Shared Splits</Text>
+                <Text style={[cardStyles.subtitle, { color: colors.textDim }]}>
                   {shareSplits
                     ? "Your programs are visible to the community"
                     : "Only you can see your programs"}
@@ -569,27 +446,71 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={s.sectionLabel}>ABOUT</Text>
-        <View style={s.card}>
-          <View style={[s.settingRow, { borderBottomWidth: 0 }]}>
-            <View style={s.settingLeft}>
-              <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F5F5F5' }]}>
-                <Ionicons name="information-circle-outline" size={20} color={colors.textMuted} />
-              </View>
-              <Text style={s.settingTitle}>SpotMe v1.0.4 · Beta</Text>
+        <Text style={[sectionStyles.label, { color: colors.textDim }]}>ABOUT</Text>
+        <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[cardStyles.row, { borderBottomWidth: 0 }]}>
+            <View style={cardStyles.left}>
+              <Ionicons name="information-circle-outline" size={20} color={colors.textDim} style={{ width: 28 }} />
+              <Text style={[cardStyles.title, { color: colors.text }]}>SpotMe v1.0.4</Text>
             </View>
+            <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim }}>Beta</Text>
           </View>
         </View>
 
-        <Text style={s.sectionLabel}>ACCOUNT</Text>
-        <View style={s.card}>
-          <TouchableOpacity onPress={handleDeleteAccount} activeOpacity={0.6}>
-            <View style={[s.settingRow, { borderBottomWidth: 0 }]}>
-              <View style={s.settingLeft}>
-                <View style={[s.iconCircle, { backgroundColor: '#FF000015' }]}>
-                  <Ionicons name="trash-outline" size={20} color="#FF4444" />
+        <Text style={[sectionStyles.label, { color: colors.textDim }]}>APPEARANCE</Text>
+        <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity onPress={toggleTheme} activeOpacity={0.6}>
+            <View style={cardStyles.row}>
+              <View style={cardStyles.left}>
+                <Ionicons
+                  name={isDark ? "moon" : "sunny"}
+                  size={20}
+                  color={colors.textMuted}
+                  style={{ width: 28 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[cardStyles.title, { color: colors.text }]}>Dark Mode</Text>
+                  <Text style={[cardStyles.subtitle, { color: colors.textDim }]}>
+                    {isDark ? "On" : "Off"}
+                  </Text>
                 </View>
-                <Text style={[s.settingTitle, { color: '#FF4444' }]}>Delete Account</Text>
+              </View>
+              <View style={{
+                width: 44, height: 26, borderRadius: 13,
+                backgroundColor: isDark ? colors.primary : '#E0E0E0',
+                justifyContent: 'center',
+                paddingHorizontal: 3,
+              }}>
+                <View style={{
+                  width: 20, height: 20, borderRadius: 10,
+                  backgroundColor: '#FFF',
+                  alignSelf: isDark ? 'flex-end' : 'flex-start',
+                }} />
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={[sectionStyles.label, { color: colors.textDim }]}>ACCOUNT</Text>
+        <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={() => router.push("/profile/change-password")}
+            activeOpacity={0.6}
+          >
+            <View style={[cardStyles.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+              <View style={cardStyles.left}>
+                <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} style={{ width: 28 }} />
+                <Text style={[cardStyles.title, { color: colors.text }]}>Change Password</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleDeleteAccount} activeOpacity={0.6}>
+            <View style={cardStyles.row}>
+              <View style={cardStyles.left}>
+                <Ionicons name="trash-outline" size={20} color="#FF4444" style={{ width: 28 }} />
+                <Text style={[cardStyles.title, { color: '#FF4444' }]}>Delete Account</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -623,14 +544,14 @@ export default function SettingsScreen() {
             </View>
 
             <Text style={{
-              fontFamily: FONTS.heading, fontSize: 20, color: isDark ? colors.text : '#1A1A1A',
+              fontFamily: FONTS.bodySemiBold, fontSize: 20, color: colors.text,
               textAlign: 'center', marginBottom: 8,
             }}>
               Delete Account
             </Text>
 
             <Text style={{
-              fontFamily: FONTS.body, fontSize: 14, color: isDark ? colors.textMuted : '#666',
+              fontFamily: FONTS.body, fontSize: 14, color: colors.textDim,
               textAlign: 'center', lineHeight: 20, marginBottom: 24,
             }}>
               This will permanently delete your account and all your data. This action cannot be undone.
@@ -646,7 +567,7 @@ export default function SettingsScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: isDark ? colors.text : '#333' }}>
+                <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: colors.text }}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -678,3 +599,73 @@ export default function SettingsScreen() {
     </View>
   );
 }
+
+const headerStyles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 17,
+  },
+});
+
+const sectionStyles = StyleSheet.create({
+  label: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    marginBottom: 10,
+    marginTop: 28,
+    marginLeft: 4,
+  },
+});
+
+const cardStyles = StyleSheet.create({
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+  },
+  left: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+    marginRight: 12,
+  },
+  title: {
+    fontFamily: FONTS.body,
+    fontSize: 15,
+  },
+  subtitle: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    marginTop: 1,
+  },
+  intervalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingLeft: 56,
+  },
+});

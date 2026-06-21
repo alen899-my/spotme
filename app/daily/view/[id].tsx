@@ -10,6 +10,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
+import OptimizedImage from '../../../components/ui/OptimizedImage';
+import { optimizeImage } from '../../../utils/imageOptimizer';
 import { FONTS } from '../../../constants/theme';
 import { P } from '../../../constants/homeTheme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,7 +85,7 @@ export default function WorkoutViewScreen() {
         const token = await getToken();
         const formData = new FormData();
         for (const [index, asset] of result.assets.entries()) {
-          const uri = asset.uri;
+          const uri = await optimizeImage(asset.uri, 'workout');
           if (Platform.OS === 'web') {
             const response = await fetch(uri);
             const blob = await response.blob();
@@ -234,7 +236,7 @@ export default function WorkoutViewScreen() {
       {/* Photo Viewer */}
       <Modal visible={viewerVisible} transparent animationType="fade">
         <View style={styles.viewerOverlay}>
-          <Image source={{ uri: viewerUri || '' }} style={styles.viewerImage} resizeMode="contain" />
+          <OptimizedImage uri={viewerUri || ''} style={styles.viewerImage} contentFit="contain" />
           <TouchableOpacity style={styles.viewerClose} onPress={() => setViewerVisible(false)}>
             <Ionicons name="close" size={32} color="#FFF" />
           </TouchableOpacity>

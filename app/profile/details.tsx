@@ -17,6 +17,8 @@ import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
+import { optimizeImage } from "../../utils/imageOptimizer";
+import OptimizedImage from "../../components/ui/OptimizedImage";
 import ActionModal from "../../components/ui/ActionModal";
 import DOBPicker from "../../components/ui/DOBPicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -211,7 +213,7 @@ export default function MyDetailsScreen() {
       // Append new images if any
       const appendImage = async (key: string, fieldName: string) => {
         if (newPhotos[key]) {
-          const uri = newPhotos[key];
+          const uri = await optimizeImage(newPhotos[key], 'profile');
           if (Platform.OS === 'web') {
             const response = await fetch(uri);
             const blob = await response.blob();
@@ -691,10 +693,10 @@ export default function MyDetailsScreen() {
                     style={[styles.photoWrapper, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
                   >
                     {(newPhotos[img.key] || img.url) ? (
-                      <Image 
-                        source={{ uri: newPhotos[img.key] || img.url }} 
+                      <OptimizedImage 
+                        uri={newPhotos[img.key] || img.url} 
                         style={styles.photoImg} 
-                        resizeMode="cover" 
+                        contentFit="cover" 
                       />
                     ) : (
                       <View style={styles.photoPlaceholder}>

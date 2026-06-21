@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
@@ -16,10 +17,14 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useWorkoutTimer } from '../../contexts/WorkoutTimerContext';
 import ActionModal from '../../components/ui/ActionModal';
+import RatingModal from '../../components/ui/RatingModal';
 import ExercisePreviewModal from '../../components/modals/ExercisePreviewModal';
 import ExerciseFilterModal, { ExerciseFilters } from '../../components/exercises/ExerciseFilterModal';
+import ExerciseBrowser from '../../components/exercises/ExerciseBrowser';
 import { ActiveWorkoutSkeleton } from '../../components/ui/Skeleton';
 import * as ImagePicker from 'expo-image-picker';
+import OptimizedImage from '../../components/ui/OptimizedImage';
+import { optimizeImage } from '../../utils/imageOptimizer';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { API_URL } from '../../utils/api';
@@ -29,25 +34,6 @@ import * as Notifications from 'expo-notifications';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 
-// ── Rating config ──
-const RATING_ICONS: string[] = [
-  'sad-outline',         // 1
-  'thumbs-down-outline', // 2
-  'remove-outline',      // 3
-  'ellipse-outline',     // 4
-  'checkmark-outline',   // 5
-  'happy-outline',       // 6
-  'barbell-outline',     // 7
-  'flash-outline',       // 8
-  'flame-outline',       // 9
-  'trophy-outline',      // 10
-];
-const LABELS = [
-  'Terrible', 'Very Bad', 'Okayish', 'Decent', 'Good',
-  'Very Good', 'Strong Lift', 'Amazing', 'Beast Mode', 'Legendary!',
-];
-// Accent colour matching the app theme
-const RATING_ACCENT = P.sun;
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -63,7 +49,7 @@ const ExerciseCard = React.memo(({
   setTimer, setTimerRunning,
   openGuide, removeExercise, removeSet,
   handleSkipExercise, openSetModal, openEditSet,
-  handleRateExercise,
+  onOpenRating,
   loadingSkip, loadingLogSet,
 }: {
   item: any; colors: any; workoutStatus: string;
@@ -71,15 +57,12 @@ const ExerciseCard = React.memo(({
   openGuide: (item: any) => void; removeExercise: (id: number) => void;
   removeSet: (id: number) => void; handleSkipExercise: (id: number) => void;
   openSetModal: (item: any) => void; openEditSet: (set: any, exercise: any) => void;
-  handleRateExercise: (id: number, rating: number) => Promise<void>;
+  onOpenRating: (id: number) => void;
   loadingSkip: boolean; loadingLogSet: boolean;
 }) => {
   const { isDark } = useTheme();
   const [localRating, setLocalRating] = useState<number | null>(item.rating || null);
-  // ── 2. Accordion state ──
   const [expanded, setExpanded] = useState(!item.is_completed && !item.is_skipped);
-  // ── 6. Rating accordion ──
-  const [ratingOpen, setRatingOpen] = useState(false);
 
   useEffect(() => { setLocalRating(item.rating || null); }, [item.rating]);
 
@@ -92,11 +75,6 @@ const ExerciseCard = React.memo(({
   const targetSets = item.target_sets || 3;
   const isDone = item.is_completed;
   const isSkipped = item.is_skipped;
-
-  const onRate = (num: number) => {
-    setLocalRating(num);
-    handleRateExercise(item.id, num);
-  };
 
   const isActive = activeExerciseId === item.id;
   const isPending = !isDone && !isSkipped && completedSets === 0;
@@ -118,7 +96,7 @@ const ExerciseCard = React.memo(({
         onPress={() => setExpanded(v => !v)}
         activeOpacity={0.8}
       >
-        <Image source={{ uri: item.image_url }} style={styles.exImage} />
+        <OptimizedImage uri={item.image_url} style={styles.exImage} />
         <View style={{ flex: 1 }}>
           {/* ── 3. Title wraps, no truncation ── */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap' }}>
@@ -263,64 +241,22 @@ const ExerciseCard = React.memo(({
             </View>
           )}
 
-          {/* ── Rating accordion ── */}
+          {/* ── Rating pill — opens modal ── */}
           {isDone && !isSkipped && (
-            <View style={[styles.ratingBanner, { borderColor: isDark ? colors.border : '#F5C842' }]}>
-              <TouchableOpacity
-                style={[styles.ratingBannerHeader, { backgroundColor: isDark ? colors.inputBg : '#FEF3C7' }]}
-                onPress={() => setRatingOpen(v => !v)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="star" size={15} color={P.sun} />
-                <Text style={[styles.ratingBannerTitle, { color: P.sun }]}>RATE THIS EXERCISE</Text>
-                {localRating ? (
-                  <View style={[styles.ratingBannerBadge, { backgroundColor: P.sun }]}>
-                    <Text style={[styles.ratingBannerBadgeText, { color: isDark ? '#000' : '#FFF' }]}>{localRating}/10</Text>
-                  </View>
-                ) : null}
-                <Ionicons name={ratingOpen ? 'chevron-up' : 'chevron-down'} size={15} color={isDark ? colors.textMuted : '#92610A'} />
-              </TouchableOpacity>
-
-              {ratingOpen && (
-                <View style={[styles.ratingGrid, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.25)' }]}>
-                  <View style={styles.ratingGridInner}>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
-                      const isSelected = localRating === num;
-                      return (
-                        <TouchableOpacity
-                          key={num}
-                          style={[
-                            styles.ratingCard,
-                            isSelected
-                              ? { backgroundColor: RATING_ACCENT, borderColor: RATING_ACCENT }
-                              : { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.12)' },
-                          ]}
-                          onPress={() => onRate(num)}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons
-                            name={RATING_ICONS[num - 1] as any}
-                            size={16}
-                            color={isSelected ? '#1A1A1A' : (isDark ? colors.primary : '#FFF')}
-                          />
-                          <Text style={[
-                            styles.ratingCardNum,
-                            { color: isSelected ? '#1A1A1A' : (isDark ? colors.text : '#FFF') },
-                          ]}>
-                            {num}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                  {localRating ? (
-                    <Text style={[styles.ratingLabel, { color: isDark ? P.sun : '#FFF' }]}>{LABELS[localRating - 1]}</Text>
-                  ) : (
-                    <Text style={[styles.ratingHint, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.5)' }]}>Tap a rating above</Text>
-                  )}
+            <TouchableOpacity
+              style={[styles.ratingPill, { backgroundColor: isDark ? colors.inputBg : '#FEF3C7', borderColor: isDark ? colors.border : '#F5C842' }]}
+              onPress={() => onOpenRating(item.id)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="star" size={15} color={P.sun} />
+              <Text style={[styles.ratingPillTitle, { color: P.sun }]}>RATE THIS EXERCISE</Text>
+              {localRating ? (
+                <View style={[styles.ratingPillBadge, { backgroundColor: P.sun }]}>
+                  <Text style={[styles.ratingPillBadgeText, { color: isDark ? '#000' : '#FFF' }]}>{localRating}/10</Text>
                 </View>
-              )}
-            </View>
+              ) : null}
+              <Ionicons name="chevron-forward" size={15} color={isDark ? colors.textMuted : '#92610A'} />
+            </TouchableOpacity>
           )}
 
           {/* Footer */}
@@ -455,6 +391,8 @@ export default function ActiveWorkoutScreen() {
     }
   };
 
+  const handleOpenRating = (id: number) => setRatingExerciseId(id);
+
   const {
     workoutElapsed,
     restTimer,
@@ -498,6 +436,7 @@ export default function ActiveWorkoutScreen() {
   const [deleteSetId, setDeleteSetId] = useState<number | null>(null);
   const [editingSet, setEditingSet] = useState<any>(null);
   const [loadingEditSet, setLoadingEditSet] = useState(false);
+  const [ratingExerciseId, setRatingExerciseId] = useState<number | null>(null);
 
   useEffect(() => {
     if (workout?.status === 'completed' && editing !== 'true') {
@@ -966,7 +905,7 @@ export default function ActiveWorkoutScreen() {
         const token = await getToken();
         const formData = new FormData();
         for (const [index, asset] of result.assets.entries()) {
-          const uri = asset.uri;
+          const uri = await optimizeImage(asset.uri, 'workout');
           if (Platform.OS === 'web') {
             const response = await fetch(uri);
             const blob = await response.blob();
@@ -1043,10 +982,10 @@ export default function ActiveWorkoutScreen() {
       openGuide={openGuide} removeExercise={removeExercise} removeSet={removeSet}
       handleSkipExercise={handleSkipExercise} openSetModal={openSetModal}
       openEditSet={openEditSet}
-      handleRateExercise={handleRateExercise} loadingSkip={loadingSkip} loadingLogSet={loadingLogSet}
+      onOpenRating={handleOpenRating} loadingSkip={loadingSkip} loadingLogSet={loadingLogSet}
     />
   ), [colors, displayStatus, activeExerciseId, setTimer, setTimerRunning, openGuide,
-    removeExercise, removeSet, handleSkipExercise, openSetModal, openEditSet, handleRateExercise, loadingSkip, loadingLogSet]);
+    removeExercise, removeSet, handleSkipExercise, openSetModal, openEditSet, handleOpenRating, loadingSkip, loadingLogSet]);
 
   if (loading) return <ActiveWorkoutSkeleton />;
 
@@ -1148,7 +1087,7 @@ export default function ActiveWorkoutScreen() {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 10 }}>
                     {workout?.photos?.map((p: any) => (
                       <TouchableOpacity key={p.id} style={styles.photoThumbWrap} onPress={() => { setViewerUri(p.photo_url); setViewerVisible(true); }}>
-                        <Image source={{ uri: p.photo_url }} style={styles.photoThumb} />
+                        <OptimizedImage uri={p.photo_url} style={styles.photoThumb} />
                         <TouchableOpacity style={styles.removePhotoBtn} onPress={() => handleDeletePhoto(p.id)}>
                           <Ionicons name="close" size={14} color="#FFF" />
                         </TouchableOpacity>
@@ -1156,7 +1095,7 @@ export default function ActiveWorkoutScreen() {
                     ))}
                     {uploadingPhotos.map((uri, idx) => (
                       <View key={`uploading-${idx}`} style={[styles.photoThumbWrap, { opacity: 0.6 }]}>
-                        <Image source={{ uri }} style={styles.photoThumb} />
+                        <OptimizedImage uri={uri} style={styles.photoThumb} />
                         <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
                           <ActivityIndicator size="small" color="#FFF" />
                         </View>
@@ -1267,109 +1206,41 @@ export default function ActiveWorkoutScreen() {
 
       <ExercisePreviewModal visible={guideModalVisible} exercise={guideExercise} onClose={() => setGuideModalVisible(false)} />
 
+      <RatingModal
+        visible={ratingExerciseId !== null}
+        onClose={() => setRatingExerciseId(null)}
+        currentRating={workout?.exercises?.find((e: any) => e.id === ratingExerciseId)?.rating}
+        onRate={async (r) => { await handleRateExercise(ratingExerciseId!, r); }}
+        colors={colors}
+        isDark={isDark}
+        insets={insets}
+        title="Rate this Exercise"
+        subtitle="How was this exercise?"
+      />
+
       {/* Add Exercise Modal */}
       <Modal visible={addExModalVisible} transparent animationType="slide" onRequestClose={() => setAddExModalVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, height: '80%' }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, height: '85%' }]}>
             <View style={styles.modalHeader}>
-              <View>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>{browseCategory ? browseCategory : (searchQuery ? 'Search Results' : 'Add Exercise')}</Text>
-                <Text style={[styles.modalSub, { color: colors.textMuted }]}>{browseCategory || searchQuery ? 'Select an exercise' : 'Choose category or search'}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                {(browseCategory || isSearching) && (
-                  <TouchableOpacity onPress={() => setFilterVisible(true)} style={{ padding: 4 }}>
-                    <Ionicons name="options-outline" size={22} color={P.cta} />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => { if (browseCategory) setBrowseCategory(null); else if (searchQuery) { setSearchQuery(''); setIsSearching(false); } else setAddExModalVisible(false); }}>
-                  <Ionicons name={(browseCategory || searchQuery) ? 'arrow-back' : 'close'} size={24} color={colors.text} />
-                </TouchableOpacity>
-              </View>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Add Exercise</Text>
+              <TouchableOpacity onPress={() => setAddExModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
             </View>
-            <View style={[styles.searchWrap, { backgroundColor: colors.inputBg }]}>
-              <Ionicons name="search" size={18} color={colors.textDim} />
-              <TextInput style={[styles.searchInput, { color: colors.text }]} placeholder={browseCategory ? `Search in ${browseCategory}...` : 'Search exercises...'} placeholderTextColor={colors.textDim} value={searchQuery} onChangeText={handleSearch} autoCorrect={false} />
-              {searchQuery.length > 0 && <TouchableOpacity onPress={() => { setSearchQuery(''); setIsSearching(false); }}><Ionicons name="close-circle" size={18} color={colors.textDim} /></TouchableOpacity>}
-            </View>
-            {browseCategory || isSearching ? (
-              loadingExs ? <ActivityIndicator color={P.cta} style={{ marginTop: 40 }} /> : (
-                <FlatList style={{ flex: 1 }} data={browseCategory ? exercisesInCategory : searchResults} keyExtractor={item => item.id} showsVerticalScrollIndicator={false} onEndReached={loadMoreExtra} onEndReachedThreshold={0.5}
-                  ListFooterComponent={loadingMore ? <ActivityIndicator color={P.cta} style={{ marginVertical: 20 }} /> : null}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity 
-                      style={[styles.browserItem, { borderBottomColor: colors.border }]} 
-                      onPress={() => {
-                        setGuideExercise(item);
-                        setGuideModalVisible(true);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Image source={{ uri: item.image_url }} style={styles.browserImg} />
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <Text style={[styles.browserName, { color: colors.text }]}>{item.name}</Text>
-                          {item.avg_rating !== undefined && item.avg_rating !== null && (
-                            <View style={[styles.avgRatingBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                              <Ionicons name="star" size={10} color={P.sun} />
-                              <Text style={[styles.avgRatingText, { color: P.sun }]}>{item.avg_rating}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={[styles.browserMeta, { color: colors.textMuted }]}>{item.equipment} • {item.target}</Text>
-                      </View>
-                      <TouchableOpacity 
-                        style={styles.addBtnSmall} 
-                        onPress={() => addExtraExercise(item)}
-                        activeOpacity={0.6}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        <Ionicons name="add-circle" size={26} color={isDark ? colors.primary : P.cta} />
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-                  )}
-                />
-              )
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-                <View style={styles.catGrid}>
-                  {categories.map(cat => (
-                    <TouchableOpacity key={cat} style={[styles.catCard, { backgroundColor: colors.inputBg }]} onPress={() => selectCategory(cat)}>
-                      <Text style={[styles.catText, { color: colors.text }]}>{cat}</Text>
-                      <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            )}
+            <ExerciseBrowser
+              apiEndpoint="/workouts/exercises/search"
+              variant="compact"
+              onSelectExercise={(exercise) => {
+                setGuideExercise(exercise);
+                setGuideModalVisible(true);
+              }}
+              onAddExercise={(exercise) => addExtraExercise(exercise)}
+              emptyMessage="No exercises found"
+            />
           </View>
         </View>
       </Modal>
-
-      {/* Exercise Filter Modal */}
-      <ExerciseFilterModal
-        visible={filterVisible}
-        onClose={() => setFilterVisible(false)}
-        filters={exerciseFilters}
-        drilldownCategory={browseCategory}
-        onApply={(newFilters) => {
-          const updated = browseCategory
-            ? { ...newFilters, bodyParts: [] }
-            : newFilters;
-          setExerciseFilters(updated);
-          setFilterVisible(false);
-          setPage(0);
-          setHasMore(true);
-          fetchExtraExercises(searchQuery, browseCategory, 0);
-        }}
-        onClear={() => {
-          setExerciseFilters({ categories: [], bodyParts: [], equipment: [], targets: [], minRating: 0 });
-          setFilterVisible(false);
-          setPage(0);
-          setHasMore(true);
-          fetchExtraExercises(searchQuery, browseCategory, 0);
-        }}
-      />
 
       {/* Photo Viewer Modal */}
       <Modal visible={viewerVisible} transparent animationType="fade" onRequestClose={() => setViewerVisible(false)}>
@@ -1379,7 +1250,7 @@ export default function ActiveWorkoutScreen() {
           </TouchableOpacity>
           {viewerUri && (
             <>
-              <Image source={{ uri: viewerUri }} style={styles.viewerImage} resizeMode="contain" />
+              <OptimizedImage uri={viewerUri} style={styles.viewerImage} contentFit="contain" />
               <TouchableOpacity style={styles.downloadBtn} onPress={() => handleDownload(viewerUri)}>
                 <LinearGradient colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)']} style={styles.downloadBtnGrad}>
                   <Ionicons name="download-outline" size={24} color="#FFF" />
@@ -1515,18 +1386,11 @@ const styles = StyleSheet.create({
   setBlockSkipped:   { fontFamily: FONTS.bodyBold, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
   setEditBtn:        { width: 28, height: 28, borderRadius: 7, backgroundColor: '#3B82F6', justifyContent: 'center', alignItems: 'center' },
 
-  // ── Rating banner ──
-  ratingBanner:           { marginTop: 4, marginBottom: 12, borderRadius: 14, overflow: 'hidden', borderWidth: 1 },
-  ratingBannerHeader:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11 },
-  ratingBannerTitle:      { flex: 1, fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.8 },
-  ratingBannerBadge:      { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
-  ratingBannerBadgeText:  { fontFamily: FONTS.bodyBold, fontSize: 11 },
-  ratingGrid:             { padding: 12 },
-  ratingGridInner:        { flexDirection: 'row', flexWrap: 'wrap', gap: 7, justifyContent: 'center' },
-  ratingCard:             { width: (SCREEN_WIDTH - 76) / 5, aspectRatio: 1, borderRadius: 12, borderWidth: 1, justifyContent: 'center', alignItems: 'center', gap: 3 },
-  ratingCardNum:          { fontFamily: FONTS.heading, fontSize: 13 },
-  ratingLabel:            { fontFamily: FONTS.bodyBold, fontSize: 13, textAlign: 'center', marginTop: 10, letterSpacing: 0.5 },
-  ratingHint:             { fontFamily: FONTS.body, fontSize: 11, textAlign: 'center', marginTop: 10 },
+  // ── Rating pill ──
+  ratingPill:           { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 14, marginTop: 4, marginBottom: 12, borderWidth: 1 },
+  ratingPillTitle:      { flex: 1, fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.8 },
+  ratingPillBadge:      { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  ratingPillBadgeText:  { fontFamily: FONTS.bodyBold, fontSize: 11 },
 
   // Footer
   exFooter:          { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
@@ -1552,7 +1416,7 @@ const styles = StyleSheet.create({
   // Modals
   modalOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   timerModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  modalContent:      { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+  modalContent:      { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 0, paddingTop: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
   modalHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
   modalTitle:        { fontFamily: FONTS.heading, fontSize: 20, marginBottom: 2 },
   modalSub:          { fontFamily: FONTS.body, fontSize: 13 },

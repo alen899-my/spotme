@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import OptimizedImage from '../ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
@@ -58,10 +59,10 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, ex
           
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.heroWrap}>
-              <Image 
-                source={{ uri: exercise.gif_url || exercise.image_url }} 
+              <OptimizedImage 
+                uri={exercise.gif_url || exercise.image_url} 
                 style={styles.guideGif} 
-                resizeMode="contain" 
+                contentFit="contain" 
               />
             </View>
              <View style={styles.guideBody}>

@@ -8,6 +8,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import OptimizedImage from '../../components/ui/OptimizedImage';
+import { optimizeImage } from '../../utils/imageOptimizer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
@@ -155,7 +157,7 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
     >
       {/* Header */}
       <View style={carouselStyles.exHeader}>
-        <Image source={{ uri: ex.image_url }} style={carouselStyles.exImage} />
+        <OptimizedImage uri={ex.image_url} style={carouselStyles.exImage} />
         <View style={carouselStyles.exMeta}>
           <Text style={[carouselStyles.exName, { color: isDark ? '#F1F5F9' : '#0F1923' }]} numberOfLines={2}>
             {ex.name}
@@ -419,17 +421,18 @@ export default function WorkoutCompleteScreen() {
         showToast(`Uploading ${photos.length} photos...`, 'info');
         const results = await Promise.allSettled(
           photos.map(async (uri, index) => {
+            const optimizedUri = await optimizeImage(uri, 'workout');
             const formData = new FormData();
             if (Platform.OS === 'web') {
-              const response = await fetch(uri);
+              const response = await fetch(optimizedUri);
               const blob = await response.blob();
               formData.append('photos', blob, `photo_${Date.now()}_${index}.jpg`);
             } else {
-              const name = uri.split('/').pop() || `photo_${index}.jpg`;
+              const name = optimizedUri.split('/').pop() || `photo_${index}.jpg`;
               const match = /\.(\w+)$/.exec(name);
               const type = match ? `image/${match[1]}` : 'image/jpeg';
               formData.append('photos', {
-                uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+                uri: Platform.OS === 'android' ? optimizedUri : optimizedUri.replace('file://', ''),
                 name,
                 type,
               } as any);
