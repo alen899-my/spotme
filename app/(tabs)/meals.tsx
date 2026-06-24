@@ -1490,25 +1490,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           <Text style={[styles.headerTitle, { color: colors.text }]}>{headerTitle}</Text>
           <Text style={[styles.headerSub, { color: colors.textMuted }]}>{headerDescription}</Text>
         </View>
-        {showLogBtn && (
-          <View style={styles.headerActionWrap}>
-            <TouchableOpacity
-              style={styles.logMealBtn}
-              onPress={() => {
-                setInitialImageUri(null);
-                setInitialIngredients([]);
-                setEditingMealId(null);
-                setShowLogSheet(true);
-              }}
-              activeOpacity={0.85}
-            >
-              <View style={styles.logMealBtnFill}>
-                <Ionicons name="add-circle-outline" size={18} color="#FFF" />
-                <Text style={styles.logMealBtnText} numberOfLines={1}>Log Meal</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        )}
+        {showLogBtn && <View style={{ width: 48 }} />}
       </View>
 
       <View style={[styles.slidingTabContainer, { backgroundColor: colors.inputBg }]}>
@@ -1606,10 +1588,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                     </View>
                     <Text style={[styles.emptyTitle, { color: colors.text }]}>No meals logged</Text>
                     <Text style={[styles.emptyText, { color: colors.textMuted }]}>Tap + to log a meal and track your nutrition</Text>
-                    <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: '#2596BE15', borderColor: '#2596BE30', borderWidth: 1 }]} onPress={() => setShowLogSheet(true)}>
-                      <Ionicons name="add-circle-outline" size={16} color="#2596BE" />
-                      <Text style={{ color: '#2596BE', fontFamily: FONTS.bodyBold, fontSize: 13 }}>Log Your First Meal</Text>
-                    </TouchableOpacity>
+
                   </View>
                 </View>
               )
@@ -2185,6 +2164,38 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ── FAB: Log Meal ── */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => {
+          setInitialImageUri(null);
+          setInitialIngredients([]);
+          setEditingMealId(null);
+          setShowLogSheet(true);
+        }}
+        style={{
+          position: 'absolute',
+          bottom: 90,
+          right: 20,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          elevation: 8,
+          shadowColor: '#2596BE',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.35,
+          shadowRadius: 8,
+          zIndex: 100,
+        }}
+      >
+        <LinearGradient
+          colors={['#2596BE', '#1a6e8a']}
+          style={{ width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' }}
+        >
+          <Ionicons name="add" size={28} color="#FFF" />
+        </LinearGradient>
+      </TouchableOpacity>
 
     </View>
   );

@@ -8,6 +8,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import OptimizedImage from '../../components/ui/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FONTS } from '../../constants/theme';
@@ -152,6 +153,7 @@ function getWorkoutDisplay(item: any) {
 
 export default function DailyTab() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const [workouts, setWorkouts] = useState<any[]>([]);
@@ -530,15 +532,7 @@ export default function DailyTab() {
                 <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>Daily Log</Text>
                 <Text style={[styles.headerSub, { color: colors.textMuted }]}>Your workout history</Text>
               </View>
-              <TouchableOpacity style={styles.newBtn} onPress={() => router.push('/daily/new')}>
-                <LinearGradient 
-                  colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]} 
-                  style={[styles.newBtnGradient]}
-                >
-                  <Ionicons name="add" size={s(20)} color="#FFF" />
-                  <Text style={[styles.newBtnText]}>New Workout</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+
             </View>
 
             <View style={styles.splitsSection}>
@@ -684,28 +678,6 @@ export default function DailyTab() {
         ListEmptyComponent={(
           workouts.length === 0 ? (
             <View style={styles.centered}>
-              {isSelectedToday && (
-                <View style={styles.emptyTodayRow}>
-                  <TouchableOpacity style={styles.emptyColBtn} onPress={() => router.push('/daily/new')} activeOpacity={0.82}>
-                    <LinearGradient
-                      colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]}
-                      style={styles.emptyColBtnGradient}
-                    >
-                      <Ionicons name="play" size={20} color="#FFF" />
-                      <Text style={[styles.emptyColBtnText, { color: '#FFF' }]}>Log Workout</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.emptyColBtn} onPress={() => setShowRestModal(true)} activeOpacity={0.82}>
-                    <LinearGradient
-                      colors={isDark ? ['#1E3A5F', '#0F2040'] : ['#DBEAFE', '#BFDBFE']}
-                      style={styles.emptyColBtnGradient}
-                    >
-                      <MaterialCommunityIcons name="bed-clock" size={20} color="#3B82F6" />
-                      <Text style={[styles.emptyColBtnText, { color: '#3B82F6' }]}>Rest Day</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              )}
               <MaterialCommunityIcons name="calendar-plus" size={64} color={colors.border} style={{ marginTop: 24 }} />
               <Text style={[styles.emptyTitle, { color: colors.text }]}>No Workouts Yet</Text>
               <Text style={[styles.emptySub, { color: colors.textMuted }]}>
@@ -720,28 +692,6 @@ export default function DailyTab() {
             </View>
           ) : (
             <View style={[styles.centered, { paddingVertical: 32 }]}>
-              {isSelectedToday && (
-                <View style={styles.emptyTodayRow}>
-                  <TouchableOpacity style={styles.emptyColBtn} onPress={() => router.push('/daily/new')} activeOpacity={0.82}>
-                    <LinearGradient
-                      colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]}
-                      style={styles.emptyColBtnGradient}
-                    >
-                      <Ionicons name="play" size={20} color="#FFF" />
-                      <Text style={[styles.emptyColBtnText, { color: '#FFF' }]}>Log Workout</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.emptyColBtn} onPress={() => setShowRestModal(true)} activeOpacity={0.82}>
-                    <LinearGradient
-                      colors={isDark ? ['#1E3A5F', '#0F2040'] : ['#DBEAFE', '#BFDBFE']}
-                      style={styles.emptyColBtnGradient}
-                    >
-                      <MaterialCommunityIcons name="bed-clock" size={20} color="#3B82F6" />
-                      <Text style={[styles.emptyColBtnText, { color: '#3B82F6' }]}>Rest Day</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              )}
               <Ionicons name="calendar-outline" size={48} color={colors.border} style={{ marginTop: 24 }} />
               <Text style={[styles.emptyTitle, { color: colors.text, fontSize: 20 }]}>No Workouts This Day</Text>
               {!isSelectedToday && (
@@ -897,6 +847,64 @@ export default function DailyTab() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* ── FAB: Rest Day ── */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => setShowRestModal(true)}
+        style={{
+          position: 'absolute',
+          bottom: 158,
+          right: 20,
+          zIndex: 100,
+        }}
+      >
+        <LinearGradient
+          colors={['#DBEAFE', '#BFDBFE']}
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            justifyContent: 'center',
+            alignItems: 'center',
+            elevation: 6,
+            shadowColor: '#3B82F6',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 6,
+          }}
+        >
+          <MaterialCommunityIcons name="bed-clock" size={24} color="#3B82F6" />
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* ── FAB: New Workout ── */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => router.push('/daily/new')}
+        style={{
+          position: 'absolute',
+          bottom: 90,
+          right: 20,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          elevation: 8,
+          shadowColor: '#2563EB',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.35,
+          shadowRadius: 8,
+          zIndex: 100,
+        }}
+      >
+        <LinearGradient
+          colors={isDark ? [colors.primary, colors.primaryDark] : [P.cta, P.ctaDark]}
+          style={{ width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' }}
+        >
+          <Ionicons name="add" size={28} color="#FFF" />
+        </LinearGradient>
+      </TouchableOpacity>
+
     </View>
   );
 }

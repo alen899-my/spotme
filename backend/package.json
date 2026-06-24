@@ -21,6 +21,7 @@
     "multer-s3": "^3.0.1",
     "nodemailer": "^9.0.1",
     "pg": "^8.11.5",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

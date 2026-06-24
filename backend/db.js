@@ -441,6 +441,14 @@ const initDB = async () => {
       );
     `);
 
+    // Add INDB columns to existing table
+    try { await pool.query(`ALTER TABLE food_database ADD COLUMN IF NOT EXISTS chromium_mg NUMERIC`); } catch (_) {}
+    try { await pool.query(`ALTER TABLE food_database ADD COLUMN IF NOT EXISTS molybdenum_mg NUMERIC`); } catch (_) {}
+    try { await pool.query(`ALTER TABLE food_database ADD COLUMN IF NOT EXISTS biotin_ug NUMERIC`); } catch (_) {}
+    try { await pool.query(`ALTER TABLE food_database ADD COLUMN IF NOT EXISTS carotenoids_ug NUMERIC`); } catch (_) {}
+    try { await pool.query(`ALTER TABLE food_database ADD COLUMN IF NOT EXISTS servings_unit TEXT`); } catch (_) {}
+    try { await pool.query(`ALTER TABLE food_database ADD COLUMN IF NOT EXISTS folate_ug NUMERIC`); } catch (_) {}
+
     // Indexes for fast food search
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_food_db_name ON food_database (food_name);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_food_db_meal_type ON food_database (meal_type);`);
