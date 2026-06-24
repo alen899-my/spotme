@@ -5,6 +5,7 @@ import {
   Modal, KeyboardAvoidingView, Platform, Dimensions, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import OptimizedImage from '../ui/OptimizedImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
-import BmiSpeedometer from '../ui/BmiSpeedometer';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 
@@ -44,16 +44,18 @@ const SORT_OPTIONS = [
   { key: 'vitamin_d', label: 'Vitamin D' },
 ];
 
-const QUICK_FILTERS: { key: string; label: string; filter: Record<string, string> }[] = [
-  { key: 'high_protein', label: 'High Protein', filter: { min_protein: '20' } },
-  { key: 'low_cal', label: 'Low Cal', filter: { max_calories: '200' } },
-  { key: 'high_fiber', label: 'High Fiber', filter: { min_fiber: '5' } },
-  { key: 'low_fat', label: 'Low Fat', filter: { max_fat: '10' } },
-  { key: 'low_carb', label: 'Low Carb', filter: { max_carbs: '20' } },
-  { key: 'high_calcium', label: 'High Calcium', filter: { min_calcium: '200' } },
-  { key: 'high_iron', label: 'High Iron', filter: { min_iron: '5' } },
-  { key: 'low_sodium', label: 'Low Sodium', filter: { max_sodium: '140' } },
-  { key: 'high_vitamin_c', label: 'High Vit.C', filter: { min_vitamin_c: '30' } },
+type QuickFilter = { key: string; label: string; sort_by: string; sort_order: 'asc' | 'desc' };
+
+const QUICK_FILTERS: QuickFilter[] = [
+  { key: 'high_protein', label: 'High Protein', sort_by: 'protein_g', sort_order: 'desc' },
+  { key: 'low_cal', label: 'Low Cal', sort_by: 'calories_kcal', sort_order: 'asc' },
+  { key: 'high_fiber', label: 'High Fiber', sort_by: 'fiber_g', sort_order: 'desc' },
+  { key: 'low_fat', label: 'Low Fat', sort_by: 'fat_g', sort_order: 'asc' },
+  { key: 'low_carb', label: 'Low Carb', sort_by: 'carbohydrates_g', sort_order: 'asc' },
+  { key: 'high_calcium', label: 'High Calcium', sort_by: 'calcium_mg', sort_order: 'desc' },
+  { key: 'high_iron', label: 'High Iron', sort_by: 'iron_mg', sort_order: 'desc' },
+  { key: 'low_sodium', label: 'Low Sodium', sort_by: 'sodium_mg', sort_order: 'asc' },
+  { key: 'high_vitamin_c', label: 'High Vit.C', sort_by: 'vitamin_c', sort_order: 'desc' },
 ];
 
 const getIngredientImage = (name: string): string | null => {
@@ -386,13 +388,37 @@ export default function DietRecsScreen({ tab, header }: Props) {
   // ── FOOD CARD ──
   const FoodCard = ({ item }: { item: any }) => {
     const isExpanded = expandedFoodId === item.id;
+    const arrowAnim = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
+
+    useEffect(() => {
+      Animated.spring(arrowAnim, { toValue: isExpanded ? 1 : 0, useNativeDriver: false, tension: 60, friction: 12 }).start();
+    }, [isExpanded]);
+
+    const arrowRotate = arrowAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+
+    const glassBorder = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)';
 
     return (
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={() => setExpandedFoodId(isExpanded ? null : item.id)}
-        style={[styles.foodCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        style={[styles.foodCard, { borderColor: glassBorder }]}
       >
+        <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} />
+        <LinearGradient
+          colors={['rgba(37,150,190,0.06)', 'rgba(37,150,190,0.01)'] as [string, string]}
+          style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(255,255,255,0.06)', 'transparent'] as [string, string]}
+          style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.25, y: 0.5 }}
+          pointerEvents="none"
+        />
         <View style={styles.foodCardTop}>
           {item.image_url || item.image_small_url ? (
             <OptimizedImage uri={item.image_url || item.image_small_url} style={styles.foodCardImg} />
@@ -428,40 +454,45 @@ export default function DietRecsScreen({ tab, header }: Props) {
               }}>{item.nutrition_grade.toUpperCase()}</Text>
             </View>
           ) : null}
+          <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
+            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+          </Animated.View>
         </View>
 
-        <View style={styles.foodCardMacros}>
-          <MacroChip value={Math.round(item.calories_kcal || 0)} label="kcal" color="#E7B100" />
-          <MacroChip value={`${Math.round(item.protein_g || 0)}g`} label="Protein" color="#10B981" />
-          <MacroChip value={`${Math.round(item.carbohydrates_g || 0)}g`} label="Carbs" color="#3B82F6" />
-          <MacroChip value={`${Math.round(item.fat_g || 0)}g`} label="Fat" color="#F59E0B" />
-          {item.fiber_g != null && <MacroChip value={`${Math.round(item.fiber_g)}g`} label="Fiber" color="#34D399" />}
-        </View>
-
-        {isExpanded && (
-          <View style={[styles.foodCardExtra, { borderTopColor: colors.border }]}>
-            <View style={styles.extraMacrosRow}>
-              {item.sugars_g != null && <ExtraPill value={`${Math.round(item.sugars_g)}g`} label="Sugar" color="#E7B100" />}
-              {item.sodium_mg != null && <ExtraPill value={`${Math.round(item.sodium_mg)}mg`} label="Sodium" color="#FB923C" />}
-              {item.saturated_fat_g != null && <ExtraPill value={`${Math.round(item.saturated_fat_g)}g`} label="Sat.Fat" color="#8B5CF6" />}
-              {item.monounsaturated_fat_g != null && <ExtraPill value={`${Math.round(item.monounsaturated_fat_g)}g`} label="Mono" color="#A78BFA" />}
-              {item.polyunsaturated_fat_g != null && <ExtraPill value={`${Math.round(item.polyunsaturated_fat_g)}g`} label="Poly" color="#818CF8" />}
-              {item.trans_fat_g != null && <ExtraPill value={`${Math.round(item.trans_fat_g)}g`} label="Trans" color="#F87171" />}
-              {item.omega3_fat_g != null && <ExtraPill value={`${Math.round(item.omega3_fat_g)}g`} label="Ω-3" color="#60A5FA" />}
-              {item.omega6_fat_g != null && <ExtraPill value={`${Math.round(item.omega6_fat_g)}g`} label="Ω-6" color="#34D399" />}
-              {item.cholesterol_mg != null && <ExtraPill value={`${Math.round(item.cholesterol_mg)}mg`} label="Chol." color="#F87171" />}
-            </View>
-            <View style={[styles.extraMacrosRow, { marginTop: 6 }]}>
-              {item.calcium_mg != null && <ExtraPill value={`${Math.round(item.calcium_mg)}mg`} label="Calcium" color="#FBBF24" />}
-              {item.iron_mg != null && <ExtraPill value={`${Math.round(item.iron_mg)}mg`} label="Iron" color="#FB923C" />}
-              {item.magnesium_mg != null && <ExtraPill value={`${Math.round(item.magnesium_mg)}mg`} label="Magnesium" color="#A78BFA" />}
-              {item.potassium_mg != null && <ExtraPill value={`${Math.round(item.potassium_mg)}mg`} label="Potassium" color="#60A5FA" />}
-              {item.zinc_mg != null && <ExtraPill value={`${Math.round(item.zinc_mg)}mg`} label="Zinc" color="#34D399" />}
-              {item.vitamin_c != null && <ExtraPill value={`${Math.round(item.vitamin_c)}mg`} label="Vit.C" color="#FBBF24" />}
-              {item.vitamin_d != null && <ExtraPill value={`${Math.round(item.vitamin_d)}µg`} label="Vit.D" color="#F59E0B" />}
-              {item.folate_ug != null && <ExtraPill value={`${Math.round(item.folate_ug)}µg`} label="Folate" color="#10B981" />}
-              {item.vitamin_b12 != null && <ExtraPill value={`${Math.round(item.vitamin_b12)}µg`} label="B12" color="#EC4899" />}
-            </View>
+        {isExpanded ? (
+          <View style={[styles.nutrientTable, { borderColor: glassBorder }]}>
+            <NutrientRow label="Calories" value={Math.round(item.calories_kcal || 0)} unit="kcal" isDark={isDark} />
+            <NutrientRow label="Protein" value={Math.round(item.protein_g || 0)} unit="g" isDark={isDark} />
+            <NutrientRow label="Carbs" value={Math.round(item.carbohydrates_g || 0)} unit="g" isDark={isDark} />
+            <NutrientRow label="Fat" value={Math.round(item.fat_g || 0)} unit="g" isDark={isDark} />
+            {item.fiber_g != null && <NutrientRow label="Fiber" value={Math.round(item.fiber_g)} unit="g" isDark={isDark} />}
+            <View style={[styles.nutrientDivider, { backgroundColor: glassBorder }]} />
+            {item.sugars_g != null && <NutrientRow label="Sugar" value={Math.round(item.sugars_g)} unit="g" isDark={isDark} />}
+            {item.sodium_mg != null && <NutrientRow label="Sodium" value={Math.round(item.sodium_mg)} unit="mg" isDark={isDark} />}
+            {item.saturated_fat_g != null && <NutrientRow label="Sat.Fat" value={Math.round(item.saturated_fat_g)} unit="g" isDark={isDark} />}
+            {item.monounsaturated_fat_g != null && <NutrientRow label="Mono" value={Math.round(item.monounsaturated_fat_g)} unit="g" isDark={isDark} />}
+            {item.polyunsaturated_fat_g != null && <NutrientRow label="Poly" value={Math.round(item.polyunsaturated_fat_g)} unit="g" isDark={isDark} />}
+            {item.trans_fat_g != null && <NutrientRow label="Trans" value={Math.round(item.trans_fat_g)} unit="g" isDark={isDark} />}
+            {item.omega3_fat_g != null && <NutrientRow label="Ω-3" value={Math.round(item.omega3_fat_g)} unit="g" isDark={isDark} />}
+            {item.omega6_fat_g != null && <NutrientRow label="Ω-6" value={Math.round(item.omega6_fat_g)} unit="g" isDark={isDark} />}
+            {item.cholesterol_mg != null && <NutrientRow label="Chol." value={Math.round(item.cholesterol_mg)} unit="mg" isDark={isDark} />}
+            <View style={[styles.nutrientDivider, { backgroundColor: glassBorder }]} />
+            {item.calcium_mg != null && <NutrientRow label="Calcium" value={Math.round(item.calcium_mg)} unit="mg" isDark={isDark} />}
+            {item.iron_mg != null && <NutrientRow label="Iron" value={Math.round(item.iron_mg)} unit="mg" isDark={isDark} />}
+            {item.magnesium_mg != null && <NutrientRow label="Magnesium" value={Math.round(item.magnesium_mg)} unit="mg" isDark={isDark} />}
+            {item.potassium_mg != null && <NutrientRow label="Potassium" value={Math.round(item.potassium_mg)} unit="mg" isDark={isDark} />}
+            {item.zinc_mg != null && <NutrientRow label="Zinc" value={Math.round(item.zinc_mg)} unit="mg" isDark={isDark} />}
+            {item.vitamin_c != null && <NutrientRow label="Vit.C" value={Math.round(item.vitamin_c)} unit="mg" isDark={isDark} />}
+            {item.vitamin_d != null && <NutrientRow label="Vit.D" value={Math.round(item.vitamin_d)} unit="µg" isDark={isDark} />}
+            {item.folate_ug != null && <NutrientRow label="Folate" value={Math.round(item.folate_ug)} unit="µg" isDark={isDark} />}
+            {item.vitamin_b12 != null && <NutrientRow label="B12" value={Math.round(item.vitamin_b12)} unit="µg" isDark={isDark} />}
+          </View>
+        ) : (
+          <View style={styles.foodCardMacros}>
+            <MacroChip value={Math.round(item.calories_kcal || 0)} label="kcal" color="#E7B100" />
+            <MacroChip value={`${Math.round(item.protein_g || 0)}g`} label="Protein" color="#10B981" />
+            <MacroChip value={`${Math.round(item.carbohydrates_g || 0)}g`} label="Carbs" color="#3B82F6" />
+            <MacroChip value={`${Math.round(item.fat_g || 0)}g`} label="Fat" color="#F59E0B" />
           </View>
         )}
       </TouchableOpacity>
@@ -482,62 +513,77 @@ export default function DietRecsScreen({ tab, header }: Props) {
 
     const getMealIcon = (type?: string) => {
       const t = (type || '').toLowerCase();
-      if (t.includes('breakfast') || t.includes('morning')) return { icon: 'sunny-outline' as const, color: '#E7B100' };
-      if (t.includes('lunch') || t.includes('afternoon')) return { icon: 'sunny' as const, color: '#3B82F6' };
-      if (t.includes('dinner') || t.includes('evening')) return { icon: 'partly-sunny-outline' as const, color: '#F59E0B' };
-      return { icon: 'cafe-outline' as const, color: '#8B5CF6' };
+      if (t.includes('breakfast') || t.includes('morning')) return { icon: 'sunny-outline' as const, color: '#E7B100', tint: ['rgba(231,177,0,0.20)', 'rgba(231,177,0,0.02)'] as [string, string] };
+      if (t.includes('lunch') || t.includes('afternoon')) return { icon: 'sunny' as const, color: '#3B82F6', tint: ['rgba(59,130,246,0.20)', 'rgba(59,130,246,0.02)'] as [string, string] };
+      if (t.includes('dinner') || t.includes('evening')) return { icon: 'partly-sunny-outline' as const, color: '#F59E0B', tint: ['rgba(245,158,11,0.20)', 'rgba(245,158,11,0.02)'] as [string, string] };
+      return { icon: 'cafe-outline' as const, color: '#8B5CF6', tint: ['rgba(139,92,246,0.20)', 'rgba(139,92,246,0.02)'] as [string, string] };
     };
 
     const vi = getMealIcon(meal.meal_type);
 
     return (
-      <View style={[styles.planCard, isDark ? { backgroundColor: colors.card } : { backgroundColor: '#2596BE' }]}>
+      <View style={[styles.planCard, { borderColor: 'rgba(255,255,255,0.10)' }]}>
+        <BlurView intensity={45} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 24 }]} />
+        <LinearGradient
+          colors={vi.tint}
+          style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(255,255,255,0.06)', 'transparent'] as [string, string]}
+          style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.25, y: 0.5 }}
+          pointerEvents="none"
+        />
         <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.planCardHeader}>
-          <View style={[styles.planCardIcon, { backgroundColor: isDark ? vi.color + '18' : 'rgba(255,255,255,0.18)' }]}>
-            <Ionicons name={vi.icon} size={20} color={isDark ? vi.color : '#FFFFFF'} />
+          <View style={[styles.planCardIcon, { backgroundColor: vi.color + '22' }]}>
+            <Ionicons name={vi.icon} size={20} color={vi.color} />
           </View>
           <View style={styles.planCardMeta}>
-            <Text style={[styles.planCardMealType, { color: isDark ? colors.text : '#FFFFFF' }]}>{meal.meal_type}</Text>
-            <Text style={[styles.planCardTitle, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.82)' }]} numberOfLines={1}>{meal.title}</Text>
+            <Text style={[styles.planCardMealType, { color: colors.text }]}>{meal.meal_type}</Text>
+            <Text style={[styles.planCardTitle, { color: colors.textMuted }]} numberOfLines={1}>{meal.title}</Text>
           </View>
           <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
-            <Ionicons name="chevron-down" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.85)'} />
+            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
           </Animated.View>
         </TouchableOpacity>
 
         <View style={styles.planCardMacros}>
-          <PlanMacro value={Math.round(meal.calories)} label="kcal" color={isDark ? "#E7B100" : "#FFFFFF"} />
-          <PlanMacro value={`${Math.round(meal.protein)}g`} label="Protein" color={isDark ? "#10B981" : "#FFFFFF"} />
-          <PlanMacro value={`${Math.round(meal.carbs)}g`} label="Carbs" color={isDark ? "#3B82F6" : "#FFFFFF"} />
-          <PlanMacro value={`${Math.round(meal.fat)}g`} label="Fat" color={isDark ? "#F59E0B" : "#FFFFFF"} />
+          <PlanMacro value={Math.round(meal.calories)} label="kcal" color="#E7B100" />
+          <PlanMacro value={`${Math.round(meal.protein)}g`} label="Protein" color="#10B981" />
+          <PlanMacro value={`${Math.round(meal.carbs)}g`} label="Carbs" color="#3B82F6" />
+          <PlanMacro value={`${Math.round(meal.fat)}g`} label="Fat" color="#F59E0B" />
         </View>
 
         {open && (
-          <View style={[styles.planCardBody, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
+          <View style={[styles.planCardBody, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
             {meal.description ? (
-              <Text style={[styles.planDesc, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.85)' }]}>{meal.description}</Text>
+              <Text style={[styles.planDesc, { color: colors.textMuted }]}>{meal.description}</Text>
             ) : null}
 
             {meal.ingredients?.length > 0 && (
               <View style={styles.planIngredients}>
-                <Text style={[styles.planSectionLabel, { color: isDark ? colors.text : '#FFFFFF' }]}>Ingredients</Text>
+                <Text style={[styles.planSectionLabel, { color: colors.text }]}>Ingredients</Text>
                 {meal.ingredients.map((ing: any, i: number) => {
                   const imgUrl = ing.image_url || getIngredientImage(ing.name);
                   return (
-                    <View key={i} style={[styles.ingredientRow, { borderBottomColor: isDark ? colors.border : 'rgba(255,255,255,0.15)' }]}>
+                    <View key={i} style={[styles.ingredientRow, { borderBottomColor: 'rgba(255,255,255,0.06)' }]}>
                       {imgUrl ? (
                         <OptimizedImage uri={imgUrl} style={styles.ingredientImg} />
                       ) : (
-                        <View style={[styles.ingredientImgPlaceholder, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)' }]}>
-                          <Ionicons name="nutrition-outline" size={14} color={isDark ? colors.textMuted : '#FFFFFF'} />
+                        <View style={[styles.ingredientImgPlaceholder, { backgroundColor: colors.inputBg }]}>
+                          <Ionicons name="nutrition-outline" size={14} color={colors.textMuted} />
                         </View>
                       )}
                       <View style={styles.ingredientInfo}>
-                        <Text style={[styles.ingredientName, { color: isDark ? colors.text : '#FFFFFF' }]}>{ing.name}</Text>
-                        <Text style={[styles.ingredientQty, { color: isDark ? colors.textDim : 'rgba(255,255,255,0.72)' }]}>{ing.quantity}</Text>
+                        <Text style={[styles.ingredientName, { color: colors.text }]}>{ing.name}</Text>
+                        <Text style={[styles.ingredientQty, { color: colors.textDim }]}>{ing.quantity}</Text>
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={[styles.ingredientCals, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.85)' }]}>
+                        <Text style={[styles.ingredientCals, { color: colors.textMuted }]}>
                           {ing.calories || Math.round(meal.calories / meal.ingredients.length)} kcal
                         </Text>
                         <TouchableOpacity
@@ -549,11 +595,11 @@ export default function DietRecsScreen({ tab, header }: Props) {
                             setShowIngredientSelector(true);
                             loadAlternativeFoods(ing);
                           }}
-                          style={[styles.changeBtn, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.14)', borderColor: isDark ? colors.border : 'rgba(255,255,255,0.2)' }]}
+                          style={[styles.changeBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
                           activeOpacity={0.7}
                         >
-                          <Ionicons name="create-outline" size={11} color={isDark ? colors.text : '#FFFFFF'} />
-                          <Text style={[styles.changeBtnText, { color: isDark ? colors.text : '#FFFFFF' }]}>Replace</Text>
+                          <Ionicons name="create-outline" size={11} color={colors.text} />
+                          <Text style={[styles.changeBtnText, { color: colors.text }]}>Replace</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -564,8 +610,8 @@ export default function DietRecsScreen({ tab, header }: Props) {
 
             {meal.instructions ? (
               <View style={styles.planInstructions}>
-                <Text style={[styles.planSectionLabel, { color: isDark ? colors.text : '#FFFFFF' }]}>Instructions</Text>
-                <Text style={[styles.planInstructionsText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.82)' }]}>{meal.instructions}</Text>
+                <Text style={[styles.planSectionLabel, { color: colors.text }]}>Instructions</Text>
+                <Text style={[styles.planInstructionsText, { color: colors.textMuted }]}>{meal.instructions}</Text>
               </View>
             ) : null}
           </View>
@@ -574,11 +620,33 @@ export default function DietRecsScreen({ tab, header }: Props) {
     );
   };
 
+  const PlanMacro = ({ value, label, color }: { value: string | number; label: string; color: string }) => (
+    <View style={[styles.planMacroChip, { backgroundColor: color + '15' }]}>
+      <Text style={[styles.planMacroValue, { color }]}>{value}</Text>
+      <Text style={[styles.planMacroLabel, { color }]}>{label}</Text>
+    </View>
+  );
+
+  const TargetBox = ({ value, label, sub, color }: { value: string; label: string; sub: string; color: string }) => (
+    <View style={[styles.targetBox, { backgroundColor: color + '15' }]}>
+      <Text style={[styles.targetBoxValue, { color }]}>{value}</Text>
+      <Text style={[styles.targetBoxLabel, { color }]}>{label || sub}</Text>
+    </View>
+  );
+
   // ── RENDERERS ──
   const renderBrowseTab = () => {
     const browseContent = (
       <View style={{ flex: 1 }}>
-        <View style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+        <View style={[styles.searchBar, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }]}>
+          <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 16 }]} />
+          <LinearGradient
+            colors={['rgba(255,255,255,0.05)', 'transparent'] as [string, string]}
+            style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            pointerEvents="none"
+          />
           <Ionicons name="search-outline" size={18} color={colors.textDim} style={{ marginRight: 8 }} />
           <TextInput
             style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 14, color: colors.text }}
@@ -600,17 +668,19 @@ export default function DietRecsScreen({ tab, header }: Props) {
           </Text>
           <View style={{ flex: 1 }} />
           <TouchableOpacity
-            style={[styles.sortBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
+            style={[styles.sortBtn, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }]}
             onPress={() => setShowSortPicker(true)}
           >
+            <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 12 }]} />
             <Text style={[styles.sortBtnText, { color: colors.text }]} numberOfLines={1}>
               {SORT_OPTIONS.find(s => s.key === sortBy)?.label || 'Sort'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.sortToggleBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
+            style={[styles.sortToggleBtn, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }]}
             onPress={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
           >
+            <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 12 }]} />
             <Ionicons name={sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'} size={14} color={colors.text} />
           </TouchableOpacity>
         </View>
@@ -618,21 +688,24 @@ export default function DietRecsScreen({ tab, header }: Props) {
         {/* Quick Filter Chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsRow}>
           {QUICK_FILTERS.map((qf) => {
-            const isActive = Object.entries(qf.filter).every(([k, v]) => filters[k] === v);
+            const isActive = sortBy === qf.sort_by && sortOrder === qf.sort_order;
             return (
               <TouchableOpacity
                 key={qf.key}
-                style={[styles.filterChip, { backgroundColor: colors.inputBg, borderColor: colors.border }, isActive && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                style={[styles.filterChip, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }, isActive && { backgroundColor: colors.primary, borderColor: colors.primary }]}
                 onPress={() => {
                   if (isActive) {
-                    const next = { ...filters };
-                    Object.keys(qf.filter).forEach(k => delete next[k]);
-                    setFilters(next);
+                    setSortBy('calories_kcal');
+                    setSortOrder('desc');
+                    setFilters({});
                   } else {
-                    setFilters(prev => ({ ...prev, ...qf.filter }));
+                    setSortBy(qf.sort_by);
+                    setSortOrder(qf.sort_order);
+                    setFilters({});
                   }
                 }}
               >
+                {!isActive && <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 16 }]} />}
                 <Text style={[styles.filterChipText, { color: isActive ? '#FFF' : colors.textMuted }]}>{qf.label}</Text>
               </TouchableOpacity>
             );
@@ -653,17 +726,18 @@ export default function DietRecsScreen({ tab, header }: Props) {
               {browseContent}
               <View style={styles.foodList}>
                 {[1,2,3,4,5].map((_, i) => (
-                  <View key={i} style={[styles.foodCard, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 10 }]}>
+                  <View key={i} style={[styles.foodCard, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)', marginBottom: 10 }]}>
+                    <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} />
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <View style={[styles.foodCardImgPlaceholder, { backgroundColor: colors.inputBg, width: 52, height: 52, borderRadius: 12 }]} />
+                      <View style={[styles.foodCardImgPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', width: 52, height: 52, borderRadius: 12 }]} />
                       <View style={{ flex: 1, gap: 6 }}>
-                        <View style={{ height: 14, width: '60%', backgroundColor: colors.inputBg, borderRadius: 4 }} />
-                        <View style={{ height: 10, width: '40%', backgroundColor: colors.inputBg, borderRadius: 4 }} />
+                        <View style={{ height: 14, width: '60%', backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 4 }} />
+                        <View style={{ height: 10, width: '40%', backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 4 }} />
                       </View>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 6, marginTop: 12 }}>
                       {[1,2,3,4].map((_, j) => (
-                        <View key={j} style={{ flex: 1, height: 36, backgroundColor: colors.inputBg, borderRadius: 10 }} />
+                        <View key={j} style={{ flex: 1, height: 36, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 10 }} />
                       ))}
                     </View>
                   </View>
@@ -683,7 +757,8 @@ export default function DietRecsScreen({ tab, header }: Props) {
           {header}
           {browseContent}
           <View style={styles.centerFlex}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.emptyIcon, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }]}>
+              <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 22 }]} />
               <Ionicons name="search-outline" size={36} color={colors.textDim} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No foods found</Text>
@@ -715,17 +790,18 @@ export default function DietRecsScreen({ tab, header }: Props) {
         ListFooterComponent={loadingMore ? (
           <View style={{ paddingBottom: 16 }}>
             {[1,2,3].map((_, i) => (
-              <View key={i} style={[styles.foodCard, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 10 }]}>
+              <View key={i} style={[styles.foodCard, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)', marginBottom: 10 }]}>
+                <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 18 }]} />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={[styles.foodCardImgPlaceholder, { backgroundColor: colors.inputBg, width: 52, height: 52, borderRadius: 12 }]} />
+                  <View style={[styles.foodCardImgPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', width: 52, height: 52, borderRadius: 12 }]} />
                   <View style={{ flex: 1, gap: 6 }}>
-                    <View style={{ height: 14, width: '60%', backgroundColor: colors.inputBg, borderRadius: 4 }} />
-                    <View style={{ height: 10, width: '40%', backgroundColor: colors.inputBg, borderRadius: 4 }} />
+                    <View style={{ height: 14, width: '60%', backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 4 }} />
+                    <View style={{ height: 10, width: '40%', backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 4 }} />
                   </View>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 6, marginTop: 12 }}>
                   {[1,2,3,4].map((_, j) => (
-                    <View key={j} style={{ flex: 1, height: 36, backgroundColor: colors.inputBg, borderRadius: 10 }} />
+                    <View key={j} style={{ flex: 1, height: 36, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: 10 }} />
                   ))}
                 </View>
               </View>
@@ -754,16 +830,17 @@ export default function DietRecsScreen({ tab, header }: Props) {
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]} showsVerticalScrollIndicator={false}>
           {header}
           <View style={styles.centerFlex}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.emptyIcon, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }]}>
+              <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 22 }]} />
               <Ionicons name="alert-circle-outline" size={36} color={colors.textDim} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Diet Plan Yet</Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>{recommendationError}</Text>
             <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+              style={[styles.primaryBtn, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)', backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(37,150,190,0.1)' }]}
               onPress={() => fetchRecommendations(true)}
             >
-              <Text style={[styles.primaryBtnText, { color: colors.bg }]}>Retry</Text>
+              <Text style={[styles.primaryBtnText, { color: colors.primary }]}>Retry</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -775,17 +852,18 @@ export default function DietRecsScreen({ tab, header }: Props) {
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]} showsVerticalScrollIndicator={false}>
           {header}
           <View style={styles.centerFlex}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.emptyIcon, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }]}>
+              <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 22 }]} />
               <Ionicons name="sparkles-outline" size={36} color={colors.textDim} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Diet Plan</Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>Configure your profile to get a personalized diet plan</Text>
             <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+              style={[styles.primaryBtn, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)', backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(37,150,190,0.1)' }]}
               onPress={openDietForm}
             >
-              <Ionicons name="options-outline" size={16} color={colors.bg} style={{ marginRight: 6 }} />
-              <Text style={[styles.primaryBtnText, { color: colors.bg }]}>Configure Diet Plan</Text>
+              <Ionicons name="options-outline" size={16} color={colors.primary} style={{ marginRight: 6 }} />
+              <Text style={[styles.primaryBtnText, { color: colors.primary }]}>Configure Diet Plan</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -793,41 +871,39 @@ export default function DietRecsScreen({ tab, header }: Props) {
     }
 
     return (
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 80, 100) }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 120, 140) }]} showsVerticalScrollIndicator={false}>
         {header}
-        {/* BMI Speedometer */}
-        <BmiSpeedometer
-          bmi={parseFloat(recommendationData.bmi) || 0}
-          bmiCategory={recommendationData.bmiCategory}
-          isDark={isDark}
-          size={260}
-        />
 
         {/* Daily Targets */}
-        <View style={[styles.targetsCard, isDark ? { backgroundColor: colors.card } : { backgroundColor: '#2596BE' }]}>
-          <Text style={[styles.sectionTitle, { color: isDark ? colors.text : '#FFF' }]}>Daily Targets</Text>
+        <View style={[styles.targetsCard, { borderColor: 'rgba(255,255,255,0.10)' }]}>
+          <BlurView intensity={45} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 24 }]} />
+          <LinearGradient
+            colors={['rgba(37,150,190,0.15)', 'rgba(37,150,190,0.02)'] as [string, string]}
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(255,255,255,0.06)', 'transparent'] as [string, string]}
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0.25, y: 0.5 }}
+            pointerEvents="none"
+          />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Daily Targets</Text>
           <View style={styles.targetsRow}>
-            <TargetBox value={`${targets.calories}`} label="kcal" sub="Calories" color={isDark ? "#E7B100" : "#FFFFFF"} />
-            <TargetBox value={`${targets.protein}g`} label="Protein" sub="" color={isDark ? "#10B981" : "#FFFFFF"} />
-            <TargetBox value={`${targets.carbs}g`} label="Carbs" sub="" color={isDark ? "#3B82F6" : "#FFFFFF"} />
-            <TargetBox value={`${targets.fat}g`} label="Fat" sub="" color={isDark ? "#F59E0B" : "#FFFFFF"} />
+            <TargetBox value={`${targets.calories}`} label="kcal" sub="Calories" color="#E7B100" />
+            <TargetBox value={`${targets.protein}g`} label="Protein" sub="" color="#10B981" />
+            <TargetBox value={`${targets.carbs}g`} label="Carbs" sub="" color="#3B82F6" />
+            <TargetBox value={`${targets.fat}g`} label="Fat" sub="" color="#F59E0B" />
           </View>
-          <View style={[styles.profileSummary, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)' }]}>
-            <Text style={[styles.profileSummaryText, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.85)' }]}>
+          <View style={[styles.profileSummary, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
+            <Text style={[styles.profileSummaryText, { color: colors.textMuted }]}>
               {recommendationData.user?.diet_type || 'Standard'} · {recommendationData.user?.meals_per_day || 4} meals · {recommendationData.user?.fitness_goal || 'Maintain'}
             </Text>
           </View>
         </View>
-
-        {/* Configure Button */}
-        <TouchableOpacity
-          style={[styles.configBtn, { borderColor: colors.primary }]}
-          onPress={openDietForm}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="settings-outline" size={16} color={colors.primary} style={{ marginRight: 6 }} />
-          <Text style={[styles.configBtnText, { color: colors.primary }]}>Configure Diet Plan</Text>
-        </TouchableOpacity>
 
         {/* Meal Plans */}
         {recommendationData.recommendedMeals?.length > 0 ? (
@@ -852,34 +928,75 @@ export default function DietRecsScreen({ tab, header }: Props) {
 
       {/* ── SORT PICKER MODAL ── */}
       <Modal visible={showSortPicker} transparent animationType="fade" onRequestClose={() => setShowSortPicker(false)}>
-        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowSortPicker(false)}>
-          <View style={[styles.sortSheet, { backgroundColor: colors.card }]}>
+        <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} pointerEvents="none" />
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowSortPicker(false)} />
+          <View style={[styles.sortSheet, { overflow: 'hidden', borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)', backgroundColor: isDark ? 'rgba(13,13,13,0.92)' : 'rgba(255,255,255,0.92)' }]}>
+            <BlurView intensity={60} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 24, borderTopRightRadius: 24 }]} pointerEvents="none" />
+            <LinearGradient
+              colors={['rgba(37,150,190,0.08)', 'transparent'] as [string, string]}
+              style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 24, borderTopRightRadius: 24 }]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              pointerEvents="none"
+            />
             <Text style={[styles.sortSheetTitle, { color: colors.text }]}>Sort By</Text>
-            {SORT_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.key}
-                style={[styles.sortOption, { borderBottomColor: colors.border }]}
-                onPress={() => {
-                  if (sortBy === opt.key) {
-                    setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
-                  } else {
-                    setSortBy(opt.key);
-                    setSortOrder('desc');
-                  }
-                  setShowSortPicker(false);
-                }}
-              >
-                <Text style={[styles.sortOptionText, { color: sortBy === opt.key ? colors.primary : colors.text }]}>
-                  {opt.label}
-                </Text>
-                {sortBy === opt.key && (
-                  <Ionicons name={sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'} size={16} color={colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: SCREEN_HEIGHT * 0.5 }}>
+              {SORT_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.sortOption, { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}
+                  onPress={() => {
+                    if (sortBy === opt.key) {
+                      setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+                    } else {
+                      setSortBy(opt.key);
+                      setSortOrder('desc');
+                    }
+                    setShowSortPicker(false);
+                  }}
+                >
+                  <Text style={[styles.sortOptionText, { color: sortBy === opt.key ? colors.primary : colors.text }]}>
+                    {opt.label}
+                  </Text>
+                  {sortBy === opt.key && (
+                    <Ionicons name={sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'} size={16} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
+
+      {/* ── FAB: Configure Diet Plan ── */}
+      {tab === 'plan' && recommendationData && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={openDietForm}
+          style={{
+            position: 'absolute',
+            bottom: insets.bottom + 100,
+            right: 20,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            elevation: 8,
+            shadowColor: '#2596BE',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.35,
+            shadowRadius: 8,
+            zIndex: 100,
+          }}
+        >
+          <LinearGradient
+            colors={['#2596BE', '#1a6e8a']}
+            style={{ width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <Ionicons name="settings-outline" size={24} color="#FFF" />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
 
       {/* ── DIET PLAN CONFIG MODAL ── */}
       <Modal
@@ -889,9 +1006,10 @@ export default function DietRecsScreen({ tab, header }: Props) {
         statusBarTranslucent
         onRequestClose={() => setShowDietForm(false)}
       >
+        <BlurView intensity={90} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} pointerEvents="none" />
         <View style={styles.modalBackdrop}>
           <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setShowDietForm(false)} />
-
+ 
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={{ flex: 1, justifyContent: 'flex-end' }}
@@ -1099,8 +1217,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
                     <ActivityIndicator color="#FFF" size="small" />
                   ) : (
                     <>
-                      <Ionicons name="sparkles" size={20} color="#FFF" />
-                      <Text style={styles.submitBtnText}>Generate AI Meal Plan ✨</Text>
+                      <Text style={styles.submitBtnText}>Generate AI Meal Plan </Text>
                     </>
                   )}
                 </LinearGradient>
@@ -1113,8 +1230,10 @@ export default function DietRecsScreen({ tab, header }: Props) {
 
       {/* ── INGREDIENT SELECTOR MODAL ── */}
       <Modal visible={showIngredientSelector} animationType="slide" transparent statusBarTranslucent>
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={[styles.fsHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <BlurView intensity={90} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} pointerEvents="none" />
+        <View style={{ flex: 1 }}>
+          <View style={[styles.fsHeader, { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+            <BlurView intensity={60} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]} pointerEvents="none" />
             <View style={{ flex: 1 }}>
               <Text style={[styles.fsTitle, { color: colors.text }]}>Replace Ingredient</Text>
               <Text style={{ fontFamily: FONTS.body, fontSize: 11, color: colors.textMuted, marginTop: 1 }}>
@@ -1123,7 +1242,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
             </View>
             <TouchableOpacity
               onPress={() => setShowIngredientSelector(false)}
-              style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: colors.inputBg, justifyContent: 'center', alignItems: 'center' }}
+              style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', justifyContent: 'center', alignItems: 'center' }}
             >
               <Ionicons name="close" size={20} color={colors.text} />
             </TouchableOpacity>
@@ -1152,8 +1271,23 @@ export default function DietRecsScreen({ tab, header }: Props) {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={() => handleSelectFood(item)}
-                  style={[styles.selectorFoodCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  style={[styles.selectorFoodCard, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }]}
                 >
+                  <BlurView intensity={50} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderRadius: 20 }]} />
+                  <LinearGradient
+                    colors={['rgba(37,150,190,0.04)', 'rgba(37,150,190,0.01)'] as [string, string]}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    pointerEvents="none"
+                  />
+                  <LinearGradient
+                    colors={['rgba(255,255,255,0.05)', 'transparent'] as [string, string]}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0.25, y: 0.5 }}
+                    pointerEvents="none"
+                  />
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     {item.image_url || item.image_small_url ? (
                       <OptimizedImage uri={item.image_url || item.image_small_url} style={styles.selectorFoodImage} contentFit="cover" />
@@ -1206,30 +1340,18 @@ export default function DietRecsScreen({ tab, header }: Props) {
 
 // ── SUB-COMPONENTS ──
 
+const NutrientRow = ({ label, value, unit, isDark }: { label: string; value: number; unit: string; isDark: boolean }) => (
+  <View style={[styles.nutrientRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}>
+    <Text style={[styles.nutrientRowLabel, { color: isDark ? 'rgba(241,245,249,0.55)' : 'rgba(15,25,35,0.55)' }]}>{label}</Text>
+    <Text style={[styles.nutrientRowValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{value}</Text>
+    <Text style={[styles.nutrientRowUnit, { color: isDark ? 'rgba(241,245,249,0.35)' : 'rgba(15,25,35,0.35)' }]}>{unit}</Text>
+  </View>
+);
+
 const MacroChip = ({ value, label, color }: { value: string | number; label: string; color: string }) => (
-  <View style={[styles.macroChip, { backgroundColor: color + '12' }]}>
+  <View style={[styles.macroChip, { backgroundColor: color + '08' }]}>
     <Text style={[styles.macroChipValue, { color }]}>{value}</Text>
-    <Text style={[styles.macroChipLabel, { color: color + 'CC' }]}>{label}</Text>
-  </View>
-);
-
-const ExtraPill = ({ value, label, color }: { value: string; label: string; color: string }) => (
-  <View style={[styles.extraPill, { backgroundColor: color + '15' }]}>
-    <Text style={[styles.extraPillText, { color }]}>{value} {label}</Text>
-  </View>
-);
-
-const PlanMacro = ({ value, label, color }: { value: string | number; label: string; color: string }) => (
-  <View style={[styles.planMacroChip, { backgroundColor: color === '#FFFFFF' ? 'rgba(255,255,255,0.15)' : color + '12' }]}>
-    <Text style={[styles.planMacroValue, { color }]}>{value}</Text>
-    <Text style={[styles.planMacroLabel, { color }]}>{label}</Text>
-  </View>
-);
-
-const TargetBox = ({ value, label, sub, color }: { value: string; label: string; sub: string; color: string }) => (
-  <View style={[styles.targetBox, { backgroundColor: color === '#FFFFFF' ? 'rgba(255,255,255,0.15)' : color + '15' }]}>
-    <Text style={[styles.targetBoxValue, { color }]}>{value}</Text>
-    <Text style={[styles.targetBoxLabel, { color }]}>{label || sub}</Text>
+    <Text style={[styles.macroChipLabel, { color: color + '99' }]}>{label}</Text>
   </View>
 );
 
@@ -1239,28 +1361,31 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 8,
     paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, borderWidth: 1,
+    overflow: 'hidden',
   },
   toolbar: {
     flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 8, marginBottom: 4, gap: 8,
   },
   sortBtn: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 12, borderWidth: 1, gap: 4,
+    borderRadius: 12, borderWidth: 1, gap: 4, overflow: 'hidden',
   },
   sortBtnText: { fontFamily: FONTS.bodySemiBold, fontSize: 12 },
   sortToggleBtn: {
-    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, borderWidth: 1, overflow: 'hidden',
   },
   totalText: { fontFamily: FONTS.body, fontSize: 11 },
   filterChipsRow: { paddingHorizontal: 20, paddingVertical: 6, gap: 6 },
   filterChip: {
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, borderWidth: 1, marginRight: 6,
+    overflow: 'hidden',
   },
   filterChipText: { fontFamily: FONTS.bodySemiBold, fontSize: 11 },
   foodList: { paddingTop: 8, paddingBottom: 24 },
   foodCard: {
     borderRadius: 18, borderWidth: 1, padding: 14, marginHorizontal: 20, marginBottom: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 4,
   },
   foodCardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   foodCardImg: { width: 52, height: 52, borderRadius: 12 },
@@ -1272,16 +1397,21 @@ const styles = StyleSheet.create({
   foodCardTagText: { fontFamily: FONTS.bodySemiBold, fontSize: 10 },
   foodCardServing: { fontFamily: FONTS.body, fontSize: 10 },
   gradeBadge: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  foodCardMacros: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
-  foodCardExtra: { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
-  extraMacrosRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  extraPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  extraPillText: { fontFamily: FONTS.bodySemiBold, fontSize: 11 },
-  macroChip: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 10 },
-  macroChipValue: { fontFamily: FONTS.heading, fontSize: 13 },
+  foodCardMacros: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 12 },
+  macroChip: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 10, minWidth: 60 },
+  macroChipValue: { fontFamily: FONTS.heading, fontSize: 12 },
   macroChipLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 8, marginTop: 1, textTransform: 'uppercase' },
+  nutrientTable: { borderWidth: 1, borderRadius: 10, marginTop: 12, overflow: 'hidden' },
+  nutrientRow: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 5, paddingHorizontal: 10,
+    borderBottomWidth: 0.5,
+  },
+  nutrientRowLabel: { flex: 1, fontFamily: FONTS.body, fontSize: 11 },
+  nutrientRowValue: { fontFamily: FONTS.bodySemiBold, fontSize: 13, marginRight: 3 },
+  nutrientRowUnit: { fontFamily: FONTS.body, fontSize: 10 },
+  nutrientDivider: { height: 1, marginVertical: 2, marginHorizontal: 8 },
   centerFlex: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
-  emptyIcon: { width: 72, height: 72, borderRadius: 22, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  emptyIcon: { width: 72, height: 72, borderRadius: 22, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 14, overflow: 'hidden' },
   emptyTitle: { fontFamily: FONTS.heading, fontSize: 18, marginBottom: 6 },
   emptySub: { fontFamily: FONTS.body, fontSize: 13, textAlign: 'center', maxWidth: 260, lineHeight: 19, marginBottom: 16 },
   loadingText: { fontFamily: FONTS.bodySemiBold, fontSize: 13, marginTop: 12 },
@@ -1290,26 +1420,21 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 40 },
   targetsCard: {
     borderRadius: 24, padding: 16, marginHorizontal: 20, marginBottom: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    overflow: 'hidden', borderWidth: 1,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 4,
   },
   sectionTitle: { fontFamily: FONTS.heading, fontSize: 17, marginBottom: 12 },
   targetsRow: { flexDirection: 'row', gap: 8 },
   targetBox: {
-    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14,
+    flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 14,
   },
-  targetBoxValue: { fontFamily: FONTS.heading, fontSize: 16 },
-  targetBoxLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 10, marginTop: 2 },
+  targetBoxValue: { fontFamily: FONTS.heading, fontSize: 17 },
+  targetBoxLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 10, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
   profileSummary: { borderRadius: 12, padding: 10, marginTop: 12, alignItems: 'center' },
   profileSummaryText: { fontFamily: FONTS.bodySemiBold, fontSize: 12 },
-  configBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    marginHorizontal: 20, marginBottom: 12, borderWidth: 1.5,
-    borderRadius: 16, paddingVertical: 12,
-  },
-  configBtnText: { fontFamily: FONTS.bodyBold, fontSize: 13 },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 12,
-    borderRadius: 16, marginTop: 8,
+    borderRadius: 16, marginTop: 8, borderWidth: 1, overflow: 'hidden',
   },
   primaryBtnText: { fontFamily: FONTS.bodyBold, fontSize: 14 },
   mealPlanSection: { marginHorizontal: 20, marginTop: 4 },
@@ -1317,8 +1442,8 @@ const styles = StyleSheet.create({
   mealPlanTitle: { fontFamily: FONTS.heading, fontSize: 17, marginRight: 8 },
   mealPlanCount: { fontFamily: FONTS.body, fontSize: 12 },
   planCard: {
-    borderRadius: 24, marginBottom: 10, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    borderRadius: 24, marginBottom: 10, overflow: 'hidden', borderWidth: 1,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 4,
   },
   planCardHeader: {
     flexDirection: 'row', alignItems: 'center', padding: 14,
@@ -1328,9 +1453,9 @@ const styles = StyleSheet.create({
   planCardMealType: { fontFamily: FONTS.heading, fontSize: 16 },
   planCardTitle: { fontFamily: FONTS.body, fontSize: 12, marginTop: 1 },
   planCardMacros: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingBottom: 14 },
-  planMacroChip: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 10 },
-  planMacroValue: { fontFamily: FONTS.heading, fontSize: 13 },
-  planMacroLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 9, marginTop: 1 },
+  planMacroChip: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 12 },
+  planMacroValue: { fontFamily: FONTS.heading, fontSize: 14 },
+  planMacroLabel: { fontFamily: FONTS.bodySemiBold, fontSize: 9, marginTop: 1, textTransform: 'uppercase', letterSpacing: 0.3 },
   planCardBody: { borderTopWidth: 1, padding: 14 },
   planDesc: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 19, marginBottom: 12 },
   planIngredients: { marginBottom: 12 },
@@ -1361,7 +1486,7 @@ const styles = StyleSheet.create({
   planInstructionsText: { fontFamily: FONTS.body, fontSize: 12, lineHeight: 18 },
 
   // Modals
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end' },
   sortSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40 },
   sortSheetTitle: { fontFamily: FONTS.heading, fontSize: 18, marginBottom: 16 },
   sortOption: {
@@ -1454,13 +1579,13 @@ const styles = StyleSheet.create({
   saveBtnText: { color: '#FFF', fontFamily: FONTS.bodyBold, fontSize: 15, letterSpacing: 0.5 },
 
   // Ingredient selector
-  fsHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 48, borderBottomWidth: 1 },
+  fsHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 48, borderBottomWidth: 1, overflow: 'hidden' },
   fsTitle: { fontFamily: FONTS.heading, fontSize: 18 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   fsEmptyIcon: { width: 70, height: 70, borderRadius: 24, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   fsEmptyTitle: { fontFamily: FONTS.heading, fontSize: 18, marginBottom: 6 },
   fsEmptySub: { fontFamily: FONTS.body, fontSize: 13, textAlign: 'center' },
-  selectorFoodCard: { borderRadius: 20, borderWidth: 1, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
+  selectorFoodCard: { borderRadius: 20, borderWidth: 1, padding: 14, marginBottom: 10, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 4 },
   selectorFoodImage: { width: 52, height: 52, borderRadius: 26 },
   selectorFoodImagePlaceholder: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center' },
   selectorFoodName: { fontFamily: FONTS.bodySemiBold, fontSize: 13, lineHeight: 18 },

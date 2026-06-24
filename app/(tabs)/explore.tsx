@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
@@ -25,6 +27,16 @@ const BG_IMAGES: Record<string, any> = {
   physique:  require("../../assets/coach/workout1.png"),
 };
 
+const CARD_TINTS: Record<string, [string, string]> = {
+  exercises: ["rgba(155,89,182,0.28)",  "rgba(155,89,182,0.04)"],
+  weight:    ["rgba(52,152,219,0.28)",   "rgba(52,152,219,0.04)"],
+  splits:    ["rgba(46,204,113,0.28)",   "rgba(46,204,113,0.04)"],
+  reports:   ["rgba(231,76,60,0.28)",    "rgba(231,76,60,0.04)"],
+  calendar:  ["rgba(241,196,15,0.28)",   "rgba(241,196,15,0.04)"],
+  followers: ["rgba(230,126,34,0.28)",   "rgba(230,126,34,0.04)"],
+  physique:  ["rgba(142,68,173,0.28)",   "rgba(142,68,173,0.04)"],
+};
+
 interface ExploreItem {
   id: string;
   title: string;
@@ -33,17 +45,16 @@ interface ExploreItem {
   iconType: "Ionicons" | "MaterialCommunityIcons";
   href: string;
   dynamic?: boolean;
-  span: 1 | 2;
 }
 
-const BENTO_LAYOUT: ExploreItem[] = [
-  { id: "exercises", title: "Exercises",           subtitle: "Exercise library",       icon: "fitness-outline",         iconType: "Ionicons",               href: "/(tabs)/exercises",  span: 2 },
-  { id: "weight",    title: "Weight Tracker",      subtitle: "Log body weight",        icon: "scale-outline",           iconType: "Ionicons",               href: "/(tabs)/weight",    span: 1 },
-  { id: "splits",    title: "Splits",              subtitle: "Training splits",        icon: "layers-outline",          iconType: "Ionicons",               href: "/(tabs)/splits",    span: 1 },
-  { id: "reports",   title: "Workout Reports",     subtitle: "AI insights",            icon: "clipboard-text-outline",  iconType: "MaterialCommunityIcons", href: "/daily/reports",    span: 2 },
-  { id: "calendar",  title: "Calendar",            subtitle: "Workout heatmap",        icon: "calendar-outline",        iconType: "Ionicons",               href: "/calendar",         span: 1 },
-  { id: "followers", title: "Followers",           subtitle: "Followers & following",  icon: "account-group-outline",   iconType: "MaterialCommunityIcons", href: "/profile/follow/",  span: 1, dynamic: true },
-  { id: "physique",  title: "Physique Analysis",   subtitle: "AI body assessment",     icon: "body-outline",            iconType: "Ionicons",               href: "/physique",         span: 2 },
+const EXPLORE_ITEMS: ExploreItem[] = [
+  { id: "exercises", title: "Exercises",           subtitle: "Exercise library",       icon: "fitness-outline",         iconType: "Ionicons",               href: "/(tabs)/exercises" },
+  { id: "weight",    title: "Weight Tracker",      subtitle: "Log body weight",        icon: "scale-outline",           iconType: "Ionicons",               href: "/(tabs)/weight" },
+  { id: "splits",    title: "Splits",              subtitle: "Training splits",        icon: "layers-outline",          iconType: "Ionicons",               href: "/(tabs)/splits" },
+  { id: "reports",   title: "Workout Reports",     subtitle: "AI insights",            icon: "clipboard-text-outline",  iconType: "MaterialCommunityIcons", href: "/daily/reports" },
+  { id: "calendar",  title: "Calendar",            subtitle: "Workout heatmap",        icon: "calendar-outline",        iconType: "Ionicons",               href: "/calendar" },
+  { id: "followers", title: "Followers",           subtitle: "Followers & following",  icon: "account-group-outline",   iconType: "MaterialCommunityIcons", href: "/profile/follow/", dynamic: true },
+  { id: "physique",  title: "Physique Analysis",   subtitle: "AI body assessment",     icon: "body-outline",            iconType: "Ionicons",               href: "/physique" },
 ];
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -75,8 +86,6 @@ export default function ExploreScreen() {
     }
   };
 
-  const rows: (typeof BENTO_LAYOUT) = BENTO_LAYOUT;
-
   return (
     <ScrollView
       style={[styles.screen, { backgroundColor: colors.bg }]}
@@ -91,66 +100,56 @@ export default function ExploreScreen() {
       </View>
 
       <View style={styles.grid}>
-        {/* Row 1: Exercises (full width) */}
-        <View style={styles.row}>
-          {renderCard(rows[0], CARD_W * 2 + CARD_GAP, Math.floor(CARD_W * 0.8))}
-        </View>
-
-        {/* Row 2: Weight + Splits */}
-        <View style={styles.row}>
-          {renderCard(rows[1], CARD_W, Math.floor(CARD_W * 0.8))}
-          {renderCard(rows[2], CARD_W, Math.floor(CARD_W * 0.8))}
-        </View>
-
-        {/* Row 3: Workout Reports (full width) */}
-        <View style={styles.row}>
-          {renderCard(rows[3], CARD_W * 2 + CARD_GAP, Math.floor(CARD_W * 0.8))}
-        </View>
-
-        {/* Row 4: Calendar + Followers */}
-        <View style={styles.row}>
-          {renderCard(rows[4], CARD_W, Math.floor(CARD_W * 0.8))}
-          {renderCard(rows[5], CARD_W, Math.floor(CARD_W * 0.8))}
-        </View>
-
-        {/* Row 5: Physique Analysis (full width) */}
-        <View style={styles.row}>
-          {renderCard(rows[6], CARD_W * 2 + CARD_GAP, Math.floor(CARD_W * 0.9))}
-        </View>
+        {EXPLORE_ITEMS.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            activeOpacity={0.85}
+            onPress={() => handleNav(item)}
+            style={{ width: CARD_W, height: CARD_W, marginBottom: CARD_GAP }}
+          >
+            <View style={styles.glassCard}>
+              <ImageBackground
+                source={BG_IMAGES[item.id]}
+                style={styles.card}
+                imageStyle={{ borderRadius: scale(18) }}
+                resizeMode="cover"
+              />
+              <BlurView
+                intensity={50}
+                tint="dark"
+                style={[StyleSheet.absoluteFill, styles.cardRadius]}
+              />
+              <LinearGradient
+                colors={CARD_TINTS[item.id]}
+                style={[StyleSheet.absoluteFill, styles.cardRadius]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                pointerEvents="none"
+              />
+              <LinearGradient
+                colors={["rgba(255,255,255,0.08)", "transparent"] as [string, string]}
+                style={[StyleSheet.absoluteFill, styles.cardRadius]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.25, y: 0.5 }}
+                pointerEvents="none"
+              />
+              <View style={styles.cardContent}>
+                <View style={styles.cardIconWrap}>
+                  {item.iconType === "MaterialCommunityIcons" ? (
+                    <MaterialCommunityIcons name={item.icon as any} size={scale(26)} color="#FFFFFF" />
+                  ) : (
+                    <Ionicons name={item.icon as any} size={scale(26)} color="#FFFFFF" />
+                  )}
+                </View>
+                <Text style={styles.cardTitle}>{item.title}</Text>
+                <Text style={styles.cardSub}>{item.subtitle}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        ))}
       </View>
     </ScrollView>
   );
-
-  function renderCard(item: typeof BENTO_LAYOUT[0], width: number, height: number) {
-    return (
-      <TouchableOpacity
-        key={item.id}
-        activeOpacity={0.85}
-        onPress={() => handleNav(item)}
-        style={{ width, height }}
-      >
-        <ImageBackground
-          source={BG_IMAGES[item.id]}
-          style={styles.card}
-          imageStyle={{ borderRadius: scale(18) }}
-          resizeMode="cover"
-        >
-          <View style={[StyleSheet.absoluteFill, styles.cardOverlay, { borderRadius: scale(18) }]} />
-          <View style={styles.cardContent}>
-            <View style={styles.cardIconWrap}>
-              {item.iconType === "MaterialCommunityIcons" ? (
-                <MaterialCommunityIcons name={item.icon as any} size={scale(item.span === 2 ? 32 : 26)} color="#FFFFFF" />
-              ) : (
-                <Ionicons name={item.icon as any} size={scale(item.span === 2 ? 32 : 26)} color="#FFFFFF" />
-              )}
-            </View>
-            <Text style={[styles.cardTitle, item.span === 2 && { fontSize: scale(17) }]}>{item.title}</Text>
-            <Text style={styles.cardSub}>{item.subtitle}</Text>
-          </View>
-        </ImageBackground>
-      </TouchableOpacity>
-    );
-  }
 }
 
 const styles = StyleSheet.create({
@@ -179,22 +178,31 @@ const styles = StyleSheet.create({
     marginTop: vs(2),
   },
   grid: {
-    gap: vs(14),
-  },
-  row: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: CARD_GAP,
   },
-  card: {
+  glassCard: {
     flex: 1,
     borderRadius: scale(18),
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  cardOverlay: {
-    backgroundColor: "rgba(0,0,0,0.78)",
+  card: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: scale(18),
+  },
+  cardRadius: {
+    borderRadius: scale(18),
   },
   cardContent: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
     gap: vs(8),

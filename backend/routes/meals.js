@@ -826,7 +826,7 @@ router.get('/food-browse', authenticateToken, async (req, res) => {
       q = '',
       sort_by = 'nutrition_density',
       sort_order = 'desc',
-      limit = 20,
+      limit = 50,
       offset = 0,
       min_calories, max_calories,
       min_protein, max_protein,
@@ -835,9 +835,18 @@ router.get('/food-browse', authenticateToken, async (req, res) => {
       min_fiber, max_fiber,
       min_sugar, max_sugar,
       min_sodium, max_sodium,
+      min_saturated_fat, max_saturated_fat,
+      min_cholesterol, max_cholesterol,
+      min_calcium, max_calcium,
+      min_iron, max_iron,
+      min_magnesium, max_magnesium,
+      min_potassium, max_potassium,
+      min_zinc, max_zinc,
+      min_vitamin_c, max_vitamin_c,
+      min_vitamin_d, max_vitamin_d,
     } = req.query;
 
-    const lim = Math.min(parseInt(limit) || 20, 100);
+    const lim = Math.min(parseInt(limit) || 50, 200);
     const off = parseInt(offset) || 0;
 
     const allowedSortColumns = [
@@ -858,7 +867,6 @@ router.get('/food-browse', authenticateToken, async (req, res) => {
     const conditions = [
       'calories_kcal IS NOT NULL',
       'calories_kcal > 0',
-      'calories_kcal < 2000'
     ];
     const params = [];
 
@@ -921,7 +929,7 @@ router.get('/food-browse', authenticateToken, async (req, res) => {
         nutrition_density, image_url, image_small_url
       FROM food_database
       ${whereClause}
-      ORDER BY (image_url IS NOT NULL AND image_url != '') DESC, ${safeSortCol} ${order} NULLS LAST, food_name ASC
+      ORDER BY ${safeSortCol} ${order} NULLS LAST, (image_url IS NOT NULL AND image_url != '') DESC, food_name ASC
       LIMIT $${params.length - 1} OFFSET $${params.length}
     `;
 

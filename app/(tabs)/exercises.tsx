@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import OptimizedImage from '../../components/ui/OptimizedImage';
 import Body, { ExtendedBodyPart, Slug } from 'react-native-body-highlighter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -86,33 +87,36 @@ const SkeletonCard = ({ tall = true }: { tall?: boolean }) => (
 const CategoryCard = React.memo(({ item, onPress }: { item: any; onPress: () => void }) => {
   const { colors, isDark } = useTheme();
   const [imgError, setImgError] = useState(false);
-  const theme = accentFor(item.category);
   const label = formatLabel(item.category);
 
   return (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={onPress}
-      style={[styles.card, styles.categoryCard, { width: CARD_WIDTH, height: CARD_HEIGHT, borderWidth: isDark ? 1 : 0, borderColor: isDark ? colors.border : 'transparent' }]}
+      style={[styles.card, styles.categoryCard, { width: CARD_WIDTH, height: CARD_HEIGHT }]}
     >
-      <View style={styles.cardMedia}>
-        <LinearGradient colors={isDark ? ['#000000', '#000000'] : [P.offWhite, P.ctaLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
-        <View style={[styles.mediaGlow, { backgroundColor: theme.glow }]} />
-        <View style={styles.imageContainer}>
-          {item.image_url && !imgError ? (
-            <OptimizedImage uri={item.image_url} style={styles.floatingImage} contentFit="contain" onError={() => setImgError(true)} />
-          ) : (
-            <Ionicons name="fitness-outline" size={64} color={isDark ? colors.primary : P.cta} />
-          )}
-        </View>
+      <BlurView intensity={40} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, styles.cardRadius]} />
+      <LinearGradient
+        colors={['rgba(255,255,255,0.06)', 'transparent'] as [string, string]}
+        style={[StyleSheet.absoluteFill, styles.cardRadius]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.25, y: 0.5 }}
+        pointerEvents="none"
+      />
+      <View style={styles.imageContainer}>
+        {item.image_url && !imgError ? (
+          <OptimizedImage uri={item.image_url} style={styles.floatingImage} contentFit="contain" onError={() => setImgError(true)} />
+        ) : (
+          <Ionicons name="fitness-outline" size={48} color={colors.primary} />
+        )}
       </View>
 
-      <View style={[styles.cardFooter, { backgroundColor: isDark ? '#000000' : P.ctaDeep }]}>
-        <Text style={styles.cardLabel}>{label}</Text>
+      <View style={styles.cardFooter}>
+        <Text style={[styles.cardLabel, { color: colors.text }]}>{label}</Text>
         <View style={styles.cardInfoRow}>
-          <Text style={[styles.cardCountText, { color: isDark ? colors.textMuted : P.sunLight }]}>{item.exercise_count || 0} exercises</Text>
-          <View style={styles.categoryArrow}>
-            <Ionicons name="arrow-forward" size={14} color={P.ink} />
+          <Text style={[styles.cardCountText, { color: colors.textMuted }]}>{item.exercise_count || 0} exercises</Text>
+          <View style={[styles.categoryArrow, { backgroundColor: colors.primary }]}>
+            <Ionicons name="arrow-forward" size={12} color="#FFF" />
           </View>
         </View>
       </View>
@@ -365,20 +369,19 @@ const styles = StyleSheet.create({
   sectionContent: { paddingHorizontal: H_PADDING, paddingTop: 18 },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: CARD_GAP, justifyContent: 'space-between' },
 
-  card: { borderRadius: 24, overflow: 'hidden', shadowColor: P.ctaDeep, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.16, shadowRadius: 16, elevation: 9 },
+  card: { borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 4 },
+  cardRadius: { borderRadius: 20 },
   skeletonCard: { backgroundColor: P.ctaLight, borderWidth: 1, borderColor: P.border },
   skeletonGlow: { position: 'absolute', top: -20, right: -10, width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(247,203,22,0.22)' },
 
-  categoryCard: { borderWidth: 1, borderColor: P.border },
-  cardMedia: { flex: 0.6, position: 'relative', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  mediaGlow: { position: 'absolute', top: -18, right: -12, width: 110, height: 110, borderRadius: 55 },
-  cardFooter: { flex: 0.4, backgroundColor: P.ctaDeep, paddingHorizontal: 14, paddingVertical: 14, justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
-  categoryArrow: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: P.sun, shadowColor: P.ctaDeep, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8 },
-  imageContainer: { width: '100%', height: '100%', justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: 10, paddingTop: 14, paddingBottom: 8 },
-  floatingImage: { width: '88%', height: '88%', opacity: 0.96 },
-  cardLabel: { fontFamily: FONTS.heading, fontSize: 22, color: P.sun, letterSpacing: 0.5, textShadowColor: 'rgba(0,0,0,0.18)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  cardInfoRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardCountText: { fontFamily: FONTS.bodyBold, fontSize: 12, color: P.sunLight, letterSpacing: 0.2 },
+  categoryCard: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
+  cardFooter: { paddingHorizontal: 14, paddingVertical: 12, justifyContent: 'space-between' },
+  categoryArrow: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  imageContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 },
+  floatingImage: { width: '82%', height: '78%', opacity: 0.92 },
+  cardLabel: { fontFamily: FONTS.heading, fontSize: 20, letterSpacing: 0.3 },
+  cardInfoRow: { marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardCountText: { fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 0.2 },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(4,40,43,0.45)', justifyContent: 'center', paddingHorizontal: 22 },
   modalCard: { backgroundColor: P.cta, borderRadius: 24, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },

@@ -35,15 +35,24 @@ export default function WeightHistoryCard({ item, onDelete }: WeightHistoryCardP
   const { colors, isDark } = useTheme();
   const weightVal = parseFloat(item.weight);
   const { date, time } = formatDate(item.logged_at);
+  const isPostWorkout = item.notes?.toLowerCase().includes('post-workout') || item.id < 0;
 
   return (
     <View style={[styles.card, { backgroundColor: isDark ? '#111' : '#fff', borderColor: isDark ? '#222' : '#e5e5e0' }]}>
       <View style={styles.leftCol}>
-        <Text style={[styles.weightValue, { color: colors.text }]}>
-          {weightVal.toFixed(1)}
-          <Text style={[styles.weightUnit, { color: colors.textMuted }]}> kg</Text>
-        </Text>
-        {item.notes && (
+        <View style={styles.weightRow}>
+          <Text style={[styles.weightValue, { color: colors.text }]}>
+            {weightVal.toFixed(1)}
+            <Text style={[styles.weightUnit, { color: colors.textMuted }]}> kg</Text>
+          </Text>
+          {isPostWorkout && (
+            <View style={[styles.postBadge, { backgroundColor: isDark ? '#3B82F618' : '#3B82F610' }]}>
+              <Ionicons name="barbell-outline" size={10} color="#3B82F6" />
+              <Text style={styles.postBadgeText}>Post-Workout</Text>
+            </View>
+          )}
+        </View>
+        {item.notes && !isPostWorkout && (
           <Text style={[styles.notes, { color: colors.textDim }]} numberOfLines={1}>
             {item.notes}
           </Text>
@@ -55,7 +64,7 @@ export default function WeightHistoryCard({ item, onDelete }: WeightHistoryCardP
           <Text style={[styles.dateText, { color: colors.textMuted }]}>{date}</Text>
           <Text style={[styles.timeText, { color: colors.textDim }]}>{time}</Text>
         </View>
-        {onDelete && (
+        {onDelete && !isPostWorkout && (
           <TouchableOpacity
             onPress={() => onDelete(item.id)}
             style={[styles.deleteBtn, { backgroundColor: isDark ? '#1a1a1a' : '#f0f0eb' }]}
@@ -83,6 +92,11 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: vs(2),
   },
+  weightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
+  },
   weightValue: {
     fontFamily: FONTS.heading,
     fontSize: scale(24),
@@ -91,6 +105,20 @@ const styles = StyleSheet.create({
   weightUnit: {
     fontFamily: FONTS.body,
     fontSize: scale(13),
+  },
+  postBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  postBadgeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 9,
+    color: '#3B82F6',
+    letterSpacing: 0.3,
   },
   notes: {
     fontFamily: FONTS.body,

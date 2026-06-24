@@ -10,6 +10,7 @@ import OptimizedImage from '../../components/ui/OptimizedImage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { API_URL } from '../../utils/api';
@@ -240,7 +241,28 @@ export default function NotificationsScreen() {
               onPress={() => handleNotificationPress(item)}
               activeOpacity={0.8}
             >
-              {!item.is_read && <View style={[s.stripeIndicator, { backgroundColor: colors.primary }]} />}
+              <BlurView
+                intensity={35}
+                tint={isDark ? 'dark' : 'light'}
+                style={[StyleSheet.absoluteFill, s.cardRadius]}
+              />
+              <LinearGradient
+                colors={(!item.is_read
+                  ? [badge.color + '18', badge.color + '04']
+                  : ['rgba(255,255,255,0.04)', 'transparent']
+                ) as [string, string]}
+                style={[StyleSheet.absoluteFill, s.cardRadius]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                pointerEvents="none"
+              />
+              <LinearGradient
+                colors={['rgba(255,255,255,0.06)', 'transparent'] as [string, string]}
+                style={[StyleSheet.absoluteFill, s.cardRadius]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.25, y: 0.5 }}
+                pointerEvents="none"
+              />
 
               {/* Icon / Avatar Box */}
               <View style={s.avatarContainer}>
@@ -248,15 +270,15 @@ export default function NotificationsScreen() {
                   <OptimizedImage uri={item.from_user_pic} style={s.avatar} />
                 ) : (
                   <LinearGradient
-                    colors={isDark ? ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.03)'] : ['#E2E8F0', '#CBD5E1']}
+                    colors={[badge.color + '25', badge.color + '08']}
                     style={s.avatarPlaceholder}
                   >
-                    <Ionicons name={badge.icon} size={20} color={colors.primary} />
+                    <Ionicons name={badge.icon} size={18} color={badge.color} />
                   </LinearGradient>
                 )}
                 {/* Micro-badge indicator */}
                 <View style={[s.badgeIconWrap, { backgroundColor: badge.color }]}>
-                  <Ionicons name={badge.icon} size={8} color="#FFF" />
+                  <Ionicons name={badge.icon} size={7} color="#FFF" />
                 </View>
               </View>
 
@@ -275,7 +297,7 @@ export default function NotificationsScreen() {
                 name="chevron-forward"
                 size={14}
                 color={colors.textDim}
-                style={{ marginLeft: 8 }}
+                style={{ marginLeft: 4 }}
               />
             </TouchableOpacity>
           );
@@ -349,55 +371,44 @@ const makeStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   emptyText: { fontFamily: FONTS.body, fontSize: 13, textAlign: 'center', opacity: 0.7, lineHeight: 18 },
 
   // Notification Cards
+  cardRadius: { borderRadius: 16 },
   notifCard: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: 18, borderWidth: 1,
-    borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-    padding: 14, marginBottom: 10,
-    position: 'relative',
+    borderRadius: 16, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 10, marginBottom: 8,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: isDark ? 0 : 0.02,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   unreadCard: {
-    backgroundColor: isDark ? 'rgba(37,150,190,0.06)' : 'rgba(37,150,190,0.04)',
-    borderColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(37,150,190,0.15)',
-  },
-  stripeIndicator: {
-    position: 'absolute',
-    left: 0,
-    top: 14,
-    bottom: 14,
-    width: 3.5,
-    borderTopRightRadius: 3,
-    borderBottomRightRadius: 3,
+    borderColor: 'rgba(37,150,190,0.25)',
   },
 
   // Avatar + Icon Container
   avatarContainer: { position: 'relative' },
-  avatar: { width: 44, height: 44, borderRadius: 14 },
+  avatar: { width: 36, height: 36, borderRadius: 12 },
   avatarPlaceholder: {
-    width: 44, height: 44, borderRadius: 14,
+    width: 36, height: 36, borderRadius: 12,
     justifyContent: 'center', alignItems: 'center',
   },
   badgeIconWrap: {
     position: 'absolute',
     bottom: -2,
     right: -2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: colors.card,
+    borderColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  notifContent: { flex: 1, marginLeft: 12, marginRight: 4 },
-  notifMessage: { fontFamily: FONTS.bodySemiBold, fontSize: 13, lineHeight: 18 },
-  notifTime: { fontFamily: FONTS.body, fontSize: 11, marginTop: 4 },
+  notifContent: { flex: 1, marginLeft: 10, marginRight: 4 },
+  notifMessage: { fontFamily: FONTS.bodySemiBold, fontSize: 12, lineHeight: 16 },
+  notifTime: { fontFamily: FONTS.body, fontSize: 10, marginTop: 3 },
 });

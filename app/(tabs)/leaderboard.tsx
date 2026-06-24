@@ -9,6 +9,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import OptimizedImage from '../../components/ui/OptimizedImage';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
@@ -996,33 +997,49 @@ export default function LeaderboardScreen() {
 
       {/* ── XP HISTORY MODAL ── */}
       <Modal visible={showXpHistory} transparent animationType="slide" onRequestClose={() => setShowXpHistory(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40, maxHeight: '70%' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={[styles.pageTitle, { color: colors.text }]}>XP History</Text>
-              <TouchableOpacity onPress={() => setShowXpHistory(false)} style={{ position: 'absolute', top: 0, right: 0 }}>
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-            {loadingXpLog ? (
-              <ActivityIndicator size="small" color={P.cta} style={{ paddingVertical: 30 }} />
-            ) : xpLog.length === 0 ? (
-              <Text style={[styles.emptyText, { color: colors.textMuted, textAlign: 'center', paddingVertical: 30 }]}>No XP transactions yet</Text>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {xpLog.map((entry: any, idx: number) => (
-                  <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.pageSubtitle, { color: colors.text, fontSize: 14, textTransform: 'capitalize' }]}>{entry.reason.replace(/_/g, ' ')}</Text>
-                      <Text style={[styles.lrXPLabel, { color: colors.textMuted, fontSize: 11 }]}>{new Date(entry.created_at).toLocaleDateString()}</Text>
-                    </View>
-                    <Text style={[styles.lrXPText, { color: P.sun, fontSize: 16 }]}>+{entry.amount} XP</Text>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
+        <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowXpHistory(false)}>
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <TouchableOpacity activeOpacity={1} style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)', borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', maxHeight: '70%' }}>
+              <BlurView intensity={60} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 28, borderTopRightRadius: 28 }]} />
+              <View style={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                  <Text style={[styles.pageTitle, { color: colors.text }]}>XP History</Text>
+                  <TouchableOpacity onPress={() => setShowXpHistory(false)} style={{}}>
+                    <Ionicons name="close" size={24} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+                {loadingXpLog ? (
+                  <ActivityIndicator size="small" color={P.cta} style={{ paddingVertical: 30 }} />
+                ) : xpLog.length === 0 ? (
+                  <Text style={[styles.emptyText, { color: colors.textMuted, textAlign: 'center', paddingVertical: 30 }]}>No XP transactions yet</Text>
+                ) : (
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                    {xpLog.map((entry: any, idx: number) => {
+                      const amount = entry.amount;
+                      const color = amount >= 100 ? '#8B5CF6' :
+                                    amount >= 50  ? '#F59E0B' :
+                                    amount >= 20  ? '#10B981' :
+                                    amount >= 10  ? '#3B82F6' :
+                                                   '#6B7280';
+                      return (
+                        <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.pageSubtitle, { color: colors.text, fontSize: 14, textTransform: 'capitalize' }]}>{entry.reason.replace(/_/g, ' ')}</Text>
+                            <Text style={[styles.lrXPLabel, { color: colors.textMuted, fontSize: 11 }]}>{new Date(entry.created_at).toLocaleDateString()}</Text>
+                          </View>
+                          <View style={{ backgroundColor: color + '18', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+                            <Text style={[styles.lrXPText, { color, fontSize: 15 }]}>+{amount} XP</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

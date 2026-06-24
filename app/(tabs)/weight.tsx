@@ -91,6 +91,7 @@ export default function WeightScreen() {
     }
   };
 
+  const reversedLogs = [...logs].reverse();
   const currentWeight = logs.length > 0 ? parseFloat(logs[logs.length - 1].weight) : null;
   const prevWeight = logs.length > 1 ? parseFloat(logs[logs.length - 2].weight) : null;
   const delta = currentWeight !== null && prevWeight !== null
@@ -110,7 +111,7 @@ export default function WeightScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 16) + vs(20) }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 16) + vs(100) }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchLogs(); }} tintColor={colors.primary} />
@@ -188,7 +189,7 @@ export default function WeightScreen() {
                 <Text style={[styles.historyLabel, { color: colors.text }]}>History</Text>
                 <Text style={[styles.historyCount, { color: colors.textDim }]}>{logs.length} {logs.length === 1 ? 'entry' : 'entries'}</Text>
               </View>
-              {logs.map((item) => (
+              {reversedLogs.map((item) => (
                 <View key={item.id} style={{ marginBottom: vs(10) }}>
                   <WeightHistoryCard item={item} onDelete={handleDelete} />
                 </View>
