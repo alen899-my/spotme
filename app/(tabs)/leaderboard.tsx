@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, Image, ImageBackground, ActivityIndicator,
-  Dimensions, Animated, ScrollView, TextInput,
+  Dimensions, Animated, ScrollView, TextInput, Modal,
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -401,6 +401,26 @@ export default function LeaderboardScreen() {
   const [promoTierName, setPromoTierName] = useState('Diamond');
   const [promoXp, setPromoXp] = useState(0);
   const [promoXpNeeded, setPromoXpNeeded] = useState(0);
+
+  // ── XP History Modal ────────────────────────────────────────────────────────
+  const [showXpHistory, setShowXpHistory] = useState(false);
+  const [xpLog, setXpLog] = useState<any[]>([]);
+  const [loadingXpLog, setLoadingXpLog] = useState(false);
+
+  const fetchXpLog = useCallback(async () => {
+    setLoadingXpLog(true);
+    try {
+      const token = await getToken();
+      const { data } = await axios.get(`${API_URL}/leaderboard/xp-log`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setXpLog(data);
+    } catch (err) {
+      console.error('Error fetching XP log:', err);
+    } finally {
+      setLoadingXpLog(false);
+    }
+  }, []);
 
   const openTierPromo = useCallback(() => {
     const name = nearbyMe?.league_tier;
@@ -803,6 +823,13 @@ export default function LeaderboardScreen() {
                   >
                     <Ionicons name="help-circle-outline" size={20} color={colors.textMuted} />
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => { fetchXpLog(); setShowXpHistory(true); }}
+                    style={{ padding: 4 }}
+                  >
+                    <Ionicons name="time-outline" size={20} color={colors.textMuted} />
+                  </TouchableOpacity>
                 </View>
                 <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
                   {tab === 'All' ? 'Global Rankings' : `${tab} League`}
@@ -966,6 +993,37 @@ export default function LeaderboardScreen() {
 
       {/* ── TIER PROMOTION OVERLAY ── */}
       <CheerCard visible={showTierPromo} tierName={promoTierName} xp={promoXp} xpNeeded={promoXpNeeded} onClose={closeTierPromo} />
+
+      {/* ── XP HISTORY MODAL ── */}
+      <Modal visible={showXpHistory} transparent animationType="slide" onRequestClose={() => setShowXpHistory(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40, maxHeight: '70%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={[styles.pageTitle, { color: colors.text }]}>XP History</Text>
+              <TouchableOpacity onPress={() => setShowXpHistory(false)} style={{ position: 'absolute', top: 0, right: 0 }}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            {loadingXpLog ? (
+              <ActivityIndicator size="small" color={P.cta} style={{ paddingVertical: 30 }} />
+            ) : xpLog.length === 0 ? (
+              <Text style={[styles.emptyText, { color: colors.textMuted, textAlign: 'center', paddingVertical: 30 }]}>No XP transactions yet</Text>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {xpLog.map((entry: any, idx: number) => (
+                  <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.pageSubtitle, { color: colors.text, fontSize: 14, textTransform: 'capitalize' }]}>{entry.reason.replace(/_/g, ' ')}</Text>
+                      <Text style={[styles.lrXPLabel, { color: colors.textMuted, fontSize: 11 }]}>{new Date(entry.created_at).toLocaleDateString()}</Text>
+                    </View>
+                    <Text style={[styles.lrXPText, { color: P.sun, fontSize: 16 }]}>+{entry.amount} XP</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

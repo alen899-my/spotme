@@ -134,6 +134,7 @@ function formatRecord(metricType?: string, value?: number | string) {
 function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; isDark: boolean }) {
   const isSkipped = ex.is_skipped;
   const isCardio = ex.category?.toLowerCase() === 'cardio';
+  const isBodyweight = ex.equipment?.toLowerCase() === 'body weight';
   const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
   const hasCompletedData = completedSets.length > 0;
   const totalReps = completedSets.reduce((acc: number, s: any) => acc + (parseInt(s.reps) || 0), 0);
@@ -192,12 +193,12 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
       </View>
 
       {/* Record row (non-cardio, has completed data) */}
-      {!isCardio && (hasCompletedData || !isSkipped) && (
+      {!isCardio && hasCompletedData && (
         <View style={carouselStyles.recordRow}>
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>BEST SET</Text>
             <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {Number(ex.best_set_weight || 0).toFixed(1)}kg × {ex.best_set_reps || 0}
+              {isBodyweight ? `${ex.best_set_reps || 0} reps` : `${Number(ex.best_set_weight || 0).toFixed(1)}kg × ${ex.best_set_reps || 0}`}
             </Text>
           </View>
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
@@ -223,6 +224,17 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
               <View style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
                 <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>TOTAL TIME</Text>
                 <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{formatTime(totalTime)}</Text>
+              </View>
+              <View style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
+                <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>AVG TIME</Text>
+                <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{formatTime(avgTime)}</Text>
+              </View>
+            </>
+          ) : isBodyweight ? (
+            <>
+              <View style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
+                <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>TOTAL REPS</Text>
+                <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{totalReps}</Text>
               </View>
               <View style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
                 <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>AVG TIME</Text>

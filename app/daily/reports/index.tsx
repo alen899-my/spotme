@@ -153,7 +153,7 @@ export default function ReportsListScreen() {
               <TouchableOpacity
                 style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={() => {
-                  if (!isGenerating) router.push(`/daily/report/${item.id}`);
+                  router.push(`/daily/report/${item.id}`);
                 }}
                 activeOpacity={0.7}
               >
@@ -171,7 +171,7 @@ export default function ReportsListScreen() {
                       {isGenerating ? 'Generating workout analysis...' : item.summary}
                     </Text>
                   </View>
-                  {!isGenerating && <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />}
+                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                 </View>
                 <View style={s.cardStats}>
                   {item.total_duration_seconds ? (

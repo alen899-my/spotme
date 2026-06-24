@@ -481,16 +481,22 @@ export default function DailyTab() {
                   <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>Time</Text>
                 </View>
               </View>
-              {/* {item.report_id && (
+              {item.report_id && (
                 <TouchableOpacity
                   style={[styles.reportLink, { borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.15)', borderTopWidth: 1, marginTop: 8 }]}
                   onPress={() => router.push(`/daily/report/${item.report_id}`)}
                 >
-                  <Ionicons name="document-text-outline" size={14} color="#10B981" />
-                  <Text style={{ color: '#10B981', fontFamily: FONTS.bodyBold, fontSize: 12 }}>View AI Report</Text>
-                  <Ionicons name="chevron-forward" size={14} color="#10B981" />
+                  {item.report_status === 'generating' ? (
+                    <ActivityIndicator size="small" color="#F59E0B" style={{ marginRight: 4 }} />
+                  ) : (
+                    <Ionicons name="document-text-outline" size={14} color="#10B981" />
+                  )}
+                  <Text style={{ color: item.report_status === 'generating' ? '#F59E0B' : '#10B981', fontFamily: FONTS.bodyBold, fontSize: 12 }}>
+                    {item.report_status === 'generating' ? 'AI Report Generating...' : 'View AI Report'}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={14} color={item.report_status === 'generating' ? '#F59E0B' : '#10B981'} />
                 </TouchableOpacity>
-              )} */}
+              )}
             </View>
           </View>
         </LinearGradient>

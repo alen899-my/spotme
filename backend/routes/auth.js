@@ -93,7 +93,7 @@ router.post('/signup', async (req, res) => {
     const user = newUser.rows[0];
 
     // Create token
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '365d' });
 
     // Send full user (minus password)
     const fullUser = { ...user };
@@ -130,7 +130,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Create token
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '365d' });
 
     const fullUser = { ...user };
     delete fullUser.password;

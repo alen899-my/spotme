@@ -313,7 +313,8 @@ router.get('/workouts', authenticateToken, async (req, res) => {
          JOIN daily_workout_exercises dwe ON dws.daily_exercise_id = dwe.id 
          WHERE dwe.daily_workout_id = dw.id AND dws.is_skipped = false) AS total_sets,
         (SELECT photo_url FROM daily_workout_photos WHERE daily_workout_id = dw.id ORDER BY created_at ASC LIMIT 1) AS cover_photo_url,
-        (SELECT id FROM workout_reports WHERE daily_workout_id = dw.id AND user_id = $1 AND status = 'completed' LIMIT 1) AS report_id
+        (SELECT id FROM workout_reports WHERE daily_workout_id = dw.id AND user_id = $1 LIMIT 1) AS report_id,
+        (SELECT status FROM workout_reports WHERE daily_workout_id = dw.id AND user_id = $1 LIMIT 1) AS report_status
        FROM daily_workouts dw
        LEFT JOIN workout_splits ws ON dw.split_id = ws.id
        LEFT JOIN workout_sessions wsess ON dw.session_id = wsess.id
@@ -829,6 +830,15 @@ router.patch('/workouts/:id/metrics', authenticateToken, async (req, res) => {
     );
 
     if (result.rows.length === 0) return res.status(404).json({ error: 'Workout not found' });
+
+    // Sync post-workout weight to weight_logs
+    if (post_workout_weight && parseFloat(post_workout_weight) > 0) {
+      await pool.query(
+        'INSERT INTO weight_logs (user_id, weight, notes) VALUES ($1, $2, $3)',
+        [userId, parseFloat(post_workout_weight), `Post-workout: ${id}`]
+      );
+    }
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error('PATCH /daily/workouts/:id/metrics error:', err);

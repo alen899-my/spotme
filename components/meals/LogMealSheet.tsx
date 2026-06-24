@@ -383,6 +383,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
+    paddingRight: 44,
   },
   stepTitle: {
     fontFamily: FONTS.heading,
@@ -400,6 +401,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'absolute',
+    top: 12,
+    right: 12,
   },
   backBtn: {
     width: 36,

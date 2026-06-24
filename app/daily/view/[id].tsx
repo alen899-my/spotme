@@ -177,14 +177,18 @@ export default function WorkoutViewScreen() {
             <View style={{ flex: 1 }} />
             {!isShared && (
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {existingReport && existingReport.status === 'completed' && (
+                {existingReport && (
                   <TouchableOpacity
                     style={styles.reportBtn}
                     onPress={() => router.push(`/daily/report/${existingReport.id}`)}
                     activeOpacity={0.85}
                   >
-                  <LinearGradient colors={['#10B981', '#059669']} style={styles.iconBtnGrad}>
-                    <Ionicons name="document-text-outline" size={16} color="#FFF" />
+                  <LinearGradient colors={existingReport.status === 'completed' ? ['#10B981', '#059669'] : ['#F59E0B', '#D97706']} style={styles.iconBtnGrad}>
+                    {existingReport.status === 'generating' ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Ionicons name="document-text-outline" size={16} color="#FFF" />
+                    )}
                   </LinearGradient>
                   </TouchableOpacity>
                 )}

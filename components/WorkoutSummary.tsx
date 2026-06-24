@@ -45,6 +45,7 @@ const CAROUSEL_SNAP = CAROUSEL_CARD_W + 12;
 function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; isDark: boolean }) {
   const isSkipped = ex.is_skipped;
   const isCardio = ex.category?.toLowerCase() === 'cardio';
+  const isBodyweight = ex.equipment?.toLowerCase() === 'body weight';
   const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
   const hasCompletedData = completedSets.length > 0;
   const totalReps = completedSets.reduce((acc: number, s: any) => acc + (parseInt(s.reps) || 0), 0);
@@ -103,12 +104,12 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
       </View>
 
       {/* Record row (non-cardio, has completed data) */}
-      {!isCardio && (hasCompletedData || !isSkipped) && (
+      {!isCardio && hasCompletedData && (
         <View style={styles.recordRow}>
           <View style={[styles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[styles.recordPillLabel, { color: colors.textMuted }]}>BEST SET</Text>
             <Text style={[styles.recordPillVal, { color: colors.text }]}>
-              {Number(ex.best_set_weight || 0).toFixed(1)}kg × {ex.best_set_reps || 0}
+              {isBodyweight ? `${ex.best_set_reps || 0} reps` : `${Number(ex.best_set_weight || 0).toFixed(1)}kg × ${ex.best_set_reps || 0}`}
             </Text>
           </View>
           <View style={[styles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
@@ -134,6 +135,17 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
               <View style={[styles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
                 <Text style={[styles.exStatLabel, { color: colors.textMuted }]}>TOTAL TIME</Text>
                 <Text style={[styles.exStatValue, { color: colors.text }]}>{formatTime(totalTime)}</Text>
+              </View>
+              <View style={[styles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
+                <Text style={[styles.exStatLabel, { color: colors.textMuted }]}>AVG TIME</Text>
+                <Text style={[styles.exStatValue, { color: colors.text }]}>{formatTime(avgTime)}</Text>
+              </View>
+            </>
+          ) : isBodyweight ? (
+            <>
+              <View style={[styles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
+                <Text style={[styles.exStatLabel, { color: colors.textMuted }]}>TOTAL REPS</Text>
+                <Text style={[styles.exStatValue, { color: colors.text }]}>{totalReps}</Text>
               </View>
               <View style={[styles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
                 <Text style={[styles.exStatLabel, { color: colors.textMuted }]}>AVG TIME</Text>

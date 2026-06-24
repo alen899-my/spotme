@@ -16,6 +16,8 @@ interface WorkoutTimerContextType {
   stopRestTimer: () => void;
   pauseIdleTimer: () => void;
   resumeIdleTimer: () => void;
+  setWorkoutElapsed: (seconds: number) => void;
+  setRestTimer: (seconds: number) => void;
 }
 
 const WorkoutTimerContext = createContext<WorkoutTimerContextType>({
@@ -244,6 +246,8 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
         stopRestTimer,
         pauseIdleTimer,
         resumeIdleTimer,
+        setWorkoutElapsed,
+        setRestTimer,
       }}
     >
       {children}

@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Image, Modal,
   ScrollView, TextInput, Platform, Vibration,
-  Dimensions, Animated, AppState,
+  Dimensions, Animated, AppState, KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -174,6 +174,7 @@ const ExerciseCard = React.memo(({
             <View style={styles.setsTable}>
               {(() => {
                 const isCardio = item.category?.toLowerCase() === 'cardio';
+                const isBodyweight = item.equipment?.toLowerCase() === 'body weight';
                 return (
                   <>
                     <View style={[styles.tableHeader, { justifyContent: 'space-between', alignItems: 'center' }]}>
@@ -206,7 +207,7 @@ const ExerciseCard = React.memo(({
                             <Text style={[styles.setBlockNum, s.is_skipped && styles.tableCellMuted]}>
                               {s.is_skipped ? 'SKIP' : s.set_number}
                             </Text>
-                            {!isCardio && !s.is_skipped && (
+                            {!isCardio && !isBodyweight && !s.is_skipped && (
                               <Text style={styles.setBlockWeight}>{s.weight} kg</Text>
                             )}
                             {!s.is_skipped && (
@@ -404,6 +405,8 @@ export default function ActiveWorkoutScreen() {
     stopRestTimer,
     pauseIdleTimer,
     resumeIdleTimer,
+    setWorkoutElapsed,
+    setRestTimer,
   } = useWorkoutTimer();
 
   const [activeExercise, setActiveExercise] = useState<any>(null);
@@ -430,6 +433,8 @@ export default function ActiveWorkoutScreen() {
   const [showExitModal, setShowExitModal] = useState(false);
   const [timerModalVisible, setTimerModalVisible] = useState(false);
   const [selectedTimerType, setSelectedTimerType] = useState<'workout' | 'rest' | null>(null);
+  const [editingTimer, setEditingTimer] = useState(false);
+  const [editTimerInput, setEditTimerInput] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showDeleteSetModal, setShowDeleteSetModal] = useState(false);
@@ -568,6 +573,7 @@ export default function ActiveWorkoutScreen() {
   const handleLogSet = async () => {
     if (loadingLogSet) return;
     const isCardio = activeExercise?.category?.toLowerCase() === 'cardio';
+    const isBodyweight = activeExercise?.equipment?.toLowerCase() === 'body weight';
     if (!isCardio && (!inputReps || parseInt(inputReps) === 0)) {
       showToast('Enter reps completed', 'info');
       return;
@@ -578,7 +584,7 @@ export default function ActiveWorkoutScreen() {
       const token = await getToken();
       await axios.post(`${API_URL}/daily/exercises/${activeExercise.id}/sets`, {
         set_number: isCardio ? 1 : activeSetNum,
-        weight: isCardio ? 0 : (parseFloat(inputWeight) || 0),
+        weight: isCardio || isBodyweight ? 0 : (parseFloat(inputWeight) || 0),
         reps: isCardio ? 1 : parseInt(inputReps),
         duration_seconds: isCardio ? setTimer : setTimer,
         rest_seconds: 0,
@@ -1121,9 +1127,11 @@ export default function ActiveWorkoutScreen() {
       <Modal visible={setModalVisible} transparent animationType="slide" onRequestClose={() => { setSetModalVisible(false); setEditingSet(null); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 24) + 60 }]}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0} style={{ flex: 1 }}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
               {(() => {
                 const isCardio = activeExercise?.category?.toLowerCase() === 'cardio';
+                const isBodyweight = activeExercise?.equipment?.toLowerCase() === 'body weight';
                 return (
                   <>
                     <View style={styles.modalHeader}>
@@ -1133,12 +1141,12 @@ export default function ActiveWorkoutScreen() {
                           {editingSet ? `Edit Set ${editingSet.set_number}` : (isCardio ? 'Log duration' : `Set ${activeSetNum} of ${activeExercise?.target_sets}`)}
                         </Text>
                       </View>
-                      <TouchableOpacity onPress={() => { setSetModalVisible(false); setEditingSet(null); }}>
+                      <TouchableOpacity onPress={() => { setSetModalVisible(false); setEditingSet(null); }} style={{ position: 'absolute', top: 0, right: 16 }}>
                         <Ionicons name="close" size={24} color={colors.text} />
                       </TouchableOpacity>
                     </View>
                     <View style={styles.clockWrap}>
-                      {isCardio ? <Text style={[styles.inputLabel, { color: colors.textMuted, textAlign: 'center', marginBottom: 4 }]}>DURATION</Text> : null}
+                      <Text style={[styles.inputLabel, { color: colors.textMuted, textAlign: 'center', marginBottom: 4 }]}>DURATION</Text>
                       <Text style={[styles.clockTime, { color: colors.text }]}>{formatTime(setTimer)}</Text>
                       <TouchableOpacity style={styles.clockBtn} onPress={toggleSetTimer}>
                         <LinearGradient colors={setTimerRunning ? [P.ctaDark, P.ctaDeep] : [P.cta, P.ctaDark]} style={styles.clockBtnGrad}>
@@ -1149,18 +1157,18 @@ export default function ActiveWorkoutScreen() {
                         <Text style={[styles.resetText, { color: colors.textMuted }]}>Reset</Text>
                       </TouchableOpacity>
                     </View>
-                    {!isCardio && (
-                      <View style={styles.inputRow}>
+                    <View style={styles.inputRow}>
+                      {!isCardio && !isBodyweight && (
                         <View style={styles.inputGroup}>
                           <Text style={[styles.inputLabel, { color: colors.textMuted }]}>WEIGHT (kg)</Text>
                           <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="decimal-pad" value={inputWeight} onChangeText={setInputWeight} placeholder="0" placeholderTextColor={colors.textDim} />
                         </View>
-                        <View style={styles.inputGroup}>
-                          <Text style={[styles.inputLabel, { color: colors.textMuted }]}>REPS DONE</Text>
-                          <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="numeric" value={inputReps} onChangeText={setInputReps} placeholder="0" placeholderTextColor={colors.textDim} />
-                        </View>
+                      )}
+                      <View style={[styles.inputGroup, (isCardio || isBodyweight) && { flex: 0, minWidth: 120 }]}>
+                        <Text style={[styles.inputLabel, { color: colors.textMuted }]}>REPS DONE</Text>
+                        <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="numeric" value={inputReps} onChangeText={setInputReps} placeholder="0" placeholderTextColor={colors.textDim} />
                       </View>
-                    )}
+                    </View>
                     <View style={styles.setModalActions}>
                       {!editingSet && (
                         <TouchableOpacity style={[styles.modalSkipBtn, { borderColor: colors.border, opacity: loadingSkip ? 0.5 : 1 }]} onPress={handleSkipSet} disabled={loadingSkip}>
@@ -1195,6 +1203,7 @@ export default function ActiveWorkoutScreen() {
                 );
               })()}
             </ScrollView>
+            </KeyboardAvoidingView>
           </View>
         </View>
       </Modal>
@@ -1224,13 +1233,13 @@ export default function ActiveWorkoutScreen() {
           <View style={[styles.modalContent, { backgroundColor: colors.card, height: '85%' }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Add Exercise</Text>
-              <TouchableOpacity onPress={() => setAddExModalVisible(false)}>
+              <TouchableOpacity onPress={() => setAddExModalVisible(false)} style={{ position: 'absolute', top: 0, right: 16 }}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
             <ExerciseBrowser
               apiEndpoint="/workouts/exercises/search"
-              variant="compact"
+              variant="add"
               onSelectExercise={(exercise) => {
                 setGuideExercise(exercise);
                 setGuideModalVisible(true);
@@ -1314,7 +1323,39 @@ export default function ActiveWorkoutScreen() {
             <View style={[styles.timerDetailCard, { backgroundColor: getTimerModalDetails().color }]}>
               <Ionicons name={getTimerModalDetails().icon as any} size={48} color="#FFF" />
               <Text style={styles.timerDetailTitle}>{getTimerModalDetails().title}</Text>
-              <Text style={styles.timerDetailValue}>{getTimerModalDetails().value}</Text>
+              {editingTimer ? (
+                <TextInput
+                  style={[styles.timerDetailEditInput, { color: '#FFF', borderBottomColor: 'rgba(255,255,255,0.5)' }]}
+                  value={editTimerInput}
+                  onChangeText={setEditTimerInput}
+                  keyboardType="number-pad"
+                  autoFocus
+                  onBlur={() => setEditingTimer(false)}
+                  onSubmitEditing={() => {
+                    const parts = editTimerInput.split(':');
+                    let totalSec = 0;
+                    if (parts.length === 3) {
+                      totalSec = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+                    } else if (parts.length === 2) {
+                      totalSec = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+                    } else {
+                      totalSec = parseInt(editTimerInput) || 0;
+                    }
+                    if (selectedTimerType === 'workout') {
+                      setWorkoutElapsed(totalSec);
+                    } else {
+                      setRestTimer(totalSec);
+                    }
+                    setEditingTimer(false);
+                  }}
+                  placeholder="MM:SS"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                />
+              ) : (
+                <TouchableOpacity onPress={() => { setEditTimerInput(getTimerModalDetails().value); setEditingTimer(true); }}>
+                  <Text style={styles.timerDetailValue}>{getTimerModalDetails().value}</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.timerDetailClose} onPress={() => setTimerModalVisible(false)}>
                 <Text style={styles.timerDetailCloseText}>CLOSE</Text>
               </TouchableOpacity>
@@ -1416,8 +1457,8 @@ const styles = StyleSheet.create({
   // Modals
   modalOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   timerModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  modalContent:      { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 0, paddingTop: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
-  modalHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
+  modalContent:      { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 0, paddingTop: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, overflow: 'hidden' },
+  modalHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, paddingHorizontal: 20, paddingRight: 52 },
   modalTitle:        { fontFamily: FONTS.heading, fontSize: 20, marginBottom: 2 },
   modalSub:          { fontFamily: FONTS.body, fontSize: 13 },
   clockWrap:         { alignItems: 'center', marginBottom: 28 },
@@ -1461,6 +1502,7 @@ const styles = StyleSheet.create({
   timerDetailCard:      { width: SCREEN_WIDTH * 0.8, padding: 30, borderRadius: 32, alignItems: 'center', elevation: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 15 },
   timerDetailTitle:     { fontFamily: FONTS.bodyBold, fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 20, letterSpacing: 2 },
   timerDetailValue:     { fontFamily: FONTS.heading, fontSize: 48, color: '#FFF', marginVertical: 10 },
+  timerDetailEditInput: { fontFamily: FONTS.heading, fontSize: 48, color: '#FFF', marginVertical: 10, borderBottomWidth: 2, textAlign: 'center', minWidth: 200 },
   timerDetailClose:     { marginTop: 20, paddingHorizontal: 30, paddingVertical: 12, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 16 },
   timerDetailCloseText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' },
 

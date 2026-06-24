@@ -54,9 +54,12 @@ export default function WorkoutReportScreen() {
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [pollFailed, setPollFailed] = useState(false);
   
   const scrollRef = useRef<ScrollView>(null);
   const typingOpacity = useRef(new Animated.Value(0.4)).current;
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Typist animation for coaching simulation
   useEffect(() => {
@@ -83,6 +86,29 @@ export default function WorkoutReportScreen() {
           headers: { Authorization: `Bearer ${token}` }
         });
         setReport(res.data);
+        if (res.data.status === 'generating') {
+          setIsTyping(true);
+          pollTimeout.current = setTimeout(() => {
+            setPollFailed(true);
+            setIsTyping(false);
+            if (pollTimer.current) { clearInterval(pollTimer.current); pollTimer.current = null; }
+          }, 60000);
+          pollTimer.current = setInterval(async () => {
+            try {
+              const t2 = await getToken();
+              const r2 = await axios.get(`${API_URL}/daily/reports/${id}`, {
+                headers: { Authorization: `Bearer ${t2}` }
+              });
+              if (r2.data.status === 'completed') {
+                setReport(r2.data);
+                setIsTyping(false);
+                setPollFailed(false);
+                if (pollTimer.current) { clearInterval(pollTimer.current); pollTimer.current = null; }
+                if (pollTimeout.current) { clearTimeout(pollTimeout.current); pollTimeout.current = null; }
+              }
+            } catch {}
+          }, 4000);
+        }
       } catch (err) {
         console.error('Failed to load report:', err);
       } finally {
@@ -90,6 +116,10 @@ export default function WorkoutReportScreen() {
       }
     };
     fetch();
+    return () => {
+      if (pollTimer.current) { clearInterval(pollTimer.current); }
+      if (pollTimeout.current) { clearTimeout(pollTimeout.current); }
+    };
   }, [id]);
 
   if (loading) {
@@ -100,11 +130,64 @@ export default function WorkoutReportScreen() {
     );
   }
 
-  if (!report) {
+  if (!report && !pollFailed) {
     return (
       <View style={[styles.center, { backgroundColor: colors.bg }]}>
         <MaterialCommunityIcons name="file-document-outline" size={64} color={colors.textDim} />
         <Text style={{ fontFamily: FONTS.body, fontSize: 15, color: colors.textMuted }}>Report not found</Text>
+      </View>
+    );
+  }
+
+  if (pollFailed) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.bg }]}>
+        <MaterialCommunityIcons name="alert-circle-outline" size={64} color="#EF4444" />
+        <Text style={{ fontFamily: FONTS.body, fontSize: 18, color: colors.text, marginTop: 8 }}>Generation Failed</Text>
+        <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: colors.textMuted, textAlign: 'center', maxWidth: 260, marginTop: 4 }}>Coach Spotty couldn't generate your report. This might be due to server load or missing data.</Text>
+        <TouchableOpacity
+          onPress={() => {
+            setPollFailed(false);
+            setLoading(true);
+            setReport(null);
+            const re = async () => {
+              try {
+                const token = await getToken();
+                const res = await axios.post(`${API_URL}/daily/workouts/${id}/generate-report`, {}, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.data.status === 'generating') {
+                  setIsTyping(true);
+                  pollTimeout.current = setTimeout(() => {
+                    setPollFailed(true);
+                    setIsTyping(false);
+                    if (pollTimer.current) { clearInterval(pollTimer.current); pollTimer.current = null; }
+                  }, 60000);
+                  pollTimer.current = setInterval(async () => {
+                    try {
+                      const t2 = await getToken();
+                      const r2 = await axios.get(`${API_URL}/daily/reports/${id}`, {
+                        headers: { Authorization: `Bearer ${t2}` }
+                      });
+                      if (r2.data.status === 'completed') {
+                        setReport(r2.data);
+                        setIsTyping(false);
+                        setPollFailed(false);
+                        if (pollTimer.current) { clearInterval(pollTimer.current); pollTimer.current = null; }
+                        if (pollTimeout.current) { clearTimeout(pollTimeout.current); pollTimeout.current = null; }
+                      }
+                    } catch {}
+                  }, 4000);
+                }
+              } catch {}
+              setLoading(false);
+            };
+            re();
+          }}
+          style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 12 }}
+        >
+          <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' }}>RETRY GENERATION</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -125,26 +208,37 @@ export default function WorkoutReportScreen() {
     if (regenerating) return;
     setRegenerating(true);
     setIsTyping(true);
+    setPollFailed(false);
     try {
       const token = await getToken();
       await axios.post(`${API_URL}/daily/workouts/${report.daily_workout_id}/generate-report`, { force: true }, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
-      // Fetch fresh report details
-      setTimeout(async () => {
+      pollTimeout.current = setTimeout(() => {
+        setPollFailed(true);
+        setIsTyping(false);
+        setRegenerating(false);
+        if (pollTimer.current) { clearInterval(pollTimer.current); pollTimer.current = null; }
+      }, 60000);
+
+      pollTimer.current = setInterval(async () => {
         try {
           const token2 = await getToken();
           const res = await axios.get(`${API_URL}/daily/reports/${id}`, {
             headers: { Authorization: `Bearer ${token2}` },
           });
-          setReport(res.data);
-          showToast('Report updated by Coach Spotty! 🏋️');
+          if (res.data.status === 'completed') {
+            setReport(res.data);
+            showToast('Report updated by Coach Spotty! 🏋️');
+            if (pollTimer.current) { clearInterval(pollTimer.current); pollTimer.current = null; }
+            if (pollTimeout.current) { clearTimeout(pollTimeout.current); pollTimeout.current = null; }
+            setRegenerating(false);
+            setIsTyping(false);
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+          }
         } catch (_) {}
-        setRegenerating(false);
-        setIsTyping(false);
-        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
-      }, 3500);
+      }, 4000);
     } catch (err) {
       console.error('Failed to regenerate report:', err);
       setRegenerating(false);
