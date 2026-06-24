@@ -1860,12 +1860,28 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                     {/* Expanded Detail */}
                     {isExpanded && (
                       <View style={[styles.fsDetailWrap, { borderTopColor: colors.border }]}>
-                        {/* Extra nutrients */}
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                        {/* Extra nutrients – Fats */}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                           {item.fiber_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#34D39915' }]}><Text style={{ color: '#34D399', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.fiber_g)}g fiber</Text></View>}
                           {item.sugars_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#E7B10015' }]}><Text style={{ color: '#E7B100', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.sugars_g)}g sugar</Text></View>}
                           {item.sodium_mg != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#FB923C15' }]}><Text style={{ color: '#FB923C', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.sodium_mg)}mg sodium</Text></View>}
                           {item.saturated_fat_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#8B5CF615' }]}><Text style={{ color: '#8B5CF6', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.saturated_fat_g)}g sat.fat</Text></View>}
+                          {item.monounsaturated_fat_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#A78BFA15' }]}><Text style={{ color: '#A78BFA', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.monounsaturated_fat_g)}g mono</Text></View>}
+                          {item.polyunsaturated_fat_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#818CF815' }]}><Text style={{ color: '#818CF8', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.polyunsaturated_fat_g)}g poly</Text></View>}
+                          {item.omega3_fat_g != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#60A5FA15' }]}><Text style={{ color: '#60A5FA', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.omega3_fat_g)}g Ω-3</Text></View>}
+                          {item.cholesterol_mg != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#F8717115' }]}><Text style={{ color: '#F87171', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.cholesterol_mg)}mg chol.</Text></View>}
+                        </View>
+                        {/* Minerals & Vitamins */}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                          {item.calcium_mg != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#FBBF2415' }]}><Text style={{ color: '#FBBF24', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.calcium_mg)}mg Ca</Text></View>}
+                          {item.iron_mg != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#FB923C15' }]}><Text style={{ color: '#FB923C', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.iron_mg)}mg Fe</Text></View>}
+                          {item.magnesium_mg != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#A78BFA15' }]}><Text style={{ color: '#A78BFA', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.magnesium_mg)}mg Mg</Text></View>}
+                          {item.potassium_mg != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#60A5FA15' }]}><Text style={{ color: '#60A5FA', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.potassium_mg)}mg K</Text></View>}
+                          {item.zinc_mg != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#34D39915' }]}><Text style={{ color: '#34D399', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.zinc_mg)}mg Zn</Text></View>}
+                          {item.vitamin_c != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#FBBF2415' }]}><Text style={{ color: '#FBBF24', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.vitamin_c)}mg Vit.C</Text></View>}
+                          {item.vitamin_d != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#F59E0B15' }]}><Text style={{ color: '#F59E0B', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.vitamin_d)}µg Vit.D</Text></View>}
+                          {item.folate_ug != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#10B98115' }]}><Text style={{ color: '#10B981', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.folate_ug)}µg folate</Text></View>}
+                          {item.vitamin_b12 != null && <View style={[styles.fsNutrientPill, { backgroundColor: '#EC489915' }]}><Text style={{ color: '#EC4899', fontFamily: FONTS.bodySemiBold, fontSize: 12 }}>{Math.round(item.vitamin_b12)}µg B12</Text></View>}
                         </View>
                         {/* Quick log button */}
                         <TouchableOpacity
@@ -2165,37 +2181,38 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── FAB: Log Meal ── */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => {
-          setInitialImageUri(null);
-          setInitialIngredients([]);
-          setEditingMealId(null);
-          setShowLogSheet(true);
-        }}
-        style={{
-          position: 'absolute',
-          bottom: insets.bottom + 100,
-          right: 20,
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          elevation: 8,
-          shadowColor: '#2596BE',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.35,
-          shadowRadius: 8,
-          zIndex: 100,
-        }}
-      >
-        <LinearGradient
-          colors={['#2596BE', '#1a6e8a']}
-          style={{ width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' }}
+      {activeTab === 0 && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => {
+            setInitialImageUri(null);
+            setInitialIngredients([]);
+            setEditingMealId(null);
+            setShowLogSheet(true);
+          }}
+          style={{
+            position: 'absolute',
+            bottom: insets.bottom + 100,
+            right: 20,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            elevation: 8,
+            shadowColor: '#2596BE',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.35,
+            shadowRadius: 8,
+            zIndex: 100,
+          }}
         >
-          <Ionicons name="add" size={28} color="#FFF" />
-        </LinearGradient>
-      </TouchableOpacity>
+          <LinearGradient
+            colors={['#2596BE', '#1a6e8a']}
+            style={{ width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <Ionicons name="add" size={28} color="#FFF" />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
 
     </View>
   );

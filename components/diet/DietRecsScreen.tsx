@@ -28,6 +28,20 @@ const SORT_OPTIONS = [
   { key: 'fiber_g', label: 'Fiber' },
   { key: 'sugars_g', label: 'Sugar' },
   { key: 'sodium_mg', label: 'Sodium' },
+  { key: 'saturated_fat_g', label: 'Sat.Fat' },
+  { key: 'monounsaturated_fat_g', label: 'Mono.Fat' },
+  { key: 'polyunsaturated_fat_g', label: 'Poly.Fat' },
+  { key: 'trans_fat_g', label: 'Trans Fat' },
+  { key: 'omega3_fat_g', label: 'Omega-3' },
+  { key: 'omega6_fat_g', label: 'Omega-6' },
+  { key: 'cholesterol_mg', label: 'Cholesterol' },
+  { key: 'calcium_mg', label: 'Calcium' },
+  { key: 'iron_mg', label: 'Iron' },
+  { key: 'magnesium_mg', label: 'Magnesium' },
+  { key: 'potassium_mg', label: 'Potassium' },
+  { key: 'zinc_mg', label: 'Zinc' },
+  { key: 'vitamin_c', label: 'Vitamin C' },
+  { key: 'vitamin_d', label: 'Vitamin D' },
 ];
 
 const QUICK_FILTERS: { key: string; label: string; filter: Record<string, string> }[] = [
@@ -36,6 +50,10 @@ const QUICK_FILTERS: { key: string; label: string; filter: Record<string, string
   { key: 'high_fiber', label: 'High Fiber', filter: { min_fiber: '5' } },
   { key: 'low_fat', label: 'Low Fat', filter: { max_fat: '10' } },
   { key: 'low_carb', label: 'Low Carb', filter: { max_carbs: '20' } },
+  { key: 'high_calcium', label: 'High Calcium', filter: { min_calcium: '200' } },
+  { key: 'high_iron', label: 'High Iron', filter: { min_iron: '5' } },
+  { key: 'low_sodium', label: 'Low Sodium', filter: { max_sodium: '140' } },
+  { key: 'high_vitamin_c', label: 'High Vit.C', filter: { min_vitamin_c: '30' } },
 ];
 
 const getIngredientImage = (name: string): string | null => {
@@ -392,7 +410,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
                 </View>
               ) : null}
               <Text style={[styles.foodCardServing, { color: colors.textDim }]}>
-                per {item.serving_size || '100g'}
+                per {item.serving_size || '100g'}{item.servings_unit ? ` (${item.servings_unit})` : ''}
               </Text>
             </View>
           </View>
@@ -417,15 +435,32 @@ export default function DietRecsScreen({ tab, header }: Props) {
           <MacroChip value={`${Math.round(item.protein_g || 0)}g`} label="Protein" color="#10B981" />
           <MacroChip value={`${Math.round(item.carbohydrates_g || 0)}g`} label="Carbs" color="#3B82F6" />
           <MacroChip value={`${Math.round(item.fat_g || 0)}g`} label="Fat" color="#F59E0B" />
+          {item.fiber_g != null && <MacroChip value={`${Math.round(item.fiber_g)}g`} label="Fiber" color="#34D399" />}
         </View>
 
         {isExpanded && (
           <View style={[styles.foodCardExtra, { borderTopColor: colors.border }]}>
             <View style={styles.extraMacrosRow}>
-              {item.fiber_g != null && <ExtraPill value={`${Math.round(item.fiber_g)}g`} label="Fiber" color="#34D399" />}
               {item.sugars_g != null && <ExtraPill value={`${Math.round(item.sugars_g)}g`} label="Sugar" color="#E7B100" />}
               {item.sodium_mg != null && <ExtraPill value={`${Math.round(item.sodium_mg)}mg`} label="Sodium" color="#FB923C" />}
               {item.saturated_fat_g != null && <ExtraPill value={`${Math.round(item.saturated_fat_g)}g`} label="Sat.Fat" color="#8B5CF6" />}
+              {item.monounsaturated_fat_g != null && <ExtraPill value={`${Math.round(item.monounsaturated_fat_g)}g`} label="Mono" color="#A78BFA" />}
+              {item.polyunsaturated_fat_g != null && <ExtraPill value={`${Math.round(item.polyunsaturated_fat_g)}g`} label="Poly" color="#818CF8" />}
+              {item.trans_fat_g != null && <ExtraPill value={`${Math.round(item.trans_fat_g)}g`} label="Trans" color="#F87171" />}
+              {item.omega3_fat_g != null && <ExtraPill value={`${Math.round(item.omega3_fat_g)}g`} label="Ω-3" color="#60A5FA" />}
+              {item.omega6_fat_g != null && <ExtraPill value={`${Math.round(item.omega6_fat_g)}g`} label="Ω-6" color="#34D399" />}
+              {item.cholesterol_mg != null && <ExtraPill value={`${Math.round(item.cholesterol_mg)}mg`} label="Chol." color="#F87171" />}
+            </View>
+            <View style={[styles.extraMacrosRow, { marginTop: 6 }]}>
+              {item.calcium_mg != null && <ExtraPill value={`${Math.round(item.calcium_mg)}mg`} label="Calcium" color="#FBBF24" />}
+              {item.iron_mg != null && <ExtraPill value={`${Math.round(item.iron_mg)}mg`} label="Iron" color="#FB923C" />}
+              {item.magnesium_mg != null && <ExtraPill value={`${Math.round(item.magnesium_mg)}mg`} label="Magnesium" color="#A78BFA" />}
+              {item.potassium_mg != null && <ExtraPill value={`${Math.round(item.potassium_mg)}mg`} label="Potassium" color="#60A5FA" />}
+              {item.zinc_mg != null && <ExtraPill value={`${Math.round(item.zinc_mg)}mg`} label="Zinc" color="#34D399" />}
+              {item.vitamin_c != null && <ExtraPill value={`${Math.round(item.vitamin_c)}mg`} label="Vit.C" color="#FBBF24" />}
+              {item.vitamin_d != null && <ExtraPill value={`${Math.round(item.vitamin_d)}µg`} label="Vit.D" color="#F59E0B" />}
+              {item.folate_ug != null && <ExtraPill value={`${Math.round(item.folate_ug)}µg`} label="Folate" color="#10B981" />}
+              {item.vitamin_b12 != null && <ExtraPill value={`${Math.round(item.vitamin_b12)}µg`} label="B12" color="#EC4899" />}
             </View>
           </View>
         )}
@@ -1237,7 +1272,7 @@ const styles = StyleSheet.create({
   foodCardTagText: { fontFamily: FONTS.bodySemiBold, fontSize: 10 },
   foodCardServing: { fontFamily: FONTS.body, fontSize: 10 },
   gradeBadge: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  foodCardMacros: { flexDirection: 'row', gap: 6, marginTop: 12 },
+  foodCardMacros: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
   foodCardExtra: { borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
   extraMacrosRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   extraPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },

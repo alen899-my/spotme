@@ -586,24 +586,19 @@ router.get('/food-search', authenticateToken, async (req, res) => {
 
       const query = `
         SELECT
-          id,
-          food_name,
-          category,
-          meal_type,
-          nutrition_grade,
-          serving_size,
-          source_file,
-          calories_kcal,
-          protein_g,
-          carbohydrates_g,
-          fat_g,
-          fiber_g,
-          sugars_g,
-          sodium_mg,
-          saturated_fat_g,
-          nutrition_density,
-          image_url,
-          image_small_url,
+          id, food_name, category, meal_type, nutrition_grade,
+          serving_size, servings_unit, source_file,
+          calories_kcal, protein_g, carbohydrates_g, fat_g,
+          fiber_g, sugars_g, sodium_mg, saturated_fat_g,
+          monounsaturated_fat_g, polyunsaturated_fat_g, trans_fat_g,
+          omega3_fat_g, omega6_fat_g, cholesterol_mg,
+          calcium_mg, phosphorus_mg, potassium_mg, iron_mg,
+          magnesium_mg, zinc_mg, copper_mg, manganese_mg,
+          selenium_ug, chromium_mg, molybdenum_mg,
+          vitamin_a, vitamin_c, vitamin_d, vitamin_e, vitamin_k,
+          vitamin_b12, folate_ug, biotin_ug, carotenoids_ug,
+          water_g, salt_g, water_intake_ml,
+          nutrition_density, image_url, image_small_url,
           1 AS relevance_rank
         FROM food_database
         WHERE calories_kcal IS NOT NULL
@@ -648,24 +643,19 @@ router.get('/food-search', authenticateToken, async (req, res) => {
 
     const query = `
       SELECT
-        id,
-        food_name,
-        category,
-        meal_type,
-        nutrition_grade,
-        serving_size,
-        source_file,
-        calories_kcal,
-        protein_g,
-        carbohydrates_g,
-        fat_g,
-        fiber_g,
-        sugars_g,
-        sodium_mg,
-        saturated_fat_g,
-        nutrition_density,
-        image_url,
-        image_small_url,
+        id, food_name, category, meal_type, nutrition_grade,
+        serving_size, servings_unit, source_file,
+        calories_kcal, protein_g, carbohydrates_g, fat_g,
+        fiber_g, sugars_g, sodium_mg, saturated_fat_g,
+        monounsaturated_fat_g, polyunsaturated_fat_g, trans_fat_g,
+        omega3_fat_g, omega6_fat_g, cholesterol_mg,
+        calcium_mg, phosphorus_mg, potassium_mg, iron_mg,
+        magnesium_mg, zinc_mg, copper_mg, manganese_mg,
+        selenium_ug, chromium_mg, molybdenum_mg,
+        vitamin_a, vitamin_c, vitamin_d, vitamin_e, vitamin_k,
+        vitamin_b12, folate_ug, biotin_ug, carotenoids_ug,
+        water_g, salt_g, water_intake_ml,
+        nutrition_density, image_url, image_small_url,
         -- Relevance ranking: exact match = 1, prefix = 2, contains = 3
         CASE
           WHEN food_name ILIKE $1 THEN 1
@@ -852,7 +842,15 @@ router.get('/food-browse', authenticateToken, async (req, res) => {
 
     const allowedSortColumns = [
       'nutrition_density', 'calories_kcal', 'protein_g', 'carbohydrates_g',
-      'fat_g', 'fiber_g', 'sugars_g', 'sodium_mg', 'saturated_fat_g', 'food_name'
+      'fat_g', 'fiber_g', 'sugars_g', 'sodium_mg', 'saturated_fat_g',
+      'monounsaturated_fat_g', 'polyunsaturated_fat_g', 'trans_fat_g',
+      'omega3_fat_g', 'omega6_fat_g', 'cholesterol_mg',
+      'calcium_mg', 'phosphorus_mg', 'potassium_mg', 'iron_mg',
+      'magnesium_mg', 'zinc_mg', 'copper_mg', 'manganese_mg',
+      'selenium_ug', 'chromium_mg', 'molybdenum_mg',
+      'vitamin_a', 'vitamin_c', 'vitamin_d', 'vitamin_e', 'vitamin_k',
+      'vitamin_b12', 'folate_ug', 'biotin_ug', 'carotenoids_ug',
+      'food_name'
     ];
     const column = allowedSortColumns.includes(sort_by) ? sort_by : 'nutrition_density';
     const order = sort_order === 'asc' ? 'ASC' : 'DESC';
@@ -879,6 +877,15 @@ router.get('/food-browse', authenticateToken, async (req, res) => {
       { min: min_fiber, max: max_fiber, col: 'fiber_g' },
       { min: min_sugar, max: max_sugar, col: 'sugars_g' },
       { min: min_sodium, max: max_sodium, col: 'sodium_mg' },
+      { min: min_saturated_fat, max: max_saturated_fat, col: 'saturated_fat_g' },
+      { min: min_cholesterol, max: max_cholesterol, col: 'cholesterol_mg' },
+      { min: min_calcium, max: max_calcium, col: 'calcium_mg' },
+      { min: min_iron, max: max_iron, col: 'iron_mg' },
+      { min: min_magnesium, max: max_magnesium, col: 'magnesium_mg' },
+      { min: min_potassium, max: max_potassium, col: 'potassium_mg' },
+      { min: min_zinc, max: max_zinc, col: 'zinc_mg' },
+      { min: min_vitamin_c, max: max_vitamin_c, col: 'vitamin_c' },
+      { min: min_vitamin_d, max: max_vitamin_d, col: 'vitamin_d' },
     ];
 
     for (const r of ranges) {
@@ -900,9 +907,17 @@ router.get('/food-browse', authenticateToken, async (req, res) => {
     const query = `
       SELECT
         id, food_name, category, meal_type, nutrition_grade,
-        serving_size, source_file,
+        serving_size, servings_unit, source_file,
         calories_kcal, protein_g, carbohydrates_g, fat_g,
         fiber_g, sugars_g, sodium_mg, saturated_fat_g,
+        monounsaturated_fat_g, polyunsaturated_fat_g, trans_fat_g,
+        omega3_fat_g, omega6_fat_g, cholesterol_mg,
+        calcium_mg, phosphorus_mg, potassium_mg, iron_mg,
+        magnesium_mg, zinc_mg, copper_mg, manganese_mg,
+        selenium_ug, chromium_mg, molybdenum_mg,
+        vitamin_a, vitamin_c, vitamin_d, vitamin_e, vitamin_k,
+        vitamin_b12, folate_ug, biotin_ug, carotenoids_ug,
+        water_g, salt_g, water_intake_ml,
         nutrition_density, image_url, image_small_url
       FROM food_database
       ${whereClause}
