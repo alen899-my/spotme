@@ -854,7 +854,7 @@ export default function DailyTab() {
         onPress={() => setShowRestModal(true)}
         style={{
           position: 'absolute',
-          bottom: 158,
+          bottom: insets.bottom + 176,
           right: 20,
           zIndex: 100,
         }}
@@ -884,7 +884,7 @@ export default function DailyTab() {
         onPress={() => router.push('/daily/new')}
         style={{
           position: 'absolute',
-          bottom: 90,
+          bottom: insets.bottom + 100,
           right: 20,
           width: 56,
           height: 56,

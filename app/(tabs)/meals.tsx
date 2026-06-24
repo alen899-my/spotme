@@ -2176,7 +2176,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         }}
         style={{
           position: 'absolute',
-          bottom: 90,
+          bottom: insets.bottom + 100,
           right: 20,
           width: 56,
           height: 56,
