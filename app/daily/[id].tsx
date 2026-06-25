@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Image, Modal,
   ScrollView, TextInput, Platform, Vibration,
-  Dimensions, Animated, AppState, KeyboardAvoidingView,
+  useWindowDimensions, Animated, AppState,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,9 +30,6 @@ import * as Sharing from 'expo-sharing';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import * as Notifications from 'expo-notifications';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 
 
 function formatTime(sec: number) {
@@ -366,6 +363,7 @@ export default function ActiveWorkoutScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
 
   const [workout, setWorkout] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -413,6 +411,38 @@ export default function ActiveWorkoutScreen() {
   const [derivedActiveId, setDerivedActiveId] = useState<number | null>(null);
   const [activeSetNum, setActiveSetNum] = useState(1);
   const [setModalVisible, setSetModalVisible] = useState(false);
+  const setModalSlideAnim = useRef(new Animated.Value(0)).current;
+  const setModalFadeAnim = useRef(new Animated.Value(0)).current;
+  const [setModalClosing, setSetModalClosing] = useState(false);
+
+  const openModal = useCallback(() => {
+    setSetModalClosing(false);
+    setSetModalVisible(true);
+    Animated.parallel([
+      Animated.spring(setModalSlideAnim, {
+        toValue: 1, useNativeDriver: true, tension: 60, friction: 10,
+      }),
+      Animated.timing(setModalFadeAnim, {
+        toValue: 1, duration: 200, useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setSetModalClosing(true);
+    Animated.parallel([
+      Animated.timing(setModalSlideAnim, {
+        toValue: 0, duration: 180, useNativeDriver: true,
+      }),
+      Animated.timing(setModalFadeAnim, {
+        toValue: 0, duration: 150, useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setSetModalVisible(false);
+      setEditingSet(null);
+      setSetModalClosing(false);
+    });
+  }, []);
 
   const [setTimer, setSetTimer] = useState(0);
   const [setTimerRunning, setSetTimerRunning] = useState(false);
@@ -557,7 +587,7 @@ export default function ActiveWorkoutScreen() {
     setEditingSet(null);
     setActiveSetNum((ex.sets?.length || 0) + 1);
     pauseIdleTimer();
-    setSetModalVisible(true);
+    openModal();
   };
 
   const openEditSet = (set: any, exercise: any) => {
@@ -567,7 +597,7 @@ export default function ActiveWorkoutScreen() {
     setInputWeight(String(set.weight || ''));
     setInputReps(String(set.reps || ''));
     setSetTimer(set.duration_seconds || 0);
-    setSetModalVisible(true);
+    openModal();
   };
 
   const handleLogSet = async () => {
@@ -591,8 +621,7 @@ export default function ActiveWorkoutScreen() {
         workout_duration: workoutElapsed,
       }, { headers: { Authorization: `Bearer ${token}` } });
       showToast(isCardio ? `Duration logged! 🔥` : `Set ${activeSetNum} logged! 🔥`);
-      setSetModalVisible(false);
-      setEditingSet(null);
+      closeModal();
       setSetTimer(0);
       setSetTimerRunning(false);
       fetchWorkout();
@@ -637,8 +666,7 @@ export default function ActiveWorkoutScreen() {
         headers: { Authorization: `Bearer ${token}` },
       });
       showToast('Set updated! ✏️');
-      setSetModalVisible(false);
-      setEditingSet(null);
+      closeModal();
       fetchWorkout();
     } catch (err) {
       console.error('Error editing set:', err);
@@ -658,7 +686,7 @@ export default function ActiveWorkoutScreen() {
         rest_seconds: 0, workout_duration: workoutElapsed, is_skipped: true,
       }, { headers: { Authorization: `Bearer ${token}` } });
       showToast(`Set ${activeSetNum} skipped`);
-      setSetModalVisible(false);
+      closeModal();
       fetchWorkout();
     } catch (err) {
       console.error('Error skipping set:', err);
@@ -1124,10 +1152,18 @@ export default function ActiveWorkoutScreen() {
       </View>
 
       {/* Set Logger Modal */}
-      <Modal visible={setModalVisible} transparent animationType="slide" onRequestClose={() => { setSetModalVisible(false); setEditingSet(null); }}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 24) + 60 }]}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0} style={{ flex: 1 }}>
+      <Modal visible={setModalVisible} transparent animationType="none" onRequestClose={closeModal}>
+        <Animated.View style={[styles.modalOverlay, { opacity: setModalFadeAnim }]}>
+          <Animated.View style={[styles.modalContentAnimated, {
+            backgroundColor: colors.card,
+            paddingBottom: Math.max(insets.bottom, 24) + 60,
+            transform: [{
+              translateY: setModalSlideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [600, 0],
+              }),
+            }],
+          }]}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
               {(() => {
                 const isCardio = activeExercise?.category?.toLowerCase() === 'cardio';
@@ -1141,7 +1177,7 @@ export default function ActiveWorkoutScreen() {
                           {editingSet ? `Edit Set ${editingSet.set_number}` : (isCardio ? 'Log duration' : `Set ${activeSetNum} of ${activeExercise?.target_sets}`)}
                         </Text>
                       </View>
-                      <TouchableOpacity onPress={() => { setSetModalVisible(false); setEditingSet(null); }} style={{ position: 'absolute', top: 0, right: 16 }}>
+                      <TouchableOpacity onPress={closeModal} style={{ position: 'absolute', top: 0, right: 16 }}>
                         <Ionicons name="close" size={24} color={colors.text} />
                       </TouchableOpacity>
                     </View>
@@ -1157,15 +1193,15 @@ export default function ActiveWorkoutScreen() {
                         <Text style={[styles.resetText, { color: colors.textMuted }]}>Reset</Text>
                       </TouchableOpacity>
                     </View>
-                    <View style={styles.inputRow}>
+                    <View style={[styles.inputRow, (isCardio || isBodyweight) && { justifyContent: 'center' }]}>
                       {!isCardio && !isBodyweight && (
                         <View style={styles.inputGroup}>
                           <Text style={[styles.inputLabel, { color: colors.textMuted }]}>WEIGHT (kg)</Text>
                           <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="decimal-pad" value={inputWeight} onChangeText={setInputWeight} placeholder="0" placeholderTextColor={colors.textDim} />
                         </View>
                       )}
-                      <View style={[styles.inputGroup, (isCardio || isBodyweight) && { flex: 0, minWidth: 120 }]}>
-                        <Text style={[styles.inputLabel, { color: colors.textMuted }]}>REPS DONE</Text>
+                      <View style={[styles.inputGroup, (isCardio || isBodyweight) && { flex: 0, minWidth: 140, alignItems: 'center' }]}>
+                        <Text style={[styles.inputLabel, { color: colors.textMuted, textAlign: (isCardio || isBodyweight) ? 'center' : 'left' }]}>REPS DONE</Text>
                         <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="numeric" value={inputReps} onChangeText={setInputReps} placeholder="0" placeholderTextColor={colors.textDim} />
                       </View>
                     </View>
@@ -1203,9 +1239,8 @@ export default function ActiveWorkoutScreen() {
                 );
               })()}
             </ScrollView>
-            </KeyboardAvoidingView>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
 
       <ActionModal visible={showFinishModal} type="confirm" title="Finish Session?" message="Are you sure you want to end this workout? All your stats will be finalized." confirmText={finishing ? 'FINISHING...' : 'YES, FINISH'} onConfirm={handleFinishWorkout} onCancel={() => setShowFinishModal(false)} />
@@ -1228,7 +1263,7 @@ export default function ActiveWorkoutScreen() {
       />
 
       {/* Add Exercise Modal */}
-      <Modal visible={addExModalVisible} transparent animationType="slide" onRequestClose={() => setAddExModalVisible(false)}>
+      <Modal visible={addExModalVisible} transparent animationType="none" onRequestClose={() => setAddExModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card, height: '85%' }]}>
             <View style={styles.modalHeader}>
@@ -1272,7 +1307,7 @@ export default function ActiveWorkoutScreen() {
       </Modal>
 
       {/* Edit Metrics Modal */}
-      <Modal visible={showEditMetricsModal} transparent animationType="slide" onRequestClose={() => setShowEditMetricsModal(false)}>
+      <Modal visible={showEditMetricsModal} transparent animationType="none" onRequestClose={() => setShowEditMetricsModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: '90%' }]}>
             <View style={styles.modalHeader}>
@@ -1320,7 +1355,7 @@ export default function ActiveWorkoutScreen() {
       <Modal visible={timerModalVisible} transparent animationType="fade" onRequestClose={() => setTimerModalVisible(false)}>
         <TouchableOpacity style={styles.timerModalOverlay} activeOpacity={1} onPress={() => setTimerModalVisible(false)}>
           {selectedTimerType && (
-            <View style={[styles.timerDetailCard, { backgroundColor: getTimerModalDetails().color }]}>
+            <View style={[{ width: SCREEN_WIDTH * 0.8, padding: 30, borderRadius: 32, alignItems: 'center', elevation: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 15 }, { backgroundColor: getTimerModalDetails().color }]}>
               <Ionicons name={getTimerModalDetails().icon as any} size={48} color="#FFF" />
               <Text style={styles.timerDetailTitle}>{getTimerModalDetails().title}</Text>
               {editingTimer ? (
@@ -1457,7 +1492,8 @@ const styles = StyleSheet.create({
   // Modals
   modalOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   timerModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  modalContent:      { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 0, paddingTop: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, overflow: 'hidden' },
+  modalContent:      { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 0, paddingTop: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+  modalContentAnimated: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 0, paddingTop: 24, overflow: 'hidden' },
   modalHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, paddingHorizontal: 20, paddingRight: 52 },
   modalTitle:        { fontFamily: FONTS.heading, fontSize: 20, marginBottom: 2 },
   modalSub:          { fontFamily: FONTS.body, fontSize: 13 },
@@ -1499,7 +1535,6 @@ const styles = StyleSheet.create({
   downloadBtnGrad: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 14 },
 
   // Timer detail
-  timerDetailCard:      { width: SCREEN_WIDTH * 0.8, padding: 30, borderRadius: 32, alignItems: 'center', elevation: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 15 },
   timerDetailTitle:     { fontFamily: FONTS.bodyBold, fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 20, letterSpacing: 2 },
   timerDetailValue:     { fontFamily: FONTS.heading, fontSize: 48, color: '#FFF', marginVertical: 10 },
   timerDetailEditInput: { fontFamily: FONTS.heading, fontSize: 48, color: '#FFF', marginVertical: 10, borderBottomWidth: 2, textAlign: 'center', minWidth: 200 },

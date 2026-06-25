@@ -752,7 +752,7 @@ export default function DailyTab() {
       <Modal
         visible={showRestModal}
         transparent
-        animationType="slide"
+        animationType="none"
         onRequestClose={() => !loggingRest && setShowRestModal(false)}
       >
         <Pressable style={restModalStyles.modalOverlay} onPress={() => !loggingRest && setShowRestModal(false)}>

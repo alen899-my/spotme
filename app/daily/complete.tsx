@@ -83,14 +83,12 @@ function ConfettiParticle({ delay, color, startX }: { delay: number; color: stri
 
 // ── Bento Tile ──────────────────────────────────────────────────────────────
 function BentoTile({
-  icon, iconColor, label, value, sub, wide, colors, isDark,
+  icon, iconColor, label, value, sub, colors, isDark,
 }: {
   icon: string; iconColor: string; label: string; value: string;
-  sub: string; wide?: boolean; colors: any; isDark: boolean;
+  sub: string; colors: any; isDark: boolean;
 }) {
-  const tileWidth = wide
-    ? SCREEN_WIDTH - s(32)
-    : (SCREEN_WIDTH - s(32) - s(12)) / 2;
+  const tileWidth = (SCREEN_WIDTH - s(32) - s(12)) / 2;
 
   return (
     <View
@@ -107,7 +105,7 @@ function BentoTile({
         <Ionicons name={icon as any} size={fs(18)} color={iconColor} />
       </View>
       <Text style={[bentoStyles.tileLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#94A3B8' }]}>{label}</Text>
-      <Text style={[bentoStyles.tileValue, { color: isDark ? '#F1F5F9' : '#0F1923', fontSize: fs(wide ? 26 : 20) }]}>
+      <Text style={[bentoStyles.tileValue, { color: isDark ? '#F1F5F9' : '#0F1923', fontSize: fs(20) }]}>
         {value}
       </Text>
       <Text style={[bentoStyles.tileSub, { color: isDark ? 'rgba(241,245,249,0.30)' : '#94A3B8' }]}>{sub}</Text>
@@ -556,15 +554,6 @@ export default function WorkoutCompleteScreen() {
     return best;
   }, [workout]);
 
-  const avgRating = useMemo(() => {
-    if (!workout?.exercises) return null;
-    const ratings = workout.exercises
-      .map((e: any) => e.rating)
-      .filter((r: any) => r !== null && r !== undefined);
-    if (ratings.length === 0) return null;
-    return (ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1);
-  }, [workout]);
-
   // ── Confetti particles ──
   const confettiParticles = useMemo(() =>
     Array.from({ length: 20 }, (_, i) => ({
@@ -682,19 +671,11 @@ export default function WorkoutCompleteScreen() {
             <BentoTile icon="stopwatch-outline" iconColor="#00C9C8" label="Active time" value={formatDuration(Math.max(0, displayDuration - displayRest))} sub="Active exercising" colors={colors} isDark={isDark} />
             <BentoTile icon="hourglass-outline" iconColor="#F59E0B" label="REST TIME" value={formatDuration(displayRest)} sub="Recovery" colors={colors} isDark={isDark} />
             <BentoTile icon="flame-outline" iconColor="#EF4444" label="CALORIES" value={`${caloriesBurned}`} sub="Est. kcal burn" colors={colors} isDark={isDark} />
-            <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${Math.round(displayVolume)} kg`} sub="Weight lifted" wide colors={colors} isDark={isDark} />
+            <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${Math.round(displayVolume)} kg`} sub="Weight lifted" colors={colors} isDark={isDark} />
             <BentoTile icon="layers-outline" iconColor="#8B5CF6" label="TOTAL SETS" value={`${totalSets}`} sub="Completed" colors={colors} isDark={isDark} />
-            <BentoTile
-              icon="fitness-outline" iconColor="#2596BE" label="EXERCISES"
-              value={`${exerciseStats.completed}/${exerciseStats.total}`}
-              sub={exerciseStats.skipped > 0 ? `${exerciseStats.skipped} skipped` : 'All completed'}
-              wide colors={colors} isDark={isDark}
-            />
+            <BentoTile icon="fitness-outline" iconColor="#2596BE" label="EXERCISES" value={`${exerciseStats.completed}/${exerciseStats.total}`} sub={exerciseStats.skipped > 0 ? `${exerciseStats.skipped} skipped` : 'All completed'} colors={colors} isDark={isDark} />
             {bestSet && (
               <BentoTile icon="trophy-outline" iconColor="#FBBF24" label="BEST SET" value={`${bestSet.w}kg × ${bestSet.r}`} sub={bestSet.name} colors={colors} isDark={isDark} />
-            )}
-            {avgRating !== null && (
-              <BentoTile icon="star-outline" iconColor="#F59E0B" label="AVG RATING" value={`${avgRating}/10`} sub="Exercise quality" colors={colors} isDark={isDark} />
             )}
           </View>
 

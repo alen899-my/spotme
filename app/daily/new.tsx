@@ -374,7 +374,7 @@ export default function NewDailyWorkout() {
       <Modal
         visible={showRestModal}
         transparent
-        animationType="slide"
+        animationType="none"
         onRequestClose={() => !loggingRest && setShowRestModal(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => !loggingRest && setShowRestModal(false)}>

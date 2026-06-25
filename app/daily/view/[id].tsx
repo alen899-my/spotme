@@ -249,7 +249,7 @@ export default function WorkoutViewScreen() {
       </Modal>
 
       {/* Edit Metrics Modal */}
-      <Modal visible={showEditMetricsModal} transparent animationType="slide">
+      <Modal visible={showEditMetricsModal} transparent animationType="none">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Metrics</Text>
