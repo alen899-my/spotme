@@ -500,15 +500,14 @@ export default function WorkoutCompleteScreen() {
 
       showToast('Workout finalized! Great job! 🏆');
 
-      // Trigger AI report generation in background
-      axios.post(`${API_URL}/daily/workouts/${workoutId}/generate-report`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      }).catch((err) => {
-        console.error('Auto AI report generation failed:', err.response?.data || err.message);
-      });
-
       setTimeout(() => {
         router.replace('/(tabs)/daily');
+        // Trigger AI report after navigation — gives backend time to fully finalize
+        setTimeout(() => {
+          axios.post(`${API_URL}/daily/workouts/${workoutId}/generate-report`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(() => {});
+        }, 3000);
       }, completeRes.data.new_streak > 0 ? 3500 : 1500);
     } catch (err: any) {
       console.error('Error saving final metrics:', err);

@@ -58,8 +58,8 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
               ]
             }
           ],
-          temperature: 0,
-          max_tokens: 1024,
+          temperature: 0.2,
+          max_tokens: 2048,
           response_format: { type: 'json_object' }, // Llama-4 Scout supports JSON mode!
           ...options
         },

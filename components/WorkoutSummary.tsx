@@ -300,7 +300,7 @@ export default function WorkoutSummary({
       wide: true,
     },
     ...(bestSet ? [{ key: 'BEST SET', icon: 'trophy-outline', value: `${bestSet.w}kg × ${bestSet.r}`, sub: bestSet.name }] : []),
-    ...(avgRating !== null ? [{ key: 'AVG RATING', icon: 'star-outline', value: `${avgRating}/10`, sub: 'Exercise quality' }] : []),
+
     ...(showBodyWeight ? [{ key: 'BODY WEIGHT', icon: 'scale-outline', value: `${workout?.post_workout_weight || 0}kg`, sub: 'Current mass' }] : []),
   ];
 

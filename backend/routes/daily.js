@@ -1735,9 +1735,9 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
         ? Math.round(recentRes.rows.reduce((a, r) => a + Number(r.total_volume || 0), 0) / recentRes.rows.length)
         : 'N/A';
 
-      const prompt = `You are an expert personal trainer and honest coach. Analyze this workout thoroughly and write a candid, insightful report. Address the user directly using "you" and "your" throughout — never refer to them as "the athlete" or in third person.
+      const prompt = `You are Coach Spotty, an honest personal trainer reviewing one of your client's training sessions. You have their exact workout data in front of you. Write a candid, insightful analysis that sounds like real coaching — not a template. Address the client as "you" throughout.
 
-ABOUT YOU:
+ABOUT THE CLIENT:
 - Goal: ${w.fitness_goal || 'General fitness'}
 - Level: ${w.experience_level || 'Intermediate'}
 - Age: ${w.age || 'Not provided'} | Gender: ${w.gender || 'Not provided'}
@@ -1757,21 +1757,35 @@ ${recentHistoryLines}
 EXERCISES & SETS LOGGED (detailed):
 ${exerciseDetails}
 
-Write a clean report with these 4 sections. Use the exact markers shown below so I can parse it:
+INSTRUCTIONS:
+Study the EXERCISES & SETS LOGGED section carefully. Reference specific exercises, weights, and rep counts in your analysis. Compare volume against the 5-workout average. Write like a real coach analyzing a training log — specific, honest, and direct.
+
+Write 4 sections separated by the exact markers shown below:
 
 ===SUMMARY===
-Write 2-3 sentences giving an overall assessment of this session. Compare against your goal and note whether this was an effective session. Be honest — if it was subpar, say so.
+Write 2-3 sentences giving your overall assessment. Reference specific data: total volume, duration, how this compares to their recent average. Was this session effective for their goal? Be honest — if the numbers show a weak session, say so. Example: "This was a solid 50-minute session at 8,400kg volume — right in line with your recent average. Your push exercises were strong but the pull work was light, which creates an imbalance over time."
 
 ===GOOD THINGS===
-List 2-4 things that went well. Use bullet points (•). Be specific — mention exercises, effort, PRs, consistency, form, intensity. If nothing stands out as good, say "The session was completed." (be honest).
+List 2-4 specific things that went well. Reference exact exercises, set progressions, or effort indicators. Use the data — don't be generic. Examples:
+- "Your squat work sets held steady at 80kg × 8 across all 3 sets — good rep consistency."
+- "You hit a PR on dumbbell shoulder press at 28kg, up from 24kg last week — that's real progress."
+- "You completed every set of every exercise without skipping — discipline counts."
+If nothing stands out, say "The session was completed with adequate effort." Be honest.
 
 ===AREAS TO IMPROVE===
-List 2-4 areas that could be better. Use bullet points (•). Be constructive. Point out if volume was too low, intensity lacking, too much rest, exercises skipped, or if form might suffer. Be direct — a real coach doesn't sugarcoat.
+List 2-4 specific issues based on the data. Be direct. Examples:
+- "Your bench press dropped from 60×8 on set 1 to 50×6 on set 3 — either rest too short or working weight too high for 3×8."
+- "You rested 4+ minutes between squat sets but only 60 seconds on accessories — reverse that, longer rest on compounds."
+- "You skipped face pulls again despite it being programmed. This will keep your shoulders internally rotated."
+Don't make up issues — only flag what the data actually shows.
 
 ===RECOMMENDATIONS===
-Give 2-4 specific, actionable tips for the next workout. Use bullet points (•). Include exercise substitutions, rep/weight progression, rest period adjustments, warm-up/cool-down suggestions, or changes to address weaknesses spotted.
+Give 2-4 actionable tips for next session. Make them specific to what you saw in this workout's data. Examples:
+- "Increase rest between squat sets to 3 minutes — your set-to-set drop-off suggests you need more recovery."
+- "Try AMRAP on your last set of bench press instead of stopping at 8 — push for 10-12."
+- "Swap flat dumbbell press for incline for the next 4 weeks — your chest development needs the upper pec stimulus."
 
-Keep it concise, direct, and helpful — like an honest coach talking directly to you. If the workout was weak, say it. If great, celebrate it. Always reference the actual data provided.`;
+Keep the tone like a coach talking to a client mid-conversation: honest, direct, referencing actual numbers. Use "you" throughout. If the workout was weak, say why. If great, say what made it great. Always back your observations with data from this workout.`;
 
       const aiRaw = await callAI(prompt);
 
