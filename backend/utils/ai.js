@@ -22,7 +22,7 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
           model: 'meta-llama/llama-4-scout-17b-16e-instruct',
           messages,
           temperature: 0.3,
-          max_tokens: 4096,
+          max_tokens: 8192,
           ...options
         },
         {
@@ -30,7 +30,7 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
             'Authorization': `Bearer ${groqKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 60000
+          timeout: 120000
         }
       );
       return response.data.choices[0].message.content;
@@ -101,8 +101,8 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
       {
         model: orModel,
         messages: [{ role: 'user', content: contentParts }],
-        max_tokens: 2000,
-        temperature: 0,
+        max_tokens: 4096,
+        temperature: 0.2,
         ...options
       },
       {
@@ -112,7 +112,7 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
           'X-Title': 'SpotMe AI',
           'Content-Type': 'application/json'
         },
-        timeout: 60000
+        timeout: 120000
       }
     );
 

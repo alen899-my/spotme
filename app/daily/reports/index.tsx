@@ -148,6 +148,8 @@ export default function ReportsListScreen() {
             const isGenerating = item.status === 'generating';
             const retrying = actionId === `retry-${item.id}`;
             const deleting = actionId === `delete-${item.id}`;
+            const progPct = item.progress_pct || 0;
+            const phase = item.current_phase || '';
 
             return (
               <TouchableOpacity
@@ -160,7 +162,7 @@ export default function ReportsListScreen() {
                 <View style={s.cardTop}>
                   {isGenerating ? (
                     <View style={[s.iconCircle, { backgroundColor: isDark ? 'rgba(37,150,190,0.12)' : 'rgba(37,150,190,0.1)' }]}>
-                      <ActivityIndicator size="small" color={colors.primary} />
+                      <MaterialCommunityIcons name="progress-check" size={20} color={colors.primary} />
                     </View>
                   ) : (
                     <Image source={coachAvatarSource} style={s.coachAvatar} />
@@ -168,7 +170,7 @@ export default function ReportsListScreen() {
                   <View style={s.cardInfo}>
                     <Text style={[s.cardDate, { color: colors.textMuted }]}>{item.workout_date}</Text>
                     <Text style={[s.cardSummary, { color: colors.text }]} numberOfLines={2}>
-                      {isGenerating ? 'Generating workout analysis...' : item.summary}
+                      {isGenerating ? (phase || 'Generating workout analysis...') : item.summary}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -185,7 +187,12 @@ export default function ReportsListScreen() {
                     </Text>
                   ) : null}
                   {isGenerating ? (
-                    <Text style={[s.stat, { color: '#F59E0B' }]}>in progress</Text>
+                    <View style={s.progressRow}>
+                      <View style={[s.miniProgressBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}>
+                        <View style={[s.miniProgressFill, { width: `${Math.min(progPct, 100)}%` }]} />
+                      </View>
+                      <Text style={[s.stat, { color: '#F59E0B' }]}>{progPct}%</Text>
+                    </View>
                   ) : null}
                 </View>
                 <View style={s.actionsRow}>
@@ -285,8 +292,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
   cardInfo: { flex: 1, gap: 2 },
   cardDate: { fontFamily: FONTS.body, fontSize: 11 },
   cardSummary: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 18 },
-  cardStats: { flexDirection: 'row', gap: 12, marginTop: 8, paddingLeft: 52 },
+  cardStats: { flexDirection: 'row', gap: 12, marginTop: 8, paddingLeft: 52, alignItems: 'center', flexWrap: 'wrap' },
   stat: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  miniProgressBg: { height: 4, borderRadius: 2, flex: 1, overflow: 'hidden' },
+  miniProgressFill: { height: 4, borderRadius: 2, backgroundColor: '#F59E0B' },
   actionsRow: {
     flexDirection: 'row',
     gap: 8,

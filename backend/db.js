@@ -284,6 +284,23 @@ const initDB = async () => {
       console.warn('Could not add status column (may already exist):', _);
     }
 
+    // Add multi-phase generation columns
+    try {
+      await pool.query(`ALTER TABLE workout_reports ADD COLUMN IF NOT EXISTS full_content JSONB`);
+    } catch (_) {
+      console.warn('Could not add full_content column:', _);
+    }
+    try {
+      await pool.query(`ALTER TABLE workout_reports ADD COLUMN IF NOT EXISTS progress_pct INT DEFAULT 0`);
+    } catch (_) {
+      console.warn('Could not add progress_pct column:', _);
+    }
+    try {
+      await pool.query(`ALTER TABLE workout_reports ADD COLUMN IF NOT EXISTS current_phase VARCHAR(100)`);
+    } catch (_) {
+      console.warn('Could not add current_phase column:', _);
+    }
+
     // ── Drop template columns (expert splits feature removed) ──────────────
     await pool.query(`
       DELETE FROM workout_splits WHERE user_id IS NULL;

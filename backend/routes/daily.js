@@ -1653,6 +1653,16 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
       }
     }
 
+    // Daily limit check — 5 reports per user per day
+    const countRes = await client.query(
+      `SELECT COUNT(*) FROM workout_reports WHERE user_id = $1 AND created_at >= CURRENT_DATE`,
+      [userId]
+    );
+    if (parseInt(countRes.rows[0].count) >= 10) {
+      client.release();
+      return res.status(429).json({ error: 'Daily report limit reached. You can generate up to 10 reports per day.' });
+    }
+
     // Check if report already exists
     const existing = await client.query(
       'SELECT id, status FROM workout_reports WHERE daily_workout_id = $1 AND user_id = $2',
@@ -1679,7 +1689,8 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
       const exercisesRes = await client.query(`
         SELECT dwe.*,
                e.name, e.category, e.muscle_group, e.target, e.body_part, e.equipment,
-               e.secondary_muscles, e.avg_rating::float8 AS rating, e.rating_count
+               e.secondary_muscles, e.avg_rating::float8 AS rating, e.rating_count,
+               e.image_url, e.gif_url
         FROM daily_workout_exercises dwe
         JOIN exercises e ON dwe.exercise_id = e.id
         WHERE dwe.daily_workout_id = $1
@@ -1733,14 +1744,16 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
         const bestR = bestSet ? bestSet.reps || 0 : 0;
         const bestE1RM = bestW > 0 ? Math.round((bestW * (1 + bestR / 30)) * 10) / 10 : bestR;
 
-        return {
-          name: e.name,
-          exercise_id: e.exercise_id,
-          target: e.target || '',
-          category: e.category || '',
-          muscle_group: e.muscle_group || '',
-          body_part: e.body_part || '',
-          equipment: e.equipment || '',
+          return {
+            name: e.name,
+            exercise_id: e.exercise_id,
+            image_url: e.image_url || null,
+            gif_url: e.gif_url || null,
+            target: e.target || '',
+            category: e.category || '',
+            muscle_group: e.muscle_group || '',
+            body_part: e.body_part || '',
+            equipment: e.equipment || '',
           target_sets: e.target_sets,
           target_reps: e.target_reps,
           target_weight: e.target_weight,
@@ -1789,23 +1802,6 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
           + exSets.reduce((sum, s) => sum + ((Number(s.weight) || 0) * (s.reps || 0)), 0);
       }
 
-      // ── Recent history ─────────────────────────────────────────────────
-      let recentRows = [];
-      try {
-        const r = await client.query(`
-          SELECT total_volume, total_duration_seconds, total_rest_seconds,
-                 completed_at, streak_at_completion, calories_burned
-          FROM daily_workouts
-          WHERE user_id = $1 AND status = 'completed' AND id != $2
-          ORDER BY completed_at DESC LIMIT 5
-        `, [userId, workoutId]);
-        recentRows = r.rows;
-      } catch (_) {}
-
-      const avgVolumeLast5 = recentRows.length > 0
-        ? Math.round(recentRows.reduce((a, r) => a + Number(r.total_volume || 0), 0) / recentRows.length)
-        : null;
-
       // ── Build structured data block for AI ─────────────────────────────
       const dataBlock = buildDataBlock();
 
@@ -1835,11 +1831,6 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
         lines.push(`rating: ${w.rating || 'Not rated'}, notes: ${w.notes || 'None'}`);
         lines.push(`skipped_exercises: ${skippedCount}`);
         lines.push(`estimated_rest_per_set: ~${estimatedRestPerSet}s (derived from total_rest / (sets-1))`);
-        if (avgVolumeLast5 !== null) {
-          const volDelta = Math.round(((totalVolume - avgVolumeLast5) / avgVolumeLast5) * 100);
-          const sign = volDelta >= 0 ? '+' : '';
-          lines.push(`volume_vs_5_workout_avg: ${sign}${volDelta}% (this: ${Math.round(totalVolume)}kg vs avg: ${avgVolumeLast5}kg)`);
-        }
         lines.push('');
 
         lines.push('=====VOLUME BY MUSCLE GROUP=====');
@@ -1849,15 +1840,7 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
         }
         lines.push('');
 
-        lines.push('=====RECENT WORKOUT HISTORY=====');
-        if (recentRows.length > 0) {
-          recentRows.forEach((r, i) => {
-            lines.push(`  Workout ${i + 1}: ${Math.round(r.total_volume || 0)}kg volume, ${Math.round((r.total_duration_seconds || 0) / 60)}min, rest ${Math.round((r.total_rest_seconds || 0) / 60)}min, streak: ${r.streak_at_completion || 0}, cals: ${r.calories_burned || 0}`);
-          });
-        } else {
-          lines.push('  (no recent completed workouts)');
-        }
-        lines.push('');
+
 
         lines.push('=====EXERCISES=====');
         exerciseAnalytics.forEach((ea, idx) => {
@@ -1892,114 +1875,219 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
       }
 
       // ═══════════════════════════════════════════════════════════════════
-      // PASS 1 — Data Analysis (cheap model, structured JSON output)
+      // Multi-phase report generation (Groq + OpenRouter free, sequential)
       // ═══════════════════════════════════════════════════════════════════
-      let analysisObservations = '';
 
-      const analysisPrompt = `You are a workout data analyst. Given the raw workout data below, extract key observations in JSON format. Be specific, use exact numbers, and only reference what the data shows — never invent or guess.
+      const fullContent = {};
+      let generationError;
 
-${dataBlock}
-
-Return ONLY a JSON object with this structure (no other text):
-{
-  "session_type": "push / pull / legs / full_body / upper / lower / mixed / cardio",
-  "overall_effectiveness": "effective / average / subpar",
-  "volume_assessment": "above_average / average / below_average vs their recent history",
-  "key_observations": [
-    "specific data-backed observation 1",
-    "specific data-backed observation 2"
-  ],
-  "per_exercise_highlights": [
-    {
-      "exercise": "exercise name",
-      "flag": "positive / concern / neutral",
-      "detail": "what specifically stood out about this exercise"
-    }
-  ],
-  "rest_and_pacing": "observation about rest patterns based on the data",
-  "consistency_notes": "observation about set-to-set consistency across exercises",
-  "priority_focus": "the single most important thing to address"
-}`;
-
-      try {
-        analysisObservations = await callAI(analysisPrompt, null, 'groq');
-      } catch (_) {
-        // Fallback: generate a minimal analysis from computed stats
-        const volNote = avgVolumeLast5 !== null
-          ? `Volume is ${Math.round(((totalVolume - avgVolumeLast5) / avgVolumeLast5) * 100) >= 0 ? 'above' : 'below'} the 5-workout average.`
-          : '';
-        analysisObservations = JSON.stringify({
-          session_type: 'mixed',
-          overall_effectiveness: totalSets > 0 ? 'average' : 'subpar',
-          volume_assessment: avgVolumeLast5 !== null
-            ? (totalVolume >= avgVolumeLast5 ? 'above_average' : 'below_average')
-            : 'average',
-          key_observations: [
-            `${totalSets} sets completed with ${totalReps} total reps and ${Math.round(totalVolume)}kg total volume. ${volNote}`,
-            `${skippedCount > 0 ? skippedCount + ' exercises skipped.' : 'No exercises skipped.'}`
-          ],
-          per_exercise_highlights: exerciseAnalytics.map(ea => ({
-            exercise: ea.name,
-            flag: ea.is_personal_record ? 'positive' : 'neutral',
-            detail: `${ea.computed.set_count}/${ea.target_sets} sets, best set: ${ea.computed.best_session_set.weight}kg \u00d7 ${ea.computed.best_session_set.reps} reps${ea.is_personal_record ? ' (NEW PR!)' : ''}${ea.is_world_record ? ' (WORLD RECORD!)' : ''}`
-          })),
-          rest_and_pacing: estimatedRestPerSet > 0
-            ? `Estimated ~${estimatedRestPerSet}s rest between sets based on total rest / (sets-1).`
-            : 'Rest data not available per set.',
-          consistency_notes: 'See per-exercise set consistency in the data above.',
-          priority_focus: 'Maintain consistency and progressive overload across all exercises.',
-        });
-      }
-
-      // ═══════════════════════════════════════════════════════════════════
-      // PASS 2 — Report Writing (capable model, 4-section output)
-      // ═══════════════════════════════════════════════════════════════════
-      const reportPrompt = `You are Coach Spotty, an elite personal trainer. Write a candid, data-driven analysis of this training session. Address the client as "you" throughout. Be specific, reference exact numbers, and sound like a real coach — not a motivational poster.
-
-Below is the COMPLETE RAW DATA from the session, followed by an initial automated analysis.
-
-${dataBlock}
-
-=====INITIAL ANALYSIS (auto-generated)=====
-${analysisObservations}
-
-=====YOUR TASK=====
-Write 4 sections separated by the exact markers shown below. Reference specific exercise names, weights, reps, and trends from the data. Be professional, direct, and helpful.
-
-===SUMMARY===
-Write 2-3 sentences: overall session assessment. Reference specific data — volume, duration, comparison to average, what type of session it was. Be honest about effectiveness.
-
-===GOOD THINGS===
-List 2-4 specific things that went well. Reference exact exercises, set progression, consistency, PRs, effort. Don't be generic. If the data shows nothing remarkable, say so honestly.
-
-===AREAS TO IMPROVE===
-List 2-4 specific issues based on actual data. Point out set-to-set dropoffs, skipped exercises, rest patterns, consistency problems. Be direct and reference exact numbers.
-
-===RECOMMENDATIONS===
-Give 2-4 actionable tips for the next session. Tie each to a specific observation from this workout's data. Include exercise substitutions, rest adjustments, or technique cues.
-
-Keep it concise, direct, and professional — like a coach reviewing your training log in person.`;
-
-      const aiRaw = await callAI(reportPrompt, null, 'openrouter/free');
-
-      // ── Parse sections ──────────────────────────────────────────────────
       const extractSection = (text, marker) => {
+        if (!text) return '';
         const regex = new RegExp(`${marker}\\s*([\\s\\S]*?)(?=\\n===|$)`);
         const match = text.match(regex);
         return match ? match[1].trim() : '';
       };
 
-      const report = {
-        summary: extractSection(aiRaw, '===SUMMARY==='),
-        good_things: extractSection(aiRaw, '===GOOD THINGS==='),
-        areas_to_improve: extractSection(aiRaw, '===AREAS TO IMPROVE==='),
-        recommendations: extractSection(aiRaw, '===RECOMMENDATIONS==='),
-      };
+      async function updateProgress(pct, phase, content) {
+        await client.query(
+          `UPDATE workout_reports SET full_content = $1, progress_pct = $2, current_phase = $3 WHERE id = $4`,
+          [JSON.stringify(content), pct, phase, reportId]
+        );
+      }
 
+      async function callWithFallback(prompt, model, options = {}) {
+        try {
+          return await callAI(prompt, null, model, options);
+        } catch (_) {
+          const alt = model === 'groq' ? 'openrouter/free' : 'groq';
+          try {
+            return await callAI(prompt, null, alt, options);
+          } catch (__) {
+            return null;
+          }
+        }
+      }
+
+      const completedEx = exercises.filter(e => e.is_completed && !e.is_skipped).length;
+
+      // ── Phase 1: Profile context + workout summary (Groq — fast) ─────
+      const phase1Prompt = `You are Coach Spotty, an elite personal trainer. Address the person directly as "you" — never refer to them as "the athlete" or "the user". Analyze how this workout fits your profile and write a clear summary.
+
+=====USER PROFILE=====
+Goal: ${w.fitness_goal || 'General fitness'}
+Experience: ${w.experience_level || 'Intermediate'}
+Age: ${w.age || 'N/A'}, Gender: ${w.gender || 'N/A'}
+Height: ${w.height || 'N/A'} cm, Weight: ${w.user_weight || 'N/A'} kg
+
+=====WORKOUT DATA=====
+${dataBlock}
+
+Write TWO sections with these exact markers:
+
+===PROFILE CONTEXT===
+2-3 sentences explaining how this session aligns with your goal and experience level. Reference specific numbers. Be honest — if it doesn't fit your goal well, say so.
+
+===WORKOUT SUMMARY===
+2-3 sentences summarizing key numbers: duration, volume, sets, reps, exercises completed, intensity level. Be factual, keep it scannable.`;
+
+      const phase1Raw = await callWithFallback(phase1Prompt, 'groq');
+      fullContent.profile_context = extractSection(phase1Raw, '===PROFILE CONTEXT===');
+      fullContent.workout_summary = extractSection(phase1Raw, '===WORKOUT SUMMARY===');
+      if (!fullContent.profile_context) {
+        fullContent.profile_context = `${w.fitness_goal || 'General fitness'} session completed in ${formatTime(w.total_duration_seconds || 0)} with ${totalSets} sets.`;
+      }
+      if (!fullContent.workout_summary) {
+        fullContent.workout_summary = `${w.title || 'Workout'} — ${formatTime(w.total_duration_seconds || 0)}, ${Math.round(totalVolume)}kg volume, ${completedEx}/${exercises.length} exercises.`;
+      }
+      await updateProgress(15, 'Analyzing your profile and workout...', fullContent);
+
+      // ── Phase 2: Per-exercise analysis (Groq with JSON mode) ──────────
+      const phase2Prompt = `You are Coach Spotty, an elite personal trainer. Address the person directly as "you" — never refer to them as "the athlete" or "the user". Analyze each exercise from this workout in detail. Be specific, reference exact numbers.
+
+=====WORKOUT DATA=====
+${dataBlock}
+
+Output a JSON array ONLY. Each element must be a JSON object with these keys:
+- "name": exercise name
+- "sets_detail": one sentence summarizing the sets performed (weights, reps, any drop-off)
+- "analysis": 2-3 sentences analyzing performance — set-to-set consistency, whether weight/reps are appropriate, technique observations based on the data
+- "verdict": a short badge string like "Strong performance" or "Needs consistency work" or "Room for progression"
+
+Rules:
+- NEVER mention exercises not in the data.
+- Reference exact weights, reps, and set numbers.
+- If an exercise has only one set, note that more volume may be needed.
+- Address the person directly as "you" — never use "the athlete" or "the user".
+- Be direct and professional.
+
+Example:
+[
+  {"name": "Bench Press", "sets_detail": "60kg×10, 65kg×8, 65kg×7 — 2-rep drop from set 1 to 3", "analysis": "Solid start at 60kg with controlled reps. The drop to 7 on the third set at 65kg suggests fatigue caught up. Consider a slightly heavier first working set to reduce the gap.", "verdict": "Good — watch endurance on later sets"}
+]`;
+
+      const phase2Raw = await callWithFallback(phase2Prompt, 'groq', { response_format: { type: 'json_object' } });
+      try {
+        const parsed = JSON.parse(phase2Raw);
+        fullContent.exercise_analyses = Array.isArray(parsed) ? parsed : (parsed.exercises || parsed.analyses || []);
+      } catch (_) {
+        fullContent.exercise_analyses = [];
+      }
+      if (!fullContent.exercise_analyses || fullContent.exercise_analyses.length === 0) {
+        fullContent.exercise_analyses = exerciseAnalytics.map(ea => ({
+          name: ea.name,
+          image_url: ea.image_url,
+          sets_detail: `${ea.computed.set_count} sets, reps ${ea.computed.rep_range}, best set ${ea.computed.best_session_set.weight}kg × ${ea.computed.best_session_set.reps}`,
+          analysis: `${ea.computed.set_count} sets completed. ${ea.computed.rep_drop_max_to_min > 2 ? `Rep drop of ${ea.computed.rep_drop_max_to_min} between sets — monitor fatigue.` : 'Consistent across sets.'}`,
+          verdict: ea.computed.rep_drop_max_to_min <= 1 ? 'Consistent' : 'Needs consistency',
+        }));
+      } else {
+        const imageMap = {};
+        exerciseAnalytics.forEach(ea => { imageMap[ea.name] = ea.image_url; });
+        fullContent.exercise_analyses = fullContent.exercise_analyses.map(ex => ({
+          ...ex,
+          image_url: imageMap[ex.name] || null,
+        }));
+      }
+      await updateProgress(55, 'Analyzing each exercise...', fullContent);
+
+      // ── Phase 3: Overall assessment + rest + skip analysis (OpenRouter) ─
+      const phase3Prompt = `You are Coach Spotty, an elite personal trainer. Address the person directly as "you" — never refer to them as "the athlete" or "the user". Write the overall assessment of this training session, focusing on rest patterns, skipped work, and your session as a whole.
+
+=====WORKOUT DATA=====
+${dataBlock}
+
+Write THREE sections with these exact markers:
+
+===OVERALL ASSESSMENT===
+3-4 sentences evaluating the session's effectiveness. Discuss intensity, consistency, effort level. Be direct.
+
+===REST ANALYSIS===
+2-3 sentences about the rest patterns. If estimated rest per set is very short (<60s) or very long (>180s), comment on it. Note how rest affects performance.
+
+===SKIP ANALYSIS===
+If exercises were skipped, analyze which ones and possible reasons (fatigue, time). If none skipped, write: "No exercises were skipped — full commitment throughout."`;
+
+      const phase3Raw = await callWithFallback(phase3Prompt, 'openrouter/free');
+      fullContent.overall_assessment = extractSection(phase3Raw, '===OVERALL ASSESSMENT===');
+      fullContent.rest_analysis = extractSection(phase3Raw, '===REST ANALYSIS===');
+      fullContent.skip_analysis = extractSection(phase3Raw, '===SKIP ANALYSIS===');
+      if (!fullContent.overall_assessment) {
+        const prCount = exerciseAnalytics.filter(ea => ea.is_personal_record).length;
+        fullContent.overall_assessment = `A ${formatTime(w.total_duration_seconds || 0)} session with ${Math.round(totalVolume)}kg total volume across ${totalSets} sets. ${prCount > 0 ? `${prCount} personal record${prCount > 1 ? 's' : ''} achieved.` : 'Solid effort throughout.'}`;
+      }
+      if (!fullContent.rest_analysis) {
+        fullContent.rest_analysis = estimatedRestPerSet > 0
+          ? `Average ~${formatTime(estimatedRestPerSet)} rest between sets. ${estimatedRestPerSet < 60 ? 'This is relatively short — may impact performance on heavy compound lifts.' : estimatedRestPerSet > 180 ? 'Generous rest periods — consider tightening to maintain intensity.' : 'A reasonable balance for this session type.'}`
+          : 'Rest data not available.';
+      }
+      if (!fullContent.skip_analysis) {
+        fullContent.skip_analysis = skippedCount === 0
+          ? 'No exercises were skipped — full commitment throughout.'
+          : `${skippedCount} exercise${skippedCount > 1 ? 's were' : ' was'} skipped (${exercises.filter(e => e.is_skipped).map(e => e.name).join(', ')}). Consider adjusting volume or exercise selection to complete all planned work.`;
+      }
+      await updateProgress(80, 'Finalizing your report...', fullContent);
+
+      // ── Phase 4: Recommendations (Groq with JSON mode) ────────────────
+      const skippedNames = exercises.filter(e => e.is_skipped).map(e => e.name);
+      const dropOffExercises = exerciseAnalytics.filter(ea => ea.computed.rep_drop_max_to_min > 2).map(ea => ea.name);
+
+      const phase4Prompt = `You are Coach Spotty. Address the person directly as "you" — never refer to them as "the athlete" or "the user". Based on the workout data below, give actionable recommendations.
+
+=====WORKOUT DATA=====
+${dataBlock}
+
+Context:
+- Total volume: ${Math.round(totalVolume)}kg
+- Duration: ${formatTime(w.total_duration_seconds || 0)}
+- Exercises completed: ${exercises.filter(e => !e.is_skipped).length}/${exercises.length}
+- Exercises skipped: ${skippedNames.length > 0 ? skippedNames.join(', ') : 'none'}
+- Exercises with rep drop-off > 2: ${dropOffExercises.length > 0 ? dropOffExercises.join(', ') : 'none'}
+- Estimated avg rest per set: ~${estimatedRestPerSet}s
+- Your goal: ${w.fitness_goal || 'General fitness'}
+- Experience: ${w.experience_level || 'Intermediate'}
+
+Output a JSON object with a single key "recommendations" containing an array of strings. Each string is one recommendation. Give 2-5 recommendations. Each must be specific and reference exact data from the session.
+
+Rules:
+- Base recommendations ONLY on actual data from this session.
+- Do not invent stretches, exercises, or routines not in the data.
+- Be specific: include numbers (weights, rest times, sets).
+
+Example:
+{"recommendations": ["Try 90-120s rest between Bench Press sets — your 2-rep drop from set 1 to 3 suggests fatigue buildup.", "Add one more set to Dumbbell Rows to match the volume of your pushing exercises.", "Consider starting with a lighter warm-up set before your first working set to reduce the initial rep drop."]}`;
+
+      const phase4Raw = await callWithFallback(phase4Prompt, 'groq', { response_format: { type: 'json_object' } });
+      try {
+        const parsed = JSON.parse(phase4Raw);
+        fullContent.recommendations = Array.isArray(parsed)
+          ? parsed
+          : (parsed.recommendations || parsed.tips || parsed.advice || []);
+      } catch (_) {
+        fullContent.recommendations = [];
+      }
+      if (!fullContent.recommendations || fullContent.recommendations.length === 0) {
+        const items = [];
+        if (skippedCount > 0) items.push(`Consider reducing volume or adjusting exercise selection to complete all planned work — ${skippedNames.join(', ')} were skipped.`);
+        const dr = exerciseAnalytics.filter(ea => ea.computed.rep_drop_max_to_min > 2);
+        if (dr.length > 0) items.push(`Watch set-to-set consistency on ${dr.map(d => d.name).join(', ')} — take adequate rest (90-120s) between hard sets.`);
+        if (estimatedRestPerSet < 60) items.push('Your average rest is under 60s. For strength and hypertrophy, aim for 90-120s between heavy compound sets.');
+        if (items.length === 0) items.push('Keep up the consistent work — your session was well-structured and executed.');
+        fullContent.recommendations = items;
+      }
+
+      // Save final content + update old columns for list view compat
       await client.query(
-        `UPDATE workout_reports SET summary = $1, good_things = $2, areas_to_improve = $3, recommendations = $4, status = 'completed'
-         WHERE id = $5`,
-        [report.summary, report.good_things, report.areas_to_improve, report.recommendations, reportId]
+        `UPDATE workout_reports SET summary = $1, good_things = $2, areas_to_improve = $3, recommendations = $4,
+                full_content = $5, progress_pct = 100, current_phase = 'Complete', status = 'completed'
+         WHERE id = $6`,
+        [
+          fullContent.workout_summary || '',
+          fullContent.overall_assessment || '',
+          '',
+          Array.isArray(fullContent.recommendations) ? fullContent.recommendations.join('\n') : '',
+          JSON.stringify(fullContent),
+          reportId,
+        ]
       );
 
       await client.query(
@@ -2013,12 +2101,15 @@ Keep it concise, direct, and professional — like a coach reviewing your traini
         referenceId: reportId,
       });
     } catch (bgErr) {
+      generationError = bgErr;
       console.error('Background report generation failed:', bgErr);
+      const pct = fullContent && Object.keys(fullContent).length > 0 ? Math.min(Object.keys(fullContent).length * 25, 95) : 5;
       try {
-        await client.query('DELETE FROM workout_reports WHERE id = $1', [reportId]);
-      } catch (_) {
-        console.error('Failed to cleanup report placeholder:', _);
-      }
+        await client.query(
+          `UPDATE workout_reports SET progress_pct = $1, current_phase = $2 WHERE id = $3`,
+          [pct, 'Some sections unavailable — partial report ready', reportId]
+        );
+      } catch (_) {}
     } finally {
       client.release();
     }
@@ -2034,6 +2125,7 @@ router.get('/reports', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT wr.id, wr.daily_workout_id, wr.summary, wr.created_at, wr.status,
+             wr.progress_pct, wr.current_phase,
              dw.total_duration_seconds, dw.total_volume,
              TO_CHAR(dw.completed_at, 'Mon DD, YYYY') AS workout_date
       FROM workout_reports wr
