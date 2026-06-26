@@ -269,7 +269,7 @@ export default function WorkoutReportScreen() {
           </View>
           <View style={styles.headerInfoBlock}>
             <Text style={[styles.coachHeaderName, { color: colors.text }]}>Coach Spotty</Text>
-            <Text style={[styles.coachHeaderStatus, { color: colors.textMuted }]}>AI Advisor · Active</Text>
+    
           </View>
         </View>
 
