@@ -142,6 +142,30 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
   const avgWeight = completedSets.length > 0 ? (totalSetWeight / completedSets.length).toFixed(1) : '0';
   const avgTime = completedSets.length > 0 ? Math.round(totalTime / completedSets.length) : 0;
 
+  // Compute best set locally from completed sets
+  const localBestSet = (() => {
+    if (!hasCompletedData) return null;
+    return completedSets.reduce((best: any, curr: any) => {
+      const cw = parseFloat(curr.weight) || 0;
+      const cr = parseInt(curr.reps) || 0;
+      if (cw <= 0 && cr <= 0) return best;
+      if (!best) return curr;
+      const bw = parseFloat(best.weight) || 0;
+      const br = parseInt(best.reps) || 0;
+      const cMetric = cw > 0 ? cw * (1 + cr / 30) : cr;
+      const bMetric = bw > 0 ? bw * (1 + br / 30) : br;
+      if (cMetric > bMetric) return curr;
+      if (cMetric === bMetric && cw > bw) return curr;
+      return best;
+    }, null);
+  })();
+  const localBestWeight = localBestSet ? parseFloat(localBestSet.weight) || 0 : 0;
+  const localBestReps = localBestSet ? parseInt(localBestSet.reps) || 0 : 0;
+  const localMetricType = localBestWeight > 0 ? 'estimated_1rm' : 'max_reps';
+  const localMetricValue = localMetricType === 'estimated_1rm'
+    ? localBestWeight * (1 + localBestReps / 30)
+    : localBestReps;
+
   return (
     <View
       style={[
@@ -196,19 +220,19 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>BEST SET</Text>
             <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {isBodyweight ? `${ex.best_set_reps || 0} reps` : `${Number(ex.best_set_weight || 0).toFixed(1)}kg × ${ex.best_set_reps || 0}`}
+              {isBodyweight ? `${localBestReps || 0} reps` : `${Number(localBestWeight || 0).toFixed(1)}kg × ${localBestReps || 0}`}
             </Text>
           </View>
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>MY PR</Text>
             <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {formatRecord(ex.record_metric_type, ex.personal_record_value)}
+              {formatRecord(localMetricType, localMetricValue)}
             </Text>
           </View>
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>WORLD PR</Text>
             <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {formatRecord(ex.record_metric_type, ex.world_record_value)}
+              {formatRecord(localMetricType, localMetricValue)}
             </Text>
           </View>
         </View>
