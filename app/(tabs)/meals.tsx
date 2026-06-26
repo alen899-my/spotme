@@ -639,18 +639,19 @@ export default function MealsScreen() {
         const imageUrl = res.data.imageUrl;
 
         // Auto-save immediately — no second confirmation modal
-        const saveRes = await axios.post(`${API_URL}/meals`, {
-          image_url: imageUrl,
-          meal_type: autoMealType,
-          ...analysis,
-          items: analysis.items,
-        }, { headers: { Authorization: `Bearer ${token}` } });
-
-        if (editingMealId) {
-          await axios.delete(`${API_URL}/meals/${editingMealId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-        }
+        const saveRes = editingMealId
+          ? await axios.put(`${API_URL}/meals/${editingMealId}`, {
+              image_url: imageUrl,
+              meal_type: autoMealType,
+              ...analysis,
+              items: analysis.items,
+            }, { headers: { Authorization: `Bearer ${token}` } })
+          : await axios.post(`${API_URL}/meals`, {
+              image_url: imageUrl,
+              meal_type: autoMealType,
+              ...analysis,
+              items: analysis.items,
+            }, { headers: { Authorization: `Bearer ${token}` } });
 
         setMeals(prev => [saveRes.data, ...prev]);
 
@@ -663,7 +664,7 @@ export default function MealsScreen() {
           .map(i => i.name)
           .join(', ');
 
-        const saveRes = await axios.post(`${API_URL}/meals`, {
+        const mealPayload = {
           image_url: '',
           meal_type: autoMealType,
           total_calories: 0,
@@ -680,13 +681,11 @@ export default function MealsScreen() {
             quantity: i.quantity || '1 portion',
             calories: 0, protein: 0, carbs: 0, fat: 0,
           })),
-        }, { headers: { Authorization: `Bearer ${token}` } });
+        };
 
-        if (editingMealId) {
-          await axios.delete(`${API_URL}/meals/${editingMealId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-        }
+        const saveRes = editingMealId
+          ? await axios.put(`${API_URL}/meals/${editingMealId}`, mealPayload, { headers: { Authorization: `Bearer ${token}` } })
+          : await axios.post(`${API_URL}/meals`, mealPayload, { headers: { Authorization: `Bearer ${token}` } });
 
         setMeals(prev => [saveRes.data, ...prev]);
         showToast(`Meal logged! 🥗`);

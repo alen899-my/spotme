@@ -166,6 +166,79 @@ router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => 
   }
 });
 
+// ── PUT /meals/:id — Update a meal in place ────────────────────────────────────
+router.put('/:id', authenticateToken, validate(schemas.meal), async (req, res) => {
+  const {
+    image_url, meal_type,
+    total_calories, total_protein, total_carbs, total_fat,
+    total_fiber, total_sugar, total_sodium, total_saturated_fat, total_cholesterol,
+    items
+  } = req.body;
+  const mealId = parseInt(req.params.id);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const mealResult = await client.query(
+      `UPDATE meals SET
+        image_url = $1, meal_type = $2,
+        total_calories = $3, total_protein = $4, total_carbs = $5, total_fat = $6,
+        total_fiber = $7, total_sugar = $8, total_sodium = $9, total_saturated_fat = $10, total_cholesterol = $11
+       WHERE id = $12 AND user_id = $13 RETURNING *`,
+      [
+        image_url, meal_type,
+        total_calories, total_protein, total_carbs, total_fat,
+        total_fiber || 0, total_sugar || 0, total_sodium || 0, total_saturated_fat || 0, total_cholesterol || 0,
+        mealId, req.user.id
+      ]
+    );
+
+    if (mealResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Meal not found' });
+    }
+
+    // Delete old items and re-insert
+    await client.query('DELETE FROM meal_items WHERE meal_id = $1', [mealId]);
+
+    for (const item of items) {
+      await client.query(
+        `INSERT INTO meal_items (
+          meal_id, item_name, quantity,
+          calories, protein, carbs, fat,
+          fiber, sugar, sodium, saturated_fat, cholesterol
+        )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [
+          mealId, item.item_name, item.quantity || '',
+          item.calories, item.protein, item.carbs, item.fat,
+          item.fiber || 0, item.sugar || 0, item.sodium || 0, item.saturated_fat || 0, item.cholesterol || 0
+        ]
+      );
+    }
+
+    const savedItems = await client.query(
+      'SELECT * FROM meal_items WHERE meal_id = $1 ORDER BY id',
+      [mealId]
+    );
+
+    await client.query('COMMIT');
+    res.json({
+      ...mealResult.rows[0],
+      items: savedItems.rows,
+      xp_awarded: null,
+      new_tier: null,
+      leveled_up: false
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error updating meal:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // ── GET /meals — List user meals (paginated, optional date filter) ─────────
 router.get('/', authenticateToken, async (req, res) => {
   try {

@@ -58,6 +58,7 @@ export default function WorkoutReportScreen() {
   
   const scrollRef = useRef<ScrollView>(null);
   const typingOpacity = useRef(new Animated.Value(0.4)).current;
+  const regenerateScale = useRef(new Animated.Value(1)).current;
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -351,75 +352,74 @@ export default function WorkoutReportScreen() {
           </View>
         </View>
 
-        {/* Message 3: Wins */}
-        {wins.length > 0 && (
-          <View style={styles.messageRow}>
-            <Image source={coachAvatarSource} style={styles.chatAvatar} />
-            <View style={styles.bubbleCol}>
-              <Text style={[styles.senderName, { color: colors.textMuted }]}>Coach Spotty</Text>
-              <View style={[styles.bubble, styles.greenBubble, { backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : '#F0FDF4', borderColor: isDark ? 'rgba(16,185,129,0.18)' : '#DCFCE7' }]}>
-                <View style={styles.bubbleHeaderRow}>
-                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                  <Text style={[styles.bubbleCategoryTitle, { color: '#10B981' }]}>Wins (What went well)</Text>
-                </View>
-                <View style={{ gap: 8, marginTop: 10 }}>
-                  {wins.map((w, idx) => (
-                    <View key={idx} style={styles.listLine}>
-                      <View style={[styles.listDot, { backgroundColor: '#10B981' }]} />
-                      <Text style={[styles.listText, { color: colors.text }]}>{w}</Text>
-                    </View>
-                  ))}
+        {/* Message 3: Wins — Individual Chat Cards */}
+        {wins.length > 0 && wins.map((w, idx) => (
+          idx === 0 ? (
+            <View key={idx} style={styles.messageRow}>
+              <Image source={coachAvatarSource} style={styles.chatAvatar} />
+              <View style={styles.bubbleCol}>
+                <Text style={[styles.senderName, { color: colors.textMuted }]}>Coach Spotty</Text>
+                <View style={[styles.bubble, styles.greenBubble, { backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : '#F0FDF4', borderColor: isDark ? 'rgba(16,185,129,0.18)' : '#DCFCE7' }]}>
+                  <Text style={[styles.bubbleText, { color: colors.text }]}>{w}</Text>
                 </View>
               </View>
             </View>
-          </View>
-        )}
+          ) : (
+            <View key={idx} style={styles.messageRowGrouped}>
+              <View style={styles.bubbleCol}>
+                <View style={[styles.bubble, styles.greenBubble, styles.bubbleFollowUp, { backgroundColor: isDark ? 'rgba(16,185,129,0.08)' : '#F0FDF4', borderColor: isDark ? 'rgba(16,185,129,0.18)' : '#DCFCE7' }]}>
+                  <Text style={[styles.bubbleText, { color: colors.text }]}>{w}</Text>
+                </View>
+              </View>
+            </View>
+          )
+        ))}
 
-        {/* Message 4: Areas to Improve */}
-        {improve.length > 0 && (
-          <View style={styles.messageRowGrouped}>
-            <View style={styles.bubbleCol}>
-              <View style={[styles.bubble, styles.amberBubble, { backgroundColor: isDark ? 'rgba(245,158,11,0.08)' : '#FFFBEB', borderColor: isDark ? 'rgba(245,158,11,0.18)' : '#FEF3C7' }]}>
-                <View style={styles.bubbleHeaderRow}>
-                  <Ionicons name="trending-up" size={16} color="#F59E0B" />
-                  <Text style={[styles.bubbleCategoryTitle, { color: '#F59E0B' }]}>Focus (Where to improve)</Text>
-                </View>
-                <View style={{ gap: 8, marginTop: 10 }}>
-                  {improve.map((i, idx) => (
-                    <View key={idx} style={styles.listLine}>
-                      <View style={[styles.listDot, { backgroundColor: '#F59E0B' }]} />
-                      <Text style={[styles.listText, { color: colors.text }]}>{i}</Text>
-                    </View>
-                  ))}
+        {/* Message 4: Areas to Improve — Individual Chat Cards */}
+        {improve.length > 0 && improve.map((i, idx) => (
+          idx === 0 ? (
+            <View key={idx} style={styles.messageRow}>
+              <Image source={coachAvatarSource} style={styles.chatAvatar} />
+              <View style={styles.bubbleCol}>
+                <Text style={[styles.senderName, { color: colors.textMuted }]}>Coach Spotty</Text>
+                <View style={[styles.bubble, styles.amberBubble, { backgroundColor: isDark ? 'rgba(245,158,11,0.08)' : '#FFFBEB', borderColor: isDark ? 'rgba(245,158,11,0.18)' : '#FEF3C7' }]}>
+                  <Text style={[styles.bubbleText, { color: colors.text }]}>{i}</Text>
                 </View>
               </View>
             </View>
-          </View>
-        )}
+          ) : (
+            <View key={idx} style={styles.messageRowGrouped}>
+              <View style={styles.bubbleCol}>
+                <View style={[styles.bubble, styles.amberBubble, styles.bubbleFollowUp, { backgroundColor: isDark ? 'rgba(245,158,11,0.08)' : '#FFFBEB', borderColor: isDark ? 'rgba(245,158,11,0.18)' : '#FEF3C7' }]}>
+                  <Text style={[styles.bubbleText, { color: colors.text }]}>{i}</Text>
+                </View>
+              </View>
+            </View>
+          )
+        ))}
 
-        {/* Message 5: Recommendations */}
-        {recommendations.length > 0 && (
-          <View style={styles.messageRow}>
-            <Image source={coachAvatarSource} style={styles.chatAvatar} />
-            <View style={styles.bubbleCol}>
-              <Text style={[styles.senderName, { color: colors.textMuted }]}>Coach Spotty</Text>
-              <View style={[styles.bubble, styles.purpleBubble, { backgroundColor: isDark ? 'rgba(139,92,246,0.08)' : '#FAF5FF', borderColor: isDark ? 'rgba(139,92,246,0.18)' : '#F3E8FF' }]}>
-                <View style={styles.bubbleHeaderRow}>
-                  <Ionicons name="bulb" size={16} color="#8B5CF6" />
-                  <Text style={[styles.bubbleCategoryTitle, { color: '#8B5CF6' }]}>Next Session Advice</Text>
-                </View>
-                <View style={{ gap: 8, marginTop: 10 }}>
-                  {recommendations.map((r, idx) => (
-                    <View key={idx} style={styles.listLine}>
-                      <View style={[styles.listDot, { backgroundColor: '#8B5CF6' }]} />
-                      <Text style={[styles.listText, { color: colors.text }]}>{r}</Text>
-                    </View>
-                  ))}
+        {/* Message 5: Recommendations — Individual Chat Cards */}
+        {recommendations.length > 0 && recommendations.map((r, idx) => (
+          idx === 0 ? (
+            <View key={idx} style={styles.messageRow}>
+              <Image source={coachAvatarSource} style={styles.chatAvatar} />
+              <View style={styles.bubbleCol}>
+                <Text style={[styles.senderName, { color: colors.textMuted }]}>Coach Spotty</Text>
+                <View style={[styles.bubble, styles.purpleBubble, { backgroundColor: isDark ? 'rgba(139,92,246,0.08)' : '#FAF5FF', borderColor: isDark ? 'rgba(139,92,246,0.18)' : '#F3E8FF' }]}>
+                  <Text style={[styles.bubbleText, { color: colors.text }]}>{r}</Text>
                 </View>
               </View>
             </View>
-          </View>
-        )}
+          ) : (
+            <View key={idx} style={styles.messageRowGrouped}>
+              <View style={styles.bubbleCol}>
+                <View style={[styles.bubble, styles.purpleBubble, styles.bubbleFollowUp, { backgroundColor: isDark ? 'rgba(139,92,246,0.08)' : '#FAF5FF', borderColor: isDark ? 'rgba(139,92,246,0.18)' : '#F3E8FF' }]}>
+                  <Text style={[styles.bubbleText, { color: colors.text }]}>{r}</Text>
+                </View>
+              </View>
+            </View>
+          )
+        ))}
 
         {/* Typing / Regenerating Indicator */}
         {isTyping && (
@@ -436,18 +436,26 @@ export default function WorkoutReportScreen() {
           </View>
         )}
 
-        {/* Regenerate Action Link in chat thread */}
+        {/* Regenerate Action */}
         {!isTyping && (
-          <View style={styles.regenerateContainer}>
+          <Animated.View style={[styles.regenerateContainer, { transform: [{ scale: regenerateScale }] }]}>
             <TouchableOpacity
               onPress={handleRegenerate}
-              style={[styles.regenerateChatBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderColor: colors.border }]}
-              activeOpacity={0.8}
+              activeOpacity={0.9}
+              onPressIn={() => Animated.spring(regenerateScale, { toValue: 0.97, useNativeDriver: true, friction: 8 }).start()}
+              onPressOut={() => Animated.spring(regenerateScale, { toValue: 1, useNativeDriver: true, friction: 8 }).start()}
             >
-              <Ionicons name="refresh-outline" size={15} color={colors.primary} />
-              <Text style={[styles.regenerateChatText, { color: colors.primary }]}>Ask Coach to Re-analyze workout</Text>
+              <LinearGradient
+                colors={['#2596BE', '#1A7A9E']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.regenerateChatBtn}
+              >
+                <Ionicons name="refresh-outline" size={17} color="#FFF" />
+                <Text style={styles.regenerateChatText}>Ask Coach to Re-analyze workout</Text>
+              </LinearGradient>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         )}
       </ScrollView>
 
@@ -619,16 +627,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 3,
     maxWidth: '96%',
   },
-  bubbleHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  bubbleCategoryTitle: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 13,
-  },
-
   // Stats Attachment Card
   attachmentCard: {
     borderRadius: 18,
@@ -691,23 +689,29 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // Regenerate Button Row
+  // Regenerate Button
   regenerateContainer: {
-    alignItems: 'center',
-    marginVertical: 18,
+    marginHorizontal: 14,
+    marginVertical: 20,
   },
   regenerateChatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    shadowColor: '#2596BE',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   regenerateChatText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 12.5,
+    fontSize: 14,
+    color: '#FFF',
   },
 
 });

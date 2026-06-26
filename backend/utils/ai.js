@@ -84,7 +84,7 @@ async function callAI(prompt, imageUrl = null, model = null, options = {}) {
   }
 
   // Use a stable vision model for OpenRouter
-  const orModel = model || (imageUrl ? 'google/gemini-2.5-flash' : 'minimax/minimax-01');
+  const orModel = model || (imageUrl ? 'openrouter/free' : 'minimax/minimax-01');
 
   const contentParts = [];
   if (imageUrl) {

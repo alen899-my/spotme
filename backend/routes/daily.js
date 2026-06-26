@@ -1980,7 +1980,7 @@ Give 2-4 actionable tips for the next session. Tie each to a specific observatio
 
 Keep it concise, direct, and professional — like a coach reviewing your training log in person.`;
 
-      const aiRaw = await callAI(reportPrompt, null, 'google/gemini-2.5-flash');
+      const aiRaw = await callAI(reportPrompt, null, 'openrouter/free');
 
       // ── Parse sections ──────────────────────────────────────────────────
       const extractSection = (text, marker) => {
