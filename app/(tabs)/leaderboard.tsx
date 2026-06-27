@@ -23,7 +23,7 @@ const { width: W } = Dimensions.get('window');
 const TOP_COUNT    = 10;     // always-visible top rows
 const NEARBY_COUNT = 3;      // rows above & below user
 const PAGE_SIZE    = 20;
-const POLL_MS      = 20_000;
+const POLL_MS      = 60_000;
 const SHOW_MORE_STEP = 10;
 
 // ── Tier config ───────────────────────────────────────────────────────────────
@@ -389,6 +389,23 @@ export default function LeaderboardScreen() {
   const [liveChanges, setLiveChanges] = useState<Map<number, number>>(new Map());
   const pollTimer     = useRef<ReturnType<typeof setInterval> | null>(null);
   const isPollRunning = useRef(false);
+  const lastFetchTime = useRef(0);
+  const [lastUpdatedLabel, setLastUpdatedLabel] = useState('');
+  const tabCache = useRef<Record<string, { rows: any[]; total: number; ts: number }>>({});
+
+  // Update "last updated" label every 30s
+  useEffect(() => {
+    const tick = () => {
+      if (!lastFetchTime.current) { setLastUpdatedLabel(''); return; }
+      const sec = Math.floor((Date.now() - lastFetchTime.current) / 1000);
+      if (sec < 5) setLastUpdatedLabel('Updated just now');
+      else if (sec < 60) setLastUpdatedLabel(`Updated ${sec}s ago`);
+      else setLastUpdatedLabel(`Updated ${Math.floor(sec / 60)}m ago`);
+    };
+    tick();
+    const iv = setInterval(tick, 30_000);
+    return () => clearInterval(iv);
+  }, []);
 
   // ── Search ──────────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery]     = useState('');
@@ -517,7 +534,10 @@ export default function LeaderboardScreen() {
       setOffset(pageOffset + rows.length);
       setHasMore(pageOffset + rows.length < serverTotal);
 
-      if (isFirstPage) snapshotBaseline(rows);
+      if (isFirstPage) {
+        tabCache.current[tier] = { rows, total: serverTotal, ts: Date.now() };
+        snapshotBaseline(rows);
+      }
     } catch (err) {
       console.error('Leaderboard page fetch error:', err);
     } finally {
@@ -530,6 +550,8 @@ export default function LeaderboardScreen() {
   // ── Live poll — only fetches page 1 silently ──────────────────────────────
   const pollTopPage = useCallback(async () => {
     if (isPollRunning.current || isFetching.current) return;
+    // Skip if we fetched recently — backend cache handles freshness
+    if (Date.now() - lastFetchTime.current < 30_000) return;
     isPollRunning.current = true;
     try {
       const token = await getToken();
@@ -539,6 +561,7 @@ export default function LeaderboardScreen() {
         headers,
       });
       const freshRows: any[] = res.data.data ?? [];
+      lastFetchTime.current = Date.now();
       setLeaders(prev => dedupe(mergePollResults(prev, freshRows)));
       setTotal(res.data.total ?? 0);
       applyPollDelta(freshRows);
@@ -580,6 +603,7 @@ export default function LeaderboardScreen() {
     } catch (err) {
       console.error('Leaderboard init error:', err);
     } finally {
+      lastFetchTime.current = Date.now();
       setLoading(false);
     }
   }, [snapshotBaseline, fetchNearby]);
@@ -602,14 +626,27 @@ export default function LeaderboardScreen() {
     setFiltering(true);
     setTab(newTab);
     currentTab.current = newTab;
-    setLeaders([]);
-    setOffset(0);
-    setHasMore(true);
-    setTotal(0);
     setLiveChanges(new Map());
     baselineRanks.current = new Map();
     isFetching.current = false;
-    fetchPage(newTab, 0, true);
+
+    const cached = tabCache.current[newTab];
+    if (cached && Date.now() - cached.ts < 60_000) {
+      // Restore from cache immediately
+      setLeaders(cached.rows);
+      setTotal(cached.total);
+      setOffset(cached.rows.length);
+      setHasMore(cached.rows.length < cached.total);
+      setFiltering(false);
+      // Refresh in background
+      fetchPage(newTab, 0, true);
+    } else {
+      setLeaders([]);
+      setOffset(0);
+      setHasMore(true);
+      setTotal(0);
+      fetchPage(newTab, 0, true);
+    }
   }, [fetchPage]);
 
   // ── Infinite scroll ─────────────────────────────────────────────────────────
@@ -814,6 +851,9 @@ export default function LeaderboardScreen() {
                 <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>
                   {tab === 'All' ? 'Global Rankings' : `${tab} League`}
                 </Text>
+                {lastUpdatedLabel !== '' && (
+                  <Text style={[styles.lastUpdated, { color: colors.textMuted }]}>{lastUpdatedLabel}</Text>
+                )}
               </View>
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -997,6 +1037,7 @@ const styles = StyleSheet.create({
   pageHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2, paddingTop: 16, paddingBottom: 12 },
   pageTitle: { fontFamily: FONTS.heading, fontSize: 28, letterSpacing: 1.5 },
   pageSubtitle: { fontFamily: FONTS.body, fontSize: 12, marginTop: 2, letterSpacing: 0.5 },
+  lastUpdated: { fontFamily: FONTS.body, fontSize: 10, marginTop: 2, letterSpacing: 0.3, opacity: 0.6 },
   pageTitleIcon: { width: 50, height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
 
   podiumWrap: {

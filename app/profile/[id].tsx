@@ -12,11 +12,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
-import { P, getXPProgress, TIER_COLORS } from '../../constants/homeTheme';
+import { P } from '../../constants/homeTheme';
 import { UserProfileSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import { formatDuration, formatDateShort, formatDateTime } from '../../utils/datetime';
+import StreakIcon from '../../components/ui/StreakIcon';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -35,6 +36,19 @@ const TIERS = [
 ];
 function getTier(name: string) { return TIERS.find(t => t.name === name) ?? TIERS[0]; }
 
+const REST_TYPE_CONFIG: Record<string, { letter: string; color: string }> = {
+  fatigue:       { letter: 'F', color: '#3B82F6' },
+  sick:          { letter: 'S', color: '#F59E0B' },
+  injury:        { letter: 'I', color: '#EF4444' },
+  after_workout: { letter: 'A', color: '#14B8A6' },
+  late:          { letter: 'L', color: '#8B5CF6' },
+  other:         { letter: 'O', color: '#6B7280' },
+};
+
+function getRestCfg(type?: string) {
+  return REST_TYPE_CONFIG[type ?? 'fatigue'] ?? REST_TYPE_CONFIG.fatigue;
+}
+
 function formatVolume(vol: number) {
   const n = Number(vol || 0);
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
@@ -49,6 +63,7 @@ export default function PublicProfileScreen() {
   const [user, setUser] = useState<any>(null);
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [splits, setSplits] = useState<any[]>([]);
+  const [restDays, setRestDays] = useState<Record<string, string>>({});
   const [canViewFull, setCanViewFull] = useState(true);
   const [followStatus, setFollowStatus] = useState<string | null>(null);
   const [hasPendingFromTarget, setHasPendingFromTarget] = useState(false);
@@ -70,6 +85,7 @@ export default function PublicProfileScreen() {
       });
       setUser(res.data.user);
       setWorkouts(res.data.workouts || []);
+      setRestDays(res.data.rest_days || {});
       setCanViewFull(res.data.can_view_full !== false);
       setFollowStatus(res.data.follow_status);
       setHasPendingFromTarget(res.data.has_pending_from_target || false);
@@ -202,7 +218,6 @@ export default function PublicProfileScreen() {
   }
 
   const tier = getTier(user.league_tier ?? 'Bronze');
-  const xpInfo = getXPProgress(user.league_tier ?? 'Bronze', user.xp ?? 0);
   const isDarkText = ['Silver','Gold','Diamond','Legend'].includes(user.league_tier ?? '');
   const isOwnProfile = myId === Number(id);
 
@@ -281,64 +296,54 @@ export default function PublicProfileScreen() {
       >
         {/* ── HERO CARD (always shown) ── */}
         <TouchableOpacity activeOpacity={1} style={[styles.heroCardWrap, { borderColor: isDark ? colors.border : 'rgba(37,150,190,0.2)' }]}>
+          <View style={styles.heroCardOuter}>
           <LinearGradient
             colors={isDark ? ['#0D0D0D', '#050505'] : ['#2596BE', '#0d4d65']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={styles.heroCard}
           >
-            <View style={styles.heroRow}>
+            {/* Level badge — top right of header card */}
+            <View style={styles.levelBadgeWrap}>
+              <LinearGradient
+                colors={tier.gradient}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.levelBadgeCircle}
+              >
+                <Text style={styles.levelBadgeNumber}>Lvl {user.level || 1}</Text>
+              </LinearGradient>
+            </View>
+
+            {/* Centered avatar */}
+            <View style={styles.heroAvatarSection}>
               <View style={styles.heroAvatarWrap}>
                 <View style={[styles.avatarRing, { borderColor: tier.color }]}>
                   {user.profile_pic_url ? (
                     <OptimizedImage uri={user.profile_pic_url} style={styles.avatarImg} />
                   ) : (
                     <View style={[styles.avatarPlaceholder, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-                      <Ionicons name="person" size={36} color="#FFF" />
+                      <Ionicons name="person" size={40} color="#FFF" />
                     </View>
                   )}
                 </View>
+                {/* Tier badge — bottom right */}
                 <View style={styles.tierBadgeWrap}>
                   <LinearGradient colors={tier.gradient} style={styles.tierBadge}>
                     <MaterialCommunityIcons
                       name={tier.mcIcon as any}
-                      size={11}
+                      size={12}
                       color={isDarkText ? '#021518' : '#FFF'}
                     />
                   </LinearGradient>
                 </View>
               </View>
-
-              <View style={styles.heroInfo}>
-                <Text style={[styles.heroName, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1}>{user.full_name ?? 'Athlete'}</Text>
-                <Text style={[styles.heroTier, { color: tier.color }]}>
-                  {(user.league_tier ?? 'Bronze').toUpperCase()} LEAGUE
-                </Text>
-              </View>
-
-              <View style={styles.heroXPBlock}>
-                <Text style={[styles.heroXPVal, { color: isDark ? colors.text : '#FFF' }]}>
-                  {(user.xp ?? 0) >= 1000
-                    ? `${((user.xp ?? 0) / 1000).toFixed(1)}k`
-                    : String(user.xp ?? 0)}
-                </Text>
-                <Text style={[styles.heroXPLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.7)' }]}>XP</Text>
-              </View>
             </View>
 
-            <View style={styles.xpBarArea}>
-              <View style={styles.xpBarLabels}>
-                <Text style={[styles.xpBarTierText, { color: tier.color }]}>{user.league_tier}</Text>
-                <Text style={[styles.xpBarNextText, { color: isDark ? colors.textMuted : 'rgba(255, 255, 255, 0.8)' }]}>
-                  {xpInfo.xpToNext.toLocaleString()} XP to {xpInfo.nextTier}
-                </Text>
-                <Text style={[styles.xpBarTierText, { color: isDark ? colors.textMuted : 'rgba(255, 255, 255, 0.7)' }]}>{xpInfo.nextTier}</Text>
-              </View>
-              <View style={[styles.xpBarTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255, 255, 255, 0.2)' }]}>
-                <LinearGradient
-                  colors={tier.gradient}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={[styles.xpBarFill, { width: `${Math.round(xpInfo.progress * 100)}%` }]}
-                />
+            {/* Name + tier badge below avatar */}
+            <View style={styles.heroInfoSection}>
+              <Text style={[styles.heroName, { color: isDark ? colors.text : '#FFF' }]} numberOfLines={1}>{user.full_name ?? 'Athlete'}</Text>
+              <View style={[styles.leagueBadge, { backgroundColor: tier.color + '25', borderColor: tier.color }]}>
+                <MaterialCommunityIcons name={tier.mcIcon as any} size={12} color={tier.color} />
+                <Text style={[styles.leagueBadgeText, { color: tier.color }]}>{user.league_tier ?? 'Bronze'}</Text>
               </View>
             </View>
 
@@ -348,14 +353,14 @@ export default function PublicProfileScreen() {
                 <Text style={[styles.followerCount, { color: isDark ? colors.text : '#FFF' }]}>
                   {Number(user.follower_count || 0).toLocaleString()}
                 </Text>
-                <Text style={[styles.followerLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.6)' }]}>Followers</Text>
+                <Text style={[styles.followerLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.6)' }]}>followers</Text>
               </TouchableOpacity>
               <View style={[styles.followerDot, { backgroundColor: isDark ? colors.textDim : 'rgba(255,255,255,0.3)' }]} />
               <TouchableOpacity style={styles.followerItem} disabled={!canViewFull && !isOwnProfile} onPress={() => router.push({ pathname: `/profile/follow/${user.id}`, params: { type: 'following' } })}>
                 <Text style={[styles.followerCount, { color: isDark ? colors.text : '#FFF' }]}>
                   {Number(user.following_count || 0).toLocaleString()}
                 </Text>
-                <Text style={[styles.followerLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.6)' }]}>Following</Text>
+                <Text style={[styles.followerLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.6)' }]}>following</Text>
               </TouchableOpacity>
             </View>
 
@@ -366,6 +371,7 @@ export default function PublicProfileScreen() {
               </View>
             )}
           </LinearGradient>
+        </View>
         </TouchableOpacity>
 
         {/* ── PRIVATE PROFILE LOCK MESSAGE ── */}
@@ -384,37 +390,115 @@ export default function PublicProfileScreen() {
         {/* ── FULL PROFILE CONTENT (only when canViewFull) ── */}
         {canViewFull && (
           <>
-            {/* Stats Row */}
-            <View style={styles.statsRow}>
-              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : tier.color + '30' }]}>
-                <View style={styles.statIconRow}>
-                  <Ionicons name="flame" size={18} color="#FF9F43" />
-                  <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>STREAK</Text>
+            {/* Streak section — day cards */}
+            {user.current_streak > 0 && (
+              <View style={styles.streakSection}>
+                <View style={styles.streakHeader}>
+                  <StreakIcon streak={user.current_streak} size={28} />
+                  <Text style={[styles.streakCount, { color: colors.text }]}>
+                    <Text style={{ color: '#F59E0B', fontSize: 22, fontFamily: FONTS.heading }}>{user.current_streak}</Text>
+                    {'  '}day streak
+                  </Text>
                 </View>
-                <Text style={[styles.statCardValue, { color: colors.text }]}>
-                  {user.current_streak || 0}
-                </Text>
-                <Text style={[styles.statCardUnit, { color: colors.textDim }]}>days</Text>
-                <View style={[styles.statCardDivider, { backgroundColor: colors.border }]} />
-                <Text style={[styles.statCardFooter, { color: colors.textMuted }]}>
-                  Last active: {formatDateShort(user.last_workout_date)}
-                </Text>
-              </View>
+                {(() => {
+                  const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+                  const today = new Date();
+                  today.setHours(0,0,0,0);
+                  const last = user.last_workout_date ? (() => {
+                    const d = new Date(user.last_workout_date.replace(' ', 'T'));
+                    return isNaN(d.getTime()) ? null : d;
+                  })() : null;
+                  const streakStart = last ? new Date(last.getTime() - (user.current_streak - 1) * 86400000) : null;
+                  const toStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                  const sStr = streakStart ? toStr(streakStart) : '';
+                  const lStr = last ? toStr(last) : '';
 
-              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? colors.border : tier.color + '30' }]}>
-                <View style={styles.statIconRow}>
-                  <MaterialCommunityIcons name="dumbbell" size={18} color={tier.color} />
-                  <Text style={[styles.statCardLabel, { color: colors.textMuted }]}>WORKOUTS</Text>
-                </View>
-                <Text style={[styles.statCardValue, { color: colors.text }]}>
-                  {workouts.length}
-                </Text>
-                <Text style={[styles.statCardUnit, { color: colors.textDim }]}>logged</Text>
-                <View style={[styles.statCardDivider, { backgroundColor: colors.border }]} />
-                <Text style={[styles.statCardFooter, { color: colors.textMuted }]}>
-                  {user.experience_level?.split('(')[0]?.trim() || 'Intermediate'}
-                </Text>
+                  const dayCount = Math.min(Math.max(user.current_streak + 2, 7), 60);
+                  const days = [];
+                  for (let i = dayCount - 1; i >= 0; i--) {
+                    const d = new Date(today);
+                    d.setDate(d.getDate() - i);
+                    const ds = toStr(d);
+                    const restType = restDays[ds];
+                    const isRest = !!restType;
+                    const active = (ds >= sStr && ds <= lStr && sStr !== '') || isRest;
+                    const missed = d < today && !active && !isRest;
+                    const isT = d.getTime() === today.getTime();
+                    days.push({ date: d, ds, active, missed, isT, dow: d.getDay(), isRest, restType });
+                  }
+
+                  const card = (d: typeof days[0], i: number) => {
+                    if (d.isRest) {
+                      const cfg = getRestCfg(d.restType);
+                      return (
+                        <View key={i} style={[styles.dayCard, { borderColor: cfg.color, borderWidth: 1.5, backgroundColor: cfg.color + '18' }]}>
+                          <View style={[styles.restDot, { backgroundColor: cfg.color }]}>
+                            <Text style={styles.restLetter}>{cfg.letter}</Text>
+                          </View>
+                          <Text style={[styles.dayNum, { color: colors.textMuted }]}>
+                            {d.date.getDate()}
+                          </Text>
+                        </View>
+                      );
+                    }
+                    return (
+                      <View key={i} style={[
+                        styles.dayCard,
+                        d.active && { backgroundColor: '#F59E0B' },
+                        d.missed && { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
+                        (d.isT && !d.active && !d.missed) && { borderColor: '#F59E0B', borderWidth: 1.5 },
+                      ]}>
+                        {d.missed && <Ionicons name="close" size={10} color="#EF4444" style={styles.dayCross} />}
+                        {d.active && <Ionicons name="checkmark" size={10} color="#FFF" style={styles.dayCheck} />}
+                        <Text style={[
+                          styles.dayNum,
+                          { color: d.active ? '#FFF' : colors.textMuted },
+                          d.isT && !d.active && !d.missed && { color: '#F59E0B', fontFamily: FONTS.bodyBold },
+                        ]}>
+                          {d.date.getDate()}
+                        </Text>
+                      </View>
+                    );
+                  };
+
+                  const content = (
+                    <View style={styles.streakCol}>
+                      <View style={styles.dowRow}>
+                        {days.map((d,i) => (
+                          <Text key={i} style={[styles.dowLabel, { color: colors.textMuted }]}>{DAYS[d.dow]}</Text>
+                        ))}
+                      </View>
+                      <View style={styles.dayCardRow}>
+                        {days.map((d,i) => card(d, i))}
+                      </View>
+                    </View>
+                  );
+
+                  if (dayCount > 7) {
+                    return (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {content}
+                      </ScrollView>
+                    );
+                  }
+                  return content;
+                })()}
               </View>
+            )}
+
+            {/* Physical Metrics — inline row */}
+            <View style={[styles.metricsRow, { borderColor: colors.border }]}>
+              {[
+                { label: 'Height', value: user.height || '—' },
+                { label: 'Weight', value: user.weight || '—' },
+                { label: 'Age',    value: user.age ? `${user.age}` : '—' },
+                { label: 'Gender', value: user.gender || '—' },
+              ].map((m) => (
+                <View key={m.label} style={styles.metricItem}>
+                  <Text style={[styles.metricVal, { color: colors.text }]}>{m.value}</Text>
+                  <Text style={[styles.metricLbl, { color: colors.textMuted }]}>{m.label}</Text>
+                </View>
+              ))}
             </View>
 
             {/* Splits Carousel */}
@@ -472,27 +556,6 @@ export default function PublicProfileScreen() {
                 </View>
               )}
             </>
-
-            {/* Physical Metrics */}
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Physical Metrics</Text>
-              <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
-            </View>
-
-            <View style={styles.metricsGrid}>
-              {[
-                { label: 'Height', value: user.height || '—', icon: 'human-male-height' },
-                { label: 'Weight', value: user.weight || '—', icon: 'scale-bathroom' },
-                { label: 'Age',    value: user.age    ? `${user.age} yrs`  : '—', icon: 'calendar-account' },
-                { label: 'Gender', value: user.gender || '—',                      icon: 'gender-male-female' },
-              ].map((m) => (
-                <View key={m.label} style={[styles.metricTile, { backgroundColor: colors.card, borderColor: tier.color + '30', shadowColor: tier.color + '20' }]}>
-                  <MaterialCommunityIcons name={m.icon as any} size={20} color={tier.color} />
-                  <Text style={[styles.metricValue, { color: colors.text }]}>{m.value}</Text>
-                  <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{m.label}</Text>
-                </View>
-              ))}
-            </View>
 
             {/* Recent Workouts */}
             <View style={styles.sectionHeader}>
@@ -671,35 +734,54 @@ const styles = StyleSheet.create({
     shadowColor: P.ctaDeep, shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18, shadowRadius: 16, elevation: 6,
   },
-  heroCard: { padding: 14 },
-  heroRow: { flexDirection: 'row', alignItems: 'center' },
-  heroAvatarWrap: { position: 'relative', marginRight: 14 },
+  heroCardOuter: { position: 'relative', borderRadius: 24, overflow: 'hidden' },
+  heroCard: { padding: 20 },
+  heroAvatarSection: { alignItems: 'center', marginBottom: 12 },
+  heroAvatarWrap: { position: 'relative' },
   avatarRing: {
-    width: 72, height: 72, borderRadius: 36,
+    width: 80, height: 80, borderRadius: 40,
     borderWidth: 2.5, overflow: 'hidden',
   },
   avatarImg: { width: '100%', height: '100%' },
   avatarPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  tierBadgeWrap: { position: 'absolute', bottom: -2, right: -2 },
+  tierBadgeWrap: { position: 'absolute', bottom: -1, right: -1 },
   tierBadge: {
-    width: 22, height: 22, borderRadius: 11,
+    width: 24, height: 24, borderRadius: 12,
     justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#FFF',
+    borderWidth: 2, borderColor: '#FFF',
   },
-  heroInfo: { flex: 1, gap: 3 },
-  heroName: { fontFamily: FONTS.heading, color: '#FFF', fontSize: 19, lineHeight: 22 },
-  heroTier: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 1.4 },
-  heroXPBlock: { alignItems: 'center', marginLeft: 10 },
-  heroXPVal: { fontFamily: FONTS.heading, fontSize: 28, lineHeight: 30 },
-  heroXPLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: 1 },
+  heroInfoSection: { alignItems: 'center', marginBottom: 12 },
+  heroName: { fontFamily: FONTS.heading, fontSize: 22, lineHeight: 26, textAlign: 'center' },
+  leagueBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 4,
+    borderRadius: 20, borderWidth: 1,
+    marginTop: 6,
+  },
+  leagueBadgeText: {
+    fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.5,
+  },
+  levelBadgeWrap: { position: 'absolute', top: 12, right: 12 },
+  levelBadgeCircle: {
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#FFF',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3, shadowRadius: 4, elevation: 4,
+  },
+  levelBadgeNumber: {
+    fontFamily: FONTS.bodyBold, fontSize: 10, color: '#FFF',
+    includeFontPadding: false,
+  },
 
   followerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    marginTop: 14, gap: 16,
+    gap: 16,
   },
   followerItem: { alignItems: 'center', gap: 2 },
   followerCount: { fontFamily: FONTS.heading, fontSize: 18, lineHeight: 20 },
-  followerLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase' },
+  followerLabel: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 0.3 },
   followerDot: { width: 4, height: 4, borderRadius: 2 },
 
   heroFollowRow: {
@@ -764,17 +846,31 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.18)',
   },
 
-  xpBarArea: { marginTop: 14 },
-  xpBarLabels: {
-    flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5,
+  streakSection: { marginBottom: 24 },
+  streakHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 10, marginBottom: 10,
   },
-  xpBarTierText: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(255,255,255,0.6)' },
-  xpBarNextText: { fontFamily: FONTS.body, fontSize: 9, color: 'rgba(255,255,255,0.45)' },
-  xpBarTrack: {
-    height: 8, borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden',
+  streakCount: { fontFamily: FONTS.bodyBold, fontSize: 15 },
+  streakCol: { flexDirection: 'column', gap: 4 },
+  dowRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 2 },
+  dowLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.3, textAlign: 'center', width: 36 },
+  dayCardRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 2 },
+  dayCard: {
+    width: 36, height: 36, borderRadius: 8,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: 'transparent',
+    position: 'relative',
   },
-  xpBarFill: { height: '100%', borderRadius: 4, minWidth: 6 },
+  dayNum: { fontFamily: FONTS.bodyBold, fontSize: 13 },
+  dayCross: { position: 'absolute', top: 1, right: 1, zIndex: 1 },
+  dayCheck: { position: 'absolute', top: 1, right: 1, zIndex: 1 },
+  restDot: {
+    position: 'absolute', top: 0, right: 0,
+    width: 14, height: 14, borderRadius: 7,
+    justifyContent: 'center', alignItems: 'center', zIndex: 1,
+  },
+  restLetter: { fontFamily: FONTS.bodyBold, color: '#FFF', fontSize: 7.5, lineHeight: 14, textAlign: 'center' },
 
   // Private locked card
   lockedCard: {
@@ -786,19 +882,7 @@ const styles = StyleSheet.create({
   lockedTitle: { fontFamily: FONTS.heading, fontSize: 20 },
   lockedSub: { fontFamily: FONTS.body, fontSize: 13, color: 'rgba(255,255,255,0.5)', textAlign: 'center' },
 
-  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  statCard: {
-    flex: 1, borderRadius: 20, padding: 14,
-    borderWidth: 1, borderColor: P.ctaDeep,
-    shadowColor: P.ctaDeep, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
-  },
-  statIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  statCardLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.5 },
-  statCardValue: { fontFamily: FONTS.heading, fontSize: 36, lineHeight: 38 },
-  statCardUnit: { fontFamily: FONTS.body, fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: -2 },
-  statCardDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 10 },
-  statCardFooter: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: 0.5 },
+  // (stats row removed)
 
   seeAllText: { fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.3 },
   splitsScroll: { marginBottom: 20, marginTop: -4 },
@@ -822,17 +906,10 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: FONTS.heading, fontSize: 16, letterSpacing: 0.5 },
   sectionLine: { flex: 1, height: 1 },
 
-  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  metricTile: {
-    width: (SW - 32 - 10) / 2,
-    borderRadius: 18, padding: 16,
-    alignItems: 'flex-start', gap: 6,
-    borderWidth: 1, borderColor: P.ctaDeep,
-    shadowColor: P.ctaDeep, shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12, shadowRadius: 6, elevation: 3,
-  },
-  metricValue: { fontFamily: FONTS.heading, color: '#FFF', fontSize: 20 },
-  metricLabel: { fontFamily: FONTS.bodyBold, color: 'rgba(255,255,255,0.5)', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' },
+  metricsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 12, marginHorizontal: 4, marginBottom: 24, borderTopWidth: 1, borderBottomWidth: 1 },
+  metricItem: { alignItems: 'center', gap: 2 },
+  metricVal: { fontFamily: FONTS.bodyBold, fontSize: 16 },
+  metricLbl: { fontFamily: FONTS.body, fontSize: 11, letterSpacing: 0.3 },
 
   wCard: {
     borderRadius: 24, marginBottom: 14,

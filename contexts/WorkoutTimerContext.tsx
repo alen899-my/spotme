@@ -57,7 +57,7 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
         const currentPeriod = Math.floor((Date.now() - idlePeriodStartRef.current) / 1000);
         setIdleAccumulated(idleAccumulatedRef.current + currentPeriod);
       }
-      }, 5000);
+      }, 1000);
   }, []);
 
   const stopWorkoutTimer = useCallback(() => {
@@ -86,25 +86,30 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const startWorkoutSession = useCallback((id: string, existingElapsed?: number, existingIdle?: number) => {
+    // Guard: don't reset if already tracking this workout
+    if (activeWorkoutId === id) return;
+
     setActiveWorkoutId(id);
-    if (existingElapsed && existingElapsed > 0) {
-      setWorkoutElapsed(existingElapsed);
-      workoutStartedAtRef.current = Date.now() - (existingElapsed * 1000);
-    } else {
-      setWorkoutElapsed(0);
-      workoutStartedAtRef.current = Date.now();
-    }
-    if (existingIdle && existingIdle > 0) {
-      idleAccumulatedRef.current = existingIdle;
-      setIdleAccumulated(existingIdle);
-    } else {
-      idleAccumulatedRef.current = 0;
-      setIdleAccumulated(0);
-    }
-    // Start idle accumulation immediately (counts warmup/setup/talking)
-    idlePeriodStartRef.current = Date.now();
+    const now = Date.now();
+    const startedAt = existingElapsed && existingElapsed > 0
+      ? now - (existingElapsed * 1000)
+      : now;
+    const idle = existingIdle && existingIdle > 0 ? existingIdle : 0;
+
+    setWorkoutElapsed(existingElapsed && existingElapsed > 0 ? existingElapsed : 0);
+    workoutStartedAtRef.current = startedAt;
+    idleAccumulatedRef.current = idle;
+    setIdleAccumulated(idle);
+    idlePeriodStartRef.current = now;
     startWorkoutTimer();
-  }, [startWorkoutTimer]);
+
+    // Persist session so it survives app close
+    AsyncStorage.multiSet([
+      ['activeWorkoutId', id],
+      ['workoutStartedAt', String(startedAt)],
+      ['idleAccumulated', String(idle)],
+    ]).catch(() => {});
+  }, [startWorkoutTimer, activeWorkoutId]);
 
   const endWorkoutSession = useCallback(() => {
     stopWorkoutTimer();
@@ -119,7 +124,10 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
     setRestRunning(false);
     setIdleAccumulated(0);
     idleAccumulatedRef.current = 0;
-    AsyncStorage.multiRemove(['restTimerEndAt', 'restNotifId']).catch(() => {});
+    AsyncStorage.multiRemove([
+      'activeWorkoutId', 'workoutStartedAt', 'idleAccumulated',
+      'restTimerEndAt', 'restNotifId',
+    ]).catch(() => {});
   }, [stopWorkoutTimer, flushIdlePeriod]);
 
   const stopRestTimer = useCallback(() => {
@@ -193,6 +201,34 @@ export const WorkoutTimerProvider = ({ children }: { children: ReactNode }) => {
         }
       }, 1000);
     })();
+  }, []);
+
+  // Restore persisted workout session on mount (survives app close)
+  useEffect(() => {
+    (async () => {
+      try {
+        const [[, savedId], [, savedStartedAt], [, savedIdle]] = await AsyncStorage.multiGet([
+          'activeWorkoutId', 'workoutStartedAt', 'idleAccumulated',
+        ]);
+        if (!savedId || !savedStartedAt) return;
+        // Screen's useFocusEffect will call startWorkoutSession which will be
+        // guarded away if we already restored here — but we restore first to
+        // handle the case where the screen never loads (e.g. deep link).
+        // We only restore if nothing else has started a session already.
+        if (activeWorkoutId) return;
+        const startedAt = parseInt(savedStartedAt);
+        const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+        const idle = parseInt(savedIdle || '0');
+        setActiveWorkoutId(savedId);
+        setWorkoutElapsed(elapsed);
+        workoutStartedAtRef.current = startedAt;
+        idleAccumulatedRef.current = idle;
+        setIdleAccumulated(idle);
+        idlePeriodStartRef.current = Date.now();
+        startWorkoutTimer();
+      } catch {}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // AppState handler for foreground recalculation

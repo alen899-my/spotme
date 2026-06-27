@@ -284,7 +284,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     const userQuery = await pool.query(`
       SELECT id, full_name, profile_pic_url, gender, age, height, weight, 
-             total_xp AS xp, league_tier, current_streak, last_workout_date, 
+             total_xp AS xp, level, league_tier, current_streak, last_workout_date, 
              fitness_goal, experience_level, is_private,
         (SELECT COUNT(*) FROM follows WHERE following_id = $1 AND status = 'accepted') AS follower_count,
         (SELECT COUNT(*) FROM follows WHERE follower_id = $1 AND status = 'accepted') AS following_count
@@ -345,9 +345,23 @@ router.get('/:id', authenticateToken, async (req, res) => {
         LIMIT $2
       `, [targetId, workoutLimit]);
 
+      // Fetch rest days for streak display (last 60 days)
+      const restDaysQuery = await pool.query(`
+        SELECT completed_at AS date, rest_type FROM daily_workouts
+        WHERE user_id = $1 AND status = 'rest'
+          AND completed_at >= CURRENT_DATE - INTERVAL '60 days'
+        ORDER BY completed_at DESC
+      `, [targetId]);
+      const restDays = restDaysQuery.rows.reduce((acc, r) => {
+        const dateStr = new Date(r.date).toISOString().split('T')[0];
+        acc[dateStr] = r.rest_type || 'fatigue';
+        return acc;
+      }, {});
+
       res.json({
         user,
         workouts: workoutsQuery.rows,
+        rest_days: restDays,
         can_view_full: true,
         follow_status: followStatus,
         has_pending_from_target: hasPendingFromTarget,
@@ -360,6 +374,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
         full_name: user.full_name,
         profile_pic_url: user.profile_pic_url,
         xp: user.xp,
+        level: user.level,
         league_tier: user.league_tier,
         current_streak: user.current_streak,
         fitness_goal: user.fitness_goal,

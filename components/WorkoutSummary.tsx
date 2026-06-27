@@ -255,6 +255,9 @@ export default function WorkoutSummary({
   const rest = displayRest ?? workout?.total_rest_seconds ?? 0;
   const caloriesBurned = Number(workout?.calories_burned) || 0;
 
+  const activeTime = workout?.exercises?.reduce((acc: number, ex: any) =>
+    acc + (ex.sets?.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0) || 0), 0) || 0;
+
   const calculatedTotalSets = workout?.exercises?.reduce((acc: number, ex: any) =>
     acc + (ex.sets?.filter((s: any) => !s.is_skipped).length || 0), 0) || 0;
   const totalSets = workout?.total_sets || calculatedTotalSets || 0;
@@ -285,19 +288,18 @@ export default function WorkoutSummary({
     ? (ratingsList.reduce((a: number, b: number) => a + b, 0) / ratingsList.length).toFixed(1)
     : null;
 
-  const stats: Array<{ key: string; icon: string; value: string; sub: string; wide?: boolean }> = [
+  const stats: Array<{ key: string; icon: string; value: string; sub: string }> = [
     { key: 'DURATION', icon: 'time-outline', value: formatDuration(duration), sub: 'Total session' },
-    { key: 'ACTIVE TIME', icon: 'stopwatch-outline', value: formatDuration(Math.max(0, duration - rest)), sub: 'Active exercising' },
+    { key: 'ACTIVE TIME', icon: 'stopwatch-outline', value: formatDuration(activeTime), sub: 'Active exercising' },
     { key: 'REST TIME', icon: 'hourglass-outline', value: formatDuration(rest), sub: 'Recovery' },
     { key: 'CALORIES', icon: 'flame-outline', value: `${caloriesBurned} kcal`, sub: 'Est. burn' },
-    { key: 'VOLUME', icon: 'barbell-outline', value: `${Math.round(volume)}kg`, sub: 'Weight lifted', wide: true },
+    { key: 'VOLUME', icon: 'barbell-outline', value: `${Math.round(volume)}kg`, sub: 'Weight lifted' },
     { key: 'SETS', icon: 'layers-outline', value: `${totalSets}`, sub: 'Completed sets' },
     {
       key: 'EXERCISES',
       icon: 'fitness-outline',
       value: `${completedExercises}/${totalExercises}`,
       sub: skippedExercises > 0 ? `${skippedExercises} skipped` : 'All completed',
-      wide: true,
     },
     ...(bestSet ? [{ key: 'BEST SET', icon: 'trophy-outline', value: `${bestSet.w}kg × ${bestSet.r}`, sub: bestSet.name }] : []),
 
@@ -360,9 +362,9 @@ export default function WorkoutSummary({
         </View>
       )}
 
-      {/* ── Stats Grid — Black solid cards ── */}
+      {/* ── Stats Grid ── */}
       <View style={styles.statsGrid}>
-        {stats.map((s, i) => {
+        {stats.map((s) => {
           const color = METRIC_COLORS[s.key] || P.cta;
           const isBodyWeight = s.key === 'BODY WEIGHT';
           const card = (
@@ -370,7 +372,6 @@ export default function WorkoutSummary({
               key={s.key}
               style={[
                 styles.statCard,
-                { width: s.wide ? SCREEN_WIDTH - 40 : (SCREEN_WIDTH - 50) / 2 },
                 {
                   backgroundColor: isDark ? '#0D0D0D' : '#FFFFFF',
                   borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
@@ -379,12 +380,10 @@ export default function WorkoutSummary({
                 isBodyWeight && onEditMetrics && { borderColor: colors.primary || P.cta, borderWidth: 1.5 },
               ]}
             >
-              <View style={styles.statHeader}>
-                <View style={[styles.statIconBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : `${color}18` }]}>
-                  <Ionicons name={s.icon as any} size={14} color={color} />
-                </View>
-                <Text style={[styles.statLabel, { color: colors.textMuted }]}>{s.key}</Text>
+              <View style={[styles.statIconBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : `${color}18` }]}>
+                <Ionicons name={s.icon as any} size={18} color={color} />
               </View>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{s.key}</Text>
               <Text style={[styles.statValue, { color: colors.text }]}>{s.value}</Text>
               <Text style={[styles.statSub, { color: colors.textDim }]}>{s.sub}</Text>
               {isBodyWeight && onEditMetrics && (
@@ -490,41 +489,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Stats Grid — Premium fitness cards ──
+  // ── Stats Grid ──
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
     marginBottom: 28,
   },
   statCard: {
-    width: (SCREEN_WIDTH - 50) / 2,
+    width: (SCREEN_WIDTH - 48) / 2,
     padding: 14,
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   statIconBox: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 8,
   },
   statLabel: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 10,
-    letterSpacing: 0.8,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    marginBottom: 1,
   },
   statValue: {
     fontFamily: FONTS.heading,
@@ -536,7 +531,7 @@ const styles = StyleSheet.create({
   statSub: {
     fontFamily: FONTS.body,
     fontSize: 10,
-    opacity: 0.6,
+    marginTop: 2,
   },
 
   // ── Section Label ──
@@ -548,11 +543,14 @@ const styles = StyleSheet.create({
 
   // ── Exercise Cards ──
   exCard: {
-    borderRadius: 14,
+    borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    overflow: 'hidden',
-    marginBottom: 14,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
   },
   exHeader: {
     flexDirection: 'row',
@@ -571,16 +569,14 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   exName: {
-    fontFamily: FONTS.bodyBold,
+    fontFamily: FONTS.heading,
     fontSize: 15,
-    color: P.sun,
     lineHeight: 20,
     marginBottom: 4,
   },
   exSetsSub: {
     fontFamily: FONTS.body,
     fontSize: 12,
-    color: 'rgba(255,255,255,0.78)',
   },
 
   // Badges
@@ -658,7 +654,7 @@ const styles = StyleSheet.create({
   },
   exStatCell: {
     width: '47%',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
   },

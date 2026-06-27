@@ -5,6 +5,7 @@ const authenticateToken = require('../middleware/auth');
 const { validate, schemas } = require('../middleware/validate');
 const upload = require('../uploadConfig');
 const { awardXP } = require('../utils/xp');
+const { invalidateLeaderboardCache } = require('./leaderboard');
 const { sendPush, sendRandomMotivation } = require('../utils/pushNotifications');
 const {
   parseWeightKg,
@@ -657,6 +658,8 @@ async function completeWorkoutBackground(workoutId, userId) {
 
       await awardXP(pool, userId, earnedXP, 'Completed workout');
     }
+
+    invalidateLeaderboardCache();
 
     await pool.query(
       'UPDATE daily_workouts SET streak_at_completion = $1 WHERE id = $2',
@@ -2624,6 +2627,8 @@ router.post('/rest-day', authenticateToken, async (req, res) => {
         [userId]
       );
     }
+
+    invalidateLeaderboardCache();
 
     res.status(isUpdated ? 200 : 201).json({ success: true, updated: isUpdated, workout });
   } catch (err) {

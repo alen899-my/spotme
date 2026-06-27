@@ -142,30 +142,6 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
   const avgWeight = completedSets.length > 0 ? (totalSetWeight / completedSets.length).toFixed(1) : '0';
   const avgTime = completedSets.length > 0 ? Math.round(totalTime / completedSets.length) : 0;
 
-  // Compute best set locally from completed sets
-  const localBestSet = (() => {
-    if (!hasCompletedData) return null;
-    return completedSets.reduce((best: any, curr: any) => {
-      const cw = parseFloat(curr.weight) || 0;
-      const cr = parseInt(curr.reps) || 0;
-      if (cw <= 0 && cr <= 0) return best;
-      if (!best) return curr;
-      const bw = parseFloat(best.weight) || 0;
-      const br = parseInt(best.reps) || 0;
-      const cMetric = cw > 0 ? cw * (1 + cr / 30) : cr;
-      const bMetric = bw > 0 ? bw * (1 + br / 30) : br;
-      if (cMetric > bMetric) return curr;
-      if (cMetric === bMetric && cw > bw) return curr;
-      return best;
-    }, null);
-  })();
-  const localBestWeight = localBestSet ? parseFloat(localBestSet.weight) || 0 : 0;
-  const localBestReps = localBestSet ? parseInt(localBestSet.reps) || 0 : 0;
-  const localMetricType = localBestWeight > 0 ? 'estimated_1rm' : 'max_reps';
-  const localMetricValue = localMetricType === 'estimated_1rm'
-    ? localBestWeight * (1 + localBestReps / 30)
-    : localBestReps;
-
   return (
     <View
       style={[
@@ -220,19 +196,19 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>BEST SET</Text>
             <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {isBodyweight ? `${localBestReps || 0} reps` : `${Number(localBestWeight || 0).toFixed(1)}kg × ${localBestReps || 0}`}
+              {isBodyweight ? `${ex.best_set_reps || 0} reps` : `${Number(ex.best_set_weight || 0).toFixed(1)}kg × ${ex.best_set_reps || 0}`}
             </Text>
           </View>
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>MY PR</Text>
             <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {formatRecord(localMetricType, localMetricValue)}
+              {formatRecord(ex.record_metric_type, ex.personal_record_value)}
             </Text>
           </View>
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>WORLD PR</Text>
             <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {formatRecord(localMetricType, localMetricValue)}
+              {formatRecord(ex.record_metric_type, ex.world_record_value)}
             </Text>
           </View>
         </View>
@@ -393,7 +369,7 @@ export default function WorkoutCompleteScreen() {
     return () => cancelAnimationFrame(raf);
   }, [earnedXP]);
 
-  useEffect(() => { fetchWorkout(); }, []);
+  useEffect(() => { fetchWorkout(); const t = setTimeout(fetchWorkout, 4000); return () => clearTimeout(t); }, []);
 
   const fetchWorkout = async () => {
     try {
@@ -552,6 +528,12 @@ export default function WorkoutCompleteScreen() {
       acc + (ex.sets?.filter((s: any) => !s.is_skipped).length || 0), 0) || 0;
   }, [workout]);
 
+  const displayActive = useMemo(() => {
+    if (!workout?.exercises) return 0;
+    return workout.exercises.reduce((acc: number, ex: any) =>
+      acc + (ex.sets?.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0) || 0), 0);
+  }, [workout]);
+
   const exerciseStats = useMemo(() => {
     if (!workout?.exercises) return { total: 0, completed: 0, skipped: 0 };
     const total = workout.exercises.length;
@@ -691,7 +673,7 @@ export default function WorkoutCompleteScreen() {
           <Text style={[st.sectionLabel, { color: colors.text, fontSize: fs(18) }]}>Session Summary</Text>
           <View style={st.bentoGrid}>
             <BentoTile icon="time-outline" iconColor="#2596BE" label="DURATION" value={formatDuration(displayDuration)} sub="Total session" colors={colors} isDark={isDark} />
-            <BentoTile icon="stopwatch-outline" iconColor="#00C9C8" label="Active time" value={formatDuration(Math.max(0, displayDuration - displayRest))} sub="Active exercising" colors={colors} isDark={isDark} />
+            <BentoTile icon="stopwatch-outline" iconColor="#00C9C8" label="Active time" value={formatDuration(displayActive)} sub="Active exercising" colors={colors} isDark={isDark} />
             <BentoTile icon="hourglass-outline" iconColor="#F59E0B" label="REST TIME" value={formatDuration(displayRest)} sub="Recovery" colors={colors} isDark={isDark} />
             <BentoTile icon="flame-outline" iconColor="#EF4444" label="CALORIES" value={`${caloriesBurned}`} sub="Est. kcal burn" colors={colors} isDark={isDark} />
             <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${Math.round(displayVolume)} kg`} sub="Weight lifted" colors={colors} isDark={isDark} />

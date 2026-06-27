@@ -3,6 +3,7 @@ const router = express.Router();
 const { pool } = require('../db');
 const authenticateToken = require('../middleware/auth');
 const { awardXP } = require('../utils/xp');
+const { invalidateLeaderboardCache } = require('./leaderboard');
 const { sendPush } = require('../utils/pushNotifications');
 
 async function checkSendWaterReminder(userId) {
@@ -87,6 +88,7 @@ router.post('/', authenticateToken, async (req, res) => {
     if (totalMl >= target && u?.water_goal_date !== today) {
       const awardRes = await awardXP(pool, userId, 10, 'Reached daily water goal');
       xpAwarded = 10;
+      invalidateLeaderboardCache();
       await pool.query('UPDATE users SET water_goal_date = $1 WHERE id = $2', [today, userId]);
     }
 

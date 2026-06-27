@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Image, Modal,
@@ -70,6 +70,7 @@ export default function WorkoutViewScreen() {
   }, [workoutId]);
 
   useFocusEffect(useCallback(() => { fetchWorkout(); }, [fetchWorkout]));
+  useEffect(() => { const t = setTimeout(fetchWorkout, 4000); return () => clearTimeout(t); }, []);
 
   const handleUpdatePhotos = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -252,14 +253,37 @@ export default function WorkoutViewScreen() {
       <Modal visible={showEditMetricsModal} transparent animationType="none">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Metrics</Text>
-            <View style={styles.editField}>
-              <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Body Weight (kg)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
-                value={finishWeight} onChangeText={setFinishWeight}
-                keyboardType="decimal-pad" placeholder="75.0" placeholderTextColor={colors.textDim}
-              />
+            <TouchableOpacity onPress={() => setShowEditMetricsModal(false)} style={{ alignSelf: 'flex-end', marginBottom: 4 }}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <View style={[styles.weightCard, { backgroundColor: isDark ? '#0D0D0D' : '#FEF3C7', borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'transparent', borderWidth: isDark ? 1 : 0 }]}>
+              <View style={styles.weightCardTop}>
+                <View style={[styles.weightIconBox, { backgroundColor: isDark ? 'rgba(217,119,6,0.15)' : 'rgba(120,53,15,0.15)' }]}>
+                  <Ionicons name="scale-outline" size={20} color={isDark ? '#F59E0B' : '#78350F'} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.weightTitle, { color: isDark ? colors.text : '#78350F', fontSize: 16 }]}>Body Weight</Text>
+                  <Text style={[styles.weightSub, { color: isDark ? colors.textMuted : 'rgba(120,53,15,0.75)', fontSize: 11 }]}>Track your body weight over time</Text>
+                </View>
+              </View>
+              <View style={[styles.weightInputWrap, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.45)', borderColor: isDark ? colors.border : 'rgba(255,255,255,0.7)' }]}>
+                <TextInput
+                  style={[styles.weightInput, { color: isDark ? colors.text : '#78350F', fontSize: 24, height: 56, paddingVertical: 0, textAlignVertical: 'center' }]}
+                  placeholder="e.g. 75.5"
+                  placeholderTextColor={isDark ? colors.textDim : 'rgba(120,53,15,0.45)'}
+                  keyboardType="decimal-pad"
+                  value={finishWeight}
+                  onChangeText={setFinishWeight}
+                />
+                <View style={[styles.weightUnit, { backgroundColor: isDark ? 'rgba(217,119,6,0.12)' : 'rgba(120,53,15,0.12)', height: 56 }]}>
+                  <Text style={[styles.weightUnitText, { color: isDark ? '#F59E0B' : '#92400E', fontSize: 14 }]}>kg</Text>
+                </View>
+              </View>
+              {!!finishWeight && (
+                <Text style={[styles.weightHint, { color: isDark ? '#F59E0B' : '#92400E', fontSize: 12 }]}>
+                  Logged: <Text style={{ fontFamily: FONTS.bodyBold }}>{finishWeight} kg</Text> ✓
+                </Text>
+              )}
             </View>
             <View style={styles.modalActions}>
               <TouchableOpacity style={[styles.cancelBtn, isDark && { backgroundColor: colors.inputBg }]} onPress={() => setShowEditMetricsModal(false)}>
@@ -307,4 +331,16 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, height: 56, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 16 },
   saveBtn: { flex: 2, borderRadius: 16, overflow: 'hidden' },
   saveBtnGrad: { height: 56, justifyContent: 'center', alignItems: 'center' },
+
+  // Body weight card (matching complete.tsx)
+  weightCard: { borderRadius: 20, padding: 16, marginBottom: 16, borderWidth: 1 },
+  weightCardTop: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
+  weightIconBox: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  weightTitle: { fontFamily: FONTS.bodyBold },
+  weightSub: { fontFamily: FONTS.body, marginTop: 2 },
+  weightInputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1.5, overflow: 'hidden' },
+  weightInput: { flex: 1, paddingHorizontal: 16, fontFamily: FONTS.heading },
+  weightUnit: { width: 48, justifyContent: 'center', alignItems: 'center' },
+  weightUnitText: { fontFamily: FONTS.bodyBold },
+  weightHint: { marginTop: 8, fontFamily: FONTS.body, textAlign: 'center' },
 });

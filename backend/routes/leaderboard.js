@@ -15,6 +15,15 @@ const router  = express.Router();
 const { pool } = require('../db');
 const authenticateToken = require('../middleware/auth');
 const { TIERS, getTierForXP, getNextTier, awardXP, XP_VALUES } = require('../utils/xp');
+const { TTLCache } = require('../utils/cache');
+
+// ── Leaderboard cache (10s default TTL) ─────────────────────────────────────
+const lbCache = new TTLCache(10_000);
+
+function invalidateLeaderboardCache() {
+  lbCache.clear();
+  console.log('[lbCache] invalidated');
+}
 
 // ── GET /leaderboard/tiers ────────────────────────────────────────────────────
 router.get('/tiers', (_req, res) => {
@@ -35,7 +44,10 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const limit  = Math.min(Math.max(Number(req.query.limit)  || 20, 1), 100);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
-    const tier   = req.query.tier;
+    const tier   = req.query.tier || 'All';
+    const cacheKey = `list:${tier}:${offset}:${limit}`;
+    const cached = lbCache.get(cacheKey);
+    if (cached) return res.json(cached);
     const filterByTier = tier && tier !== 'All';
 
     // ── Single query: data + total in one pass ──────────────────────────────
@@ -100,7 +112,11 @@ router.get('/', authenticateToken, async (req, res) => {
     });
 
     // ── Respond immediately – don't wait for prev_rank update ──────────────
-    res.json({ data: rows, total });
+    const payload = { data: rows, total };
+    res.json(payload);
+
+    // Cache the response
+    lbCache.set(cacheKey, payload);
 
     // ── Async batch UPDATE prev_rank (fire-and-forget) ─────────────────────
     // Uses a single parameterised VALUES list instead of N queries.
@@ -130,6 +146,9 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
+    const cacheKey = `me:${userId}`;
+    const cached = lbCache.get(cacheKey);
+    if (cached) return res.json(cached);
 
     // One query: user row + their rank via fast count (uses idx_users_xp)
     const result = await pool.query(
@@ -170,7 +189,7 @@ router.get('/me', authenticateToken, async (req, res) => {
       [Math.max(0, rank - 3)]
     );
 
-    res.json({
+    const payload = {
       ...user,
       global_rank:   rank,
       tier,
@@ -178,7 +197,9 @@ router.get('/me', authenticateToken, async (req, res) => {
       xp_to_next:    xpToNext,
       tier_progress: tierProgress,
       nearby:        nearby.rows,
-    });
+    };
+    lbCache.set(cacheKey, payload);
+    res.json(payload);
   } catch (err) {
     console.error('GET /leaderboard/me error:', err);
     res.status(500).json({ error: err.message });
@@ -199,6 +220,9 @@ router.get('/nearby', authenticateToken, async (req, res) => {
     const userId      = req.user.id;
     const count       = Math.min(Math.max(Number(req.query.count)       || 3, 1), 20);
     const extraOffset = Math.max(Number(req.query.extraOffset) || 0, 0);
+    const cacheKey = `nearby:${userId}:${count}:${extraOffset}`;
+    const cached = lbCache.get(cacheKey);
+    if (cached) return res.json(cached);
     const belowLimit  = count + 1; // fetch 1 extra to detect hasMoreBelow
 
     // Step 1: get user's rank and total
@@ -243,14 +267,16 @@ router.get('/nearby', authenticateToken, async (req, res) => {
     const belowRows  = belowRes.rows.slice(0, count);
     const hasMoreBelow = belowRes.rows.length > count;
 
-    res.json({
+    const payload = {
       myRank,
       total,
       above: aboveRes.rows.map(r => ({ ...r, global_rank: Number(r.global_rank) })),
       me: { ...myRow, global_rank: myRank },
       below: belowRows.map(r => ({ ...r, global_rank: Number(r.global_rank) })),
       hasMoreBelow,
-    });
+    };
+    lbCache.set(cacheKey, payload);
+    res.json(payload);
   } catch (err) {
     console.error('GET /leaderboard/nearby error:', err);
     res.status(500).json({ error: err.message });
@@ -260,6 +286,9 @@ router.get('/nearby', authenticateToken, async (req, res) => {
 // ── GET /leaderboard/top ── Top 3 for podium (no ROW_NUMBER needed) ───────────
 router.get('/top', authenticateToken, async (req, res) => {
   try {
+    const cacheKey = 'top';
+    const cached = lbCache.get(cacheKey);
+    if (cached) return res.json(cached);
     // Simple indexed scan – no window function needed, positions are 1..10 by definition
     const result = await pool.query(
       `SELECT
@@ -277,6 +306,7 @@ router.get('/top', authenticateToken, async (req, res) => {
       global_rank: i + 1,
       rank_change: Number(row.prev_rank) > 0 ? Number(row.prev_rank) - (i + 1) : 0,
     }));
+    lbCache.set(cacheKey, rows, 30_000); // 30s TTL — top 10 changes slowly
     res.json(rows);
   } catch (err) {
     console.error('GET /leaderboard/top error:', err);
@@ -307,6 +337,7 @@ router.post('/award', authenticateToken, async (req, res) => {
     await client.query('BEGIN');
     const result = await awardXP(client, userId, amount, action);
     await client.query('COMMIT');
+    invalidateLeaderboardCache();
     res.json({ success: true, ...result, action, amount });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -357,3 +388,4 @@ router.get('/search', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.invalidateLeaderboardCache = invalidateLeaderboardCache;

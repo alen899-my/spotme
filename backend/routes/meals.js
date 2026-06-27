@@ -6,6 +6,7 @@ const { validate, schemas } = require('../middleware/validate');
 const upload = require('../uploadConfig');
 const { callAI } = require('../utils/ai');
 const { awardXP, XP_VALUES } = require('../utils/xp');
+const { invalidateLeaderboardCache } = require('./leaderboard');
 
 // ── POST /meals/analyze — Analyze meal image using AI ────────────────────────
 router.post('/analyze', authenticateToken, upload.single('photo'), async (req, res) => {
@@ -150,6 +151,7 @@ router.post('/', authenticateToken, validate(schemas.meal), async (req, res) => 
     const awardRes = await awardXP(client, req.user.id, XP_VALUES.LOG_MEAL, 'Logged a meal');
 
     await client.query('COMMIT');
+    invalidateLeaderboardCache();
     res.status(201).json({
       ...mealResult.rows[0],
       items: savedItems.rows,

@@ -5,18 +5,17 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  Image,
   Dimensions,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import OptimizedImage from '../ui/OptimizedImage';
-import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const GIF_MAX_WIDTH = Math.min(SCREEN_WIDTH - 80, 220);
 
 interface ExercisePreviewModalProps {
   visible: boolean;
@@ -29,10 +28,8 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, ex
 
   if (!exercise) return null;
 
-  // Handle various instruction field names and formats
   let instructionText = exercise.instruction_steps_en || exercise.instructions_en || exercise.instructions || exercise.description || '';
-  
-  // If it's a JSON string of an array (common in some DB setups), parse it
+
   let steps: string[] = [];
   if (typeof instructionText === 'string') {
     if (instructionText.startsWith('[') && instructionText.endsWith(']')) {
@@ -42,8 +39,11 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, ex
         steps = [instructionText];
       }
     } else {
-      // Split by newline if it's a block of text
-      steps = instructionText.split('\n').filter((s: string) => s.trim().length > 0);
+      let lines = instructionText.split('\n').filter((s: string) => s.trim().length > 0);
+      if (lines.length === 1) {
+        lines = lines[0].split(/(?<=[.!])\s+(?=[A-Z])/).filter((s: string) => s.trim().length > 0);
+      }
+      steps = lines;
     }
   } else if (Array.isArray(instructionText)) {
     steps = instructionText;
@@ -54,7 +54,7 @@ const ExercisePreviewModal: React.FC<ExercisePreviewModalProps> = ({ visible, ex
       <View style={[styles.guideOverlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(4,40,43,0.78)' }]}>
         <View style={[styles.guideContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TouchableOpacity style={styles.closeGuide} onPress={onClose}>
-            <Ionicons name="close-circle" size={32} color="rgba(255,255,255,0.85)" />
+            <Ionicons name="close-circle" size={32} color="rgba(0,0,0,0.6)" />
           </TouchableOpacity>
           
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -128,12 +128,16 @@ const styles = StyleSheet.create({
     zIndex: 10 
   },
   heroWrap: {
-    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    backgroundColor: '#FFF',
   },
   guideGif: { 
-    width: '100%', 
-    height: 250, 
-    backgroundColor: 'transparent' 
+    width: GIF_MAX_WIDTH, 
+    height: GIF_MAX_WIDTH * 0.8,
+    backgroundColor: 'transparent',
+    borderRadius: 16,
   },
   guideBody: { 
     padding: 24 
