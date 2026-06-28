@@ -22,7 +22,7 @@ const feedbackRoutes = require('./routes/feedback');
 
 const app = express();
 
-const allowedOrigins = ['https://spotme-gym.vercel.app'];
+const allowedOrigins = ['https://spotme-gym.vercel.app', 'https://spotme-kdjd.vercel.app'];
 if (!isProduction) {
   allowedOrigins.push('http://localhost:19006', 'http://localhost:8081', 'http://localhost:5173', 'http://localhost:3000');
 }
