@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { FONTS } from '../../constants/theme';
 import { scale, vs } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeightValue, weightUnit } from '../../utils/units';
 
 const STEP_OPTIONS = [0.1, 0.5, 1, 2.5, 5];
 
@@ -31,6 +33,7 @@ export default function WeightScale({
   max = 300,
 }: WeightScaleProps) {
   const { colors, isDark } = useTheme();
+  const { unitSystem } = useUnits();
   const [currentStep, setCurrentStep] = useState(0.1);
 
   const cycleStep = useCallback(() => {
@@ -55,9 +58,9 @@ export default function WeightScale({
 
         <View style={styles.valueWrap}>
           <Text style={[styles.weightValue, { color: colors.text }]}>
-            {value.toFixed(1)}
+            {formatWeightValue(value, unitSystem)}
           </Text>
-          <Text style={[styles.weightUnit, { color: colors.textMuted }]}>kg</Text>
+          <Text style={[styles.weightUnit, { color: colors.textMuted }]}>{weightUnit(unitSystem)}</Text>
         </View>
 
         <TouchableOpacity onPress={() => adjust(currentStep)} style={[styles.stepperBtn, { backgroundColor: isDark ? '#1a1a1a' : '#f0f0eb', borderColor: isDark ? '#333' : '#ddd' }]}>

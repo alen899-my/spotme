@@ -22,6 +22,8 @@ import { DailySkeleton } from '../../components/ui/Skeleton';
 import { api } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import { formatDuration, formatDateTime, isSameDay, isToday, parseUTC } from '../../utils/datetime';
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeightValue, weightUnit } from '../../utils/units';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -168,6 +170,7 @@ export default function DailyTab() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { activeWorkoutId, endWorkoutSession } = useWorkoutTimer();
+  const { unitSystem } = useUnits();
 
   // Rest day modal state
   const [showRestModal, setShowRestModal] = useState(false);
@@ -474,8 +477,8 @@ export default function DailyTab() {
                 </View>
                 <View style={[styles.statLine, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]} />
                 <View style={styles.statItem}>
-                  <Text style={[styles.statVal, { color: isDark ? colors.text : '#FFF' }]}>{Math.round(item.total_volume)}</Text>
-                  <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>kg</Text>
+                  <Text style={[styles.statVal, { color: isDark ? colors.text : '#FFF' }]}>{formatWeightValue(Math.round(item.total_volume), unitSystem)}</Text>
+                  <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>{weightUnit(unitSystem)}</Text>
                 </View>
                 <View style={[styles.statLine, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]} />
                 <View style={styles.statItem}>

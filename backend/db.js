@@ -571,6 +571,18 @@ const initDB = async () => {
       );
     `);
 
+    // ── Feedback ──────────────────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS feedback (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        category VARCHAR(50) DEFAULT 'General',
+        title VARCHAR(255) NOT NULL,
+        description TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     const adminHash = await bcrypt.hash('alenadmin123', 10);
     await pool.query(`
       INSERT INTO admins (email, password, name)

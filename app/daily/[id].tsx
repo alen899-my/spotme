@@ -30,6 +30,8 @@ import * as Sharing from 'expo-sharing';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import * as Notifications from 'expo-notifications';
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeight, formatWeightValue, formatRecordValue, weightUnit, formatHeight, heightUnit, formatBodyWeight } from '../../utils/units';
 
 
 function formatTime(sec: number) {
@@ -58,6 +60,7 @@ const ExerciseCard = React.memo(({
   loadingSkip: boolean; loadingLogSet: boolean;
 }) => {
   const { isDark } = useTheme();
+  const { unitSystem } = useUnits();
   const [localRating, setLocalRating] = useState<number | null>(item.rating || null);
   const [expanded, setExpanded] = useState(!item.is_completed && !item.is_skipped);
 
@@ -208,7 +211,7 @@ const ExerciseCard = React.memo(({
                                   ? formatTime(s.duration_seconds || 0)
                                   : isBodyweight
                                     ? `${s.reps} reps`
-                                    : `${s.weight} kg × ${s.reps} reps`
+                                    : `${formatWeightValue(Number(s.weight), unitSystem)} ${weightUnit(unitSystem)} × ${s.reps} reps`
                                 }
                               </Text>
                               {!isCardio && (
@@ -360,6 +363,7 @@ export default function ActiveWorkoutScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  const { unitSystem } = useUnits();
   const { width: SCREEN_WIDTH } = useWindowDimensions();
 
   const [workout, setWorkout] = useState<any>(null);
@@ -1204,7 +1208,7 @@ export default function ActiveWorkoutScreen() {
                     <View style={styles.inputRow}>
                       {!isCardio && !isBodyweight && (
                         <View style={styles.inputGroup}>
-                          <Text style={[styles.inputLabel, { color: colors.textMuted }]}>WEIGHT (kg)</Text>
+                          <Text style={[styles.inputLabel, { color: colors.textMuted }]}>WEIGHT ({weightUnit(unitSystem).toUpperCase()})</Text>
                           <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="decimal-pad" value={inputWeight} onChangeText={setInputWeight} placeholder="0" placeholderTextColor={colors.textDim} />
                         </View>
                       )}
@@ -1336,7 +1340,7 @@ export default function ActiveWorkoutScreen() {
                   </View>
                   <TextInput
                     style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border, textAlign: 'left', paddingHorizontal: 16 }]}
-                    placeholder="Enter weight in kg (e.g. 75.5)"
+                    placeholder={`Enter weight in ${weightUnit(unitSystem)} (e.g. 75.5)`}
                     placeholderTextColor={colors.textDim}
                     keyboardType="decimal-pad"
                     value={finishWeight}

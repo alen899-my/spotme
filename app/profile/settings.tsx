@@ -18,6 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clearAll, getToken } from "../../utils/tokenStorage";
 import axios from "axios";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useUnits } from "../../contexts/UnitContext";
 import { FONTS } from "../../constants/theme";
 import { API_URL } from "../../utils/api";
 import ActionModal from "../../components/ui/ActionModal";
@@ -259,6 +260,7 @@ function PushReminderSettings() {
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors, isDark, toggleTheme } = useTheme();
+  const { unitSystem, setUnitSystem } = useUnits();
   const insets = useSafeAreaInsets();
   const [isPrivate, setIsPrivate] = useState(false);
   const [shareSplits, setShareSplits] = useState(false);
@@ -266,7 +268,53 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [savingShare, setSavingShare] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [alertModal, setAlertModal] = useState<{ visible: boolean; type: 'info' | 'error'; title: string; message: string }>({ visible: false, type: 'info', title: '', message: '' });
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [clearType, setClearType] = useState<'cache' | 'data' | null>(null);
+  const [cacheSize, setCacheSize] = useState('');
+  const [dataSize, setDataSize] = useState('');
+  const [clearing, setClearing] = useState(false);
+  const [alertModal, setAlertModal] = useState<{ visible: boolean; type: 'info' | 'success' | 'error'; title: string; message: string }>({ visible: false, type: 'info', title: '', message: '' });
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getStorageSizes = async () => {
+    const keys = await AsyncStorage.getAllKeys();
+    let cacheBytes = 0;
+    let totalBytes = 0;
+    for (const key of keys) {
+      const val = await AsyncStorage.getItem(key);
+      const size = val ? val.length * 2 : 0;
+      totalBytes += size;
+      if (!key.includes('token') && !key.includes('auth')) {
+        cacheBytes += size;
+      }
+    }
+    setCacheSize(formatBytes(cacheBytes));
+    setDataSize(formatBytes(totalBytes));
+  };
+
+  const handleClear = async () => {
+    setClearing(true);
+    try {
+      if (clearType === 'cache') {
+        const keys = await AsyncStorage.getAllKeys();
+        const cacheKeys = keys.filter(k => !k.includes('token') && !k.includes('auth'));
+        await AsyncStorage.multiRemove(cacheKeys);
+      } else {
+        await AsyncStorage.clear();
+      }
+      setShowClearModal(false);
+      setAlertModal({ visible: true, type: 'success', title: 'Done', message: clearType === 'cache' ? 'Cache cleared successfully.' : 'All local data cleared successfully.' });
+    } catch (e) {
+      setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Failed to clear data.' });
+    } finally {
+      setClearing(false);
+    }
+  };
 
   useEffect(() => {
     loadSettings();
@@ -446,17 +494,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={[sectionStyles.label, { color: colors.textDim }]}>ABOUT</Text>
-        <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[cardStyles.row, { borderBottomWidth: 0 }]}>
-            <View style={cardStyles.left}>
-              <Ionicons name="information-circle-outline" size={20} color={colors.textDim} style={{ width: 28 }} />
-              <Text style={[cardStyles.title, { color: colors.text }]}>SpotMe v1.0.4</Text>
-            </View>
-            <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim }}>Beta</Text>
-          </View>
-        </View>
-
         <Text style={[sectionStyles.label, { color: colors.textDim }]}>APPEARANCE</Text>
         <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TouchableOpacity onPress={toggleTheme} activeOpacity={0.6}>
@@ -491,6 +528,90 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        <Text style={[sectionStyles.label, { color: colors.textDim }]}>UNITS</Text>
+        <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 15 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                <Ionicons name="speedometer-outline" size={20} color={colors.textMuted} style={{ width: 28 }} />
+                <Text style={[cardStyles.title, { color: colors.text }]}>Unit System</Text>
+              </View>
+              <Text style={[cardStyles.subtitle, { color: colors.textDim }]}>
+                {unitSystem === 'metric' ? 'kg, cm' : 'lbs, ft'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, marginTop: 12, alignSelf: 'flex-start' }}>
+              <TouchableOpacity
+                onPress={() => setUnitSystem('metric')}
+                style={{
+                  paddingHorizontal: 16, paddingVertical: 8,
+                  backgroundColor: unitSystem === 'metric' ? colors.primary : 'transparent',
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={{
+                  fontFamily: FONTS.bodySemiBold, fontSize: 13,
+                  color: unitSystem === 'metric' ? '#FFF' : colors.textMuted,
+                }}>Metric</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setUnitSystem('imperial')}
+                style={{
+                  paddingHorizontal: 16, paddingVertical: 8,
+                  backgroundColor: unitSystem === 'imperial' ? colors.primary : 'transparent',
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={{
+                  fontFamily: FONTS.bodySemiBold, fontSize: 13,
+                  color: unitSystem === 'imperial' ? '#FFF' : colors.textMuted,
+                }}>Imperial</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        <Text style={[sectionStyles.label, { color: colors.textDim }]}>DATA</Text>
+        <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={async () => {
+              await getStorageSizes();
+              setClearType('cache');
+              setShowClearModal(true);
+            }}
+            activeOpacity={0.6}
+          >
+            <View style={[cardStyles.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+              <View style={cardStyles.left}>
+                <Ionicons name="trash-bin-outline" size={20} color={colors.textMuted} style={{ width: 28 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[cardStyles.title, { color: colors.text }]}>Clear Cache</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={async () => {
+              await getStorageSizes();
+              setClearType('data');
+              setShowClearModal(true);
+            }}
+            activeOpacity={0.6}
+          >
+            <View style={cardStyles.row}>
+              <View style={cardStyles.left}>
+                <Ionicons name="server-outline" size={20} color={colors.textMuted} style={{ width: 28 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[cardStyles.title, { color: colors.text }]}>Clear All Data</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+            </View>
+          </TouchableOpacity>
+        </View>
+
         <Text style={[sectionStyles.label, { color: colors.textDim }]}>ACCOUNT</Text>
         <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TouchableOpacity
@@ -512,6 +633,46 @@ export default function SettingsScreen() {
                 <Ionicons name="trash-outline" size={20} color="#FF4444" style={{ width: 28 }} />
                 <Text style={[cardStyles.title, { color: '#FF4444' }]}>Delete Account</Text>
               </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={[sectionStyles.label, { color: colors.textDim }]}>ABOUT</Text>
+        <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[cardStyles.row, { borderBottomWidth: 0 }]}>
+            <View style={cardStyles.left}>
+              <Ionicons name="information-circle-outline" size={20} color={colors.textDim} style={{ width: 28 }} />
+              <Text style={[cardStyles.title, { color: colors.text }]}>SpotMe v1.0.4</Text>
+            </View>
+            <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim }}>Beta</Text>
+          </View>
+        </View>
+
+        <Text style={[sectionStyles.label, { color: colors.textDim }]}>LEGAL</Text>
+        <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={() => router.push("/profile/privacy")}
+            activeOpacity={0.6}
+          >
+            <View style={[cardStyles.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+              <View style={cardStyles.left}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.textMuted} style={{ width: 28 }} />
+                <Text style={[cardStyles.title, { color: colors.text }]}>Privacy Policy</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => router.push("/profile/terms")}
+            activeOpacity={0.6}
+          >
+            <View style={cardStyles.row}>
+              <View style={cardStyles.left}>
+                <Ionicons name="document-text-outline" size={20} color={colors.textMuted} style={{ width: 28 }} />
+                <Text style={[cardStyles.title, { color: colors.text }]}>Terms & Conditions</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
             </View>
           </TouchableOpacity>
         </View>
@@ -596,6 +757,95 @@ export default function SettingsScreen() {
         message={alertModal.message}
         onConfirm={() => setAlertModal({ ...alertModal, visible: false })}
       />
+
+      <Modal visible={showClearModal} transparent animationType="fade" onRequestClose={() => setShowClearModal(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}
+          activeOpacity={1}
+          onPress={() => !clearing && setShowClearModal(false)}
+        >
+          <View
+            style={{
+              backgroundColor: isDark ? colors.card : '#FFF',
+              borderRadius: 24,
+              padding: 28,
+              marginHorizontal: 28,
+              width: '85%',
+              maxWidth: 360,
+              alignItems: 'center',
+            }}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={{
+              width: 56, height: 56, borderRadius: 28,
+              backgroundColor: clearType === 'cache' ? '#2596BE20' : '#FF4D4D20',
+              justifyContent: 'center', alignItems: 'center',
+              marginBottom: 16,
+            }}>
+              <Ionicons name={clearType === 'cache' ? 'trash-bin-outline' : 'server-outline'} size={28} color={clearType === 'cache' ? '#2596BE' : '#FF4D4D'} />
+            </View>
+
+            <Text style={{
+              fontFamily: FONTS.bodySemiBold, fontSize: 20, color: colors.text,
+              textAlign: 'center', marginBottom: 4,
+            }}>
+              {clearType === 'cache' ? 'Clear Cache' : 'Clear All Data'}
+            </Text>
+
+            <View style={{ width: '100%', backgroundColor: colors.inputBg, borderRadius: 12, padding: 16, marginTop: 16, marginBottom: 20, gap: 8 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: colors.textMuted }}>{clearType === 'cache' ? 'Cache Size' : 'Data Size'}</Text>
+                <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13, color: colors.text }}>{clearType === 'cache' ? cacheSize : dataSize || '...'}</Text>
+              </View>
+            </View>
+
+            <Text style={{
+              fontFamily: FONTS.body, fontSize: 13, color: colors.textDim,
+              textAlign: 'center', lineHeight: 18, marginBottom: 20,
+            }}>
+              {clearType === 'cache'
+                ? 'This will clear cached preferences and temporary data. Your account will not be affected.'
+                : 'This will remove all locally stored data. Your server data will not be affected.'}
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <TouchableOpacity
+                onPress={() => setShowClearModal(false)}
+                style={{
+                  flex: 1, borderRadius: 16, paddingVertical: 14,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0',
+                  alignItems: 'center',
+                }}
+                disabled={clearing}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 15, color: colors.text }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleClear}
+                disabled={clearing}
+                style={{
+                  flex: 1, borderRadius: 16, paddingVertical: 14,
+                  backgroundColor: clearType === 'cache' ? '#2596BE' : '#FF4444',
+                  alignItems: 'center', opacity: clearing ? 0.6 : 1,
+                }}
+                activeOpacity={0.8}
+              >
+                {clearing ? (
+                  <ActivityIndicator color="#FFF" size="small" />
+                ) : (
+                  <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 15, color: '#FFF' }}>
+                    {clearType === 'cache' ? 'Clear' : 'Clear All'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

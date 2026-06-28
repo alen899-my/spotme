@@ -24,6 +24,8 @@ import WorkoutCalendarHeatmap, { DayEntry } from "../../components/ui/WorkoutCal
 import { API_URL } from "../../utils/api";
 import { getToken } from "../../utils/tokenStorage";
 import { formatDuration, formatDateLabel } from "../../utils/datetime";
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeightValue, weightUnit } from '../../utils/units';
 
 const bgImage = require("../../assets/coach/workout3.jpg");
 
@@ -31,11 +33,6 @@ interface PartEntry {
   slug: string;
   label: string;
   history: DayEntry[];
-}
-
-function formatVolume(vol: number) {
-  const n = Number(vol || 0);
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
 }
 
 const TIERS = [
@@ -70,6 +67,7 @@ export default function CalendarScreen() {
   const [modalDate, setModalDate] = useState<string | null>(null);
   const [dayWorkouts, setDayWorkouts] = useState<any[]>([]);
   const [modalLoading, setModalLoading] = useState(false);
+  const { unitSystem } = useUnits();
 
   useEffect(() => {
     (async () => {
@@ -334,7 +332,7 @@ export default function CalendarScreen() {
                   const tier = getTier(w.league_tier);
                   const totalExs  = parseInt(w.exercise_count || 0);
                   const totalSets = parseInt(w.total_sets || 0);
-                  const vol       = formatVolume(w.total_volume);
+                  const vol       = Number(w.total_volume) || 0;
                   const dur       = formatDuration(w.total_duration_seconds);
                   const hasPhoto  = !!(w.cover_photo_url || w.completion_photo_url);
                   const title     = w.session_name || w.title || "Workout Session";
@@ -380,8 +378,8 @@ export default function CalendarScreen() {
                             </View>
                             <View style={[styles.workoutStatLine, { backgroundColor: tier.color + "30" }]} />
                             <View style={styles.workoutStatItem}>
-                              <Text style={[styles.workoutStatVal, { color: colors.text }]}>{vol}</Text>
-                              <Text style={[styles.workoutStatLbl, { color: colors.textMuted }]}>kg</Text>
+                              <Text style={[styles.workoutStatVal, { color: colors.text }]}>{formatWeightValue(vol, unitSystem)}</Text>
+                              <Text style={[styles.workoutStatLbl, { color: colors.textMuted }]}>{weightUnit(unitSystem)}</Text>
                             </View>
                             <View style={[styles.workoutStatLine, { backgroundColor: tier.color + "30" }]} />
                             <View style={styles.workoutStatItem}>

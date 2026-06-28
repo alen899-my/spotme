@@ -16,6 +16,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeight, formatHeight, weightUnit, heightUnit, weightUnitLabel, heightUnitLabel } from '../../utils/units';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -100,6 +102,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
+  const { unitSystem } = useUnits();
 
   const [userData, setUserData] = useState<any>(null);
 
@@ -176,9 +179,9 @@ export default function DietRecsScreen({ tab, header }: Props) {
         setUserData(parsed);
         setFormGender(parsed.gender || 'Male');
         setFormAge(parsed.age ? parsed.age.toString() : '');
-        setFormHeight(parsed.height ? parsed.height.toString() : '');
-        setFormWeight(parsed.weight ? parsed.weight.toString() : '');
-        setFormBodyFat(parsed.body_fat ? parsed.body_fat.toString() : '');
+        setFormHeight(parsed.height ? parseFloat(parsed.height).toString() : '');
+        setFormWeight(parsed.weight ? parseFloat(parsed.weight).toString() : '');
+        setFormBodyFat(parsed.body_fat ? parseFloat(parsed.body_fat).toString() : '');
         setFormFitnessGoal(parsed.fitness_goal || 'Maintain');
         setFormActivityLevel(parsed.activity_level || 'Lightly Active');
         setFormDietType(parsed.diet_type || 'Standard');
@@ -254,15 +257,15 @@ export default function DietRecsScreen({ tab, header }: Props) {
     const profile = recommendationData?.user || userData || {};
     setFormGender(profile.gender || formGender);
     setFormAge(profile.age ? profile.age.toString() : formAge);
-    setFormHeight(profile.height ? profile.height.toString() : formHeight);
-    setFormWeight(profile.weight ? profile.weight.toString() : formWeight);
+    setFormHeight(profile.height ? parseFloat(profile.height).toString() : formHeight);
+    setFormWeight(profile.weight ? parseFloat(profile.weight).toString() : formWeight);
     setFormBodyFat(profile.body_fat ? profile.body_fat.toString() : formBodyFat);
     setFormFitnessGoal(profile.fitness_goal || formFitnessGoal);
     setFormActivityLevel(profile.activity_level || formActivityLevel);
     setFormDietType(profile.diet_type || formDietType);
     setFormFoodPreference(profile.food_preference || formFoodPreference);
     setFormMealsPerDay(profile.meals_per_day || formMealsPerDay);
-    setFormTargetWeight(profile.target_weight ? profile.target_weight.toString() : '');
+    setFormTargetWeight(profile.target_weight ? parseFloat(profile.target_weight).toString() : '');
     setShowDietForm(true);
   };
 
@@ -273,15 +276,15 @@ export default function DietRecsScreen({ tab, header }: Props) {
       const payload = {
         gender: formGender,
         age: formAge ? parseInt(formAge) : null,
-        height: formHeight,
-        weight: formWeight,
+        height: formHeight ? `${formHeight} ${heightUnit(unitSystem)}` : '',
+        weight: formWeight ? `${formWeight} ${weightUnit(unitSystem)}` : '',
         body_fat: formBodyFat,
         fitness_goal: formFitnessGoal,
         activity_level: formActivityLevel,
         diet_type: formDietType,
         food_preference: formFoodPreference,
         meals_per_day: formMealsPerDay,
-        target_weight: formTargetWeight,
+        target_weight: formTargetWeight ? `${formTargetWeight} ${weightUnit(unitSystem)}` : '',
       };
 
       const res = await axios.post(`${API_URL}/meals/recommendation`, payload, {
@@ -1071,11 +1074,11 @@ export default function DietRecsScreen({ tab, header }: Props) {
                   <TextInput style={[styles.dietInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} placeholder="30" placeholderTextColor={colors.textDim} keyboardType="numeric" value={formAge} onChangeText={setFormAge} />
                 </View>
                 <View style={styles.dietGridCell}>
-                  <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>Height (cm)</Text>
+                  <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>{heightUnitLabel(unitSystem)}</Text>
                   <TextInput style={[styles.dietInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} placeholder="170" placeholderTextColor={colors.textDim} keyboardType="numeric" value={formHeight} onChangeText={setFormHeight} />
                 </View>
                 <View style={styles.dietGridCell}>
-                  <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>Weight (kg)</Text>
+                  <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>{weightUnitLabel(unitSystem)}</Text>
                   <TextInput style={[styles.dietInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} placeholder="70" placeholderTextColor={colors.textDim} keyboardType="numeric" value={formWeight} onChangeText={setFormWeight} />
                 </View>
                 <View style={styles.dietGridCell}>
@@ -1088,7 +1091,7 @@ export default function DietRecsScreen({ tab, header }: Props) {
                 <View style={[styles.targetWeightRow, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>Current Weight</Text>
-                    <Text style={[styles.targetWeightValue, { color: colors.text }]}>{formWeight || '—'} kg</Text>
+                    <Text style={[styles.targetWeightValue, { color: colors.text }]}>{formWeight ? formatWeight(Number(formWeight), unitSystem) : '—'}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>Target Weight</Text>

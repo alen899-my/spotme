@@ -13,6 +13,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from '../../constants/theme';
 import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeight, formatHeight, weightUnit, heightUnit, volumeUnitLabel, formatWeightValue } from '../../utils/units';
 
 type CardVariant = 'browse' | 'add' | 'session' | 'compact';
 
@@ -127,6 +129,7 @@ function ExerciseCard({
   isShared,
 }: ExerciseCardProps) {
   const { colors, isDark } = useTheme();
+  const { unitSystem } = useUnits();
   const [imgError, setImgError] = useState(false);
   const theme = accentFor(exercise.category);
 
@@ -277,7 +280,7 @@ function ExerciseCard({
           <View style={styles.vDivider} />
           <View style={styles.controlItem}>
             <Text style={styles.controlLabel}>WEIGHT</Text>
-            <Text style={styles.controlValue}>{sessionData?.weight || exercise.weight || 0}kg</Text>
+            <Text style={styles.controlValue}>{formatWeightValue(sessionData?.weight || exercise.weight || 0, unitSystem)} {weightUnit(unitSystem)}</Text>
           </View>
           <View style={styles.vDivider} />
           <View style={styles.controlItem}>

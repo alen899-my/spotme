@@ -13,6 +13,8 @@ import { useTheme } from "../../contexts/ThemeContext";
 import WorkoutCalendarHeatmap from "../ui/WorkoutCalendarHeatmap";
 import { API_URL } from "../../utils/api";
 import { getToken } from "../../utils/tokenStorage";
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeight, formatHeight, weightUnit, heightUnit, volumeUnitLabel, formatWeightValue } from '../../utils/units';
 
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -104,6 +106,7 @@ const BodyStatusCard = React.memo(function BodyStatusCard({
   dbMuscleActivity,
 }: Props) {
   const { colors, isDark } = useTheme();
+  const { unitSystem } = useUnits();
   const [bodySide, setBodySide]         = useState<"front" | "back">("front");
   const [showInfo, setShowInfo]         = useState(false);
 
@@ -124,8 +127,8 @@ const BodyStatusCard = React.memo(function BodyStatusCard({
   const activeDayColor = activityScore >= 0.7 ? C.sun : activityScore >= 0.4 ? C.sunDeep : C.lightText;
 
   const stats = [
-    { val: `${weightKg}kg`,                                        lbl: "Weight",         color: C.white },
-    { val: `${Math.round(heightCm)}cm`,                            lbl: "Height",         color: C.white },
+    { val: `${formatWeightValue(weightKg, unitSystem)} ${weightUnit(unitSystem)}`, lbl: "Weight",         color: C.white },
+    { val: formatHeight(heightCm, unitSystem),                            lbl: "Height",         color: C.white },
     { val: bodyFat ? `${parseFloat(bodyFat).toFixed(1)}%` : "--",  lbl: "Body fat",       color: C.white },
     { val: `${totalWorkouts}`,                                      lbl: "Total sessions", color: activeDayColor },
   ];

@@ -17,6 +17,8 @@ import WeightHistoryCard from '../../components/weight/WeightHistoryCard';
 import WeightChart from '../../components/weight/WeightChart';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeightValue, weightUnit } from '../../utils/units';
 
 const RANGE_OPTIONS = [
   { key: '7d', label: '1W' },
@@ -30,6 +32,7 @@ export default function WeightScreen() {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
+  const { unitSystem } = useUnits();
 
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,14 +130,14 @@ export default function WeightScreen() {
             {currentWeight !== null && (
               <View style={[styles.statPanel, { backgroundColor: isDark ? '#0f0f0f' : '#f0f0eb', borderColor: isDark ? '#1e1e1e' : '#e0e0d8' }]}>
                 <Text style={[styles.statWeight, { color: colors.text }]}>
-                  {currentWeight.toFixed(1)}
-                  <Text style={[styles.statUnit, { color: colors.textMuted }]}> kg</Text>
+                  {formatWeightValue(currentWeight, unitSystem)}
+                  <Text style={[styles.statUnit, { color: colors.textMuted }]}> {weightUnit(unitSystem)}</Text>
                 </Text>
                 {delta !== null && (
                   <View style={styles.deltaRow}>
                     <Ionicons name={delta === 0 ? 'remove' : delta > 0 ? 'trending-up' : 'trending-down'} size={scale(12)} color={delta === 0 ? colors.textDim : delta > 0 ? '#f87171' : '#34d399'} />
                     <Text style={[styles.deltaText, { color: delta === 0 ? colors.textDim : delta > 0 ? '#f87171' : '#34d399' }]}>
-                      {delta > 0 ? '+' : ''}{delta.toFixed(1)} kg
+                      {delta > 0 ? '+' : ''}{formatWeightValue(delta, unitSystem)} {weightUnit(unitSystem)}
                     </Text>
                   </View>
                 )}
@@ -176,8 +179,8 @@ export default function WeightScreen() {
             <View style={[styles.prevWeightBanner, { backgroundColor: isDark ? '#0f0f0f' : '#f0f0eb', borderColor: isDark ? '#1e1e1e' : '#e0e0d8' }]}>
               <Ionicons name="refresh-outline" size={14} color={colors.textMuted} />
               <Text style={[styles.prevWeightLabel, { color: colors.textMuted }]}>Latest: </Text>
-              <Text style={[styles.prevWeightValue, { color: colors.text }]}>{currentWeight?.toFixed(1)}</Text>
-              <Text style={[styles.prevWeightUnit, { color: colors.textMuted }]}> kg</Text>
+              <Text style={[styles.prevWeightValue, { color: colors.text }]}>{formatWeightValue(Number(currentWeight || 0), unitSystem)}</Text>
+              <Text style={[styles.prevWeightUnit, { color: colors.textMuted }]}> {weightUnit(unitSystem)}</Text>
             </View>
           )}
 

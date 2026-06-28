@@ -30,6 +30,8 @@ import ExercisePreviewModal from '../../../components/modals/ExercisePreviewModa
 import ExerciseCard from '../../../components/exercises/ExerciseCard';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
+import { useUnits } from '../../../contexts/UnitContext';
+import { weightUnit } from '../../../utils/units';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -40,6 +42,7 @@ export default function SessionDetailScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  const { unitSystem } = useUnits();
   const isShared = shared === '1';
   const clonedFromId = cfId;
   
@@ -301,7 +304,7 @@ export default function SessionDetailScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.modalInputLabel, { color: colors.textMuted }]}>WEIGHT (kg)</Text>
+                  <Text style={[styles.modalInputLabel, { color: colors.textMuted }]}>WEIGHT ({weightUnit(unitSystem).toUpperCase()})</Text>
                   <TextInput
                     style={[styles.modalInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
                     keyboardType="numeric"

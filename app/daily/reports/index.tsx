@@ -14,6 +14,8 @@ import { useToast } from '../../../contexts/ToastContext';
 import ActionModal from '../../../components/ui/ActionModal';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
+import { useUnits } from '../../../contexts/UnitContext';
+import { formatWeightValue, weightUnit } from '../../../utils/units';
 
 const coachAvatarSource = require('../../../assets/coach/fit-cartoon-character-training.png');
 
@@ -24,6 +26,7 @@ export default function ReportsListScreen() {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
+  const { unitSystem } = useUnits();
   const [reports, setReports] = useState<any[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -183,7 +186,7 @@ export default function ReportsListScreen() {
                   ) : null}
                   {item.total_volume ? (
                     <Text style={[s.stat, { color: colors.textDim }]}>
-                      {Math.round(Number(item.total_volume)).toLocaleString()} kg
+                      {formatWeightValue(Math.round(Number(item.total_volume)), unitSystem)} {weightUnit(unitSystem)}
                     </Text>
                   ) : null}
                   {isGenerating ? (

@@ -12,6 +12,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useUnits } from '../../contexts/UnitContext';
+import { displayStoredWeight, displayStoredHeight, formatWeightValue, weightUnit } from '../../utils/units';
 import { P } from '../../constants/homeTheme';
 import { UserProfileSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
@@ -49,16 +51,13 @@ function getRestCfg(type?: string) {
   return REST_TYPE_CONFIG[type ?? 'fatigue'] ?? REST_TYPE_CONFIG.fatigue;
 }
 
-function formatVolume(vol: number) {
-  const n = Number(vol || 0);
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
-}
 
 export default function PublicProfileScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { unitSystem } = useUnits();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [workouts, setWorkouts] = useState<any[]>([]);
@@ -489,8 +488,8 @@ export default function PublicProfileScreen() {
             {/* Physical Metrics — inline row */}
             <View style={[styles.metricsRow, { borderColor: colors.border }]}>
               {[
-                { label: 'Height', value: user.height || '—' },
-                { label: 'Weight', value: user.weight || '—' },
+                { label: 'Height', value: displayStoredHeight(user.height, unitSystem) || '—' },
+                { label: 'Weight', value: displayStoredWeight(user.weight, unitSystem) || '—' },
                 { label: 'Age',    value: user.age ? `${user.age}` : '—' },
                 { label: 'Gender', value: user.gender || '—' },
               ].map((m) => (
@@ -576,7 +575,7 @@ export default function PublicProfileScreen() {
               workouts.map((w) => {
                 const totalExs  = parseInt(w.exercise_count   || 0);
                 const totalSets = parseInt(w.total_sets       || 0);
-                const vol       = formatVolume(w.total_volume);
+                const vol       = Number(w.total_volume) || 0;
                 const dur       = formatDuration(w.total_duration_seconds);
                 const hasPhoto  = !!(w.cover_photo_url || w.completion_photo_url);
                 const title     = w.session_name || w.title || 'Workout Session';
@@ -617,8 +616,8 @@ export default function PublicProfileScreen() {
                               </View>
                               <View style={[styles.wStatLine, { backgroundColor: tier.color + '30' }]} />
                               <View style={styles.wStatItem}>
-                                <Text style={[styles.wStatVal, { color: colors.text }]}>{vol}</Text>
-                                <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>kg</Text>
+                                <Text style={[styles.wStatVal, { color: colors.text }]}>{formatWeightValue(vol, unitSystem)}</Text>
+                                <Text style={[styles.wStatLbl, { color: colors.textMuted }]}>{weightUnit(unitSystem)}</Text>
                               </View>
                               <View style={[styles.wStatLine, { backgroundColor: tier.color + '30' }]} />
                               <View style={styles.wStatItem}>

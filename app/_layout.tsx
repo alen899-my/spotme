@@ -16,6 +16,7 @@ import * as Device from "expo-device";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { ToastProvider } from "../contexts/ToastContext";
 import { WorkoutTimerProvider } from "../contexts/WorkoutTimerContext";
+import { UnitProvider } from "../contexts/UnitContext";
 import SilentUpdateManager from "../components/SilentUpdateManager";
 import AnimatedSplash from "../components/ui/AnimatedSplash";
 import { API_URL, api } from "../utils/api";
@@ -122,6 +123,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
+      <UnitProvider>
       <SafeAreaProvider>
         <ToastProvider>
           <WorkoutTimerProvider>
@@ -136,6 +138,7 @@ export default function RootLayout() {
           </WorkoutTimerProvider>
         </ToastProvider>
       </SafeAreaProvider>
+      </UnitProvider>
     </ThemeProvider>
   );
 }

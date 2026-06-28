@@ -21,6 +21,8 @@ import { ViewSessionSkeleton } from '../../../components/ui/Skeleton';
 import WorkoutSummary from '../../../components/WorkoutSummary';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
+import { useUnits } from '../../../contexts/UnitContext';
+import { formatWeight, formatWeightValue, formatRecordValue, weightUnit, formatHeight, heightUnit, formatBodyWeight } from '../../../utils/units';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -31,6 +33,7 @@ export default function WorkoutViewScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  const { unitSystem } = useUnits();
 
   const isShared = shared === '1';
   const [workout, setWorkout] = useState<any>(null);
@@ -276,12 +279,12 @@ export default function WorkoutViewScreen() {
                   onChangeText={setFinishWeight}
                 />
                 <View style={[styles.weightUnit, { backgroundColor: isDark ? 'rgba(217,119,6,0.12)' : 'rgba(120,53,15,0.12)', height: 56 }]}>
-                  <Text style={[styles.weightUnitText, { color: isDark ? '#F59E0B' : '#92400E', fontSize: 14 }]}>kg</Text>
+                  <Text style={[styles.weightUnitText, { color: isDark ? '#F59E0B' : '#92400E', fontSize: 14 }]}>{weightUnit(unitSystem)}</Text>
                 </View>
               </View>
               {!!finishWeight && (
                 <Text style={[styles.weightHint, { color: isDark ? '#F59E0B' : '#92400E', fontSize: 12 }]}>
-                  Logged: <Text style={{ fontFamily: FONTS.bodyBold }}>{finishWeight} kg</Text> ✓
+                  Logged: <Text style={{ fontFamily: FONTS.bodyBold }}>{formatBodyWeight(Number(finishWeight), unitSystem)}</Text> ✓
                 </Text>
               )}
             </View>

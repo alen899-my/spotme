@@ -5,6 +5,8 @@ import { FONTS } from '../../constants/theme';
 import { scale, vs } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { parseUTC } from '../../utils/datetime';
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeightValue, weightUnit } from '../../utils/units';
 
 interface WeightEntry {
   id: number;
@@ -33,6 +35,7 @@ function formatDate(dateStr: string) {
 
 export default function WeightHistoryCard({ item, onDelete }: WeightHistoryCardProps) {
   const { colors, isDark } = useTheme();
+  const { unitSystem } = useUnits();
   const weightVal = parseFloat(item.weight);
   const { date, time } = formatDate(item.logged_at);
   const isPostWorkout = item.notes?.toLowerCase().includes('post-workout') || item.id < 0;
@@ -42,8 +45,8 @@ export default function WeightHistoryCard({ item, onDelete }: WeightHistoryCardP
       <View style={styles.leftCol}>
         <View style={styles.weightRow}>
           <Text style={[styles.weightValue, { color: colors.text }]}>
-            {weightVal.toFixed(1)}
-            <Text style={[styles.weightUnit, { color: colors.textMuted }]}> kg</Text>
+            {formatWeightValue(weightVal, unitSystem)}
+            <Text style={[styles.weightUnit, { color: colors.textMuted }]}> {weightUnit(unitSystem)}</Text>
           </Text>
           {isPostWorkout && (
             <View style={[styles.postBadge, { backgroundColor: isDark ? '#3B82F618' : '#3B82F610' }]}>

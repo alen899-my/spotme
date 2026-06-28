@@ -4,6 +4,8 @@ import { LineChart } from "react-native-gifted-charts";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useUnits } from "../../contexts/UnitContext";
+import { formatWeightValue, weightUnit } from "../../utils/units";
 
 const SW = Dimensions.get("window").width;
 
@@ -37,6 +39,7 @@ function formatDate(dateStr: string, range: string): string {
 
 export default function WeightChart({ data, range }: Props) {
   const { colors, isDark } = useTheme();
+  const { unitSystem } = useUnits();
 
   if (data.length < 2) {
     return (
@@ -55,7 +58,7 @@ export default function WeightChart({ data, range }: Props) {
   const maxVal = Math.max(...vals);
   const avgVal = vals.reduce((a, b) => a + b, 0) / vals.length;
   const change = vals[vals.length - 1] - vals[0];
-  const changeStr = change >= 0 ? `+${change.toFixed(1)}` : change.toFixed(1);
+  const changeStr = change >= 0 ? `+${formatWeightValue(change, unitSystem)}` : formatWeightValue(change, unitSystem);
 
   const chartData = data.map((d) => ({
     value: parseFloat(d.weight),
@@ -121,7 +124,7 @@ export default function WeightChart({ data, range }: Props) {
         pointerLabelComponent: (items: any[]) => (
           <View style={[styles.pointer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.pointerText, { color: colors.text }]}>
-              {items[0]?.value?.toFixed(1)} kg
+              {formatWeightValue(items[0]?.value, unitSystem)} {weightUnit(unitSystem)}
             </Text>
           </View>
         ),
@@ -141,9 +144,9 @@ export default function WeightChart({ data, range }: Props) {
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
-        <StatTile label="Min" value={`${minVal.toFixed(1)}`} color={colors.text} theme={colors} />
-        <StatTile label="Max" value={`${maxVal.toFixed(1)}`} color={colors.text} theme={colors} />
-        <StatTile label="Avg" value={`${avgVal.toFixed(1)}`} color={colors.text} theme={colors} />
+        <StatTile label="Min" value={`${formatWeightValue(minVal, unitSystem)}`} color={colors.text} theme={colors} />
+        <StatTile label="Max" value={`${formatWeightValue(maxVal, unitSystem)}`} color={colors.text} theme={colors} />
+        <StatTile label="Avg" value={`${formatWeightValue(avgVal, unitSystem)}`} color={colors.text} theme={colors} />
         <StatTile
           label="Change"
           value={`${changeStr}`}

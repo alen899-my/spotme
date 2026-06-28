@@ -9,6 +9,8 @@ import { FONTS } from '../constants/theme';
 import { P } from '../constants/homeTheme';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatDurationFull as formatDuration, formatDateTime } from '../utils/datetime';
+import { useUnits } from '../contexts/UnitContext';
+import { formatWeight, formatWeightValue, formatRecordValue, formatBodyWeight, weightUnit } from '../utils/units';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -18,11 +20,13 @@ function formatTime(sec: number) {
   return `${m}:${s}`;
 }
 
-function formatRecord(metricType?: string, value?: number | string) {
+function formatRecord(metricType?: string, value?: number | string, system?: any) {
   const numeric = Number(value) || 0;
   if (!numeric) return '0';
   if (metricType === 'max_reps') return `${Math.round(numeric)} reps`;
-  return `${numeric.toFixed(1)} kg est. 1RM`;
+  const val = system === 'imperial' ? (numeric * 2.20462).toFixed(1) : numeric.toFixed(1);
+  const unit = system === 'imperial' ? 'lbs' : weightUnit(system);
+  return `${val} ${unit} est. 1RM`;
 }
 
 const METRIC_COLORS: Record<string, string> = {
@@ -42,7 +46,7 @@ const METRIC_COLORS: Record<string, string> = {
 const CAROUSEL_CARD_W = SCREEN_WIDTH - 64;
 const CAROUSEL_SNAP = CAROUSEL_CARD_W + 12;
 
-function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; isDark: boolean }) {
+function ExerciseCarouselCard({ ex, colors, isDark, unitSystem }: { ex: any; colors: any; isDark: boolean; unitSystem: any }) {
   const isSkipped = ex.is_skipped;
   const isCardio = ex.category?.toLowerCase() === 'cardio';
   const isBodyweight = ex.equipment?.toLowerCase() === 'body weight';
@@ -109,19 +113,19 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
           <View style={[styles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[styles.recordPillLabel, { color: colors.textMuted }]}>BEST SET</Text>
             <Text style={[styles.recordPillVal, { color: colors.text }]}>
-              {isBodyweight ? `${ex.best_set_reps || 0} reps` : `${Number(ex.best_set_weight || 0).toFixed(1)}kg × ${ex.best_set_reps || 0}`}
+              {isBodyweight ? `${ex.best_set_reps || 0} reps` : `${formatWeightValue(Number(ex.best_set_weight || 0), unitSystem)}${weightUnit(unitSystem)} × ${ex.best_set_reps || 0}`}
             </Text>
           </View>
           <View style={[styles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[styles.recordPillLabel, { color: colors.textMuted }]}>MY PR</Text>
             <Text style={[styles.recordPillVal, { color: colors.text }]}>
-              {formatRecord(ex.record_metric_type, ex.personal_record_value)}
+              {formatRecord(ex.record_metric_type, ex.personal_record_value, unitSystem)}
             </Text>
           </View>
           <View style={[styles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[styles.recordPillLabel, { color: colors.textMuted }]}>WORLD PR</Text>
             <Text style={[styles.recordPillVal, { color: colors.text }]}>
-              {formatRecord(ex.record_metric_type, ex.world_record_value)}
+              {formatRecord(ex.record_metric_type, ex.world_record_value, unitSystem)}
             </Text>
           </View>
         </View>
@@ -154,8 +158,8 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
             </>
           ) : (
             [
-              { label: 'TOTAL WEIGHT', value: `${Math.round(totalWeight)}kg` },
-              { label: 'AVG / SET', value: `${avgWeight}kg` },
+              { label: 'TOTAL WEIGHT', value: `${formatWeightValue(Math.round(totalWeight), unitSystem)}${weightUnit(unitSystem)}` },
+              { label: 'AVG / SET', value: `${formatWeightValue(Number(avgWeight), unitSystem)}${weightUnit(unitSystem)}` },
               { label: 'TOTAL REPS', value: `${totalReps}` },
               { label: 'AVG TIME / SET', value: formatTime(avgTime) },
             ].map((item, idx) => (
@@ -172,7 +176,7 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
 }
 
 // ── Exercise Carousel with pagination dots ──────────────────────────────────
-function ExerciseCarousel({ exercises, colors, isDark }: { exercises: any[]; colors: any; isDark: boolean }) {
+function ExerciseCarousel({ exercises, colors, isDark, unitSystem }: { exercises: any[]; colors: any; isDark: boolean; unitSystem: any }) {
   const [activeIdx, setActiveIdx] = useState(0);
   const onScroll = (e: any) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / CAROUSEL_SNAP);
@@ -193,7 +197,7 @@ function ExerciseCarousel({ exercises, colors, isDark }: { exercises: any[]; col
         onMomentumScrollEnd={onScroll}
       >
         {exercises.map((ex: any) => (
-          <ExerciseCarouselCard key={ex.id} ex={ex} colors={colors} isDark={isDark} />
+          <ExerciseCarouselCard key={ex.id} ex={ex} colors={colors} isDark={isDark} unitSystem={unitSystem} />
         ))}
       </ScrollView>
       {/* Pagination dots */}
@@ -249,6 +253,7 @@ export default function WorkoutSummary({
   hideEditButton = false,
 }: WorkoutSummaryProps) {
   const { colors, isDark } = useTheme();
+  const { unitSystem } = useUnits();
 
   const duration = displayDuration ?? workout?.total_duration_seconds ?? 0;
   const volume = displayVolume ?? workout?.total_volume ?? 0;
@@ -293,7 +298,7 @@ export default function WorkoutSummary({
     { key: 'ACTIVE TIME', icon: 'stopwatch-outline', value: formatDuration(activeTime), sub: 'Active exercising' },
     { key: 'REST TIME', icon: 'hourglass-outline', value: formatDuration(rest), sub: 'Recovery' },
     { key: 'CALORIES', icon: 'flame-outline', value: `${caloriesBurned} kcal`, sub: 'Est. burn' },
-    { key: 'VOLUME', icon: 'barbell-outline', value: `${Math.round(volume)}kg`, sub: 'Weight lifted' },
+    { key: 'VOLUME', icon: 'barbell-outline', value: `${formatWeightValue(Math.round(volume), unitSystem)}${weightUnit(unitSystem)}`, sub: 'Weight lifted' },
     { key: 'SETS', icon: 'layers-outline', value: `${totalSets}`, sub: 'Completed sets' },
     {
       key: 'EXERCISES',
@@ -301,9 +306,9 @@ export default function WorkoutSummary({
       value: `${completedExercises}/${totalExercises}`,
       sub: skippedExercises > 0 ? `${skippedExercises} skipped` : 'All completed',
     },
-    ...(bestSet ? [{ key: 'BEST SET', icon: 'trophy-outline', value: `${bestSet.w}kg × ${bestSet.r}`, sub: bestSet.name }] : []),
+    ...(bestSet ? [{ key: 'BEST SET', icon: 'trophy-outline', value: `${formatWeightValue(bestSet.w, unitSystem)}${weightUnit(unitSystem)} × ${bestSet.r}`, sub: bestSet.name }] : []),
 
-    ...(showBodyWeight ? [{ key: 'BODY WEIGHT', icon: 'scale-outline', value: `${workout?.post_workout_weight || 0}kg`, sub: 'Current mass' }] : []),
+    ...(showBodyWeight ? [{ key: 'BODY WEIGHT', icon: 'scale-outline', value: `${formatBodyWeight(workout?.post_workout_weight || 0, unitSystem)}`, sub: 'Current mass' }] : []),
   ];
 
   return (
@@ -408,7 +413,7 @@ export default function WorkoutSummary({
       <Text style={[styles.sectionLabel, { color: colors.text, marginBottom: 12 }]}>Movement Summary</Text>
 
       {workout?.exercises?.length > 0 && (
-        <ExerciseCarousel exercises={workout.exercises} colors={colors} isDark={isDark} />
+        <ExerciseCarousel exercises={workout.exercises} colors={colors} isDark={isDark} unitSystem={unitSystem} />
       )}
     </View>
   );

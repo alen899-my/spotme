@@ -24,6 +24,8 @@ import DOBPicker from "../../components/ui/DOBPicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useUnits } from "../../contexts/UnitContext";
+import { WEIGHT_UNIT_OPTIONS, HEIGHT_UNIT_OPTIONS, BODY_UNIT_OPTIONS, DEFAULT_WEIGHT_UNIT, DEFAULT_HEIGHT_UNIT, DEFAULT_BODY_UNIT } from "../../utils/units";
 import axios from "axios";
 import { LinearGradient } from 'expo-linear-gradient';
 import { API_URL } from "../../utils/api";
@@ -41,6 +43,7 @@ const SectionHeader = ({ title, colors }: { title: string; colors: any }) => (
 export default function MyDetailsScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { unitSystem, setUnitSystem } = useUnits();
   const insets = useSafeAreaInsets();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -70,21 +73,21 @@ export default function MyDetailsScreen() {
 
   // Unit Toggle State
   const [units, setUnits] = useState({
-    height: "cm", weight: "kg", neck: "cm", waist: "cm",
-    hip: "cm", chest: "cm", arm: "cm", thigh: "cm",
+    height: DEFAULT_HEIGHT_UNIT, weight: DEFAULT_WEIGHT_UNIT, neck: DEFAULT_BODY_UNIT, waist: DEFAULT_BODY_UNIT,
+    hip: DEFAULT_BODY_UNIT, chest: DEFAULT_BODY_UNIT, arm: DEFAULT_BODY_UNIT, thigh: DEFAULT_BODY_UNIT,
   });
   const updateUnit = (field: keyof typeof units, unit: string) =>
     setUnits(prev => ({ ...prev, [field]: unit }));
 
   const [editingBodyFat, setEditingBodyFat] = useState(false);
 
-  // Parse "175 cm" → "175"
+  // Extract numeric value from stored string
   const parseValue = (str: any) => {
     if (!str) return "";
     return String(str).trim().split(" ")[0] || "";
   };
-  // Parse "175 cm" → "cm"
-  const parseUnit = (str: any, fallback = "cm") => {
+  // Extract unit suffix from stored value
+  const parseUnit = (str: any, fallback = DEFAULT_HEIGHT_UNIT) => {
     if (!str) return fallback;
     const parts = String(str).trim().split(" ");
     return parts[1] || fallback;
@@ -97,7 +100,7 @@ export default function MyDetailsScreen() {
       if (!val) return null;
       const p = String(val).trim().split(" ");
       const num = parseFloat(p[0]);
-      const u = p[1] || "cm";
+      const u = p[1] || DEFAULT_HEIGHT_UNIT;
       if (isNaN(num)) return null;
       return u === "in" ? num * 2.54 : num;
     };
@@ -145,21 +148,26 @@ export default function MyDetailsScreen() {
       setFormData(res.data);
       // Parse units from stored values (e.g. "175 cm")
       const u = res.data;
-      const pu = (val: any, fallback: string) => {
-        if (!val) return fallback;
-        const p = String(val).trim().split(" ");
-        return p[1] || fallback;
-      };
-      setUnits({
-        height: pu(u.height, "cm"),
-        weight: pu(u.weight, "kg"),
-        neck: pu(u.neck, "cm"),
-        waist: pu(u.waist, "cm"),
-        hip: pu(u.hip, "cm"),
-        chest: pu(u.chest, "cm"),
-        arm: pu(u.arm, "cm"),
-        thigh: pu(u.thigh, "cm"),
-      });
+        const pu = (val: any, fallback: string) => {
+          if (!val) return fallback;
+          const p = String(val).trim().split(" ");
+          return p[1] || fallback;
+        };
+        const loadedUnits = {
+          height: pu(u.height, DEFAULT_HEIGHT_UNIT),
+          weight: pu(u.weight, DEFAULT_WEIGHT_UNIT),
+          neck: pu(u.neck, DEFAULT_BODY_UNIT),
+          waist: pu(u.waist, DEFAULT_BODY_UNIT),
+          hip: pu(u.hip, DEFAULT_BODY_UNIT),
+          chest: pu(u.chest, DEFAULT_BODY_UNIT),
+          arm: pu(u.arm, DEFAULT_BODY_UNIT),
+          thigh: pu(u.thigh, DEFAULT_BODY_UNIT),
+        };
+        setUnits(loadedUnits);
+        // Sync global preference from loaded units
+        if (loadedUnits.weight === 'lbs' || loadedUnits.height === 'in') {
+          setUnitSystem('imperial');
+        }
     } catch (err) {
       console.error("Error fetching user details:", err);
       setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Failed to load profile details' });
@@ -399,6 +407,10 @@ export default function MyDetailsScreen() {
           <UnitToggle options={unitOptions} value={currentUnit} onChange={(u) => {
             setFormData({ ...formData, [key]: `${numVal} ${u}` });
             updateUnit(key as any, u);
+            if (key === 'weight' || key === 'height') {
+              const prefersImperial = u === 'lbs' || u === 'in';
+              setUnitSystem(prefersImperial ? 'imperial' : 'metric');
+            }
           }} />
         </View>
       </View>
@@ -545,8 +557,8 @@ export default function MyDetailsScreen() {
               <SectionHeader title="Physical Metrics" colors={colors} />
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.grid}><View style={styles.gridItem}>{renderInfoRow("Age", formData.age, "age", "calendar-clear-outline")}</View><View style={styles.gridItem} /></View>
-                {renderUnitField("Height", formData.height, "height", "resize-outline", ["cm", "in"])}
-                {renderUnitField("Weight", formData.weight, "weight", "speedometer-outline", ["kg", "lbs"])}
+                {renderUnitField("Height", formData.height, "height", "resize-outline", [...HEIGHT_UNIT_OPTIONS])}
+                {renderUnitField("Weight", formData.weight, "weight", "speedometer-outline", [...WEIGHT_UNIT_OPTIONS])}
                 {/* Body Fat Auto-Calculation */}
                 <View style={{ marginBottom: 16 }}>
                   <Text style={[styles.dietFieldLabel, { color: colors.textMuted }]}>Body Fat</Text>
@@ -622,12 +634,12 @@ export default function MyDetailsScreen() {
             <View style={styles.section}>
               <SectionHeader title="Body Stats" colors={colors} />
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                {renderUnitField("Neck", formData.neck, "neck", "bandage-outline", ["cm", "in"])}
-                {renderUnitField("Chest", formData.chest, "chest", "shirt-outline", ["cm", "in"])}
-                {renderUnitField("Waist", formData.waist, "waist", "body-outline", ["cm", "in"])}
-                {renderUnitField("Hip", formData.hip, "hip", "body-outline", ["cm", "in"])}
-                {renderUnitField("Arm", formData.arm, "arm", "fitness-outline", ["cm", "in"])}
-                {renderUnitField("Thigh", formData.thigh, "thigh", "fitness-outline", ["cm", "in"])}
+                {renderUnitField("Neck", formData.neck, "neck", "bandage-outline", [...BODY_UNIT_OPTIONS])}
+                {renderUnitField("Chest", formData.chest, "chest", "shirt-outline", [...BODY_UNIT_OPTIONS])}
+                {renderUnitField("Waist", formData.waist, "waist", "body-outline", [...BODY_UNIT_OPTIONS])}
+                {renderUnitField("Hip", formData.hip, "hip", "body-outline", [...BODY_UNIT_OPTIONS])}
+                {renderUnitField("Arm", formData.arm, "arm", "fitness-outline", [...BODY_UNIT_OPTIONS])}
+                {renderUnitField("Thigh", formData.thigh, "thigh", "fitness-outline", [...BODY_UNIT_OPTIONS])}
               </View>
             </View>
           ) : (
@@ -738,14 +750,14 @@ export default function MyDetailsScreen() {
                  return p[1] || fb;
                };
                setUnits({
-                 height: pu(user?.height, "cm"),
-                 weight: pu(user?.weight, "kg"),
-                 neck: pu(user?.neck, "cm"),
-                 waist: pu(user?.waist, "cm"),
-                 hip: pu(user?.hip, "cm"),
-                 chest: pu(user?.chest, "cm"),
-                 arm: pu(user?.arm, "cm"),
-                 thigh: pu(user?.thigh, "cm"),
+                 height: pu(user?.height, DEFAULT_HEIGHT_UNIT),
+                 weight: pu(user?.weight, DEFAULT_WEIGHT_UNIT),
+                 neck: pu(user?.neck, DEFAULT_BODY_UNIT),
+                 waist: pu(user?.waist, DEFAULT_BODY_UNIT),
+                 hip: pu(user?.hip, DEFAULT_BODY_UNIT),
+                 chest: pu(user?.chest, DEFAULT_BODY_UNIT),
+                 arm: pu(user?.arm, DEFAULT_BODY_UNIT),
+                 thigh: pu(user?.thigh, DEFAULT_BODY_UNIT),
                });
              }}>
                <Text style={[styles.cancelBtnText, { color: colors.textDim }]}>Discard Changes</Text>

@@ -25,6 +25,9 @@ import { P } from "../../constants/homeTheme";
 import axios from "axios";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useUnits } from "../../contexts/UnitContext";
+import type { UnitSystem } from "../../utils/units";
+import { WEIGHT_UNIT_OPTIONS, HEIGHT_UNIT_OPTIONS, BODY_UNIT_OPTIONS, DEFAULT_WEIGHT_UNIT, DEFAULT_HEIGHT_UNIT, DEFAULT_BODY_UNIT } from "../../utils/units";
 import { LinearGradient } from "expo-linear-gradient";
 import { API_URL } from "../../utils/api";
 import { getToken } from "../../utils/tokenStorage";
@@ -41,6 +44,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { unitSystem, setUnitSystem } = useUnits();
 
   const [step, setStep] = useState(0);
   const [visitedSteps, setVisitedSteps] = useState<number[]>([]);
@@ -63,11 +67,16 @@ export default function OnboardingScreen() {
   const [bodyFat, setBodyFat] = useState("");
   const [editingBodyFat, setEditingBodyFat] = useState(false);
   const [units, setUnits] = useState({
-    height: "cm", weight: "kg", neck: "cm", waist: "cm",
-    hip: "cm", chest: "cm", arm: "cm", thigh: "cm",
+    height: DEFAULT_HEIGHT_UNIT, weight: DEFAULT_WEIGHT_UNIT, neck: DEFAULT_BODY_UNIT, waist: DEFAULT_BODY_UNIT,
+    hip: DEFAULT_BODY_UNIT, chest: DEFAULT_BODY_UNIT, arm: DEFAULT_BODY_UNIT, thigh: DEFAULT_BODY_UNIT,
   });
-  const updateUnit = (field: keyof typeof units, unit: string) =>
+  const updateUnit = (field: keyof typeof units, unit: string) => {
     setUnits(prev => ({ ...prev, [field]: unit }));
+    if (field === 'weight' || field === 'height') {
+      const prefersImperial = unit === 'lbs' || unit === 'in';
+      setUnitSystem(prefersImperial ? 'imperial' : 'metric');
+    }
+  };
 
   const [fitnessGoal, setFitnessGoal] = useState("");
   const [experienceLevel, setExperienceLevel] = useState("");
@@ -94,6 +103,13 @@ export default function OnboardingScreen() {
     back: string | null; side: string | null;
   }>({ profile: null, front: null, back: null, side: null });
 
+  // Sync initial units from global preference
+  useEffect(() => {
+    if (unitSystem === 'imperial') {
+      setUnits(prev => ({ ...prev, weight: 'lbs', height: 'in' }));
+    }
+  }, []);
+
   // ─── Load existing profile & jump to first incomplete step ────────────────
   useEffect(() => {
     const loadProfile = async () => {
@@ -107,8 +123,8 @@ export default function OnboardingScreen() {
         if (!u) return;
         setUserId(u.id);
 
-        // Helper: split "175 cm" → { val: "175", unit: "cm" }
-        const splitVal = (str: any, fallbackUnit = "cm") => {
+        // Helper: split "175 cm" -> { val: "175", unit }
+        const splitVal = (str: any, fallbackUnit = DEFAULT_HEIGHT_UNIT) => {
           if (str === null || str === undefined || str === "") return { val: "", unit: fallbackUnit };
           const parts = String(str).trim().split(" ");
           return { val: parts[0] || "", unit: parts[1] || fallbackUnit };
@@ -126,10 +142,10 @@ export default function OnboardingScreen() {
           setAge(calculateAge(dobStr));
         }
 
-        const h = splitVal(u.height, "cm");
+        const h = splitVal(u.height, DEFAULT_HEIGHT_UNIT);
         if (h.val) { setHeightVal(h.val); setUnits(prev => ({ ...prev, height: h.unit })); }
 
-        const w = splitVal(u.weight, "kg");
+        const w = splitVal(u.weight, DEFAULT_WEIGHT_UNIT);
         if (w.val) { setWeightVal(w.val); setUnits(prev => ({ ...prev, weight: w.unit })); }
 
         if (u.body_fat) setBodyFat(u.body_fat.toString());
@@ -137,12 +153,12 @@ export default function OnboardingScreen() {
         if (u.experience_level) setExperienceLevel(u.experience_level);
         if (u.activity_level) setActivityLevel(u.activity_level);
 
-        const nk = splitVal(u.neck, "cm");  if (nk.val) { setNeck(nk.val);  setUnits(prev => ({ ...prev, neck: nk.unit })); }
-        const ws = splitVal(u.waist, "cm"); if (ws.val) { setWaist(ws.val); setUnits(prev => ({ ...prev, waist: ws.unit })); }
-        const hp = splitVal(u.hip, "cm");   if (hp.val) { setHip(hp.val);   setUnits(prev => ({ ...prev, hip: hp.unit })); }
-        const ch = splitVal(u.chest, "cm"); if (ch.val) { setChest(ch.val); setUnits(prev => ({ ...prev, chest: ch.unit })); }
-        const ar = splitVal(u.arm, "cm");   if (ar.val) { setArm(ar.val);   setUnits(prev => ({ ...prev, arm: ar.unit })); }
-        const th = splitVal(u.thigh, "cm"); if (th.val) { setThigh(th.val); setUnits(prev => ({ ...prev, thigh: th.unit })); }
+        const nk = splitVal(u.neck, DEFAULT_BODY_UNIT);  if (nk.val) { setNeck(nk.val);  setUnits(prev => ({ ...prev, neck: nk.unit })); }
+        const ws = splitVal(u.waist, DEFAULT_BODY_UNIT); if (ws.val) { setWaist(ws.val); setUnits(prev => ({ ...prev, waist: ws.unit })); }
+        const hp = splitVal(u.hip, DEFAULT_BODY_UNIT);   if (hp.val) { setHip(hp.val);   setUnits(prev => ({ ...prev, hip: hp.unit })); }
+        const ch = splitVal(u.chest, DEFAULT_BODY_UNIT); if (ch.val) { setChest(ch.val); setUnits(prev => ({ ...prev, chest: ch.unit })); }
+        const ar = splitVal(u.arm, DEFAULT_BODY_UNIT);   if (ar.val) { setArm(ar.val);   setUnits(prev => ({ ...prev, arm: ar.unit })); }
+        const th = splitVal(u.thigh, DEFAULT_BODY_UNIT); if (th.val) { setThigh(th.val); setUnits(prev => ({ ...prev, thigh: th.unit })); }
 
         if (u.medical_conditions) setMedicalConditions(u.medical_conditions);
         if (u.medication) setMedication(u.medication as "Yes" | "No");
@@ -712,12 +728,12 @@ export default function OnboardingScreen() {
 
             <ThemedInput label="Height" placeholder="Enter your height" value={heightVal} onChangeText={setHeightVal}
               keyboardType="numeric"
-              rightElement={<UnitToggle options={["cm", "in"]} value={units.height} onChange={u => updateUnit("height", u)} />}
+              rightElement={<UnitToggle options={[...HEIGHT_UNIT_OPTIONS]} value={units.height} onChange={u => updateUnit("height", u)} />}
             />
 
             <ThemedInput label="Current Weight" placeholder="Enter your weight" value={weightVal} onChangeText={setWeightVal}
               keyboardType="numeric"
-              rightElement={<UnitToggle options={["kg", "lbs"]} value={units.weight} onChange={u => updateUnit("weight", u)} />}
+              rightElement={<UnitToggle options={[...WEIGHT_UNIT_OPTIONS]} value={units.weight} onChange={u => updateUnit("weight", u)} />}
             />
 
 
@@ -903,17 +919,17 @@ export default function OnboardingScreen() {
           
 
             <ThemedInput label="Neck" placeholder="Neck circumference" value={neck} onChangeText={setNeck} keyboardType="numeric"
-              rightElement={<UnitToggle options={["cm", "in"]} value={units.neck} onChange={u => updateUnit("neck", u)} />} />
-            <ThemedInput label="Waist" placeholder="Waist circumference" value={waist} onChangeText={setWaist} keyboardType="numeric"
-              rightElement={<UnitToggle options={["cm", "in"]} value={units.waist} onChange={u => updateUnit("waist", u)} />} />
-            <ThemedInput label="Hip" placeholder="Hip circumference" value={hip} onChangeText={setHip} keyboardType="numeric"
-              rightElement={<UnitToggle options={["cm", "in"]} value={units.hip} onChange={u => updateUnit("hip", u)} />} />
-            <ThemedInput label="Chest" placeholder="Chest circumference" value={chest} onChangeText={setChest} keyboardType="numeric"
-              rightElement={<UnitToggle options={["cm", "in"]} value={units.chest} onChange={u => updateUnit("chest", u)} />} />
-            <ThemedInput label="Arm" placeholder="Arm circumference" value={arm} onChangeText={setArm} keyboardType="numeric"
-              rightElement={<UnitToggle options={["cm", "in"]} value={units.arm} onChange={u => updateUnit("arm", u)} />} />
-            <ThemedInput label="Thigh" placeholder="Thigh circumference" value={thigh} onChangeText={setThigh} keyboardType="numeric"
-              rightElement={<UnitToggle options={["cm", "in"]} value={units.thigh} onChange={u => updateUnit("thigh", u)} />} />
+              rightElement={<UnitToggle options={[...BODY_UNIT_OPTIONS]} value={units.neck} onChange={u => updateUnit("neck", u)} />} />
+              : <ThemedInput label="Waist" placeholder="Enter waist" value={waist} onChangeText={setWaist} keyboardType="numeric"
+              rightElement={<UnitToggle options={[...BODY_UNIT_OPTIONS]} value={units.waist} onChange={u => updateUnit("waist", u)} />} />
+              : <ThemedInput label="Hip" placeholder="Enter hip" value={hip} onChangeText={setHip} keyboardType="numeric"
+              rightElement={<UnitToggle options={[...BODY_UNIT_OPTIONS]} value={units.hip} onChange={u => updateUnit("hip", u)} />} />
+              : <ThemedInput label="Chest" placeholder="Enter chest" value={chest} onChangeText={setChest} keyboardType="numeric"
+              rightElement={<UnitToggle options={[...BODY_UNIT_OPTIONS]} value={units.chest} onChange={u => updateUnit("chest", u)} />} />
+              : <ThemedInput label="Arm" placeholder="Enter arm" value={arm} onChangeText={setArm} keyboardType="numeric"
+              rightElement={<UnitToggle options={[...BODY_UNIT_OPTIONS]} value={units.arm} onChange={u => updateUnit("arm", u)} />} />
+              : <ThemedInput label="Thigh" placeholder="Enter thigh" value={thigh} onChangeText={setThigh} keyboardType="numeric"
+              rightElement={<UnitToggle options={[...BODY_UNIT_OPTIONS]} value={units.thigh} onChange={u => updateUnit("thigh", u)} />} />
 
             {neck && waist && (hip || gender === "Male") && !editingBodyFat && (
               <View style={[subStyles.bodyFatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>

@@ -4,6 +4,8 @@ import { LineChart } from "react-native-gifted-charts";
 import { FONTS } from "../../constants/theme";
 import { P, scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeight, formatHeight, weightUnit, heightUnit, volumeUnitLabel, formatWeightValue } from '../../utils/units';
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
@@ -17,6 +19,7 @@ interface Props {
 
 export default function WeightSparkline({ data }: Props) {
   const { colors, isDark } = useTheme();
+  const { unitSystem } = useUnits();
 
   if (data.length < 2) {
     return (
@@ -39,10 +42,10 @@ export default function WeightSparkline({ data }: Props) {
     <View>
       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: vs(8) }}>
         <Text style={{ fontFamily: FONTS.body, fontSize: scale(12), color: isDark ? colors.textMuted : P.muted }}>
-          {vals[0]}kg
+          {formatWeightValue(vals[0], unitSystem)} {weightUnit(unitSystem)}
         </Text>
         <Text style={{ fontFamily: FONTS.bodyBold, fontSize: scale(13), color: isDark ? colors.primary : P.cta }}>
-          {vals[vals.length - 1]}kg
+          {formatWeightValue(vals[vals.length - 1], unitSystem)} {weightUnit(unitSystem)}
         </Text>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -88,7 +91,7 @@ export default function WeightSparkline({ data }: Props) {
                 borderColor: colors.border,
               }}>
                 <Text style={{ fontFamily: FONTS.bodyBold, fontSize: scale(12), color: colors.text }}>
-                  {items[0]?.value}kg
+                  {formatWeightValue(items[0]?.value, unitSystem)} {weightUnit(unitSystem)}
                 </Text>
               </View>
             ),

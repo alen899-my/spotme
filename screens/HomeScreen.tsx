@@ -17,6 +17,7 @@ import { getCached, setCache } from "../utils/cache";
 import { P, scale, vs } from "../constants/homeTheme";
 import { FONTS } from "../constants/theme";
 import { useTheme } from "../contexts/ThemeContext";
+import { parseStoredWeight, parseStoredHeight } from "../utils/units";
 import { Ionicons } from "@expo/vector-icons";
 import MiniCalendar from "../components/home/MiniCalendar";
 
@@ -125,13 +126,8 @@ export default function HomeScreen() {
 
   const firstName = (u.full_name || "User").split(" ")[0];
 
-  // Height normalisation (supports both cm and ft'in strings)
-  const heightStr = u.height || "175";
-  const heightCm  = heightStr.includes("'")
-    ? parseFloat(heightStr.split("'")[0]) * 30.48 +
-      parseFloat(heightStr.split("'")[1] || "0") * 2.54
-    : parseFloat(heightStr) || 175;
-  const weightKg  = parseFloat(u.weight) || 75;
+  const heightCm  = parseStoredHeight(u.height);
+  const weightKg  = parseStoredWeight(u.weight);
 
   const weeklyWorkouts    = weekly.filter((d: any) => d.workouts > 0).length;
   const totalWorkouts      = dashboard?.total_workouts || 0;

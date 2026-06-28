@@ -19,6 +19,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
 import { formatDuration, formatDateTime } from '../../../utils/datetime';
+import { useUnits } from '../../../contexts/UnitContext';
+import { formatWeightValue, weightUnit } from '../../../utils/units';
 
 
 
@@ -36,16 +38,12 @@ const TIERS = [
 ];
 function getTier(name: string) { return TIERS.find(t => t.name === name) ?? TIERS[0]; }
 
-function formatVolume(vol: number) {
-  const n = Number(vol || 0);
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
-}
-
 export default function UserWorkoutsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { unitSystem } = useUnits();
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -78,7 +76,7 @@ export default function UserWorkoutsScreen() {
   const renderCard = ({ item: w }: { item: any }) => {
     const totalExs  = parseInt(w.exercise_count   || 0);
     const totalSets = parseInt(w.total_sets       || 0);
-    const vol       = formatVolume(w.total_volume);
+    const vol       = Number(w.total_volume) || 0;
     const dur       = formatDuration(w.total_duration_seconds);
     const hasPhoto  = !!(w.cover_photo_url || w.completion_photo_url);
     const title     = w.session_name || w.title || 'Workout Session';
@@ -117,8 +115,8 @@ export default function UserWorkoutsScreen() {
               </View>
               <View style={[styles.statLine, { backgroundColor: tier.color + '30' }]} />
               <View style={styles.statItem}>
-                <Text style={[styles.statVal, { color: colors.text }]}>{vol}</Text>
-                <Text style={[styles.statLbl, { color: colors.textMuted }]}>kg</Text>
+                <Text style={[styles.statVal, { color: colors.text }]}>{formatWeightValue(vol, unitSystem)}</Text>
+                <Text style={[styles.statLbl, { color: colors.textMuted }]}>{weightUnit(unitSystem)}</Text>
               </View>
               <View style={[styles.statLine, { backgroundColor: tier.color + '30' }]} />
               <View style={styles.statItem}>

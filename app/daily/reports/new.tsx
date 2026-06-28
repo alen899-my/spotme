@@ -13,6 +13,8 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
+import { useUnits } from '../../../contexts/UnitContext';
+import { formatWeightValue, weightUnit } from '../../../utils/units';
 
 
 
@@ -21,6 +23,7 @@ export default function GenerateReportScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
+  const { unitSystem } = useUnits();
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingIds, setGeneratingIds] = useState<Set<number>>(new Set());
@@ -125,7 +128,7 @@ export default function GenerateReportScreen() {
                       ) : null}
                       {item.total_volume ? (
                         <Text style={[s.stat, { color: colors.textDim }]}>
-                          {Math.round(Number(item.total_volume)).toLocaleString()} kg
+                          {formatWeightValue(Math.round(Number(item.total_volume)), unitSystem)} {weightUnit(unitSystem)}
                         </Text>
                       ) : null}
                     </View>

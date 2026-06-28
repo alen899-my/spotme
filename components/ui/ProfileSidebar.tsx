@@ -13,7 +13,6 @@ import {
   Modal,
   ImageBackground,
   StatusBar,
-  Alert,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import OptimizedImage from "./OptimizedImage";
@@ -77,8 +76,7 @@ interface ProfileSidebarProps {
 const MENU_ITEMS = [
   { id: "details",   title: "Profile Details", subtitle: "Personal stats & data",      icon: "account-details-outline", iconType: "MaterialCommunityIcons", href: "/profile/details",  accent: false },
   { id: "settings",  title: "Settings",        subtitle: "Preferences & theme",        icon: "settings-outline",        iconType: "Ionicons",               href: "/profile/settings", accent: false },
-  { id: "privacy",   title: "Privacy Policy",  subtitle: "Your data & privacy rights", icon: "shield-checkmark-outline",iconType: "Ionicons",               href: "/profile/privacy",  accent: false },
-  { id: "terms",     title: "Terms & Conditions", subtitle: "Terms of service & rules",  icon: "document-text-outline",    iconType: "Ionicons",               href: "/profile/terms",    accent: false },
+  { id: "feedback",  title: "Feedback",        subtitle: "Send us your thoughts",      icon: "chatbox-ellipses-outline",iconType: "Ionicons",               href: "/profile/feedback", accent: false },
 ];
 
 

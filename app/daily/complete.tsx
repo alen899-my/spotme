@@ -22,6 +22,8 @@ import { CompleteSkeleton } from '../../components/ui/Skeleton';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import { formatDurationShort as formatDuration } from '../../utils/datetime';
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeight, formatWeightValue, formatRecordValue, weightUnit, formatHeight, heightUnit, formatBodyWeight, UnitSystem } from '../../utils/units';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -122,14 +124,11 @@ function formatTime(sec: number) {
   return `${m}:${s}`;
 }
 
-function formatRecord(metricType?: string, value?: number | string) {
-  const numeric = Number(value) || 0;
-  if (!numeric) return '0';
-  if (metricType === 'max_reps') return `${Math.round(numeric)} reps`;
-  return `${numeric.toFixed(1)} kg est. 1RM`;
+function formatRecord(metricType?: string, value?: number | string, system?: UnitSystem) {
+  return formatRecordValue(metricType, value, system || 'metric');
 }
 
-function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; isDark: boolean }) {
+function ExerciseCarouselCard({ ex, colors, isDark, unitSystem }: { ex: any; colors: any; isDark: boolean; unitSystem: UnitSystem }) {
   const isSkipped = ex.is_skipped;
   const isCardio = ex.category?.toLowerCase() === 'cardio';
   const isBodyweight = ex.equipment?.toLowerCase() === 'body weight';
@@ -196,19 +195,19 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>BEST SET</Text>
             <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {isBodyweight ? `${ex.best_set_reps || 0} reps` : `${Number(ex.best_set_weight || 0).toFixed(1)}kg × ${ex.best_set_reps || 0}`}
+              {isBodyweight ? `${ex.best_set_reps || 0} reps` : `${formatWeightValue(Number(ex.best_set_weight || 0), unitSystem)} ${weightUnit(unitSystem)} × ${ex.best_set_reps || 0}`}
             </Text>
           </View>
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>MY PR</Text>
             <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {formatRecord(ex.record_metric_type, ex.personal_record_value)}
+              {formatRecord(ex.record_metric_type, ex.personal_record_value, unitSystem)}
             </Text>
           </View>
           <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
             <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>WORLD PR</Text>
             <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {formatRecord(ex.record_metric_type, ex.world_record_value)}
+              {formatRecord(ex.record_metric_type, ex.world_record_value, unitSystem)}
             </Text>
           </View>
         </View>
@@ -241,8 +240,8 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
             </>
           ) : (
             [
-              { label: 'TOTAL WEIGHT', value: `${Math.round(totalWeight)}kg` },
-              { label: 'AVG / SET', value: `${avgWeight}kg` },
+              { label: 'TOTAL WEIGHT', value: `${formatWeightValue(totalWeight, unitSystem)} ${weightUnit(unitSystem)}` },
+              { label: 'AVG / SET', value: `${formatWeightValue(Number(avgWeight), unitSystem)} ${weightUnit(unitSystem)}` },
               { label: 'TOTAL REPS', value: `${totalReps}` },
               { label: 'AVG TIME / SET', value: formatTime(avgTime) },
             ].map((item, idx) => (
@@ -259,7 +258,7 @@ function ExerciseCarouselCard({ ex, colors, isDark }: { ex: any; colors: any; is
 }
 
 // ── Exercise Carousel with pagination dots ──────────────────────────────────
-function ExerciseCarousel({ exercises, colors, isDark }: { exercises: any[]; colors: any; isDark: boolean }) {
+function ExerciseCarousel({ exercises, colors, isDark, unitSystem }: { exercises: any[]; colors: any; isDark: boolean; unitSystem: UnitSystem }) {
   const [activeIdx, setActiveIdx] = useState(0);
   const onScroll = (e: any) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / CAROUSEL_SNAP);
@@ -279,7 +278,7 @@ function ExerciseCarousel({ exercises, colors, isDark }: { exercises: any[]; col
         onMomentumScrollEnd={onScroll}
       >
         {exercises.map((ex: any) => (
-          <ExerciseCarouselCard key={ex.id} ex={ex} colors={colors} isDark={isDark} />
+          <ExerciseCarouselCard key={ex.id} ex={ex} colors={colors} isDark={isDark} unitSystem={unitSystem} />
         ))}
       </ScrollView>
       {/* Pagination dots */}
@@ -313,6 +312,7 @@ export default function WorkoutCompleteScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  const { unitSystem } = useUnits();
   const params = useLocalSearchParams();
 
   const workoutId = params.id as string;
@@ -676,11 +676,11 @@ export default function WorkoutCompleteScreen() {
             <BentoTile icon="stopwatch-outline" iconColor="#00C9C8" label="Active time" value={formatDuration(displayActive)} sub="Active exercising" colors={colors} isDark={isDark} />
             <BentoTile icon="hourglass-outline" iconColor="#F59E0B" label="REST TIME" value={formatDuration(displayRest)} sub="Recovery" colors={colors} isDark={isDark} />
             <BentoTile icon="flame-outline" iconColor="#EF4444" label="CALORIES" value={`${caloriesBurned}`} sub="Est. kcal burn" colors={colors} isDark={isDark} />
-            <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${Math.round(displayVolume)} kg`} sub="Weight lifted" colors={colors} isDark={isDark} />
+            <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${formatWeightValue(displayVolume, unitSystem)} ${weightUnit(unitSystem)}`} sub="Weight lifted" colors={colors} isDark={isDark} />
             <BentoTile icon="layers-outline" iconColor="#8B5CF6" label="TOTAL SETS" value={`${totalSets}`} sub="Completed" colors={colors} isDark={isDark} />
             <BentoTile icon="fitness-outline" iconColor="#2596BE" label="EXERCISES" value={`${exerciseStats.completed}/${exerciseStats.total}`} sub={exerciseStats.skipped > 0 ? `${exerciseStats.skipped} skipped` : 'All completed'} colors={colors} isDark={isDark} />
             {bestSet && (
-              <BentoTile icon="trophy-outline" iconColor="#FBBF24" label="BEST SET" value={`${bestSet.w}kg × ${bestSet.r}`} sub={bestSet.name} colors={colors} isDark={isDark} />
+              <BentoTile icon="trophy-outline" iconColor="#FBBF24" label="BEST SET" value={`${formatWeightValue(bestSet.w, unitSystem)} ${weightUnit(unitSystem)} × ${bestSet.r}`} sub={bestSet.name} colors={colors} isDark={isDark} />
             )}
           </View>
 
@@ -694,7 +694,7 @@ export default function WorkoutCompleteScreen() {
 
         {/* Carousel lives outside the padded container for edge-to-edge snap */}
         {workout?.exercises?.length > 0 && (
-          <ExerciseCarousel exercises={workout.exercises} colors={colors} isDark={isDark} />
+          <ExerciseCarousel exercises={workout.exercises} colors={colors} isDark={isDark} unitSystem={unitSystem} />
         )}
 
         {/* Reopen padded container for remaining sections */}
@@ -721,12 +721,12 @@ export default function WorkoutCompleteScreen() {
                 onChangeText={setWeight}
               />
               <View style={[st.weightUnit, { backgroundColor: isDark ? 'rgba(217,119,6,0.12)' : 'rgba(120,53,15,0.12)', height: vs(56) }]}>
-                <Text style={[st.weightUnitText, { color: isDark ? '#F59E0B' : '#92400E', fontSize: fs(14) }]}>kg</Text>
+                <Text style={[st.weightUnitText, { color: isDark ? '#F59E0B' : '#92400E', fontSize: fs(14) }]}>{weightUnit(unitSystem)}</Text>
               </View>
             </View>
             {!!weight && (
               <Text style={[st.weightHint, { color: isDark ? '#F59E0B' : '#92400E', fontSize: fs(12) }]}>
-                Logged: <Text style={{ fontFamily: FONTS.bodyBold }}>{weight} kg</Text> ✓
+                Logged: <Text style={{ fontFamily: FONTS.bodyBold }}>{formatBodyWeight(Number(weight), unitSystem)}</Text> ✓
               </Text>
             )}
           </View>

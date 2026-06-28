@@ -15,6 +15,8 @@ import { useToast } from '../../../contexts/ToastContext';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
 import { formatDateWithWeekday as formatDate } from '../../../utils/datetime';
+import { useUnits } from '../../../contexts/UnitContext';
+import { formatWeightValue, weightUnit } from '../../../utils/units';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const coachAvatarSource = require('../../../assets/coach/fit-cartoon-character-training.png');
@@ -76,6 +78,7 @@ export default function WorkoutReportScreen() {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
+  const { unitSystem } = useUnits();
 
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -213,7 +216,7 @@ export default function WorkoutReportScreen() {
   };
 
   const durationMin = report?.total_duration_seconds ? `${Math.round((report.total_duration_seconds || 0) / 60)} min` : '-';
-  const volumeKg = report?.total_volume ? `${Math.round(Number(report.total_volume)).toLocaleString()} kg` : '-';
+  const volumeKg = report?.total_volume ? `${formatWeightValue(Math.round(Number(report.total_volume)), unitSystem)} ${weightUnit(unitSystem)}` : '-';
   const cals = report?.calories_burned ? `${report.calories_burned} kcal` : '-';
   const displayDate = report ? formatDate(report.workout_date) : '';
 

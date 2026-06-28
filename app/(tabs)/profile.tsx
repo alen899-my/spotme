@@ -13,6 +13,8 @@ import OptimizedImage from "../../components/ui/OptimizedImage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FONTS } from "../../constants/theme";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useUnits } from "../../contexts/UnitContext";
+import { displayStoredWeight, displayStoredHeight } from "../../utils/units";
 import { useWorkoutTimer } from "../../contexts/WorkoutTimerContext";
 import axios from "axios";
 import StreakIcon from "../../components/ui/StreakIcon";
@@ -50,6 +52,7 @@ const Badge = ({ value, colors }: { value: any; colors: any }) => (
 export default function ProfileScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { unitSystem } = useUnits();
   const { endWorkoutSession } = useWorkoutTimer();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -145,8 +148,8 @@ export default function ProfileScreen() {
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <InfoRow label="Gender" value={u.gender} colors={colors} />
               <InfoRow label="Age" value={u.age} colors={colors} />
-              <InfoRow label="Height" value={u.height} colors={colors} />
-              <InfoRow label="Weight" value={u.weight} colors={colors} />
+              <InfoRow label="Height" value={displayStoredHeight(u.height, unitSystem)} colors={colors} />
+              <InfoRow label="Weight" value={displayStoredWeight(u.weight, unitSystem)} colors={colors} />
               <InfoRow label="Body Fat" value={u.body_fat ? `${u.body_fat}%` : null} colors={colors} />
             </View>
           </View>

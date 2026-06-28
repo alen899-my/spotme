@@ -25,6 +25,8 @@ import MealNutrientCard from '../../components/meals/MealNutrientCard';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import { isSameDay, isToday } from '../../utils/datetime';
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeight, formatHeight, weightUnit, heightUnit, weightUnitLabel, heightUnitLabel } from '../../utils/units';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -33,6 +35,7 @@ export default function MealsScreen() {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
+  const { unitSystem } = useUnits();
   const [meals, setMeals] = useState<any[]>([]);
   const [mealsPage, setMealsPage] = useState(1);
   const [mealsTotal, setMealsTotal] = useState(0);
@@ -281,8 +284,8 @@ export default function MealsScreen() {
     const profile = recommendationData?.user || userData || {};
     setFormGender(profile.gender || 'Male');
     setFormAge(profile.age ? profile.age.toString() : '');
-    setFormHeight(profile.height ? profile.height.toString() : '');
-    setFormWeight(profile.weight ? profile.weight.toString() : '');
+    setFormHeight(profile.height ? parseFloat(profile.height).toString() : '');
+    setFormWeight(profile.weight ? parseFloat(profile.weight).toString() : '');
     setFormBodyFat(profile.body_fat ? profile.body_fat.toString() : '');
     setFormFitnessGoal(profile.fitness_goal || 'Maintain');
     setFormActivityLevel(profile.activity_level || 'Lightly Active');
@@ -300,8 +303,8 @@ export default function MealsScreen() {
       const payload = {
         gender: formGender,
         age: formAge ? parseInt(formAge) : null,
-        height: formHeight,
-        weight: formWeight,
+        height: formHeight ? `${formHeight} ${heightUnit(unitSystem)}` : '',
+        weight: formWeight ? `${formWeight} ${weightUnit(unitSystem)}` : '',
         body_fat: formBodyFat,
         fitness_goal: formFitnessGoal,
         activity_level: formActivityLevel,
@@ -1150,7 +1153,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           <View style={[styles.recCard, styles.recAlertCard, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30' }]}>
             <Ionicons name="warning-outline" size={20} color="#F59E0B" style={{ marginRight: 10 }} />
             <Text style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 12, color: colors.text, lineHeight: 18 }}>
-              Profile incomplete. We are using standard values (70kg, 170cm). Complete your height and weight in Profile for more precise meal recommendations.
+              Profile incomplete. We are using standard values ({formatWeight(70, unitSystem)}, {formatHeight(170, unitSystem)}). Complete your height and weight in Profile for more precise meal recommendations.
             </Text>
           </View>
         )}
@@ -1292,7 +1295,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           <View style={[styles.recCard, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30', padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 14 }]}>
             <Ionicons name="warning-outline" size={20} color="#F59E0B" style={{ marginRight: 10 }} />
             <Text style={{ flex: 1, fontFamily: FONTS.bodySemiBold, fontSize: 12, color: colors.text, lineHeight: 18 }}>
-              Profile incomplete. We're using standard values (70kg, 170cm). Please complete your height/weight in Profile for fully personalized targets!
+              Profile incomplete. We're using standard values ({formatWeight(70, unitSystem)}, {formatHeight(170, unitSystem)}). Please complete your height/weight in Profile for fully personalized targets!
             </Text>
           </View>
         )}
@@ -2007,7 +2010,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                   />
                 </View>
                 <View style={styles.dietFormGridCell}>
-                  <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>Height (cm)</Text>
+                  <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>{heightUnitLabel(unitSystem)}</Text>
                   <TextInput
                     style={[styles.dietFormInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
                     placeholder="170"
@@ -2018,7 +2021,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
                   />
                 </View>
                 <View style={styles.dietFormGridCell}>
-                  <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>Weight (kg)</Text>
+                  <Text style={[styles.dietFormFieldLabel, { color: colors.textMuted }]}>{weightUnitLabel(unitSystem)}</Text>
                   <TextInput
                     style={[styles.dietFormInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
                     placeholder="70"

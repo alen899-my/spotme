@@ -3,6 +3,8 @@ import { View, Text, StyleSheet } from "react-native";
 import { FONTS } from "../../constants/theme";
 import { P, scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useUnits } from '../../contexts/UnitContext';
+import { formatWeight, formatHeight, weightUnit, heightUnit, volumeUnitLabel, formatWeightValue } from '../../utils/units';
 import WeeklyBarChart from "./WeeklyBarChart";
 
 interface DayData {
@@ -19,6 +21,7 @@ interface Props {
 
 export default function WeeklyActivityCard({ weekly }: Props) {
   const { colors, isDark } = useTheme();
+  const { unitSystem } = useUnits();
   const weeklyWorkouts = weekly.filter((d) => d.workouts > 0).length;
   const weeklyMinutes  = Math.round(
     weekly.reduce((s, d) => s + d.duration_seconds, 0) / 60
@@ -49,7 +52,7 @@ export default function WeeklyActivityCard({ weekly }: Props) {
           {[
             { val: weeklyWorkouts, lbl: "Workouts" },
             { val: weeklyMinutes,  lbl: "Total Mins" },
-            { val: totalVolume,    lbl: "Volume (kg)" },
+            { val: totalVolume,    lbl: volumeUnitLabel(unitSystem) },
           ].map((s) => (
             <View key={s.lbl}>
               <Text style={[styles.chartStatVal, { color: colors.text }]}>{s.val}</Text>
