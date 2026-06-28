@@ -180,7 +180,7 @@ export default function NewExercisePage() {
                 <FormSelect
                   label={field.label}
                   items={options[field.optionsKey]}
-                  value={form[field.key]}
+                  value={form[field.key] ?? ""}
                   onChange={(v) => update(field.key, v)}
                   placeholder={`Select ${field.label.toLowerCase()}`}
                 />
