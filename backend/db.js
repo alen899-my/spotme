@@ -301,15 +301,14 @@ const initDB = async () => {
       console.warn('Could not add current_phase column:', _);
     }
 
-    // ── Drop template columns (expert splits feature removed) ──────────────
+    // ── Re-add template columns for admin-created splits ────────────────────
     await pool.query(`
-      DELETE FROM workout_splits WHERE user_id IS NULL;
-      ALTER TABLE workout_splits DROP COLUMN IF EXISTS is_template;
-      ALTER TABLE workout_splits DROP COLUMN IF EXISTS template_goal;
-      ALTER TABLE workout_splits DROP COLUMN IF EXISTS template_level;
-      ALTER TABLE workout_splits DROP COLUMN IF EXISTS template_days;
-      ALTER TABLE workout_splits DROP COLUMN IF EXISTS template_color;
-      ALTER TABLE workout_splits DROP COLUMN IF EXISTS template_icon;
+      ALTER TABLE workout_splits ADD COLUMN IF NOT EXISTS is_template BOOLEAN DEFAULT false;
+      ALTER TABLE workout_splits ADD COLUMN IF NOT EXISTS template_goal VARCHAR(100);
+      ALTER TABLE workout_splits ADD COLUMN IF NOT EXISTS template_level VARCHAR(50);
+      ALTER TABLE workout_splits ADD COLUMN IF NOT EXISTS template_days VARCHAR(50);
+      ALTER TABLE workout_splits ADD COLUMN IF NOT EXISTS template_color VARCHAR(7);
+      ALTER TABLE workout_splits ADD COLUMN IF NOT EXISTS template_icon VARCHAR(50);
     `);
 
     // ── Split Ratings ───────────────────────────────────────────────────────
@@ -581,6 +580,117 @@ const initDB = async () => {
         description TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // ── Entity library tables ─────────────────────────────────────────────────
+    const entityTables = [
+      'categories', 'body_parts', 'equipment', 'targets', 'muscle_groups', 'secondary_muscles',
+    ];
+    for (const table of entityTables) {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ${table} (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL UNIQUE,
+          image_url TEXT,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    }
+
+    // ── Seed entity tables from exercises ─────────────────────────────────────
+    await pool.query(`
+      INSERT INTO categories (name)
+      SELECT DISTINCT category FROM exercises WHERE category IS NOT NULL
+      ON CONFLICT (name) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO body_parts (name)
+      SELECT DISTINCT body_part FROM exercises WHERE body_part IS NOT NULL
+      ON CONFLICT (name) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO equipment (name)
+      SELECT DISTINCT equipment FROM exercises WHERE equipment IS NOT NULL
+      ON CONFLICT (name) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO targets (name)
+      SELECT DISTINCT target FROM exercises WHERE target IS NOT NULL
+      ON CONFLICT (name) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO muscle_groups (name)
+      SELECT DISTINCT muscle_group FROM exercises WHERE muscle_group IS NOT NULL
+      ON CONFLICT (name) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO secondary_muscles (name)
+      SELECT DISTINCT unnest(secondary_muscles) FROM exercises
+      ON CONFLICT (name) DO NOTHING
+    `);
+
+    // ── Add entity image columns to exercises table ───────────────────────────
+    const imageColumns = [
+      'category_image_url',
+      'body_part_image_url',
+      'equipment_image_url',
+      'target_image_url',
+      'muscle_group_image_url',
+    ];
+    for (const col of imageColumns) {
+      try {
+        await pool.query(`ALTER TABLE exercises ADD COLUMN ${col} TEXT`);
+      } catch (e) {
+        // Column already exists — ignore
+      }
+    }
+
+    // ── Seed exercises entity image URLs from entity tables ───────────────────
+    await pool.query(`
+      UPDATE exercises e
+      SET category_image_url = cat.image_url
+      FROM categories cat
+      WHERE e.category = cat.name
+    `);
+    await pool.query(`
+      UPDATE exercises e
+      SET body_part_image_url = bp.image_url
+      FROM body_parts bp
+      WHERE e.body_part = bp.name
+    `);
+    await pool.query(`
+      UPDATE exercises e
+      SET equipment_image_url = eq.image_url
+      FROM equipment eq
+      WHERE e.equipment = eq.name
+    `);
+    await pool.query(`
+      UPDATE exercises e
+      SET target_image_url = tgt.image_url
+      FROM targets tgt
+      WHERE e.target = tgt.name
+    `);
+    await pool.query(`
+      UPDATE exercises e
+      SET muscle_group_image_url = mg.image_url
+      FROM muscle_groups mg
+      WHERE e.muscle_group = mg.name
+    `);
+
+    // ── Add last_active_at for activity tracking ────────────────────────────
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ;
+    `);
+    await pool.query(`
+      UPDATE users u
+      SET last_active_at = sub.last_active
+      FROM (
+        SELECT user_id, MAX(completed_at) AS last_active
+        FROM daily_workouts
+        WHERE status = 'completed'
+        GROUP BY user_id
+      ) sub
+      WHERE u.id = sub.user_id AND u.last_active_at IS NULL
     `);
 
     const adminHash = await bcrypt.hash('alenadmin123', 10);

@@ -17,6 +17,7 @@ const weightRoutes = require('./routes/weight');
 const notificationRoutes = require('./routes/notifications');
 const physiqueRoutes = require('./routes/physique');
 const adminRoutes = require('./routes/admin');
+const imagesRoutes = require('./routes/images');
 const feedbackRoutes = require('./routes/feedback');
 
 const app = express();
@@ -50,6 +51,9 @@ app.use('/api/weight', weightRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/physique', physiqueRoutes);
 app.use('/api/admin', adminRoutes);
+
+const authenticateAdmin = require('./middleware/adminAuth');
+app.use('/api/images', authenticateAdmin, imagesRoutes);
 app.use('/api/feedback', feedbackRoutes);
 
 // Global error-handling middleware

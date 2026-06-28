@@ -22,6 +22,13 @@ const upload = multer({
       // Dynamically set folder based on route
       const folder = req.originalUrl.includes('/physique') ? 'physique'
                    : req.originalUrl.includes('/daily') ? 'daily'
+                   : req.originalUrl.includes('/exercises') ? 'exercises'
+                   : req.originalUrl.includes('/categories') ? 'categories'
+                   : req.originalUrl.includes('/body_parts') ? 'body_parts'
+                   : req.originalUrl.includes('/equipment') ? 'equipment'
+                   : req.originalUrl.includes('/targets') ? 'targets'
+                   : req.originalUrl.includes('/muscle_groups') ? 'muscle_groups'
+                   : req.originalUrl.includes('/secondary_muscles') ? 'secondary_muscles'
                    : 'onboarding';
       cb(null, `spotme/${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`);
     }
@@ -29,3 +36,4 @@ const upload = multer({
 });
 
 module.exports = upload;
+module.exports.s3 = s3;

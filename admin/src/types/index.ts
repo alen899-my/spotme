@@ -66,3 +66,91 @@ export interface User {
   totalMeals?: number
   totalWaterLogs?: number
 }
+
+export interface Feedback {
+  id: string
+  user_id: number
+  category: string
+  title: string
+  description: string
+  created_at: string
+  userName?: string
+  userEmail?: string
+}
+
+export interface Exercise {
+  id: string
+  name: string
+  category: string
+  body_part: string
+  equipment: string
+  muscle_group: string
+  secondary_muscles: string[]
+  target: string
+  image_url: string
+  gif_url: string
+  instructions_en: string
+  avg_rating: number
+  rating_count: number
+  category_image_url?: string
+  body_part_image_url?: string
+  equipment_image_url?: string
+  target_image_url?: string
+  muscle_group_image_url?: string
+}
+
+export interface LibraryEntity {
+  id: string
+  name: string
+  image_url: string | null
+  created_at: string
+}
+
+export type EntityType = "categories" | "body_parts" | "equipment" | "targets" | "muscle_groups" | "secondary_muscles"
+
+export interface EntityConfig {
+  type: EntityType
+  label: string
+  slug: string
+  table: string
+}
+
+export interface WorkoutSplit {
+  id: string
+  name: string
+  description: string | null
+  is_template: boolean
+  template_goal?: string
+  template_level?: string
+  template_days?: string
+  template_color?: string
+  template_icon?: string
+  created_at: string
+  session_count?: number
+  sessions?: WorkoutSession[]
+}
+
+export interface WorkoutSession {
+  id: string
+  split_id: string
+  name: string
+  sort_order: number
+  created_at: string
+  exercises?: WorkoutSessionExercise[]
+}
+
+export interface WorkoutSessionExercise {
+  id: string
+  session_id: string
+  exercise_id: string
+  sets: number
+  reps: string
+  rest_time: string
+  weight: string
+  sort_order: number
+  name?: string
+  category?: string
+  image_url?: string
+  target?: string
+  equipment?: string
+}

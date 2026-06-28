@@ -17,6 +17,24 @@ const { pool } = require('../db');
 // ─── Middleware: simple JWT auth (re-used from profile routes) ────────────────
 const jwt = require('jsonwebtoken');
 
+// ─── Helper: look up entity image URLs ────────────────────────────────────────
+async function getEntityImageUrls({ category, body_part, equipment, target, muscle_group }) {
+  const [cat, bp, eq, tgt, mg] = await Promise.all([
+    category ? pool.query('SELECT image_url FROM categories WHERE name = $1', [category]) : Promise.resolve({ rows: [{ image_url: null }] }),
+    body_part ? pool.query('SELECT image_url FROM body_parts WHERE name = $1', [body_part]) : Promise.resolve({ rows: [{ image_url: null }] }),
+    equipment ? pool.query('SELECT image_url FROM equipment WHERE name = $1', [equipment]) : Promise.resolve({ rows: [{ image_url: null }] }),
+    target ? pool.query('SELECT image_url FROM targets WHERE name = $1', [target]) : Promise.resolve({ rows: [{ image_url: null }] }),
+    muscle_group ? pool.query('SELECT image_url FROM muscle_groups WHERE name = $1', [muscle_group]) : Promise.resolve({ rows: [{ image_url: null }] }),
+  ]);
+  return {
+    category_image_url: cat.rows[0]?.image_url ?? null,
+    body_part_image_url: bp.rows[0]?.image_url ?? null,
+    equipment_image_url: eq.rows[0]?.image_url ?? null,
+    target_image_url: tgt.rows[0]?.image_url ?? null,
+    muscle_group_image_url: mg.rows[0]?.image_url ?? null,
+  };
+}
+
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
   if (!header) return res.status(401).json({ error: 'No token provided' });
@@ -59,7 +77,7 @@ router.get('/meta/filters', async (req, res) => {
     const categoryFilter = category ? ' AND category = $1' : '';
     const filterParam = category || null;
 
-    const [categories, bodyParts, equipment, targets] = await Promise.all([
+    const [categories, bodyParts, equipment, targets, muscleGroups] = await Promise.all([
       pool.query('SELECT DISTINCT category   FROM exercises WHERE category   IS NOT NULL ORDER BY category'),
       filterParam
         ? pool.query(`SELECT DISTINCT body_part  FROM exercises WHERE body_part  IS NOT NULL${categoryFilter} ORDER BY body_part`, [filterParam])
@@ -70,12 +88,16 @@ router.get('/meta/filters', async (req, res) => {
       filterParam
         ? pool.query(`SELECT DISTINCT target     FROM exercises WHERE target     IS NOT NULL${categoryFilter} ORDER BY target`, [filterParam])
         : pool.query('SELECT DISTINCT target     FROM exercises WHERE target     IS NOT NULL ORDER BY target'),
+      filterParam
+        ? pool.query(`SELECT DISTINCT muscle_group FROM exercises WHERE muscle_group IS NOT NULL${categoryFilter} ORDER BY muscle_group`, [filterParam])
+        : pool.query('SELECT DISTINCT muscle_group FROM exercises WHERE muscle_group IS NOT NULL ORDER BY muscle_group'),
     ]);
     res.json({
-      categories:  categories.rows.map(r => r.category),
-      body_parts:  bodyParts.rows.map(r => r.body_part),
-      equipment:   equipment.rows.map(r => r.equipment),
-      targets:     targets.rows.map(r => r.target),
+      categories:     categories.rows.map(r => r.category),
+      body_parts:     bodyParts.rows.map(r => r.body_part),
+      equipment:      equipment.rows.map(r => r.equipment),
+      targets:        targets.rows.map(r => r.target),
+      muscle_groups:  muscleGroups.rows.map(r => r.muscle_group),
     });
   } catch (err) {
     console.error('GET /exercises/meta/filters error:', err);
@@ -139,7 +161,10 @@ router.get('/', async (req, res) => {
       `SELECT e.id, e.name, e.category, e.body_part, e.equipment,
               e.muscle_group, e.secondary_muscles, e.target,
               e.image_url, e.gif_url, e.instructions_en,
-              e.avg_rating::float8 AS avg_rating, e.rating_count
+              e.avg_rating::float8 AS avg_rating, e.rating_count,
+              e.category_image_url, e.body_part_image_url,
+              e.equipment_image_url, e.target_image_url,
+              e.muscle_group_image_url
        FROM exercises e ${where}
        ${orderClause}
        LIMIT $${idx} OFFSET $${idx + 1}`;
@@ -202,14 +227,22 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'id and name are required' });
     }
 
+    const entityImages = await getEntityImageUrls({
+      category, body_part, equipment, target, muscle_group,
+    });
+
     const result = await pool.query(
       `INSERT INTO exercises
         (id, name, category, body_part, equipment,
          instructions_en, instructions_tr,
          instruction_steps_en, instruction_steps_tr,
          muscle_group, secondary_muscles, target,
-         image_url, gif_url)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+         image_url, gif_url,
+         category_image_url, body_part_image_url,
+         equipment_image_url, target_image_url,
+         muscle_group_image_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
+               $15,$16,$17,$18,$19)
        RETURNING *`,
       [
         id, name, category || null, body_part || null, equipment || null,
@@ -217,6 +250,11 @@ router.post('/', authMiddleware, async (req, res) => {
         instruction_steps_en || [], instruction_steps_tr || [],
         muscle_group || null, secondary_muscles || [], target || null,
         image_url || null, gif_url || null,
+        entityImages.category_image_url,
+        entityImages.body_part_image_url,
+        entityImages.equipment_image_url,
+        entityImages.target_image_url,
+        entityImages.muscle_group_image_url,
       ]
     );
 
@@ -242,6 +280,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
       image_url, gif_url,
     } = req.body;
 
+    const entityImages = await getEntityImageUrls({
+      category, body_part, equipment, target, muscle_group,
+    });
+
     const result = await pool.query(
       `UPDATE exercises SET
         name                  = COALESCE($1,  name),
@@ -256,8 +298,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
         secondary_muscles     = COALESCE($10, secondary_muscles),
         target                = COALESCE($11, target),
         image_url             = COALESCE($12, image_url),
-        gif_url               = COALESCE($13, gif_url)
-       WHERE id = $14
+        gif_url               = COALESCE($13, gif_url),
+        category_image_url    = COALESCE($14, category_image_url),
+        body_part_image_url   = COALESCE($15, body_part_image_url),
+        equipment_image_url   = COALESCE($16, equipment_image_url),
+        target_image_url      = COALESCE($17, target_image_url),
+        muscle_group_image_url= COALESCE($18, muscle_group_image_url)
+       WHERE id = $19
        RETURNING *`,
       [
         name        || null,
@@ -273,6 +320,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
         target      || null,
         image_url   || null,
         gif_url     || null,
+        entityImages.category_image_url,
+        entityImages.body_part_image_url,
+        entityImages.equipment_image_url,
+        entityImages.target_image_url,
+        entityImages.muscle_group_image_url,
         id,
       ]
     );

@@ -87,6 +87,17 @@ const mealSchema = z.object({
   })),
 });
 
+const createExerciseSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  category: z.string().optional().default(''),
+  body_part: z.string().optional().default(''),
+  equipment: z.string().optional().default(''),
+  target: z.string().optional().default(''),
+  muscle_group: z.string().optional().default(''),
+  secondary_muscles: z.string().optional().default(''),
+  instructions_en: z.string().optional().default(''),
+});
+
 module.exports = {
   validate,
   schemas: {
@@ -95,5 +106,6 @@ module.exports = {
     completeWorkout: completeWorkoutSchema,
     addExercise: addExerciseSchema,
     meal: mealSchema,
+    createExercise: createExerciseSchema,
   },
 };
