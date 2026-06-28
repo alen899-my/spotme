@@ -22,15 +22,32 @@ const feedbackRoutes = require('./routes/feedback');
 
 const app = express();
 
-const allowedOrigins = ['https://spotme-gym.vercel.app', 'https://spotme-kdjd.vercel.app'];
+const allowedOrigins = [
+  'https://spotme-gym.vercel.app',   // old/other frontend
+  'https://spotme-kdjd.vercel.app',  // expo web frontend
+  'https://spotme-admin.vercel.app', // admin panel (update if different)
+];
 if (!isProduction) {
   allowedOrigins.push('http://localhost:19006', 'http://localhost:8081', 'http://localhost:5173', 'http://localhost:3000');
 }
-app.use(cors({
-  origin: allowedOrigins,
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked: ${origin}`));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+};
+
+// Handle OPTIONS preflight for all routes before anything else
+app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
