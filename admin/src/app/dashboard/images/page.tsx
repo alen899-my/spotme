@@ -3,14 +3,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react"
 import { Trash2, CheckSquare, Square, ChevronDown, ChevronRight, ImageIcon, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Pagination } from "@/components/ui/pagination"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import api from "@/lib/api"
 
 interface ImageItem {
   key: string
   url: string
-  folder: string
   lastModified: string
   size: number
 }
@@ -20,12 +18,6 @@ interface FolderData {
   displayName: string
   count: number
   images: ImageItem[]
-}
-
-interface ImageResponse {
-  folders: FolderData[]
-  allFolders: { name: string; displayName: string; count: number }[]
-  pagination: { page: number; limit: number; total: number; totalPages: number }
 }
 
 function formatSize(bytes: number): string {
@@ -39,10 +31,8 @@ function formatDate(dateStr: string): string {
 }
 
 export default function ImageVaultPage() {
-  const [data, setData] = useState<ImageResponse | null>(null)
+  const [folders, setFolders] = useState<FolderData[]>([])
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState(60)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -51,21 +41,24 @@ export default function ImageVaultPage() {
   const fetchImages = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api.get("/images", { params: { page, limit } })
-      setData(res.data)
+      const res = await api.get("/images")
+      setFolders(res.data.folders)
     } finally {
       setLoading(false)
     }
-  }, [page, limit])
+  }, [])
 
   useEffect(() => {
     fetchImages()
   }, [fetchImages])
 
   const allKeys = useMemo(() => {
-    if (!data) return []
-    return data.folders.flatMap((f) => f.images.map((img) => img.key))
-  }, [data])
+    return folders.flatMap((f) => f.images.map((img) => img.key))
+  }, [folders])
+
+  const totalImages = useMemo(() => {
+    return folders.reduce((sum, f) => sum + f.count, 0)
+  }, [folders])
 
   const toggleSelect = (key: string) => {
     setSelected((prev) => {
@@ -78,7 +71,7 @@ export default function ImageVaultPage() {
 
   const toggleFolder = (folder: string) => {
     setSelected((prev) => {
-      const folderKeys = data?.folders.find((f) => f.name === folder)?.images.map((i) => i.key) ?? []
+      const folderKeys = folders.find((f) => f.name === folder)?.images.map((i) => i.key) ?? []
       const allSelected = folderKeys.every((k) => prev.has(k))
       const next = new Set(prev)
       for (const k of folderKeys) {
@@ -125,38 +118,37 @@ export default function ImageVaultPage() {
         <div>
           <h1 className="text-xl font-semibold">Image Vault</h1>
           <p className="text-sm text-muted-foreground">
-            {data ? `${data.pagination.total} images across ${data.allFolders.length} folders` : "Manage uploaded images"}
+            {totalImages} images across {folders.length} folders
           </p>
         </div>
         {allKeys.length > 0 && (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={selectAll}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-            >
-              {selected.size === allKeys.length ? (
-                <CheckSquare className="h-4 w-4" />
-              ) : (
-                <Square className="h-4 w-4" />
-              )}
-              {selected.size === allKeys.length ? "Deselect All" : "Select All"}
-            </button>
-          </div>
+          <button
+            onClick={selectAll}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            {selected.size === allKeys.length ? (
+              <CheckSquare className="h-4 w-4" />
+            ) : (
+              <Square className="h-4 w-4" />
+            )}
+            {selected.size === allKeys.length ? "Deselect All" : "Select All"}
+          </button>
         )}
       </div>
 
+      <div className="overflow-y-auto" style={{ maxHeight: 'calc(100dvh - 9rem)' }}>
       {loading ? (
         <div className="flex h-60 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : data?.folders.length === 0 ? (
+      ) : folders.length === 0 ? (
         <div className="flex h-60 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
           <ImageIcon className="h-10 w-10" />
           <p>No images uploaded yet</p>
         </div>
       ) : (
         <div className="space-y-6">
-          {data!.folders.map((folder) => {
+          {folders.map((folder) => {
             const folderKeys = folder.images.map((i) => i.key)
             const folderSelected = folderKeys.every((k) => selected.has(k))
             const isCollapsed = collapsed.has(folder.name)
@@ -221,16 +213,9 @@ export default function ImageVaultPage() {
               </div>
             )
           })}
-
-          <Pagination
-            page={page}
-            limit={limit}
-            total={data!.pagination.total}
-            onPageChange={setPage}
-            onLimitChange={(n) => { setLimit(n); setPage(1) }}
-          />
         </div>
       )}
+      </div>
 
       {selected.size > 0 && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">

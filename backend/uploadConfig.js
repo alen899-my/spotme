@@ -22,6 +22,7 @@ const upload = multer({
       // Dynamically set folder based on route
       const folder = req.originalUrl.includes('/physique') ? 'physique'
                    : req.originalUrl.includes('/daily') ? 'daily'
+                   : req.originalUrl.includes('/meals') ? 'meals'
                    : req.originalUrl.includes('/exercises') ? 'exercises'
                    : req.originalUrl.includes('/categories') ? 'categories'
                    : req.originalUrl.includes('/body_parts') ? 'body_parts'

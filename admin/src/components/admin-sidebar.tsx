@@ -28,6 +28,7 @@ const navItems = [
   { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/activity", label: "Activity", icon: Activity },
+  { href: "/dashboard/active-users", label: "Active Users", icon: Users },
   { href: "/dashboard/images", label: "Image Vault", icon: ImageIcon },
   { href: "/dashboard/workout-splits", label: "Workout Splits", icon: Activity },
 ]

@@ -13,16 +13,13 @@ const FOLDER_LABELS = {
   secondary_muscles: 'Secondary Muscles',
   physique: 'Physique Photos',
   daily: 'Daily Workouts',
+  meals: 'Meals',
   onboarding: 'Onboarding',
 };
 
-// GET / – List images grouped by folder
-router.get('/', async (req, res) => {
+// GET / – List ALL images grouped by folder (no pagination — metadata only)
+router.get('/', async (_req, res) => {
   try {
-    const { page = 1, limit = 60 } = req.query;
-    const pageNum = Math.max(1, Number(page));
-    const limitNum = Math.min(200, Math.max(1, Number(limit)));
-
     const allObjects = [];
 
     const paginator = paginateListObjectsV2(
@@ -37,7 +34,6 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // Group by folder
     const folderMap = {};
     for (const obj of allObjects) {
       const parts = obj.Key.split('/');
@@ -51,52 +47,22 @@ router.get('/', async (req, res) => {
       });
     }
 
-    // Sort folders and their images
-    const folderEntries = Object.entries(folderMap).sort(([a], [b]) => {
-      const order = ['exercises', 'categories', 'body_parts', 'equipment', 'targets', 'muscle_groups', 'secondary_muscles', 'physique', 'daily', 'onboarding'];
-      return order.indexOf(a) - order.indexOf(b);
-    });
+    const order = ['exercises', 'categories', 'body_parts', 'equipment', 'targets', 'muscle_groups', 'secondary_muscles', 'physique', 'daily', 'meals', 'onboarding'];
 
-    // Build flat list with folder context for pagination
-    const flatImages = [];
-    const folderSummary = [];
-    for (const [name, images] of folderEntries) {
-      images.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
-      folderSummary.push({ name, displayName: FOLDER_LABELS[name] || name, count: images.length });
-      for (const img of images) {
-        flatImages.push({ ...img, folder: name });
-      }
-    }
-
-    const total = flatImages.length;
-    const totalPages = Math.ceil(total / limitNum);
-    const start = (pageNum - 1) * limitNum;
-    const paginatedImages = flatImages.slice(start, start + limitNum);
-
-    // Re-group paginated images by folder
-    const paginatedFolderMap = {};
-    for (const img of paginatedImages) {
-      if (!paginatedFolderMap[img.folder]) paginatedFolderMap[img.folder] = [];
-      paginatedFolderMap[img.folder].push(img);
-    }
-
-    const paginatedFolders = folderSummary
-      .filter(f => paginatedFolderMap[f.name])
-      .map(f => ({
-        ...f,
-        images: paginatedFolderMap[f.name],
+    const folders = Object.entries(folderMap)
+      .sort(([a], [b]) => {
+        const ai = order.indexOf(a);
+        const bi = order.indexOf(b);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      })
+      .map(([name, images]) => ({
+        name,
+        displayName: FOLDER_LABELS[name] || name,
+        count: images.length,
+        images: images.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified)),
       }));
 
-    res.json({
-      folders: paginatedFolders,
-      allFolders: folderSummary,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages,
-      },
-    });
+    res.json({ folders });
   } catch (err) {
     console.error('GET /images error:', err);
     res.status(500).json({ message: 'Failed to list images' });
