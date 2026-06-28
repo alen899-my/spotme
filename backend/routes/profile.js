@@ -272,6 +272,70 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
+// EXPORT USER DATA (GDPR compliance)
+router.get('/export-data', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [userRes, workoutsRes, weightRes, waterRes, mealsRes, xpRes, physiqueRes, reportsRes, feedbackRes] = await Promise.all([
+      pool.query('SELECT * FROM users WHERE id = $1', [userId]),
+      pool.query(`
+        SELECT dw.*, json_agg(
+          json_build_object(
+            'id', dwe.id, 'exercise_id', dwe.exercise_id, 'target_sets', dwe.target_sets,
+            'target_reps', dwe.target_reps, 'target_weight', dwe.target_weight,
+            'sort_order', dwe.sort_order, 'is_completed', dwe.is_completed, 'is_skipped', dwe.is_skipped,
+            'sets', (SELECT json_agg(json_build_object(
+              'set_number', dws.set_number, 'weight', dws.weight, 'reps', dws.reps,
+              'duration_seconds', dws.duration_seconds, 'rest_seconds', dws.rest_seconds,
+              'is_skipped', dws.is_skipped, 'completed_at', dws.completed_at
+            ) ORDER BY dws.set_number) FROM daily_workout_sets dws WHERE dws.daily_exercise_id = dwe.id)
+          ) ORDER BY dwe.sort_order
+        ) AS exercises
+        FROM daily_workouts dw
+        LEFT JOIN daily_workout_exercises dwe ON dwe.daily_workout_id = dw.id
+        WHERE dw.user_id = $1
+        GROUP BY dw.id
+        ORDER BY dw.completed_at DESC NULLS LAST
+      `, [userId]),
+      pool.query('SELECT * FROM weight_logs WHERE user_id = $1 ORDER BY logged_at DESC', [userId]),
+      pool.query('SELECT * FROM water_logs WHERE user_id = $1 ORDER BY logged_at DESC', [userId]),
+      pool.query(`SELECT * FROM meal_recommendations WHERE user_id = $1`, [userId]),
+      pool.query('SELECT * FROM xp_transactions WHERE user_id = $1 ORDER BY created_at DESC', [userId]),
+      pool.query('SELECT * FROM physique_analyses WHERE user_id = $1 ORDER BY created_at DESC', [userId]),
+      pool.query('SELECT * FROM workout_reports WHERE user_id = $1 ORDER BY created_at DESC', [userId]),
+      pool.query('SELECT * FROM feedback WHERE user_id = $1 ORDER BY created_at DESC', [userId]),
+    ]);
+
+    const user = userRes.rows[0];
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    delete user.password;
+
+    const exportData = {
+      exported_at: new Date().toISOString(),
+      user,
+      measurements: {
+        neck: user.neck, waist: user.waist, hip: user.hip,
+        chest: user.chest, arm: user.arm, thigh: user.thigh,
+        body_fat: user.body_fat, height: user.height, weight: user.weight,
+      },
+      workouts: workoutsRes.rows,
+      weight_logs: weightRes.rows,
+      water_logs: waterRes.rows,
+      diet_recommendations: mealsRes.rows,
+      xp_transactions: xpRes.rows,
+      physique_analyses: physiqueRes.rows,
+      workout_reports: reportsRes.rows,
+      feedback: feedbackRes.rows,
+    };
+
+    res.json(exportData);
+  } catch (error) {
+    console.error("GET /profile/export-data error:", error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET PUBLIC PROFILE BY ID (with privacy check)
 router.get('/:id', authenticateToken, async (req, res) => {
   try {

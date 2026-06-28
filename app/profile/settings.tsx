@@ -10,7 +10,11 @@ import {
   Modal,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Platform,
+  Alert,
 } from "react-native";
+import { Paths, File } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -273,6 +277,7 @@ export default function SettingsScreen() {
   const [cacheSize, setCacheSize] = useState('');
   const [dataSize, setDataSize] = useState('');
   const [clearing, setClearing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [alertModal, setAlertModal] = useState<{ visible: boolean; type: 'info' | 'success' | 'error'; title: string; message: string }>({ visible: false, type: 'info', title: '', message: '' });
 
   const formatBytes = (bytes: number) => {
@@ -313,6 +318,46 @@ export default function SettingsScreen() {
       setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Failed to clear data.' });
     } finally {
       setClearing(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setExporting(true);
+    try {
+      const token = await getToken();
+      const res = await axios.get(`${API_URL}/profile/export-data`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = JSON.stringify(res.data, null, 2);
+      const fileName = `spotme-export-${Date.now()}.json`;
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(url);
+        setAlertModal({ visible: true, type: 'success', title: 'Exported', message: 'Your data has been exported successfully.' });
+      } else {
+        const file = new File(Paths.cache, fileName);
+        file.write(json);
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(file.uri, {
+            mimeType: 'application/json',
+            dialogTitle: 'Export My Data',
+          });
+        } else {
+          setAlertModal({ visible: true, type: 'info', title: 'Exported', message: `File saved to: ${file.uri}` });
+        }
+      }
+    } catch (e: any) {
+      const msg = e.response?.data?.message || 'Failed to export data.';
+      setAlertModal({ visible: true, type: 'error', title: 'Error', message: msg });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -573,6 +618,26 @@ export default function SettingsScreen() {
 
         <Text style={[sectionStyles.label, { color: colors.textDim }]}>DATA</Text>
         <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={handleExportData}
+            disabled={exporting}
+            activeOpacity={0.6}
+          >
+            <View style={[cardStyles.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+              <View style={cardStyles.left}>
+                <Ionicons name="download-outline" size={20} color={colors.textMuted} style={{ width: 28 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[cardStyles.title, { color: colors.text }]}>Export Data</Text>
+                </View>
+              </View>
+              {exporting ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+              )}
+            </View>
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={async () => {
               await getStorageSizes();
