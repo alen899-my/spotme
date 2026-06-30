@@ -108,6 +108,28 @@ export interface LibraryEntity {
 
 export type EntityType = "categories" | "body_parts" | "equipment" | "targets" | "muscle_groups" | "secondary_muscles"
 
+export type ReplacerStatus = "pending" | "uploading" | "frames_ready" | "generating_gif" | "replaced" | "failed"
+
+export interface ExerciseReplacerState {
+  exerciseId: string
+  status: ReplacerStatus
+  referenceImageUrl?: string
+  frame1Url?: string
+  frame2Url?: string
+  frame3Url?: string
+  frameProgress: [number, number, number]
+  referenceProgress: number
+  generatingGif?: boolean
+}
+
+export interface GifSettings {
+  frameDelay: number
+  loopCount: number
+  quality: number
+  width: number
+  height: number
+}
+
 export interface EntityConfig {
   type: EntityType
   label: string

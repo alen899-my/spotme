@@ -18,6 +18,7 @@ import {
   GitBranch,
   ListTree,
   Image as ImageIcon,
+  RefreshCw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -31,6 +32,7 @@ const navItems = [
   { href: "/dashboard/active-users", label: "Active Users", icon: Users },
   { href: "/dashboard/images", label: "Image Vault", icon: ImageIcon },
   { href: "/dashboard/workout-splits", label: "Workout Splits", icon: Activity },
+  { href: "/dashboard/file-replacer", label: "File Replacer", icon: RefreshCw },
 ]
 
 const libraryItems = [

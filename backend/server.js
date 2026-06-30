@@ -19,11 +19,12 @@ const physiqueRoutes = require('./routes/physique');
 const adminRoutes = require('./routes/admin');
 const imagesRoutes = require('./routes/images');
 const feedbackRoutes = require('./routes/feedback');
+const fileReplacerRoutes = require('./routes/file-replacer');
 
 const app = express();
 
 const allowedOrigins = [
-  'https://spotme-gym.vercel.app',   // expo web frontend
+  'https://spotme-gym.vercel.app',   // expo web
   'https://spotme-kdjd.vercel.app',  // admin panel
 ];
 if (!isProduction) {
@@ -71,6 +72,7 @@ app.use('/api/admin', adminRoutes);
 const authenticateAdmin = require('./middleware/adminAuth');
 app.use('/api/images', authenticateAdmin, imagesRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/admin/file-replacer', fileReplacerRoutes);
 
 // Global error-handling middleware
 app.use((err, req, res, _next) => {
