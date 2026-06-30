@@ -3,7 +3,7 @@ const { pool } = require('../db');
 const authenticateAdmin = require('../middleware/adminAuth');
 const upload = require('../uploadConfig');
 const { s3 } = require('../uploadConfig');
-const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const sharp = require('sharp');
 const NeuQuant = require('gif.js/src/NeuQuant');
 const omggif = require('omggif');
@@ -236,6 +236,16 @@ router.post('/exercises/:id/generate-gif', async (req, res) => {
       "UPDATE exercise_replacer SET status = 'replaced', updated_at = CURRENT_TIMESTAMP WHERE exercise_id = $1",
       [id]
     );
+
+    // Delete frame 2 and 3 from R2 (only need thumbnail + GIF)
+    const bucket = process.env.CLOUDFLARE_R2_BUCKET;
+    const r2Prefix = process.env.CLOUDFLARE_R2_PUBLIC_URL + '/';
+    for (let i = 1; i < frameUrls.length; i++) {
+      const key = frameUrls[i].replace(r2Prefix, '');
+      if (key) {
+        s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
+      }
+    }
 
     res.json({ success: true, gifUrl, thumbnailUrl });
   } catch (error) {
