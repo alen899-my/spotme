@@ -22,6 +22,8 @@ async function ensureTables() {
       frame_2_url VARCHAR(500),
       frame_3_url VARCHAR(500),
       status VARCHAR(20) DEFAULT 'pending',
+      mycopyv1_gif_url VARCHAR(500),
+      mycopyv1_image_url VARCHAR(500),
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -41,6 +43,13 @@ async function ensureTables() {
     INSERT INTO gif_settings (id) VALUES (1)
     ON CONFLICT (id) DO NOTHING
   `);
+
+  // Migrate: add mycopyv1 columns if missing
+  for (const col of ['mycopyv1_gif_url', 'mycopyv1_image_url']) {
+    try {
+      await pool.query(`ALTER TABLE exercise_replacer ADD COLUMN ${col} VARCHAR(500)`);
+    } catch (_) {}
+  }
 }
 
 router.use(authenticateAdmin);
@@ -227,10 +236,23 @@ router.post('/exercises/:id/generate-gif', async (req, res) => {
     const gifUrl = await uploadBufferToR2(gifBuffer, `${id}.gif`, 'image/gif');
     const thumbnailUrl = frameUrls[0];
 
+    // Save old gif/image to mycopyv1 before overwriting
+    const old = await pool.query(
+      'SELECT gif_url, image_url FROM exercises WHERE id = $1', [id]
+    );
+    const oldGif = old.rows[0]?.gif_url || null;
+    const oldImg = old.rows[0]?.image_url || null;
+
     await pool.query(
       'UPDATE exercises SET gif_url = $1, image_url = $2 WHERE id = $3',
       [gifUrl, thumbnailUrl, id]
     );
+
+    await pool.query(`
+      UPDATE exercise_replacer SET
+        mycopyv1_gif_url = $1, mycopyv1_image_url = $2
+      WHERE exercise_id = $3
+    `, [oldGif, oldImg, id]);
 
     await pool.query(
       "UPDATE exercise_replacer SET status = 'replaced', updated_at = CURRENT_TIMESTAMP WHERE exercise_id = $1",
@@ -303,7 +325,7 @@ router.get('/status', async (req, res) => {
 
     const result = await pool.query(
       `SELECT exercise_id, status, frame_1_url, frame_2_url, frame_3_url,
-              reference_image_url, updated_at
+              reference_image_url, mycopyv1_gif_url, mycopyv1_image_url, updated_at
        FROM exercise_replacer
        WHERE exercise_id = ANY($1::varchar[])`,
       [ids]

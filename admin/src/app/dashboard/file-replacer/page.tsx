@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
-import { Settings, Check, Loader2, AlertCircle, Upload } from "lucide-react"
+import { Settings, Check, Loader2, AlertCircle, Upload, Clock, History } from "lucide-react"
 import { DataTable } from "@/components/data-table"
 import { ExerciseFilters } from "@/components/exercise-filters"
 import { GifEngine } from "@/components/gif-engine"
@@ -54,9 +54,11 @@ export default function FileReplacerPage() {
   const [viewTarget, setViewTarget] = useState<Exercise | null>(null)
 
   const [rowStates, setRowStates] = useState<Record<string, ReplacerRowState>>({})
+  const [replacerStatuses, setReplacerStatuses] = useState<Record<string, { status: string }>>({})
   const triggeredRef = useRef<Set<string>>(new Set())
   const [gifEngineOpen, setGifEngineOpen] = useState(false)
   const [uploadModalExercise, setUploadModalExercise] = useState<Exercise | null>(null)
+  const [tab, setTab] = useState<"pending" | "history">("pending")
 
   const getRow = (id: string) => rowStates[id] ?? createEmptyRowState()
   const updateRow = (id: string, upd: Partial<ReplacerRowState>) => {
@@ -90,6 +92,19 @@ export default function FileReplacerPage() {
   useEffect(() => {
     fetchExercises()
   }, [fetchExercises])
+
+  useEffect(() => {
+    if (exercises.length === 0) return
+    const ids = exercises.map(e => e.id).join(',')
+    api.get(`/admin/file-replacer/status?ids=${ids}`).then((res) => {
+      setReplacerStatuses(res.data)
+    }).catch(() => {})
+  }, [exercises])
+
+  const filteredExercises = exercises.filter((e) => {
+    const s = replacerStatuses[e.id]?.status ?? "pending"
+    return tab === "pending" ? s !== "replaced" : s === "replaced"
+  })
 
   const handlePipelineComplete = (exerciseId: string, result: { framePreviews: string[] }) => {
     triggeredRef.current.add(exerciseId)
@@ -188,6 +203,30 @@ export default function FileReplacerPage() {
         <ExerciseFilters filters={filters} onChange={handleFilterChange} />
       </div>
 
+      {/* Tabs */}
+      <div className="mb-4 flex gap-1 rounded-lg border bg-secondary/30 p-1">
+        <button
+          onClick={() => { setTab("pending"); setPage(1) }}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+            tab === "pending" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Clock className="h-3.5 w-3.5" />
+          Pending
+        </button>
+        <button
+          onClick={() => { setTab("history"); setPage(1) }}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+            tab === "history" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <History className="h-3.5 w-3.5" />
+          My Copy V1
+        </button>
+      </div>
+
       <DataTable
         columns={[
           { key: "id", label: "ID", sortable: true, render: (e) => (
@@ -213,11 +252,14 @@ export default function FileReplacerPage() {
           { key: "category", label: "Category", sortable: true, render: (e) => (
             <span className="text-sm capitalize">{e.category}</span>
           ), hideOnMobile: true },
-          { key: "gif_url", label: "GIF", render: (e) => (
-            e.gif_url
-              ? <img src={e.gif_url} alt="" className="h-8 w-8 rounded object-contain" />
+          { key: "gif_url", label: tab === "history" ? "GIF (V1)" : "GIF", render: (e) => {
+            const url = tab === "history"
+              ? (replacerStatuses[e.id] as any)?.mycopyv1_gif_url || e.gif_url
+              : e.gif_url
+            return url
+              ? <img src={url} alt="" className="h-8 w-8 rounded object-contain" />
               : <span className="text-[10px] text-muted-foreground">—</span>
-          ), className: "w-14" },
+          }, className: "w-14" },
           { key: "preview", label: "New", render: (ex) => {
             const row = getRow(ex.id)
             if (row.status === "replaced" && row.frames.some((f) => f.preview)) {
@@ -268,9 +310,13 @@ export default function FileReplacerPage() {
             )
           }, className: "w-16" },
         ]}
-        data={exercises}
+        data={filteredExercises}
         loading={loading}
-        emptyMessage={search ? "No exercises match your search." : "No exercises found."}
+        emptyMessage={
+          tab === "history"
+            ? "No completed replacements yet."
+            : (search ? "No exercises match your search." : "No exercises found.")
+        }
         onView={(e) => setViewTarget(e)}
         searchValue={search}
         onSearchChange={(val) => { setSearch(val); setPage(1) }}
