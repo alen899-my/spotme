@@ -21,6 +21,7 @@ const exerciseSchema = z.object({
   muscle_group: z.string().optional(),
   secondary_muscles: z.string().optional(),
   instructions_en: z.string().optional(),
+  gif_prompt: z.string().optional(),
 })
 
 type ExerciseFormData = z.infer<typeof exerciseSchema>
@@ -53,7 +54,7 @@ export default function EditExercisePage() {
 
   const [form, setForm] = useState<ExerciseFormData>({
     name: "", category: "", body_part: "", equipment: "",
-    target: "", muscle_group: "", secondary_muscles: "", instructions_en: "",
+    target: "", muscle_group: "", secondary_muscles: "", instructions_en: "", gif_prompt: "",
   })
   const [options, setOptions] = useState<FilterOptions>({
     categories: [], body_parts: [], equipment: [], targets: [], muscle_groups: [],
@@ -96,6 +97,7 @@ export default function EditExercisePage() {
           ? ex.secondary_muscles.join(", ")
           : (ex.secondary_muscles ?? ""),
         instructions_en: ex.instructions_en ?? "",
+        gif_prompt: ex.gif_prompt ?? "",
       })
       setExistingImage(ex.image_url ?? null)
       setExistingGif(ex.gif_url ?? null)
@@ -234,6 +236,18 @@ export default function EditExercisePage() {
             onChange={(e) => update("instructions_en", e.target.value)}
             placeholder="Step-by-step instructions..."
             rows={5}
+            className="mt-1 w-full rounded-md border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="gif_prompt">GIF Prompt</Label>
+          <textarea
+            id="gif_prompt"
+            value={form.gif_prompt}
+            onChange={(e) => update("gif_prompt", e.target.value)}
+            placeholder="Custom prompt for AI GIF generation..."
+            rows={4}
             className="mt-1 w-full rounded-md border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>

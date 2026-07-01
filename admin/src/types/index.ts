@@ -90,6 +90,7 @@ export interface Exercise {
   image_url: string
   gif_url: string
   instructions_en: string
+  gif_prompt?: string
   avg_rating: number
   rating_count: number
   category_image_url?: string
@@ -114,10 +115,8 @@ export interface ExerciseReplacerState {
   exerciseId: string
   status: ReplacerStatus
   referenceImageUrl?: string
-  frame1Url?: string
-  frame2Url?: string
-  frame3Url?: string
-  frameProgress: [number, number, number]
+  frameUrls?: string[]
+  frameProgress: number[]
   referenceProgress: number
   generatingGif?: boolean
 }

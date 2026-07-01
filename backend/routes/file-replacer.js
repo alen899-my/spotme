@@ -21,6 +21,7 @@ async function ensureTables() {
       frame_1_url VARCHAR(500),
       frame_2_url VARCHAR(500),
       frame_3_url VARCHAR(500),
+      frames JSONB DEFAULT '[]'::jsonb,
       status VARCHAR(20) DEFAULT 'pending',
       mycopyv1_gif_url VARCHAR(500),
       mycopyv1_image_url VARCHAR(500),
@@ -43,6 +44,11 @@ async function ensureTables() {
     INSERT INTO gif_settings (id) VALUES (1)
     ON CONFLICT (id) DO NOTHING
   `);
+
+  // Migrate: add frames column if missing
+  try {
+    await pool.query(`ALTER TABLE exercise_replacer ADD COLUMN frames JSONB DEFAULT '[]'::jsonb`);
+  } catch (_) {}
 
   // Migrate: add mycopyv1 columns if missing
   for (const col of ['mycopyv1_gif_url', 'mycopyv1_image_url']) {
@@ -82,18 +88,14 @@ async function getFrameBufferFromUrl(url) {
   return Buffer.concat(chunks);
 }
 
+// Upload a frame (dynamic index, no longer limited to 3)
 router.post('/exercises/:id/upload-frame', memoryUpload.single('frame'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { frame } = req.query;
+    const reset = req.query.reset === 'true';
 
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
-    }
-
-    const column = `frame_${frame}_url`;
-    if (!['frame_1_url', 'frame_2_url', 'frame_3_url'].includes(column)) {
-      return res.status(400).json({ message: 'Invalid frame number. Use frame=1,2,3' });
     }
 
     const processed = await sharp(req.file.buffer)
@@ -101,23 +103,124 @@ router.post('/exercises/:id/upload-frame', memoryUpload.single('frame'), async (
       .webp({ quality: 80 })
       .toBuffer();
 
-    const url = await uploadBufferToR2(processed, `frame_${frame}.webp`, 'image/webp');
+    const url = await uploadBufferToR2(processed, `frame_${Date.now()}.webp`, 'image/webp');
 
+    // When reset=true, replace frames array entirely (clears old deleted URLs).
+    // Otherwise append to existing frames.
+    const framesExpr = reset ? '$2::jsonb' : 'exercise_replacer.frames || $2::jsonb';
     await pool.query(`
-      INSERT INTO exercise_replacer (exercise_id, ${column}, status)
-      VALUES ($1, $2, 'uploading')
+      INSERT INTO exercise_replacer (exercise_id, frames, status)
+      VALUES ($1, $2::jsonb, 'uploading')
       ON CONFLICT (exercise_id)
-      DO UPDATE SET ${column} = $2, status = CASE
-        WHEN exercise_replacer.frame_1_url IS NOT NULL
-         AND exercise_replacer.frame_2_url IS NOT NULL
-         AND exercise_replacer.frame_3_url IS NOT NULL THEN 'frames_ready'
-        ELSE 'uploading'
-      END, updated_at = CURRENT_TIMESTAMP
-    `, [id, url]);
+      DO UPDATE SET
+        frames = ${framesExpr},
+        status = 'uploading',
+        updated_at = CURRENT_TIMESTAMP
+    `, [id, JSON.stringify([url])]);
 
-    res.json({ success: true, url, frame: parseInt(frame) });
+    // Also keep legacy columns for backward compat (first 3 frames)
+    const result = await pool.query(
+      'SELECT frames FROM exercise_replacer WHERE exercise_id = $1', [id]
+    );
+    const frames = result.rows[0]?.frames || [];
+
+    // Update legacy frame_1_url, frame_2_url, frame_3_url for first 3 frames
+    for (let i = 0; i < Math.min(3, frames.length); i++) {
+      const col = `frame_${i + 1}_url`;
+      await pool.query(
+        `UPDATE exercise_replacer SET ${col} = $1 WHERE exercise_id = $2`,
+        [frames[i], id]
+      );
+    }
+
+    res.json({
+      success: true,
+      url,
+      frameIndex: frames.length - 1,
+      totalFrames: frames.length,
+    });
   } catch (error) {
     console.error('Upload frame error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Delete a specific frame by index
+router.delete('/exercises/:id/frames/:index', async (req, res) => {
+  try {
+    const { id, index } = req.params;
+    const idx = parseInt(index);
+
+    const result = await pool.query(
+      'SELECT frames FROM exercise_replacer WHERE exercise_id = $1', [id]
+    );
+    const frames = result.rows[0]?.frames || [];
+    if (idx < 0 || idx >= frames.length) {
+      return res.status(400).json({ message: 'Invalid frame index' });
+    }
+
+    const removedUrl = frames[idx];
+
+    // Remove from R2
+    const bucket = process.env.CLOUDFLARE_R2_BUCKET;
+    const r2Prefix = process.env.CLOUDFLARE_R2_PUBLIC_URL + '/';
+    const key = removedUrl.replace(r2Prefix, '');
+    if (key) {
+      s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
+    }
+
+    // Remove from JSONB array
+    frames.splice(idx, 1);
+    await pool.query(
+      'UPDATE exercise_replacer SET frames = $1::jsonb, updated_at = CURRENT_TIMESTAMP WHERE exercise_id = $2',
+      [JSON.stringify(frames), id]
+    );
+
+    // Update legacy columns
+    for (let i = 0; i < 3; i++) {
+      const col = `frame_${i + 1}_url`;
+      const val = i < frames.length ? frames[i] : null;
+      await pool.query(
+        `UPDATE exercise_replacer SET ${col} = $1 WHERE exercise_id = $2`,
+        [val, id]
+      );
+    }
+
+    res.json({ success: true, frames });
+  } catch (error) {
+    console.error('Delete frame error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Reorder frames
+router.put('/exercises/:id/frames/reorder', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { frameUrls } = req.body;
+
+    if (!Array.isArray(frameUrls)) {
+      return res.status(400).json({ message: 'frameUrls must be an array' });
+    }
+
+    await pool.query(
+      'UPDATE exercise_replacer SET frames = $1::jsonb, updated_at = CURRENT_TIMESTAMP WHERE exercise_id = $2',
+      [JSON.stringify(frameUrls), id]
+    );
+
+    // Update legacy columns
+    for (let i = 0; i < 3; i++) {
+      const col = `frame_${i + 1}_url`;
+      const val = i < frameUrls.length ? frameUrls[i] : null;
+      await pool.query(
+        `UPDATE exercise_replacer SET ${col} = $1 WHERE exercise_id = $2`,
+        [val, id]
+      );
+    }
+
+    res.json({ success: true, frames: frameUrls });
+  } catch (error) {
+    console.error('Reorder frames error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -160,24 +263,29 @@ router.post('/exercises/:id/generate-gif', async (req, res) => {
     const { frame_delay, quality, width, height, loop_count } = req.body;
 
     const result = await pool.query(
-      'SELECT frame_1_url, frame_2_url, frame_3_url FROM exercise_replacer WHERE exercise_id = $1', [id]
+      'SELECT frames, frame_1_url FROM exercise_replacer WHERE exercise_id = $1', [id]
     );
 
-    if (!result.rows[0]?.frame_1_url) {
+    // Read frames from JSONB, fall back to legacy columns for old data
+    let frameUrls = result.rows[0]?.frames || [];
+    if (!frameUrls.length) {
+      frameUrls = [result.rows[0]?.frame_1_url].filter(Boolean);
+    }
+
+    if (!frameUrls.length) {
       return res.status(400).json({ message: 'No frames uploaded yet' });
     }
 
-    const frameUrls = [result.rows[0].frame_1_url, result.rows[0].frame_2_url, result.rows[0].frame_3_url].filter(Boolean);
-
-    const gifWidth = width || 300;
-    const gifHeight = height || 300;
-    const pixelCount = gifWidth * gifHeight;
-
-    const gifDelay = Math.round((frame_delay || 200) / 10); // omggif uses centiseconds
+    const gifDelay = Math.round((frame_delay || 200) / 10);
     const gifLoop = loop_count === 0 ? 0 : (loop_count || 0);
 
-    // Build palette from first frame using NeuQuant
+    // Read the first frame and detect actual dimensions
     const firstBuf = await getFrameBufferFromUrl(frameUrls[0]);
+    const firstMeta = await sharp(firstBuf).metadata();
+    const gifWidth = width > 0 ? width : (firstMeta.width || 300);
+    const gifHeight = height > 0 ? height : (firstMeta.height || 300);
+    const pixelCount = gifWidth * gifHeight * 4; // RGBA
+
     const firstRgba = await sharp(firstBuf)
       .resize(gifWidth, gifHeight)
       .ensureAlpha()
@@ -188,7 +296,6 @@ router.post('/exercises/:id/generate-gif', async (req, res) => {
     const nq = new NeuQuant(firstRgb, quality || 20);
     nq.buildColormap();
 
-    // Convert NeuQuant palette ([r,g,b,...]) to omggif format ([rgb24,...])
     const nqPalette = nq.getColormap();
     const omggifPalette = [];
     for (let i = 0; i < 256; i++) {
@@ -198,14 +305,13 @@ router.post('/exercises/:id/generate-gif', async (req, res) => {
     }
 
     function indexPixels(rgba) {
-      const indexed = new Uint8Array(pixelCount);
-      for (let i = 0; i < pixelCount; i++) {
+      const indexed = new Uint8Array(pixelCount / 4);
+      for (let i = 0; i < pixelCount / 4; i++) {
         indexed[i] = nq.lookupRGB(rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2]);
       }
       return indexed;
     }
 
-    // Estimate buffer size and write GIF
     const estSize = (gifWidth * gifHeight * 2 + 1024) * frameUrls.length;
     const gifBuf = Buffer.alloc(estSize);
     const writer = new omggif.GifWriter(gifBuf, gifWidth, gifHeight, {
@@ -259,15 +365,22 @@ router.post('/exercises/:id/generate-gif', async (req, res) => {
       [id]
     );
 
-    // Delete frame 2 and 3 from R2 (only need thumbnail + GIF)
+    // Delete all frame images from R2 (only need thumbnail + GIF)
     const bucket = process.env.CLOUDFLARE_R2_BUCKET;
     const r2Prefix = process.env.CLOUDFLARE_R2_PUBLIC_URL + '/';
-    for (let i = 1; i < frameUrls.length; i++) {
-      const key = frameUrls[i].replace(r2Prefix, '');
+    for (const url of frameUrls) {
+      if (url === thumbnailUrl) continue
+      const key = url.replace(r2Prefix, '');
       if (key) {
         s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
       }
     }
+
+    // Clear frames column so old URLs don't accumulate (prevents NoSuchKey on retry)
+    await pool.query(
+      "UPDATE exercise_replacer SET frames = '[]'::jsonb, frame_1_url = NULL, frame_2_url = NULL, frame_3_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE exercise_id = $1",
+      [id]
+    );
 
     res.json({ success: true, gifUrl, thumbnailUrl });
   } catch (error) {
@@ -324,7 +437,7 @@ router.get('/status', async (req, res) => {
     if (ids.length === 0) return res.json({});
 
     const result = await pool.query(
-      `SELECT exercise_id, status, frame_1_url, frame_2_url, frame_3_url,
+      `SELECT exercise_id, status, frames, frame_1_url, frame_2_url, frame_3_url,
               reference_image_url, mycopyv1_gif_url, mycopyv1_image_url, updated_at
        FROM exercise_replacer
        WHERE exercise_id = ANY($1::varchar[])`,

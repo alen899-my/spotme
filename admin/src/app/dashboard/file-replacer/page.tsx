@@ -33,11 +33,7 @@ function createEmptyRowState(): ReplacerRowState {
   return {
     status: "pending",
     referenceProgress: 0,
-    frames: [
-      { progress: 0 },
-      { progress: 0 },
-      { progress: 0 },
-    ],
+    frames: [],
   }
 }
 

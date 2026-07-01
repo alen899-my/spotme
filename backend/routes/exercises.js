@@ -17,6 +17,13 @@ const { pool } = require('../db');
 // ─── Middleware: simple JWT auth (re-used from profile routes) ────────────────
 const jwt = require('jsonwebtoken');
 
+// ─── Migration: ensure gif_prompt column exists ──────────────────────────────
+(async () => {
+  try {
+    await pool.query(`ALTER TABLE exercises ADD COLUMN IF NOT EXISTS gif_prompt TEXT`);
+  } catch (_) {}
+})();
+
 // ─── Helper: look up entity image URLs ────────────────────────────────────────
 async function getEntityImageUrls({ category, body_part, equipment, target, muscle_group }) {
   const [cat, bp, eq, tgt, mg] = await Promise.all([
@@ -220,7 +227,7 @@ router.post('/', authMiddleware, async (req, res) => {
       instructions_en, instructions_tr,
       instruction_steps_en, instruction_steps_tr,
       muscle_group, secondary_muscles, target,
-      image_url, gif_url,
+      image_url, gif_url, gif_prompt,
     } = req.body;
 
     if (!id || !name) {
@@ -237,19 +244,19 @@ router.post('/', authMiddleware, async (req, res) => {
          instructions_en, instructions_tr,
          instruction_steps_en, instruction_steps_tr,
          muscle_group, secondary_muscles, target,
-         image_url, gif_url,
+         image_url, gif_url, gif_prompt,
          category_image_url, body_part_image_url,
          equipment_image_url, target_image_url,
          muscle_group_image_url)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
-               $15,$16,$17,$18,$19)
+               $15,$16,$17,$18,$19,$20)
        RETURNING *`,
       [
         id, name, category || null, body_part || null, equipment || null,
         instructions_en || null, instructions_tr || null,
         instruction_steps_en || [], instruction_steps_tr || [],
         muscle_group || null, secondary_muscles || [], target || null,
-        image_url || null, gif_url || null,
+        image_url || null, gif_url || null, gif_prompt || null,
         entityImages.category_image_url,
         entityImages.body_part_image_url,
         entityImages.equipment_image_url,
@@ -277,7 +284,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       instructions_en, instructions_tr,
       instruction_steps_en, instruction_steps_tr,
       muscle_group, secondary_muscles, target,
-      image_url, gif_url,
+      image_url, gif_url, gif_prompt,
     } = req.body;
 
     const entityImages = await getEntityImageUrls({
@@ -299,12 +306,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
         target                = COALESCE($11, target),
         image_url             = COALESCE($12, image_url),
         gif_url               = COALESCE($13, gif_url),
-        category_image_url    = COALESCE($14, category_image_url),
-        body_part_image_url   = COALESCE($15, body_part_image_url),
-        equipment_image_url   = COALESCE($16, equipment_image_url),
-        target_image_url      = COALESCE($17, target_image_url),
-        muscle_group_image_url= COALESCE($18, muscle_group_image_url)
-       WHERE id = $19
+        gif_prompt            = COALESCE($14, gif_prompt),
+        category_image_url    = COALESCE($15, category_image_url),
+        body_part_image_url   = COALESCE($16, body_part_image_url),
+        equipment_image_url   = COALESCE($17, equipment_image_url),
+        target_image_url      = COALESCE($18, target_image_url),
+        muscle_group_image_url= COALESCE($19, muscle_group_image_url)
+       WHERE id = $20
        RETURNING *`,
       [
         name        || null,
@@ -320,6 +328,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
         target      || null,
         image_url   || null,
         gif_url     || null,
+        gif_prompt  || null,
         entityImages.category_image_url,
         entityImages.body_part_image_url,
         entityImages.equipment_image_url,

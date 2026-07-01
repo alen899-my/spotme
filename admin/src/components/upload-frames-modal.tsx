@@ -3,13 +3,33 @@
 import { useState, useRef, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Upload, X, Check, Loader2, FileWarning } from "lucide-react"
+import { Upload, X, Check, Loader2, FileWarning, GripVertical } from "lucide-react"
 import { createFilePreview, revokePreview } from "@/lib/compress-image"
 import { cn } from "@/lib/utils"
 import api from "@/lib/api"
 import type { Exercise } from "@/types"
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { arrayMove } from "@dnd-kit/sortable"
 
 type PipelineStep = "idle" | "uploading" | "generating_gif" | "done" | "failed"
+
+interface FrameEntry {
+  file: File
+  preview: string
+}
 
 interface UploadFramesModalProps {
   open: boolean
@@ -18,21 +38,72 @@ interface UploadFramesModalProps {
   onPipelineComplete: (exerciseId: string, result: { framePreviews: string[] }) => void
 }
 
+function SortableFrame({
+  entry,
+  label,
+  onRemove,
+  disabled,
+}: {
+  entry: FrameEntry
+  label: string
+  onRemove: () => void
+  disabled: boolean
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: entry.preview,
+    disabled,
+  })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className={cn("relative touch-none", disabled ? "" : "cursor-grab")} {...attributes} {...listeners}>
+      <div className="relative">
+        <img
+          src={entry.preview}
+          alt={label}
+          className="h-20 w-20 rounded-lg object-cover ring-1 ring-green-500/50 sm:h-24 sm:w-24"
+        />
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          disabled={disabled}
+          className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground disabled:opacity-50"
+        >
+          <X className="h-3 w-3" />
+        </button>
+        <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded bg-green-600 px-1.5 text-[9px] text-white">
+          {label}
+        </span>
+      </div>
+      {!disabled && (
+        <div className="absolute left-0.5 top-1/2 -translate-y-1/2">
+          <GripVertical className="h-3 w-3 text-muted-foreground/50" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function UploadFramesModal({ open, onClose, exercise, onPipelineComplete }: UploadFramesModalProps) {
   const framesInputRef = useRef<HTMLInputElement>(null)
 
-  const [frameFiles, setFrameFiles] = useState<(File | null)[]>([null, null, null])
-  const [framePreviews, setFramePreviews] = useState<(string | null)[]>([null, null, null])
+  const [frames, setFrames] = useState<FrameEntry[]>([])
 
   const [step, setStep] = useState<PipelineStep>("idle")
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState("")
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+
   useEffect(() => {
     if (!open) {
-      setFrameFiles([null, null, null])
-      framePreviews.forEach((p) => { if (p) revokePreview(p) })
-      setFramePreviews([null, null, null])
+      frames.forEach((f) => revokePreview(f.preview))
+      setFrames([])
       setStep("idle")
       setProgress(0)
       setError("")
@@ -41,35 +112,35 @@ export function UploadFramesModal({ open, onClose, exercise, onPipelineComplete 
 
   const handleFramesSelect = (files: FileList | null) => {
     if (!files) return
-    const newFiles: (File | null)[] = [null, null, null]
-    const newPreviews: (string | null)[] = [null, null, null]
-
-    for (let i = 0; i < Math.min(3, files.length); i++) {
+    const newFrames: FrameEntry[] = [...frames]
+    for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      newFiles[i] = file
-      newPreviews[i] = createFilePreview(file)
+      newFrames.push({ file, preview: createFilePreview(file) })
     }
-
-    framePreviews.forEach((p) => { if (p) revokePreview(p) })
-
-    setFrameFiles(newFiles)
-    setFramePreviews(newPreviews)
+    frames.forEach((f) => revokePreview(f.preview))
+    setFrames(newFrames)
   }
 
   const removeFrame = (idx: number) => {
-    if (framePreviews[idx]) revokePreview(framePreviews[idx]!)
-    const newFiles = [...frameFiles]
-    const newPreviews = [...framePreviews]
-    newFiles[idx] = null
-    newPreviews[idx] = null
-    setFrameFiles(newFiles)
-    setFramePreviews(newPreviews)
+    revokePreview(frames[idx].preview)
+    setFrames((prev) => prev.filter((_, i) => i !== idx))
   }
 
-  const canSave = frameFiles.some((f) => f !== null)
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = frames.findIndex((f) => f.preview === active.id)
+    const newIndex = frames.findIndex((f) => f.preview === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) return
+    setFrames(arrayMove(frames, oldIndex, newIndex))
+  }
+
+  const canSave = frames.length > 0
 
   const handleSave = async () => {
-    if (!canSave) return
+    if (!canSave || !exercise) return
     setStep("uploading")
     setProgress(1)
     setError("")
@@ -77,25 +148,24 @@ export function UploadFramesModal({ open, onClose, exercise, onPipelineComplete 
     try {
       setStep("uploading")
       const uploadedUrls: string[] = []
-      for (let i = 0; i < 3; i++) {
-        if (frameFiles[i]) {
-          const fd = new FormData()
-          fd.append("frame", frameFiles[i]!)
-          const res = await api.post(`/admin/file-replacer/exercises/${exercise.id}/upload-frame?frame=${i + 1}`, fd, {
-            headers: { "Content-Type": "multipart/form-data" },
-            onUploadProgress: (e) => {
-              if (e.total) {
-                setProgress(5 + i * 20 + Math.round((e.loaded / e.total) * 18))
-              }
-            },
-          })
-          uploadedUrls.push(res.data.url)
-        }
+      for (let i = 0; i < frames.length; i++) {
+        const fd = new FormData()
+        fd.append("frame", frames[i].file)
+        const resetParam = i === 0 ? "?reset=true" : ""
+        const res = await api.post(`/admin/file-replacer/exercises/${exercise.id}/upload-frame${resetParam}`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+          onUploadProgress: (e) => {
+            if (e.total) {
+              setProgress(5 + (i / frames.length) * 60 + Math.round((e.loaded / e.total) * (60 / frames.length)))
+            }
+          },
+        })
+        uploadedUrls.push(res.data.url)
       }
-      setProgress(65)
+      setProgress(68)
 
       setStep("generating_gif")
-      setProgress(68)
+      setProgress(70)
 
       const settingsRes = await api.get("/admin/file-replacer/gif-settings")
       const s = settingsRes.data
@@ -104,8 +174,8 @@ export function UploadFramesModal({ open, onClose, exercise, onPipelineComplete 
         frame_delay: s?.frame_delay ?? 200,
         quality: s?.quality ?? 20,
         loop_count: s?.loop_count ?? 0,
-        width: s?.width ?? 300,
-        height: s?.height ?? 300,
+        width: 0,
+        height: 0,
       })
 
       setProgress(100)
@@ -129,48 +199,40 @@ export function UploadFramesModal({ open, onClose, exercise, onPipelineComplete 
 
   return (
     <Dialog open={open} onClose={isRunning ? () => {} : onClose}>
-      <DialogContent onClose={isRunning ? undefined : onClose} className="sm:max-w-lg">
+      <DialogContent onClose={isRunning ? undefined : onClose} className="w-[calc(100%-1rem)] sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Upload 3 Frames — {exercise.name}</DialogTitle>
+          <DialogTitle>Upload Frames — {exercise.name}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5">
           <div>
             <p className="mb-2 text-xs font-semibold text-muted-foreground">
-              Select 3 frame images (starting position, mid lift, peak contraction)
+              Select frame images (drag to reorder)
             </p>
-            <div className="flex items-center gap-3">
-              {[0, 1, 2].map((idx) => (
-                <div key={idx} className="relative">
-                  {framePreviews[idx] ? (
-                    <div className="relative">
-                      <img
-                        src={framePreviews[idx]!}
-                        alt={`Frame ${idx + 1}`}
-                        className="h-24 w-24 rounded-lg object-cover ring-1 ring-green-500/50"
-                      />
-                      <button
-                        onClick={() => removeFrame(idx)}
+
+            {frames.length > 0 && (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={frames.map((f) => f.preview)} strategy={rectSortingStrategy}>
+                  <div className="flex flex-wrap gap-3">
+                    {frames.map((entry, idx) => (
+                      <SortableFrame
+                        key={entry.preview}
+                        entry={entry}
+                        label={`F${idx + 1}`}
+                        onRemove={() => removeFrame(idx)}
                         disabled={isRunning}
-                        className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                      <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded bg-green-600 px-1.5 text-[9px] text-white">
-                        F{idx + 1}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed bg-secondary text-muted-foreground">
-                      <span className="text-lg font-semibold">{idx + 1}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-              <label className="flex h-24 w-24 cursor-pointer items-center justify-center rounded-lg border border-dashed bg-secondary text-muted-foreground hover:border-ring">
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+
+            <div className={cn("flex flex-wrap gap-3", frames.length > 0 && "mt-3")}>
+              <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed bg-secondary text-muted-foreground hover:border-ring sm:h-24 sm:w-24">
                 <div className="flex flex-col items-center gap-1">
                   <Upload className="h-5 w-5" />
-                  <span className="text-[10px] text-center leading-tight">Select<br/>3 Files</span>
+                  <span className="text-[10px] text-center leading-tight">Add<br/>Images</span>
                 </div>
                 <input
                   ref={framesInputRef}
@@ -182,9 +244,10 @@ export function UploadFramesModal({ open, onClose, exercise, onPipelineComplete 
                 />
               </label>
             </div>
-            {frameFiles.some((f) => f !== null) && (
+
+            {frames.length > 0 && (
               <p className="mt-1.5 text-[10px] text-muted-foreground">
-                {frameFiles.filter((f) => f !== null).length} of 3 selected
+                {frames.length} frame{frames.length !== 1 ? "s" : ""} selected
               </p>
             )}
           </div>

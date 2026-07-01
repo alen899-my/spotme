@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { Upload, X, Check, Loader2, Image as ImageIcon } from "lucide-react"
+import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react"
 import { compressImage, createFilePreview, revokePreview } from "@/lib/compress-image"
 import { cn } from "@/lib/utils"
 
@@ -44,8 +44,6 @@ export function FrameUploader({ frameIndex, accept = "image/*", onUpload, classN
     if (inputRef.current) inputRef.current.value = ""
   }
 
-  const labels = ["Frame 1 (New Thumbnail)", "Frame 2", "Frame 3"]
-
   return (
     <div className={cn("relative", className)}>
       {state === "done" && preview ? (
@@ -78,7 +76,7 @@ export function FrameUploader({ frameIndex, accept = "image/*", onUpload, classN
       ) : (
         <label className="flex h-12 w-12 cursor-pointer items-center justify-center rounded bg-secondary text-muted-foreground hover:bg-secondary/80">
           <ImageIcon className="h-4 w-4" />
-          <span className="sr-only">{labels[frameIndex]}</span>
+          <span className="sr-only">Frame {frameIndex + 1}</span>
           <input
             ref={inputRef}
             type="file"

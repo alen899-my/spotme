@@ -4,10 +4,25 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Settings, Play, Pause, Save, Upload, X } from "lucide-react"
+import { Settings, Play, Pause, Save, Upload, X, GripVertical } from "lucide-react"
 import { createFilePreview, revokePreview } from "@/lib/compress-image"
 import api from "@/lib/api"
 import type { GifSettings } from "@/types"
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { arrayMove } from "@dnd-kit/sortable"
 
 interface GifEngineProps {
   open: boolean
@@ -22,15 +37,62 @@ const DEFAULT_SETTINGS: GifSettings = {
   height: 300,
 }
 
+function SortableFrame({
+  id,
+  preview,
+  label,
+  onRemove,
+}: {
+  id: string
+  preview: string
+  label: string
+  onRemove: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative cursor-grab touch-none" {...attributes} {...listeners}>
+      <div className="relative">
+        <img
+          src={preview}
+          alt={label}
+          className="h-14 w-14 rounded-md object-cover ring-1 ring-green-500/50 sm:h-16 sm:w-16"
+        />
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
+        >
+          <X className="h-2.5 w-2.5" />
+        </button>
+        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded bg-green-600 px-1 text-[8px] text-white">
+          {label}
+        </span>
+      </div>
+      <div className="absolute left-0 top-1/2 -translate-y-1/2">
+        <GripVertical className="h-3 w-3 text-muted-foreground/50" />
+      </div>
+    </div>
+  )
+}
+
 export function GifEngine({ open, onClose }: GifEngineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [settings, setSettings] = useState<GifSettings>(DEFAULT_SETTINGS)
   const [playing, setPlaying] = useState(false)
 
-  const [framePreviews, setFramePreviews] = useState<(string | null)[]>([null, null, null])
+  const [framePreviews, setFramePreviews] = useState<string[]>([])
   const [loadedImages, setLoadedImages] = useState<HTMLImageElement[]>([])
 
   const animRef = useRef<number | undefined>(undefined)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
 
   useEffect(() => {
     if (!open) {
@@ -55,13 +117,12 @@ export function GifEngine({ open, onClose }: GifEngineProps) {
   }, [open])
 
   useEffect(() => {
-    const urls = framePreviews.filter((p): p is string => p !== null)
-    if (urls.length === 0) {
+    if (framePreviews.length === 0) {
       setLoadedImages([])
       setPlaying(false)
       return
     }
-    const images = urls.map((url) => {
+    const images = framePreviews.map((url) => {
       const img = new Image()
       img.crossOrigin = "anonymous"
       img.src = url
@@ -120,19 +181,29 @@ export function GifEngine({ open, onClose }: GifEngineProps) {
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return
-    const newPreviews: (string | null)[] = [null, null, null]
-    for (let i = 0; i < Math.min(3, files.length); i++) {
-      newPreviews[i] = createFilePreview(files[i])
+    const newPreviews: string[] = [...framePreviews]
+    for (let i = 0; i < files.length; i++) {
+      newPreviews.push(createFilePreview(files[i]))
     }
-    framePreviews.forEach((p) => { if (p) revokePreview(p) })
+    framePreviews.forEach((p) => revokePreview(p))
     setFramePreviews(newPreviews)
   }
 
   const removeFrame = (idx: number) => {
-    if (framePreviews[idx]) revokePreview(framePreviews[idx]!)
-    const newPreviews = [...framePreviews]
-    newPreviews[idx] = null
+    if (framePreviews[idx]) revokePreview(framePreviews[idx])
+    const newPreviews = framePreviews.filter((_, i) => i !== idx)
     setFramePreviews(newPreviews)
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = framePreviews.findIndex((p) => p === active.id)
+    const newIndex = framePreviews.findIndex((p) => p === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) return
+    setFramePreviews(arrayMove(framePreviews, oldIndex, newIndex))
   }
 
   const handleSaveSettings = async () => {
@@ -151,11 +222,11 @@ export function GifEngine({ open, onClose }: GifEngineProps) {
     setSettings((prev) => ({ ...prev, [key]: value }))
   }
 
-  const loadedCount = framePreviews.filter((p) => p !== null).length
+  const loadedCount = framePreviews.length
 
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogContent onClose={onClose} className="sm:max-w-3xl">
+      <DialogContent onClose={onClose} className="w-[calc(100%-1rem)] sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
@@ -163,8 +234,8 @@ export function GifEngine({ open, onClose }: GifEngineProps) {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-          <div className="space-y-3 lg:col-span-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-5 md:gap-6">
+          <div className="space-y-3 md:col-span-3">
             <canvas
               ref={canvasRef}
               className="w-full rounded-lg border bg-black"
@@ -185,33 +256,31 @@ export function GifEngine({ open, onClose }: GifEngineProps) {
               </Button>
               {loadedCount > 0 && (
                 <span className="text-[10px] text-muted-foreground">
-                  {loadedCount} of 3 frames
+                  {loadedCount} frame{loadedCount !== 1 ? "s" : ""}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              {[0, 1, 2].map((idx) => (
-                <div key={idx} className="relative">
-                  {framePreviews[idx] ? (
-                    <div className="relative">
-                      <img src={framePreviews[idx]!} alt={`F${idx + 1}`} className="h-14 w-14 rounded-md object-cover ring-1 ring-green-500/50" />
-                      <button
-                        onClick={() => removeFrame(idx)}
-                        className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </button>
-                      <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded bg-green-600 px-1 text-[8px] text-white">F{idx + 1}</span>
-                    </div>
-                  ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded-md border border-dashed bg-secondary text-muted-foreground">
-                      <span className="text-xs font-semibold">{idx + 1}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-              <label className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-md border border-dashed bg-secondary text-muted-foreground hover:border-ring">
+            {loadedCount > 0 && (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={framePreviews} strategy={rectSortingStrategy}>
+                  <div className="flex flex-wrap gap-2">
+                    {framePreviews.map((preview, idx) => (
+                      <SortableFrame
+                        key={preview}
+                        id={preview}
+                        preview={preview}
+                        label={`F${idx + 1}`}
+                        onRemove={() => removeFrame(idx)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+
+            <div className="flex justify-center">
+              <label className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-md border border-dashed bg-secondary text-muted-foreground hover:border-ring sm:h-16 sm:w-16">
                 <Upload className="h-4 w-4" />
                 <input
                   type="file"
@@ -224,7 +293,7 @@ export function GifEngine({ open, onClose }: GifEngineProps) {
             </div>
           </div>
 
-          <div className="space-y-4 lg:col-span-2">
+          <div className="space-y-4 md:col-span-2">
             <div>
               <Label>Frame Delay</Label>
               <input
@@ -302,7 +371,7 @@ export function GifEngine({ open, onClose }: GifEngineProps) {
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-between border-t pt-4">
+        <div className="mt-4 flex items-center justify-between border-t pt-4 md:mt-6">
           <Button variant="outline" size="sm" onClick={handleSaveSettings}>
             <Save className="mr-1 h-3 w-3" />
             Save as Default

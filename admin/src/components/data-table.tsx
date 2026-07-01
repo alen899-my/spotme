@@ -93,7 +93,7 @@ export function DataTable<T extends { id: string }>({
         </div>
       )}
 
-      <div className="max-h-[calc(100vh-18rem)] overflow-y-auto rounded-lg border">
+      <div className="max-h-[calc(100vh-18rem)] overflow-auto rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
