@@ -168,7 +168,7 @@ function splitInstructions(text: string): Phases {
 
 const PROMPT_TEMPLATE = `AI Image Generation – {EXERCISE_NAME} (Frame-by-Frame)
 
-Reference Character: Use the uploaded anime fitness coach as the exact character reference. Maintain identical facial features, hairstyle, skin tone, muscular proportions, clothing (black tank top, black shorts, black athletic shoes, smartwatch), cel-shaded anime style, and premium rendering quality across all frames. The character must remain perfectly consistent in every frame.
+Reference Character: Use the uploaded anime fitness coach as the exact character reference. Maintain identical facial features, hairstyle, skin tone, muscular proportions, cel-shaded anime style, and premium rendering quality across all frames. Character is shirtless (bare torso, no tank top or shirt) so the muscle highlight overlay is fully visible directly on the skin — wearing only black shorts, black athletic shoes, and a smartwatch. The character must remain perfectly consistent in every frame.
 
 Exercise: {EXERCISE_NAME}
 Category: {CATEGORY}
@@ -241,7 +241,7 @@ Same camera in every frame: medium front-right three-quarter view.
 Same zoom, same focal length. No camera movement. No perspective changes.
 
 Negative Prompt:
-Different face, different hairstyle, inconsistent character design, different clothing, changing body proportions, changing background, different gym, different lighting, different camera angle, elbow bending, finger curl, wrist flexion instead of extension, forearm rotation, shoulder movement, torso movement, swinging, clipping, distorted anatomy, extra fingers, blurry image, motion blur, watermark, text, logo, UI, cropped limbs, inconsistent gym equipment, inconsistent lighting, inconsistent camera angle, red highlight bleeding onto non-target muscles, flat opaque red fill, red highlight on clothing, missing muscle highlight, inconsistent highlight shape between frames.`
+Different face, different hairstyle, inconsistent character design, different clothing, changing body proportions, changing background, different gym, different lighting, different camera angle, elbow bending, finger curl, wrist flexion instead of extension, forearm rotation, shoulder movement, torso movement, swinging, clipping, distorted anatomy, extra fingers, blurry image, motion blur, watermark, text, logo, UI, cropped limbs, inconsistent gym equipment, inconsistent lighting, inconsistent camera angle, red highlight bleeding onto non-target muscles, flat opaque red fill, red highlight on clothing, missing muscle highlight, inconsistent highlight shape between frames, tank top, t-shirt, shirt, covered torso, sleeves, jacket.`
 
 interface PromptBuilderProps {
   exercise: Exercise
