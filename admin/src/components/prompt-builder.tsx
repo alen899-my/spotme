@@ -4,30 +4,167 @@ import { Check, Copy } from "lucide-react"
 import { useState } from "react"
 import type { Exercise } from "@/types"
 
-function splitInstructions(text: string): { setup: string; movement: string; peak: string; return: string } {
+/* -------------------------------------------------------------------------- */
+/*  Phase classification                                                      */
+/* -------------------------------------------------------------------------- */
+
+type Phase = "setup" | "movement" | "peak" | "return"
+
+const PHASE_KEYWORDS: Record<Phase, string[]> = {
+  setup: [
+    "starting position",
+    "start position",
+    "stand",
+    "sit",
+    "lie down",
+    "lie flat",
+    "grip",
+    "grasp",
+    "begin by",
+    "set up",
+    "position yourself",
+    "stance",
+    "start with",
+    "hold the bar",
+    "hold a",
+    "hold the",
+    "feet shoulder",
+    "place your",
+    "rest the",
+  ],
+  movement: [
+    "lift",
+    "raise",
+    "push",
+    "pull",
+    "lower the",
+    "curl",
+    "press",
+    "extend",
+    "bend",
+    "drive",
+    "row",
+    "bring the",
+    "flex",
+    "rotate",
+    "swing",
+    "kick",
+  ],
+  peak: [
+    "squeeze",
+    "contract",
+    "pause",
+    "hold for",
+    "at the top",
+    "full extension",
+    "peak contraction",
+    "fully extended",
+    "fully flexed",
+    "maximum",
+    "briefly hold",
+  ],
+  return: [
+    "return to",
+    "lower back to",
+    "back to the starting",
+    "back to start",
+    "release",
+    "repeat",
+    "slowly lower",
+    "lower slowly",
+    "reset",
+  ],
+}
+
+function classifySentence(sentence: string): Phase | null {
+  const lower = sentence.toLowerCase()
+  // Order matters: check return/peak before generic movement words so
+  // e.g. "squeeze and lower back down" lands correctly.
+  if (PHASE_KEYWORDS.return.some((w) => lower.includes(w))) return "return"
+  if (PHASE_KEYWORDS.peak.some((w) => lower.includes(w))) return "peak"
+  if (PHASE_KEYWORDS.setup.some((w) => lower.includes(w))) return "setup"
+  if (PHASE_KEYWORDS.movement.some((w) => lower.includes(w))) return "movement"
+  return null
+}
+
+interface Phases {
+  setup: string
+  movement: string
+  peak: string
+  return: string
+}
+
+/**
+ * Splits raw exercise instructions into setup / movement / peak / return
+ * phases. First pass: keyword-based classification, so frames actually
+ * reflect what the instruction text says happens at each stage. Falls back
+ * to an even three-way split only when no keywords are detected at all.
+ */
+function splitInstructions(text: string): Phases {
   const sentences = text
     .split(/[.\n]+/)
     .map((s) => s.trim())
     .filter(Boolean)
 
-  if (sentences.length <= 3) {
-    const all = sentences.join(". ")
+  if (sentences.length === 0) {
+    return { setup: text, movement: text, peak: text, return: text }
+  }
+
+  const buckets: Record<Phase, string[]> = {
+    setup: [],
+    movement: [],
+    peak: [],
+    return: [],
+  }
+  const unclassified: string[] = []
+
+  sentences.forEach((s) => {
+    const phase = classifySentence(s)
+    if (phase) buckets[phase].push(s)
+    else unclassified.push(s)
+  })
+
+  const anyClassified =
+    buckets.setup.length + buckets.movement.length + buckets.peak.length + buckets.return.length > 0
+
+  if (!anyClassified) {
+    // Fallback: old even split by thirds.
+    const third = Math.ceil(sentences.length / 3)
     return {
-      setup: sentences[0] || all,
-      movement: sentences[1] || all,
-      peak: sentences[sentences.length - 1] || all,
-      return: sentences[0] || all,
+      setup: sentences.slice(0, third).join(". "),
+      movement: sentences.slice(third, third * 2).join(". "),
+      peak: sentences.slice(third * 2).join(". "),
+      return: sentences[0],
     }
   }
 
-  const third = Math.ceil(sentences.length / 3)
+  // Backfill any empty bucket sensibly instead of leaving it blank.
+  if (buckets.setup.length === 0) {
+    buckets.setup.push(sentences[0])
+  }
+  if (buckets.movement.length === 0) {
+    buckets.movement.push(unclassified[0] || sentences[Math.min(1, sentences.length - 1)])
+  }
+  if (buckets.peak.length === 0) {
+    buckets.peak.push(sentences[sentences.length - 1])
+  }
+  if (buckets.return.length === 0) {
+    // Return should mirror the starting position whenever the instructions
+    // don't explicitly describe a "return to start" step.
+    buckets.return.push(buckets.setup[0])
+  }
+
   return {
-    setup: sentences.slice(0, third).join(". "),
-    movement: sentences.slice(third, third * 2).join(". "),
-    peak: sentences.slice(third * 2).join(". "),
-    return: sentences[0],
+    setup: buckets.setup.join(". "),
+    movement: buckets.movement.join(". "),
+    peak: buckets.peak.join(". "),
+    return: buckets.return.join(". "),
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Prompt template                                                           */
+/* -------------------------------------------------------------------------- */
 
 const PROMPT_TEMPLATE = `AI Image Generation – {EXERCISE_NAME} (Frame-by-Frame)
 
@@ -37,6 +174,9 @@ Exercise: {EXERCISE_NAME}
 Category: {CATEGORY}
 Equipment: {EQUIPMENT}
 Target Muscles: {TARGET}
+
+Starting Position (Reference — used for Frame 1 and to reset Frame 4):
+{START_POSITION}
 
 Full Exercise Instructions:
 {INSTRUCTIONS}
@@ -53,32 +193,40 @@ High contrast
 Consistent proportions
 Consistent facial expression
 
-CRITICAL — Background & Environment Consistency:
-The background, gym environment, lighting, camera angle, zoom level, framing, equipment placement, and character position must be EXACTLY THE SAME in every frame. The only thing that changes between frames is the position of the working muscles/joints. Everything else — background, lighting, shadows, equipment, clothes, hair, facial expression — must remain completely identical across all frames.
+Muscle Highlight System (Red Overlay — Highest Priority):
+In every frame, render a translucent RED glow/heat-map overlay directly on top of the {TARGET} muscle group to show which muscles are working. This is a soft, semi-transparent red highlight sitting on the skin over the muscle, similar to a thermal/EMG activation map — not a flat color fill, not clothing, not a tattoo.
+- The red highlight must ONLY appear over the {TARGET} muscles — no other muscle group should be tinted.
+- Intensity scales with how hard the muscle is working in that frame (see per-frame notes below).
+- The glow should follow the underlying muscle shape and anatomy, brightening/dimming smoothly frame to frame so it reads as one continuous animation when viewed in sequence.
+- Everything else about the character (skin tone, clothing, face, hair) stays completely unaffected by the highlight.
 
 IMPORTANT — Generate ONE image at a time:
 Step 1: Generate only Frame 1 (Starting Position). Wait for my confirmation.
-Step 2: After I say "Next, generate next frame image", generate Frame 2 (Mid Lift) — same background, same everything, only movement changes.
-Step 3: After I say "Next, generate next frame image", generate Frame 3 (Peak Contraction) — same background, same everything, only movement changes.
-Step 4: After I say "Next, generate next frame image", generate Frame 4 (Return Position) — back to starting pose, same background.
+Step 2: After I say "Next, generate next frame image", generate Frame 2 (Mid Lift) — same background, same everything, only movement and muscle-highlight intensity changes.
+Step 3: After I say "Next, generate next frame image", generate Frame 3 (Peak Contraction) — same background, same everything, only movement and muscle-highlight intensity changes.
+Step 4: After I say "Next, generate next frame image", generate Frame 4 (Return Position) — back to starting pose, same background, highlight fades back to resting level.
 
 Do NOT generate multiple frames in one response. Only 1 image per response.
 
 Frame 1 — Starting Position (Setup)
 {START_POSITION}
 Camera: front-right 3/4 angle. Character fully set up and ready. Neutral expression. All equipment in correct starting position. This frame sets the background, lighting, and framing for all subsequent frames.
+Muscle Highlight: Faint red glow (roughly 10–20% opacity) on the {TARGET} — muscle is engaged for stabilization only, not yet under load.
 
 Frame 2 — Mid Lift (Movement Phase)
 {MID_LIFT}
-ONLY the movement changes. Background, lighting, camera, character, clothes, equipment — EVERYTHING ELSE is 100% identical to Frame 1.
+ONLY the movement and highlight intensity change. Background, lighting, camera, character, clothes, equipment — EVERYTHING ELSE is 100% identical to Frame 1.
+Muscle Highlight: Medium red glow (roughly 45–60% opacity) on the {TARGET}, brighter than Frame 1, showing rising activation as the muscle takes on load.
 
 Frame 3 — Peak Contraction (Full Engagement)
 {PEAK_CONTRACTION}
 Maximum range of motion. Muscles fully engaged and flexed. Background, lighting, camera, character — ALL identical to Frame 1.
+Muscle Highlight: Brightest, most saturated red glow (roughly 85–100% opacity) directly over the {TARGET}, clearly outlining the fully contracted muscle fibers — this is the visual peak of the highlight effect.
 
 Frame 4 — Return Position (Reset)
 {RETURN_POSITION}
-Identical to Frame 1 in every way — background, lighting, character pose, camera angle. Perfect loop point.
+Identical to Frame 1 in every way — background, lighting, character pose, camera angle. Perfect loop point. Pose must match the Starting Position reference above exactly.
+Muscle Highlight: Fades back down to a faint red glow (roughly 10–20% opacity), matching Frame 1, as the muscle returns to rest.
 
 Biomechanics (Highest Priority):
 This is a true {EXERCISE_NAME}.
@@ -93,7 +241,7 @@ Same camera in every frame: medium front-right three-quarter view.
 Same zoom, same focal length. No camera movement. No perspective changes.
 
 Negative Prompt:
-Different face, different hairstyle, inconsistent character design, different clothing, changing body proportions, changing background, different gym, different lighting, different camera angle, elbow bending, finger curl, wrist flexion instead of extension, forearm rotation, shoulder movement, torso movement, swinging, clipping, distorted anatomy, extra fingers, blurry image, motion blur, watermark, text, logo, UI, cropped limbs, inconsistent gym equipment, inconsistent lighting, inconsistent camera angle.`
+Different face, different hairstyle, inconsistent character design, different clothing, changing body proportions, changing background, different gym, different lighting, different camera angle, elbow bending, finger curl, wrist flexion instead of extension, forearm rotation, shoulder movement, torso movement, swinging, clipping, distorted anatomy, extra fingers, blurry image, motion blur, watermark, text, logo, UI, cropped limbs, inconsistent gym equipment, inconsistent lighting, inconsistent camera angle, red highlight bleeding onto non-target muscles, flat opaque red fill, red highlight on clothing, missing muscle highlight, inconsistent highlight shape between frames.`
 
 interface PromptBuilderProps {
   exercise: Exercise
