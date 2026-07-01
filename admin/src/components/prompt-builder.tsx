@@ -380,6 +380,11 @@ Character Appearance:
 - Maintain identical facial features, hairstyle, skin tone, body proportions, and clothing across both frames
 - The character must look exactly the same in every frame — only the pose changes
 
+Background:
+- Use the old gym appearance and background setting from the reference GIF
+- Maintain the same gym environment, equipment, lighting, and atmosphere in both frames
+- The background must be identical in frame 1 and frame 2 — only the character's pose changes
+
 Requirements:
 - Frame 1: Starting position of the movement (exact same pose as the start of the gif)
 - Frame 2: End/peak position of the movement (exact same pose as the end of the gif)
