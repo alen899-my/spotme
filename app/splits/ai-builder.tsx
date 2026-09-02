@@ -9,19 +9,20 @@ import {
   Image,
   Animated,
   Dimensions,
+  TextInput,
+  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
-import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
+import ExercisePreviewModal from '../../components/modals/ExercisePreviewModal';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const coachAvatarSource = require('../../assets/coach/fit-cartoon-character-training.png');
@@ -91,6 +92,21 @@ const DURATION_OPTIONS = [
   { value: '90 mins', label: '90 min', sub: 'Extended' },
 ];
 
+const SUGGESTED_CHIPS = [
+  '❄️ Winter Arc Bulk',
+  '💪 Arms & Upper Chest Priority',
+  '🛡️ Joint Friendly / No Deadlifts',
+  '⚡ Athletic Power & Explosiveness',
+];
+
+interface ReplaceItem {
+  session_idx: number;
+  exercise_idx: number;
+  name: string;
+  target: string;
+  session_name: string;
+}
+
 export default function AISplitBuilderScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -105,13 +121,23 @@ export default function AISplitBuilderScreen() {
   const [daysPerWeek, setDaysPerWeek] = useState(4);
   const [splitStyle, setSplitStyle] = useState('AI Choice');
   const [sessionDuration, setSessionDuration] = useState('60 mins');
+  const [customNotes, setCustomNotes] = useState('');
 
   // Generation & Result State
   const [generating, setGenerating] = useState(false);
+  const [generatingLabel, setGeneratingLabel] = useState('Coach Spotty is Designing Your Split');
   const [progressStep, setProgressStep] = useState(0);
   const [generatedSplit, setGeneratedSplit] = useState<any>(null);
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
   const [saving, setSaving] = useState(false);
+
+  // Refinement / Replacement State
+  const [replaceList, setReplaceList] = useState<ReplaceItem[]>([]);
+  const [refineNotes, setRefineNotes] = useState('');
+  const [refining, setRefining] = useState(false);
+
+  // Exercise Preview Modal State
+  const [previewExercise, setPreviewExercise] = useState<any>(null);
 
   // Pulse animation for generation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -156,10 +182,14 @@ export default function AISplitBuilderScreen() {
     }
   }, [generating, pulseAnim]);
 
+  // Initial Split Generation
   const handleGenerate = async () => {
     setGenerating(true);
+    setGeneratingLabel('Coach Spotty is Designing Your Split');
     setProgressStep(0);
     setGeneratedSplit(null);
+    setReplaceList([]);
+    setRefineNotes('');
 
     try {
       const token = await getToken();
@@ -169,6 +199,7 @@ export default function AISplitBuilderScreen() {
           days_per_week: daysPerWeek,
           split_style: splitStyle,
           session_duration: sessionDuration,
+          custom_notes: customNotes,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -186,6 +217,74 @@ export default function AISplitBuilderScreen() {
     }
   };
 
+  // Toggle Exercise for Replacement
+  const toggleReplaceExercise = (sessionIdx: number, exerciseIdx: number, exercise: any) => {
+    const sessionName = generatedSplit?.sessions?.[sessionIdx]?.name || `Day ${sessionIdx + 1}`;
+    setReplaceList((prev) => {
+      const existing = prev.find((item) => item.session_idx === sessionIdx && item.exercise_idx === exerciseIdx);
+      if (existing) {
+        return prev.filter((item) => !(item.session_idx === sessionIdx && item.exercise_idx === exerciseIdx));
+      } else {
+        return [
+          ...prev,
+          {
+            session_idx: sessionIdx,
+            exercise_idx: exerciseIdx,
+            name: exercise.name,
+            target: exercise.target,
+            session_name: sessionName,
+          },
+        ];
+      }
+    });
+  };
+
+  const isExerciseMarkedForReplace = (sessionIdx: number, exerciseIdx: number) => {
+    return replaceList.some((item) => item.session_idx === sessionIdx && item.exercise_idx === exerciseIdx);
+  };
+
+  // Retry with Changes / Refinement
+  const handleRetryWithChanges = async () => {
+    if (!generatedSplit) return;
+    if (replaceList.length === 0 && !refineNotes.trim()) {
+      showToast('Check an exercise to replace or enter your adjustment note.', 'info');
+      return;
+    }
+
+    setRefining(true);
+    setGenerating(true);
+    setGeneratingLabel('Refining & Substituting Exercises with AI...');
+    setProgressStep(0);
+
+    try {
+      const token = await getToken();
+      const res = await axios.post(
+        `${API_URL}/workouts/splits/ai-refine`,
+        {
+          current_split: generatedSplit,
+          replace_exercises: replaceList,
+          refine_notes: refineNotes,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 120000,
+        }
+      );
+
+      setGeneratedSplit(res.data);
+      setReplaceList([]);
+      setRefineNotes('');
+      showToast('Split revised with your adjustments! 🎉', 'success');
+    } catch (err: any) {
+      console.error('Refine split error:', err);
+      showToast(err.response?.data?.error || 'Failed to refine workout split. Please try again.', 'error');
+    } finally {
+      setRefining(false);
+      setGenerating(false);
+    }
+  };
+
+  // Transactionally Save Split
   const handleSaveSplit = async () => {
     if (!generatedSplit) return;
     setSaving(true);
@@ -219,394 +318,558 @@ export default function AISplitBuilderScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      {/* ── TOP HEADER ── */}
-      <View style={[styles.header, { borderBottomColor: cardBorder, backgroundColor: colors.card }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={[styles.backBtn, { borderColor: cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
-          activeOpacity={0.75}
-        >
-          <Ionicons name="close" size={20} color={colors.text} />
-        </TouchableOpacity>
-
-        <View style={styles.headerCenter}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>AI Split Builder</Text>
-            
-          </View>
-          <Text style={[styles.headerSub, { color: colors.textMuted }]}>
-            Personalized progressive overload routine
-          </Text>
-        </View>
-
-        <View style={{ width: 36 }} />
-      </View>
-
-      {/* ── CONTENT BODY ── */}
-      {generating ? (
-        /* ── GENERATING ANIMATION ── */
-        <View style={styles.centerContainer}>
-          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <View style={[styles.avatarGlow, { borderColor: colors.primary, backgroundColor: cardBg }]}>
-              <Image source={coachAvatarSource} style={styles.avatarImg} />
-            </View>
-          </Animated.View>
-
-          <Text style={[styles.genTitle, { color: colors.text }]}>Coach Spotty is Designing Your Split</Text>
-          <Text style={[styles.genSub, { color: colors.textMuted }]}>
-            Structuring volume, selecting library exercises, and tuning rest periods
-          </Text>
-
-          {/* Progress Steps */}
-          <View style={styles.stepsWrap}>
-            {[
-              'Analyzing your fitness goal and recovery capacity...',
-              'Structuring optimal training frequency and day splits...',
-              'Querying SpotMe 1,300+ verified exercise library...',
-              'Dialing in progressive overload sets and rep ranges...',
-            ].map((stepText, idx) => {
-              const isDone = progressStep > idx;
-              const isCurrent = progressStep === idx;
-              return (
-                <View key={idx} style={styles.stepRow}>
-                  <View
-                    style={[
-                      styles.stepDot,
-                      {
-                        backgroundColor: isDone ? '#10B981' : isCurrent ? colors.primary : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
-                      },
-                    ]}
-                  >
-                    {isDone ? (
-                      <Ionicons name="checkmark" size={12} color="#FFF" />
-                    ) : isCurrent ? (
-                      <ActivityIndicator size="small" color="#FFF" />
-                    ) : null}
-                  </View>
-                  <Text
-                    style={[
-                      styles.stepLabel,
-                      {
-                        color: isCurrent ? colors.text : isDone ? colors.textMuted : colors.textDim,
-                        fontFamily: isCurrent ? FONTS.bodyBold : FONTS.body,
-                      },
-                    ]}
-                  >
-                    {stepText}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-      ) : generatedSplit ? (
-        /* ── SPLIT PREVIEW (ONBOARDING CARD AESTHETIC) ── */
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={[styles.previewScroll, { paddingBottom: insets.bottom + 80 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Program Overview Banner */}
-          <View style={[styles.programCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <View style={[styles.badgePill, { backgroundColor: colors.primary + '18' }]}>
-                <Ionicons name="flame" size={12} color={colors.primary} />
-                <Text style={[styles.badgePillText, { color: colors.primary }]}>{generatedSplit.template_goal}</Text>
-              </View>
-              <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
-                <Text style={[styles.badgePillText, { color: colors.textMuted }]}>{generatedSplit.template_level}</Text>
-              </View>
-              <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
-                <Text style={[styles.badgePillText, { color: colors.textMuted }]}>{generatedSplit.template_days}</Text>
-              </View>
-            </View>
-
-            <Text style={[styles.programName, { color: colors.text }]}>{generatedSplit.name}</Text>
-            <Text style={[styles.programDesc, { color: colors.textMuted }]}>{generatedSplit.description}</Text>
-          </View>
-
-          {/* Day Navigation Tabs */}
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>PROGRAM SESSIONS</Text>
-            <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.dayTabsList}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        {/* ── TOP HEADER ── */}
+        <View style={[styles.header, { borderBottomColor: cardBorder, backgroundColor: colors.card }]}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.backBtn, { borderColor: cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
+            activeOpacity={0.75}
           >
-            {generatedSplit.sessions.map((sess: any, idx: number) => {
-              const isSelected = selectedDayIdx === idx;
-              return (
-                <TouchableOpacity
-                  key={idx}
-                  activeOpacity={0.8}
-                  onPress={() => setSelectedDayIdx(idx)}
-                  style={[
-                    styles.dayTab,
-                    {
-                      backgroundColor: isSelected ? colors.primary : cardBg,
-                      borderColor: isSelected ? colors.primary : cardBorder,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.dayTabNum, { color: isSelected ? '#FFF' : colors.primary }]}>
-                    Day {idx + 1}
-                  </Text>
-                  <Text
-                    style={[styles.dayTabTitle, { color: isSelected ? '#FFF' : colors.text }]}
-                    numberOfLines={1}
-                  >
-                    {sess.name.replace(/^Day\s*\d+\s*[-:]?\s*/i, '')}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+            <Ionicons name="close" size={20} color={colors.text} />
+          </TouchableOpacity>
 
-          {/* Selected Session Details & Exercises */}
-          {generatedSplit.sessions[selectedDayIdx] && (
-            <View style={{ marginTop: 14 }}>
-              <View style={[styles.sessionHeaderBox, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-                <Text style={[styles.sessionHeaderName, { color: colors.text }]}>
-                  {generatedSplit.sessions[selectedDayIdx].name}
-                </Text>
-                {generatedSplit.sessions[selectedDayIdx].target_muscles ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
-                    <MaterialCommunityIcons name="target" size={14} color={colors.primary} />
-                    <Text style={[styles.targetMusclesText, { color: colors.primary }]}>
-                      {generatedSplit.sessions[selectedDayIdx].target_muscles}
+          <View style={styles.headerCenter}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>AI Split Builder</Text>
+            </View>
+            <Text style={[styles.headerSub, { color: colors.textMuted }]}>
+              Personalized progressive overload routine
+            </Text>
+          </View>
+
+          <View style={{ width: 36 }} />
+        </View>
+
+        {/* ── CONTENT BODY ── */}
+        {generating ? (
+          /* ── GENERATING ANIMATION ── */
+          <View style={styles.centerContainer}>
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <View style={[styles.avatarGlow, { borderColor: colors.primary, backgroundColor: cardBg }]}>
+                <Image source={coachAvatarSource} style={styles.avatarImg} />
+              </View>
+            </Animated.View>
+
+            <Text style={[styles.genTitle, { color: colors.text }]}>{generatingLabel}</Text>
+            <Text style={[styles.genSub, { color: colors.textMuted }]}>
+              Structuring volume, selecting library exercises, and tuning rest periods
+            </Text>
+
+            {/* Progress Steps */}
+            <View style={styles.stepsWrap}>
+              {[
+                'Analyzing your fitness goal and recovery capacity...',
+                'Structuring optimal training frequency and day splits...',
+                'Querying SpotMe 1,300+ verified exercise library...',
+                'Dialing in progressive overload sets and rep ranges...',
+              ].map((stepText, idx) => {
+                const isDone = progressStep > idx;
+                const isCurrent = progressStep === idx;
+                return (
+                  <View key={idx} style={styles.stepRow}>
+                    <View
+                      style={[
+                        styles.stepDot,
+                        {
+                          backgroundColor: isDone ? '#10B981' : isCurrent ? colors.primary : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
+                        },
+                      ]}
+                    >
+                      {isDone ? (
+                        <Ionicons name="checkmark" size={12} color="#FFF" />
+                      ) : isCurrent ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : null}
+                    </View>
+                    <Text
+                      style={[
+                        styles.stepLabel,
+                        {
+                          color: isCurrent ? colors.text : isDone ? colors.textMuted : colors.textDim,
+                          fontFamily: isCurrent ? FONTS.bodyBold : FONTS.body,
+                        },
+                      ]}
+                    >
+                      {stepText}
                     </Text>
                   </View>
-                ) : null}
+                );
+              })}
+            </View>
+          </View>
+        ) : generatedSplit ? (
+          /* ── SPLIT PREVIEW WITH RETRY & REPLACEMENT ── */
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={[styles.previewScroll, { paddingBottom: insets.bottom + 80 }]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Program Overview Banner */}
+            <View style={[styles.programCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <View style={[styles.badgePill, { backgroundColor: colors.primary + '18' }]}>
+                  <Ionicons name="flame" size={12} color={colors.primary} />
+                  <Text style={[styles.badgePillText, { color: colors.primary }]}>{generatedSplit.template_goal}</Text>
+                </View>
+                <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+                  <Text style={[styles.badgePillText, { color: colors.textMuted }]}>{generatedSplit.template_level}</Text>
+                </View>
+                <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+                  <Text style={[styles.badgePillText, { color: colors.textMuted }]}>{generatedSplit.template_days}</Text>
+                </View>
               </View>
 
-              {/* Exercises List */}
-              <View style={{ gap: 10, marginTop: 12 }}>
-                {generatedSplit.sessions[selectedDayIdx].exercises.map((ex: any, exIdx: number) => (
-                  <View
-                    key={exIdx}
-                    style={[styles.exerciseCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
+              <Text style={[styles.programName, { color: colors.text }]}>{generatedSplit.name}</Text>
+              <Text style={[styles.programDesc, { color: colors.textMuted }]}>{generatedSplit.description}</Text>
+            </View>
+
+            {/* Day Navigation Tabs */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>PROGRAM SESSIONS</Text>
+              <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.dayTabsList}
+            >
+              {generatedSplit.sessions.map((sess: any, idx: number) => {
+                const isSelected = selectedDayIdx === idx;
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedDayIdx(idx)}
+                    style={[
+                      styles.dayTab,
+                      {
+                        backgroundColor: isSelected ? colors.primary : cardBg,
+                        borderColor: isSelected ? colors.primary : cardBorder,
+                      },
+                    ]}
                   >
-                    {ex.image_url ? (
-                      <Image source={{ uri: ex.image_url }} style={styles.exerciseThumb} />
-                    ) : (
-                      <View style={[styles.exerciseThumbPlaceholder, { backgroundColor: isDark ? '#141E24' : '#E2E8F0' }]}>
-                        <Ionicons name="barbell-outline" size={24} color={colors.textDim} />
+                    <Text style={[styles.dayTabNum, { color: isSelected ? '#FFF' : colors.primary }]}>
+                      Day {idx + 1}
+                    </Text>
+                    <Text
+                      style={[styles.dayTabTitle, { color: isSelected ? '#FFF' : colors.text }]}
+                      numberOfLines={1}
+                    >
+                      {sess.name.replace(/^Day\s*\d+\s*[-:]?\s*/i, '')}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Selected Session Details & Exercises */}
+            {generatedSplit.sessions[selectedDayIdx] && (
+              <View style={{ marginTop: 14 }}>
+                <View style={[styles.sessionHeaderBox, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={[styles.sessionHeaderName, { color: colors.text }]}>
+                      {generatedSplit.sessions[selectedDayIdx].name}
+                    </Text>
+                    <Text style={[styles.replaceHintText, { color: colors.textMuted }]}>
+                      Tap exercise to preview • Check to replace
+                    </Text>
+                  </View>
+                  {generatedSplit.sessions[selectedDayIdx].target_muscles ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                      <MaterialCommunityIcons name="target" size={14} color={colors.primary} />
+                      <Text style={[styles.targetMusclesText, { color: colors.primary }]}>
+                        {generatedSplit.sessions[selectedDayIdx].target_muscles}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Exercises List */}
+                <View style={{ gap: 10, marginTop: 12 }}>
+                  {generatedSplit.sessions[selectedDayIdx].exercises.map((ex: any, exIdx: number) => {
+                    const isMarked = isExerciseMarkedForReplace(selectedDayIdx, exIdx);
+                    return (
+                      <View
+                        key={exIdx}
+                        style={[
+                          styles.exerciseCard,
+                          {
+                            backgroundColor: isMarked ? (isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.06)') : cardBg,
+                            borderColor: isMarked ? '#EF4444' : cardBorder,
+                          },
+                        ]}
+                      >
+                        {/* Tap exercise body to open preview modal */}
+                        <TouchableOpacity
+                          activeOpacity={0.75}
+                          onPress={() => setPreviewExercise(ex)}
+                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                        >
+                          {ex.image_url ? (
+                            <Image source={{ uri: ex.image_url }} style={styles.exerciseThumb} />
+                          ) : (
+                            <View style={[styles.exerciseThumbPlaceholder, { backgroundColor: isDark ? '#141E24' : '#E2E8F0' }]}>
+                              <Ionicons name="barbell-outline" size={24} color={colors.textDim} />
+                            </View>
+                          )}
+
+                          <View style={{ flex: 1, gap: 4 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <Text style={[styles.exerciseName, { color: colors.text }]} numberOfLines={1}>
+                                {ex.name}
+                              </Text>
+                              <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
+                            </View>
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <View style={[styles.exTag, { backgroundColor: colors.primary + '18' }]}>
+                                <Text style={[styles.exTagText, { color: colors.primary }]}>{ex.target}</Text>
+                              </View>
+                              <View style={[styles.exTag, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+                                <Text style={[styles.exTagText, { color: colors.textMuted }]}>{ex.equipment}</Text>
+                              </View>
+                              {isMarked && (
+                                <View style={[styles.exTag, { backgroundColor: '#EF444422' }]}>
+                                  <Text style={[styles.exTagText, { color: '#EF4444' }]}>Replace 🔄</Text>
+                                </View>
+                              )}
+                            </View>
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                              <Text style={[styles.setsRepsText, { color: colors.text }]}>
+                                {ex.sets} sets × {ex.reps} reps
+                              </Text>
+                              <Text style={[styles.restTimeText, { color: colors.textMuted }]}>
+                                ⏱️ {ex.rest_time} rest
+                              </Text>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* Replace Checkbox Button */}
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => toggleReplaceExercise(selectedDayIdx, exIdx, ex)}
+                          style={styles.replaceCheckboxWrap}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Ionicons
+                            name={isMarked ? 'checkbox' : 'square-outline'}
+                            size={24}
+                            color={isMarked ? '#EF4444' : colors.textDim}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* ── RETRY WITH CHANGES CARD ── */}
+            <View style={[styles.retryCard, { backgroundColor: cardBg, borderColor: replaceList.length > 0 ? colors.primary : cardBorder }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[styles.retryIconBox, { backgroundColor: colors.primary + '18' }]}>
+                  <Ionicons name="sync-outline" size={18} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.retryCardTitle, { color: colors.text }]}>
+                    Customize & Retry with AI
+                  </Text>
+                  <Text style={[styles.retryCardSub, { color: colors.textMuted }]}>
+                    {replaceList.length > 0
+                      ? `${replaceList.length} exercise(s) marked for replacement`
+                      : 'Check exercises to replace or type adjustments below'}
+                  </Text>
+                </View>
+              </View>
+
+              <TextInput
+                style={[
+                  styles.refineInput,
+                  {
+                    color: colors.text,
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                    borderColor: cardBorder,
+                  },
+                ]}
+                placeholder="e.g. Replace marked with dumbbells, add more tricep work, lighter Day 2..."
+                placeholderTextColor={colors.textDim}
+                value={refineNotes}
+                onChangeText={setRefineNotes}
+                multiline
+                numberOfLines={2}
+              />
+
+              <TouchableOpacity
+                activeOpacity={0.82}
+                onPress={handleRetryWithChanges}
+                disabled={refining}
+                style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+              >
+                {refining ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <>
+                    <Ionicons name="refresh" size={17} color="#FFF" />
+                    <Text style={styles.retryBtnText}>
+                      {replaceList.length > 0 ? `Replace Selected (${replaceList.length}) & Retry` : 'Retry with Changes'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* ── ACTIONS (SAVE OR GO BACK) ── */}
+            <View style={styles.previewActions}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleSaveSplit}
+                disabled={saving}
+                style={[styles.primaryBtn, { backgroundColor: '#10B981' }]}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={18} color="#FFF" />
+                    <Text style={styles.primaryBtnText}>Save Program</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setGeneratedSplit(null)}
+                disabled={saving}
+                style={[styles.secondaryBtn, { borderColor: cardBorder, backgroundColor: cardBg }]}
+              >
+                <Ionicons name="arrow-back" size={16} color={colors.text} />
+                <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Go Back</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        ) : (
+          /* ── QUESTIONNAIRE FORM (COMPLETE PROFILE AESTHETIC) ── */
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={[styles.formScroll, { paddingBottom: insets.bottom + 80 }]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* User Profile Sync Card */}
+            <View style={[styles.profileSyncCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+              <View style={[styles.profileSyncAvatar, { backgroundColor: colors.primary + '18' }]}>
+                <Ionicons name="person" size={22} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.profileSyncName, { color: colors.text }]}>Synced for {userName}</Text>
+                  <Ionicons name="checkmark-circle" size={15} color="#10B981" />
+                </View>
+                <Text style={[styles.profileSyncDetail, { color: colors.textMuted }]}>
+                  Goal: <Text style={{ fontFamily: FONTS.bodyBold, color: colors.text }}>{userGoal}</Text> • Level: {userLevel}
+                </Text>
+                <Text style={[styles.profileSyncNote, { color: colors.primary }]}>
+                  Equipment & focus areas automatically optimized by AI
+                </Text>
+              </View>
+            </View>
+
+            {/* Section 1: Training Frequency */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>TRAINING FREQUENCY</Text>
+              <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
+            </View>
+
+            <View style={styles.daysGrid}>
+              {DAYS_OPTIONS.map((opt) => {
+                const isSelected = daysPerWeek === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    activeOpacity={0.82}
+                    onPress={() => setDaysPerWeek(opt.value)}
+                    style={[
+                      styles.dayCard,
+                      {
+                        borderColor: isSelected ? opt.color : cardBorder,
+                        backgroundColor: isSelected ? opt.bg : cardBg,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.dayIconWrap, { backgroundColor: isSelected ? opt.bg : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') }]}>
+                      <Ionicons name={opt.icon as any} size={22} color={isSelected ? opt.color : colors.textMuted} />
+                    </View>
+                    <Text style={[styles.dayCardLabel, { color: isSelected ? colors.text : colors.textMuted }]}>
+                      {opt.label}
+                    </Text>
+                    <Text style={[styles.dayCardSub, { color: colors.textDim }]}>{opt.sub}</Text>
+                    {isSelected && (
+                      <View style={styles.selectedCheckBadge}>
+                        <Ionicons name="checkmark-circle" size={17} color={opt.color} />
                       </View>
                     )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-                    <View style={{ flex: 1, gap: 4 }}>
-                      <Text style={[styles.exerciseName, { color: colors.text }]} numberOfLines={1}>
-                        {ex.name}
-                      </Text>
+            {/* Section 2: Split Style */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SPLIT STYLE PREFERENCE</Text>
+              <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
+            </View>
 
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <View style={[styles.exTag, { backgroundColor: colors.primary + '18' }]}>
-                          <Text style={[styles.exTagText, { color: colors.primary }]}>{ex.target}</Text>
-                        </View>
-                        <View style={[styles.exTag, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
-                          <Text style={[styles.exTagText, { color: colors.textMuted }]}>{ex.equipment}</Text>
-                        </View>
-                      </View>
-
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                        <Text style={[styles.setsRepsText, { color: colors.text }]}>
-                          {ex.sets} sets × {ex.reps} reps
-                        </Text>
-                        <Text style={[styles.restTimeText, { color: colors.textMuted }]}>
-                          ⏱️ {ex.rest_time} rest
-                        </Text>
-                      </View>
+            <View style={{ gap: 10 }}>
+              {SPLIT_STYLES.map((style) => {
+                const isSelected = splitStyle === style.key;
+                return (
+                  <TouchableOpacity
+                    key={style.key}
+                    activeOpacity={0.82}
+                    onPress={() => setSplitStyle(style.key)}
+                    style={[
+                      styles.styleCard,
+                      {
+                        borderColor: isSelected ? style.color : cardBorder,
+                        backgroundColor: isSelected ? style.bg : cardBg,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.styleIconWrap, { backgroundColor: isSelected ? style.bg : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') }]}>
+                      <Ionicons name={style.icon as any} size={24} color={isSelected ? style.color : colors.textMuted} />
                     </View>
-                  </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.styleCardLabel, { color: isSelected ? colors.text : colors.textMuted }]}>
+                        {style.label}
+                      </Text>
+                      <Text style={[styles.styleCardDesc, { color: colors.textDim }]}>{style.desc}</Text>
+                    </View>
+                    {isSelected ? (
+                      <View style={[styles.styleCheckBadge, { backgroundColor: style.color }]}>
+                        <Ionicons name="checkmark" size={14} color="#FFF" />
+                      </View>
+                    ) : (
+                      <Ionicons name="ellipse-outline" size={20} color={colors.textDim} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Section 3: Duration */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SESSION DURATION</Text>
+              <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
+            </View>
+
+            <View style={styles.durationRow}>
+              {DURATION_OPTIONS.map((dur) => {
+                const isSelected = sessionDuration === dur.value;
+                return (
+                  <TouchableOpacity
+                    key={dur.value}
+                    activeOpacity={0.8}
+                    onPress={() => setSessionDuration(dur.value)}
+                    style={[
+                      styles.durationCard,
+                      {
+                        backgroundColor: isSelected ? colors.primary : cardBg,
+                        borderColor: isSelected ? colors.primary : cardBorder,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.durationCardText, { color: isSelected ? '#FFF' : colors.text }]}>
+                      {dur.label}
+                    </Text>
+                    <Text style={[styles.durationCardSub, { color: isSelected ? 'rgba(255,255,255,0.85)' : colors.textDim }]}>
+                      {dur.sub}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Section 4: Special Focus or Theme Note (e.g. Winter Arc) */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SPECIAL FOCUS OR THEME (OPTIONAL)</Text>
+              <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
+            </View>
+
+            <View style={[styles.noteContainer, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <Ionicons name="chatbox-ellipses-outline" size={16} color={colors.primary} />
+                <Text style={[styles.noteHeaderLabel, { color: colors.text }]}>
+                  Custom Requirements or Focus Areas
+                </Text>
+              </View>
+
+              <TextInput
+                style={[
+                  styles.noteTextInput,
+                  {
+                    color: colors.text,
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                    borderColor: cardBorder,
+                  },
+                ]}
+                placeholder="e.g. Winter arc bulk, prioritize arms & upper chest, bad lower back so avoid barbell deadlifts..."
+                placeholderTextColor={colors.textDim}
+                value={customNotes}
+                onChangeText={setCustomNotes}
+                multiline
+                numberOfLines={3}
+              />
+
+              {/* Quick Suggestion Chips */}
+              <View style={styles.chipRow}>
+                {SUGGESTED_CHIPS.map((chipText, chipIdx) => (
+                  <TouchableOpacity
+                    key={chipIdx}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      setCustomNotes((prev) => (prev ? `${prev}, ${chipText}` : chipText));
+                    }}
+                    style={[
+                      styles.suggestionChip,
+                      {
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                        borderColor: cardBorder,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.suggestionChipText, { color: colors.textMuted }]}>{chipText}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>
-          )}
 
-          {/* Action Buttons */}
-          <View style={styles.previewActions}>
+            {/* Submit Button */}
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={handleSaveSplit}
-              disabled={saving}
-              style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+              onPress={handleGenerate}
+              style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
             >
-              {saving ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={18} color="#FFF" />
-                  <Text style={styles.primaryBtnText}>Save Program to My Splits</Text>
-                </>
-              )}
+              <Ionicons name="sparkles" size={18} color="#FFF" />
+              <Text style={styles.primaryBtnText}>Build My Split with AI</Text>
             </TouchableOpacity>
+          </ScrollView>
+        )}
+      </KeyboardAvoidingView>
 
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setGeneratedSplit(null)}
-              disabled={saving}
-              style={[styles.secondaryBtn, { borderColor: cardBorder, backgroundColor: cardBg }]}
-            >
-              <Ionicons name="options-outline" size={16} color={colors.text} />
-              <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Tweak Preferences</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      ) : (
-        /* ── QUESTIONNAIRE FORM (COMPLETE PROFILE AESTHETIC) ── */
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={[styles.formScroll, { paddingBottom: insets.bottom + 80 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* User Profile Sync Card (Matches Complete Profile Header) */}
-          <View style={[styles.profileSyncCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-            <View style={[styles.profileSyncAvatar, { backgroundColor: colors.primary + '18' }]}>
-              <Ionicons name="person" size={22} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.profileSyncName, { color: colors.text }]}>Synced for {userName}</Text>
-                <Ionicons name="checkmark-circle" size={15} color="#10B981" />
-              </View>
-              <Text style={[styles.profileSyncDetail, { color: colors.textMuted }]}>
-                Goal: <Text style={{ fontFamily: FONTS.bodyBold, color: colors.text }}>{userGoal}</Text> • Level: {userLevel}
-              </Text>
-              <Text style={[styles.profileSyncNote, { color: colors.primary }]}>
-                Equipment & focus areas automatically optimized by AI
-              </Text>
-            </View>
-          </View>
-
-          {/* Section 1: Training Frequency */}
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>TRAINING FREQUENCY</Text>
-            <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
-          </View>
-
-          <View style={styles.daysGrid}>
-            {DAYS_OPTIONS.map((opt) => {
-              const isSelected = daysPerWeek === opt.value;
-              return (
-                <TouchableOpacity
-                  key={opt.value}
-                  activeOpacity={0.82}
-                  onPress={() => setDaysPerWeek(opt.value)}
-                  style={[
-                    styles.dayCard,
-                    {
-                      borderColor: isSelected ? opt.color : cardBorder,
-                      backgroundColor: isSelected ? opt.bg : cardBg,
-                    },
-                  ]}
-                >
-                  <View style={[styles.dayIconWrap, { backgroundColor: isSelected ? opt.bg : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') }]}>
-                    <Ionicons name={opt.icon as any} size={22} color={isSelected ? opt.color : colors.textMuted} />
-                  </View>
-                  <Text style={[styles.dayCardLabel, { color: isSelected ? colors.text : colors.textMuted }]}>
-                    {opt.label}
-                  </Text>
-                  <Text style={[styles.dayCardSub, { color: colors.textDim }]}>{opt.sub}</Text>
-                  {isSelected && (
-                    <View style={styles.selectedCheckBadge}>
-                      <Ionicons name="checkmark-circle" size={17} color={opt.color} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Section 2: Split Style */}
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SPLIT STYLE PREFERENCE</Text>
-            <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
-          </View>
-
-          <View style={{ gap: 10 }}>
-            {SPLIT_STYLES.map((style) => {
-              const isSelected = splitStyle === style.key;
-              return (
-                <TouchableOpacity
-                  key={style.key}
-                  activeOpacity={0.82}
-                  onPress={() => setSplitStyle(style.key)}
-                  style={[
-                    styles.styleCard,
-                    {
-                      borderColor: isSelected ? style.color : cardBorder,
-                      backgroundColor: isSelected ? style.bg : cardBg,
-                    },
-                  ]}
-                >
-                  <View style={[styles.styleIconWrap, { backgroundColor: isSelected ? style.bg : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') }]}>
-                    <Ionicons name={style.icon as any} size={24} color={isSelected ? style.color : colors.textMuted} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.styleCardLabel, { color: isSelected ? colors.text : colors.textMuted }]}>
-                      {style.label}
-                    </Text>
-                    <Text style={[styles.styleCardDesc, { color: colors.textDim }]}>{style.desc}</Text>
-                  </View>
-                  {isSelected ? (
-                    <View style={[styles.styleCheckBadge, { backgroundColor: style.color }]}>
-                      <Ionicons name="checkmark" size={14} color="#FFF" />
-                    </View>
-                  ) : (
-                    <Ionicons name="ellipse-outline" size={20} color={colors.textDim} />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Section 3: Duration */}
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SESSION DURATION</Text>
-            <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
-          </View>
-
-          <View style={styles.durationRow}>
-            {DURATION_OPTIONS.map((dur) => {
-              const isSelected = sessionDuration === dur.value;
-              return (
-                <TouchableOpacity
-                  key={dur.value}
-                  activeOpacity={0.8}
-                  onPress={() => setSessionDuration(dur.value)}
-                  style={[
-                    styles.durationCard,
-                    {
-                      backgroundColor: isSelected ? colors.primary : cardBg,
-                      borderColor: isSelected ? colors.primary : cardBorder,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.durationCardText, { color: isSelected ? '#FFF' : colors.text }]}>
-                    {dur.label}
-                  </Text>
-                  <Text style={[styles.durationCardSub, { color: isSelected ? 'rgba(255,255,255,0.85)' : colors.textDim }]}>
-                    {dur.sub}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Submit Button */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={handleGenerate}
-            style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
-          >
-            <Ionicons name="sparkles" size={18} color="#FFF" />
-            <Text style={styles.primaryBtnText}>Build My Split with AI</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
+      {/* Exercise Preview Modal */}
+      <ExercisePreviewModal
+        visible={!!previewExercise}
+        exercise={previewExercise}
+        onClose={() => setPreviewExercise(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -628,13 +891,8 @@ const styles = StyleSheet.create({
   headerCenter: { flex: 1, alignItems: 'center' },
   headerTitle: { fontFamily: FONTS.bodyBold, fontSize: 16 },
   headerSub: { fontFamily: FONTS.body, fontSize: 11, marginTop: 1 },
-  sparkleTag: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
-  },
-  sparkleTagText: { fontFamily: FONTS.bodyBold, fontSize: 9.5, letterSpacing: 0.5 },
 
-  // Section Dividers (Matches Complete Profile)
+  // Section Dividers
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -673,7 +931,7 @@ const styles = StyleSheet.create({
   // Form Scroll
   formScroll: { paddingHorizontal: 16, paddingTop: 14, gap: 14 },
 
-  // Days Grid (Matches Goal Grid in Onboarding)
+  // Days Grid
   daysGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -700,7 +958,7 @@ const styles = StyleSheet.create({
     right: 12,
   },
 
-  // Split Styles (Matches Experience Level Cards in Onboarding)
+  // Split Styles
   styleCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -735,7 +993,33 @@ const styles = StyleSheet.create({
   durationCardText: { fontFamily: FONTS.bodyBold, fontSize: 13 },
   durationCardSub: { fontFamily: FONTS.body, fontSize: 9.5 },
 
-  // Primary Button (Matches Onboarding PrimaryBtn)
+  // Custom Note Input
+  noteContainer: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    gap: 8,
+  },
+  noteHeaderLabel: { fontFamily: FONTS.bodyBold, fontSize: 13 },
+  noteTextInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 13,
+    minHeight: 65,
+    textAlignVertical: 'top',
+    fontFamily: FONTS.body,
+  },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  suggestionChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  suggestionChipText: { fontFamily: FONTS.body, fontSize: 11 },
+
+  // Primary Button
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -818,6 +1102,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   sessionHeaderName: { fontFamily: FONTS.bodyBold, fontSize: 15 },
+  replaceHintText: { fontFamily: FONTS.body, fontSize: 11 },
   targetMusclesText: { fontFamily: FONTS.bodyBold, fontSize: 11.5 },
 
   exerciseCard: {
@@ -838,6 +1123,40 @@ const styles = StyleSheet.create({
   exTagText: { fontFamily: FONTS.bodyBold, fontSize: 10.5 },
   setsRepsText: { fontFamily: FONTS.bodyBold, fontSize: 12.5 },
   restTimeText: { fontFamily: FONTS.body, fontSize: 11.5 },
+  replaceCheckboxWrap: { paddingHorizontal: 4 },
 
-  previewActions: { marginTop: 24, gap: 10 },
+  // Retry Card
+  retryCard: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    padding: 16,
+    gap: 12,
+    marginTop: 20,
+  },
+  retryIconBox: {
+    width: 34, height: 34, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  retryCardTitle: { fontFamily: FONTS.bodyBold, fontSize: 14.5 },
+  retryCardSub: { fontFamily: FONTS.body, fontSize: 11.5, marginTop: 1 },
+  refineInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 13,
+    minHeight: 55,
+    textAlignVertical: 'top',
+    fontFamily: FONTS.body,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 13,
+    borderRadius: 14,
+  },
+  retryBtnText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' },
+
+  previewActions: { marginTop: 20, gap: 10 },
 });

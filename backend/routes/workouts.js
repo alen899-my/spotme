@@ -417,7 +417,7 @@ router.get('/splits/:id', authenticateToken, async (req, res) => {
 router.post('/splits/ai-generate', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { days_per_week, split_style, session_duration } = req.body;
+    const { days_per_week, split_style, session_duration, custom_notes } = req.body;
 
     // 1. Fetch user profile
     const userRes = await pool.query(
@@ -443,6 +443,7 @@ User Profile:
 - Training Frequency: Exactly ${days} Days Per Week
 - Split Style Preference: ${style} (if "AI Choice", select the most proven split structure for ${days} days and ${goal}, e.g. Upper/Lower, PPL, Full Body, or Arnold Split)
 - Target Session Duration: ${duration}
+${custom_notes && custom_notes.trim() ? `- Lifter Custom Focus / Theme Note: "${custom_notes.trim()}". You MUST strictly honor this special theme (e.g. if Winter Arc, structure high intensity hypertrophy; if specific muscles like upper chest & arms requested, bias volume heavily toward them; if injuries or movements to avoid are noted, omit them).` : ''}
 
 AI Directives:
 1. Equipment Choice: Automatically pick the optimal commercial gym equipment (Barbells, Dumbbells, Cables, and Selectorized Machines) for highest hypertrophy stimulus and safety.
@@ -478,6 +479,7 @@ IMPORTANT: Respond ONLY with a valid JSON object in this EXACT structure (no mar
     console.log('[AI Split] 📥 New Split Generation Request');
     console.log(`  -> User ID: ${userId} | Goal: ${goal} | Level: ${level}`);
     console.log(`  -> Frequency: ${days} Days | Style: ${style} | Duration: ${duration}`);
+    if (custom_notes) console.log(`  -> Custom Note: "${custom_notes}"`);
 
     const rawAI = await callAI(prompt);
 
@@ -504,80 +506,7 @@ IMPORTANT: Respond ONLY with a valid JSON object in this EXACT structure (no mar
 
     console.log(`[AI Split] ✅ Successfully extracted ${sessionsArray.length} sessions from AI response`);
 
-    // 3. Ensure pg_trgm extension is active for similarity matching
-    try {
-      await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
-    } catch (_) {}
-
-    // 4. Match every recommended exercise against SpotMe's 1,324 exercise library
-    const matchedSessions = [];
-
-    for (let i = 0; i < sessionsArray.length; i++) {
-      const sess = sessionsArray[i];
-      const matchedExercises = [];
-      const exercisesList = sess.exercises || sess.workout_exercises || sess.movements || sess.routine || [];
-
-      if (Array.isArray(exercisesList)) {
-        for (let j = 0; j < exercisesList.length; j++) {
-          const ex = exercisesList[j];
-          const queryTerm = (ex.query_name || ex.name || '').toLowerCase().trim();
-
-          let chosenEx = null;
-
-          if (queryTerm) {
-            // Fuzzy match using trigram similarity
-            const simRes = await pool.query(
-              `SELECT id, name, target, equipment, image_url, body_part,
-                      similarity(name, $1) as sim
-               FROM exercises
-               ORDER BY similarity(name, $1) DESC
-               LIMIT 1`,
-              [queryTerm]
-            );
-            if (simRes.rows.length > 0 && simRes.rows[0].sim > 0.22) {
-              chosenEx = simRes.rows[0];
-            }
-          }
-
-          // Fallback: search by target muscle and common equipment
-          if (!chosenEx) {
-            const muscleTarget = (ex.target_muscle || 'pectorals').toLowerCase().trim();
-            const fallbackRes = await pool.query(
-              `SELECT id, name, target, equipment, image_url, body_part
-               FROM exercises
-               WHERE target ILIKE $1 OR body_part ILIKE $1
-               ORDER BY rating_count DESC, id ASC
-               LIMIT 1`,
-              [`%${muscleTarget}%`]
-            );
-            if (fallbackRes.rows.length > 0) {
-              chosenEx = fallbackRes.rows[0];
-            }
-          }
-
-          if (chosenEx) {
-            matchedExercises.push({
-              exercise_id: String(chosenEx.id),
-              name: chosenEx.name,
-              target: chosenEx.target,
-              equipment: chosenEx.equipment,
-              image_url: chosenEx.image_url,
-              sets: Number(ex.sets) || 3,
-              reps: String(ex.reps || '8-12'),
-              rest_time: String(ex.rest_time || '90s'),
-              sort_order: j,
-            });
-          }
-        }
-      }
-
-      matchedSessions.push({
-        name: sess.name || `Day ${i + 1}`,
-        target_muscles: sess.target_muscles || '',
-        sort_order: i,
-        exercises: matchedExercises,
-      });
-    }
+    const matchedSessions = await matchExercisesToLibrary(sessionsArray);
 
     res.json({
       name: parsed.name || `${days}-Day ${goal} Program`,
@@ -590,6 +519,224 @@ IMPORTANT: Respond ONLY with a valid JSON object in this EXACT structure (no mar
   } catch (err) {
     console.error('POST /workouts/splits/ai-generate error:', err);
     res.status(500).json({ error: err.message || 'Failed to generate AI split' });
+  }
+});
+
+// Helper function to match AI exercise suggestions to SpotMe's 1,324 exercise library
+async function matchExercisesToLibrary(sessionsArray) {
+  try {
+    await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
+  } catch (_) {}
+
+  const matchedSessions = [];
+
+  for (let i = 0; i < sessionsArray.length; i++) {
+    const sess = sessionsArray[i];
+    const matchedExercises = [];
+    const exercisesList = sess.exercises || sess.workout_exercises || sess.movements || sess.routine || [];
+
+    if (Array.isArray(exercisesList)) {
+      for (let j = 0; j < exercisesList.length; j++) {
+        const ex = exercisesList[j];
+
+        // If this exercise already has a valid library ID and photo, keep it unless marked for re-match
+        if (ex.exercise_id && ex.image_url && !ex.needs_rematch) {
+          matchedExercises.push({
+            exercise_id: String(ex.exercise_id),
+            name: ex.name,
+            target: ex.target,
+            equipment: ex.equipment,
+            image_url: ex.image_url,
+            sets: Number(ex.sets) || 3,
+            reps: String(ex.reps || '8-12'),
+            rest_time: String(ex.rest_time || '90s'),
+            sort_order: j,
+          });
+          continue;
+        }
+
+        const queryTerm = (ex.query_name || ex.name || '').toLowerCase().trim();
+        let chosenEx = null;
+
+        if (queryTerm) {
+          // Fuzzy match using trigram similarity
+          const simRes = await pool.query(
+            `SELECT id, name, target, equipment, image_url, gif_url, body_part, instructions_en, instruction_steps_en,
+                    similarity(name, $1) as sim
+             FROM exercises
+             ORDER BY similarity(name, $1) DESC
+             LIMIT 1`,
+            [queryTerm]
+          );
+          if (simRes.rows.length > 0 && simRes.rows[0].sim > 0.22) {
+            chosenEx = simRes.rows[0];
+          }
+        }
+
+        // Fallback: search by target muscle and common equipment
+        if (!chosenEx) {
+          const muscleTarget = (ex.target_muscle || ex.target || 'pectorals').toLowerCase().trim();
+          const fallbackRes = await pool.query(
+            `SELECT id, name, target, equipment, image_url, gif_url, body_part, instructions_en, instruction_steps_en
+             FROM exercises
+             WHERE target ILIKE $1 OR body_part ILIKE $1
+             ORDER BY rating_count DESC, id ASC
+             LIMIT 1`,
+            [`%${muscleTarget}%`]
+          );
+          if (fallbackRes.rows.length > 0) {
+            chosenEx = fallbackRes.rows[0];
+          }
+        }
+
+        if (chosenEx) {
+          matchedExercises.push({
+            exercise_id: String(chosenEx.id),
+            name: chosenEx.name,
+            target: chosenEx.target,
+            equipment: chosenEx.equipment,
+            image_url: chosenEx.image_url,
+            gif_url: chosenEx.gif_url,
+            instructions_en: chosenEx.instructions_en,
+            instruction_steps_en: chosenEx.instruction_steps_en,
+            sets: Number(ex.sets) || 3,
+            reps: String(ex.reps || '8-12'),
+            rest_time: String(ex.rest_time || '90s'),
+            sort_order: j,
+          });
+        }
+      }
+    }
+
+    matchedSessions.push({
+      name: sess.name || `Day ${i + 1}`,
+      target_muscles: sess.target_muscles || '',
+      sort_order: i,
+      exercises: matchedExercises,
+    });
+  }
+
+  return matchedSessions;
+}
+
+// POST /workouts/splits/ai-refine – Retry and refine existing split with replacements and user feedback notes
+router.post('/splits/ai-refine', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { current_split, replace_exercises, refine_notes } = req.body;
+
+    if (!current_split || !Array.isArray(current_split.sessions)) {
+      return res.status(400).json({ error: 'Current workout split is required for refinement.' });
+    }
+
+    const userRes = await pool.query(
+      'SELECT full_name, username, fitness_goal, experience_level, gender, weight, height, age FROM users WHERE id = $1',
+      [userId]
+    );
+    const user = userRes.rows[0] || {};
+    const goal = current_split.template_goal || user.fitness_goal || 'Muscle Hypertrophy';
+    const level = current_split.template_level || user.experience_level || 'Intermediate';
+
+    let replaceInstructions = 'None specifically marked.';
+    if (Array.isArray(replace_exercises) && replace_exercises.length > 0) {
+      replaceInstructions = replace_exercises.map((item, idx) => 
+        `- Replace "${item.name}" (in ${item.session_name || `Session ${item.session_idx + 1}`}) with a superior alternate exercise for ${item.target || 'target muscle'}.`
+      ).join('\n');
+    }
+
+    const prompt = `You are Coach Spotty, the elite master strength and hypertrophy AI coach for SpotMe.
+The lifter has reviewed their workout split and requested specific adjustments, replacements, and retries.
+
+User Profile:
+- Goal: ${goal} | Level: ${level}
+
+Lifter's Feedback / Revision Note:
+"${refine_notes && refine_notes.trim() ? refine_notes.trim() : 'Please provide fresh, alternative exercises for the selected movements.'}"
+
+Exercises Explicitly Marked for Replacement:
+${replaceInstructions}
+
+Current Program Structure:
+${JSON.stringify(current_split.sessions.map((s, sIdx) => ({
+  session_idx: sIdx,
+  name: s.name,
+  target_muscles: s.target_muscles,
+  exercises: (s.exercises || []).map((e, eIdx) => ({
+    exercise_idx: eIdx,
+    name: e.name,
+    target: e.target,
+    sets: e.sets,
+    reps: e.reps,
+    rest_time: e.rest_time
+  }))
+})), null, 2)}
+
+AI Directives:
+1. Replace every exercise explicitly marked for replacement with a different high-impact exercise from commercial gyms (Barbells, Dumbbells, Cables, Machines).
+2. Keep the non-replaced exercises intact unless the lifter's revision note asks for broad adjustments (e.g. Winter Arc intensity, more arm volume, etc.).
+3. Maintain optimal progression sets (3-4), rep ranges (e.g. "6-8", "8-12", "10-15"), and rest intervals.
+
+IMPORTANT: Respond ONLY with a valid JSON object in this EXACT structure (no markdown fences, no extra text outside JSON):
+{
+  "name": "${current_split.name || 'Refined Workout Split'}",
+  "description": "Updated 2-3 sentence scientific explanation reflecting the revisions and why these new movements suit the lifter's goal...",
+  "template_goal": "${goal}",
+  "template_level": "${level}",
+  "template_days": "${current_split.template_days || '4 Days'}",
+  "sessions": [
+    {
+      "name": "Day 1 - ...",
+      "target_muscles": "...",
+      "exercises": [
+        {
+          "query_name": "new exercise name",
+          "target_muscle": "muscle group",
+          "sets": 3,
+          "reps": "8-12",
+          "rest_time": "90s"
+        }
+      ]
+    }
+  ]
+}`;
+
+    console.log('================================================================');
+    console.log('[AI Split] 🔄 Split Refinement Request');
+    console.log(`  -> User ID: ${userId} | Goal: ${goal}`);
+    console.log(`  -> Replace Count: ${Array.isArray(replace_exercises) ? replace_exercises.length : 0}`);
+    console.log(`  -> Refine Note: "${refine_notes || ''}"`);
+
+    const rawAI = await callAI(prompt);
+    console.log('----------------------------------------------------------------');
+    console.log('[AI Split] 🤖 Refine Raw Output:\n', rawAI);
+    console.log('----------------------------------------------------------------');
+
+    const parsed = extractJson(rawAI);
+    let sessionsArray = [];
+    if (Array.isArray(parsed)) {
+      sessionsArray = parsed;
+    } else if (parsed && typeof parsed === 'object') {
+      sessionsArray = parsed.sessions || parsed.days || parsed.workouts || parsed.program?.sessions || parsed.workout_split?.sessions || parsed.routine || [];
+    }
+
+    if (!parsed || !Array.isArray(sessionsArray) || sessionsArray.length === 0) {
+      console.error('[AI Split] ❌ Refinement extraction failed!');
+      throw new Error('AI failed to refine the workout split. Please try again.');
+    }
+
+    const matchedSessions = await matchExercisesToLibrary(sessionsArray);
+
+    res.json({
+      name: parsed.name || current_split.name,
+      description: parsed.description || current_split.description,
+      template_goal: parsed.template_goal || goal,
+      template_level: parsed.template_level || level,
+      template_days: parsed.template_days || current_split.template_days,
+      sessions: matchedSessions,
+    });
+  } catch (err) {
+    console.error('POST /workouts/splits/ai-refine error:', err);
+    res.status(500).json({ error: err.message || 'Failed to refine AI split' });
   }
 });
 
