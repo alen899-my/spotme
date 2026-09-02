@@ -84,7 +84,7 @@ export default function AIChatFAB({ user }: AIChatFABProps) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    right: 18,
+    left: 18,
     zIndex: 999,
   },
   fabButton: {
