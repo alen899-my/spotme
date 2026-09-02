@@ -204,6 +204,38 @@ export default function SplitsTab() {
     if (activeTab === 'my') {
       if (loading) return <SplitsSkeleton />;
 
+      const renderAIHeader = () => (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push('/splits/ai-builder' as any)}
+          style={[
+            styles.aiBannerCard,
+            {
+              backgroundColor: isDark ? '#0D161C' : '#F0F9FF',
+              borderColor: colors.primary,
+            },
+          ]}
+        >
+          <View style={styles.aiBannerContent}>
+            <View style={[styles.aiBannerIconWrap, { backgroundColor: colors.primary + '22' }]}>
+              <Ionicons name="sparkles" size={20} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.aiBannerTitle, { color: colors.text }]}>Build Split with AI</Text>
+                <View style={[styles.aiBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.aiBadgeText}>NEW</Text>
+                </View>
+              </View>
+              <Text style={[styles.aiBannerSub, { color: colors.textMuted }]}>
+                Auto-tailored to your goal with 1,300+ library exercises & progressive overload
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+          </View>
+        </TouchableOpacity>
+      );
+
       if (splits.length === 0) {
         return (
           <View style={styles.centered}>
@@ -212,14 +244,23 @@ export default function SplitsTab() {
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Programs Yet</Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              Build your own custom program from scratch.
+              Build a science-backed routine with Coach Spotty AI or create one from scratch.
             </Text>
-            <TouchableOpacity
-              style={[styles.createNowBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/splits/create')}
-            >
-              <Text style={styles.createNowText}>CREATE FROM SCRATCH</Text>
-            </TouchableOpacity>
+            <View style={{ gap: 10, width: '100%', maxWidth: 280, marginTop: 16 }}>
+              <TouchableOpacity
+                style={[styles.createNowBtn, { backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
+                onPress={() => router.push('/splits/ai-builder' as any)}
+              >
+                <Ionicons name="sparkles" size={16} color="#FFF" />
+                <Text style={styles.createNowText}>BUILD WITH AI</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.createNowBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border }]}
+                onPress={() => router.push('/splits/create')}
+              >
+                <Text style={[styles.createNowText, { color: colors.text }]}>CREATE FROM SCRATCH</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         );
       }
@@ -232,7 +273,7 @@ export default function SplitsTab() {
           renderItem={({ item }) => renderSplit({ item })}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={null}
+          ListHeaderComponent={renderAIHeader}
         />
       );
     }
@@ -349,7 +390,8 @@ export default function SplitsTab() {
             </Text>
           </View>
           {activeTab === 'my' && (
-            <View style={styles.headerBtns}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+             
               <TouchableOpacity
                 style={styles.addBtn}
                 onPress={() => router.push('/splits/create')}
@@ -695,4 +737,61 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   createNowText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: '#FFF' },
+
+  // AI Split Builder Header & Banner
+  aiHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  aiHeaderBtnText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+  },
+  aiBannerCard: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 14,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  aiBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  aiBannerIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiBannerTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+  },
+  aiBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  aiBadgeText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 9,
+    color: '#FFF',
+    letterSpacing: 0.5,
+  },
+  aiBannerSub: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    lineHeight: 16,
+  },
 });

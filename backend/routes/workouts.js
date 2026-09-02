@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
 const authenticateToken = require('../middleware/auth');
+const { callAI, extractJson } = require('../utils/ai');
 
 const SPLIT_THEME_RULES = [
   {
@@ -408,6 +409,253 @@ router.get('/splits/:id', authenticateToken, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── AI WORKOUT SPLIT BUILDER ──────────────────────────────────────────────────
+// POST /workouts/splits/ai-generate – Generate personalized split and match with exercise library
+router.post('/splits/ai-generate', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { days_per_week, split_style, session_duration } = req.body;
+
+    // 1. Fetch user profile
+    const userRes = await pool.query(
+      'SELECT full_name, username, fitness_goal, experience_level, gender, weight, height, age FROM users WHERE id = $1',
+      [userId]
+    );
+    const user = userRes.rows[0] || {};
+
+    const goal = user.fitness_goal || 'Muscle Hypertrophy';
+    const level = user.experience_level || 'Intermediate';
+    const days = Number(days_per_week) || 4;
+    const style = split_style || 'AI Choice';
+    const duration = session_duration || '60 mins';
+
+    // 2. Build prompt for AI engine
+    const prompt = `You are Coach Spotty, the elite master strength and hypertrophy AI coach for SpotMe.
+Design a complete, scientifically backed workout split tailored specifically for this lifter.
+
+User Profile:
+- Goal: ${goal}
+- Experience Level: ${level}
+- Gender: ${user.gender || 'Not specified'}, Weight: ${user.weight || 'N/A'} kg, Height: ${user.height || 'N/A'} cm
+- Training Frequency: Exactly ${days} Days Per Week
+- Split Style Preference: ${style} (if "AI Choice", select the most proven split structure for ${days} days and ${goal}, e.g. Upper/Lower, PPL, Full Body, or Arnold Split)
+- Target Session Duration: ${duration}
+
+AI Directives:
+1. Equipment Choice: Automatically pick the optimal commercial gym equipment (Barbells, Dumbbells, Cables, and Selectorized Machines) for highest hypertrophy stimulus and safety.
+2. Focus Areas: Automatically distribute volume and weak-point focus according to ${goal} and ${level} (compounds first, followed by hypertrophy accessories and isolation finishers).
+3. Number of Sessions: Provide EXACTLY ${days} sessions (Day 1 to Day ${days}).
+4. Exercises Per Session: 5 to 6 high-stimulus exercises per session with optimal sets (3-4), rep ranges (e.g. "6-8", "8-12", "10-15"), and rest periods (e.g. "90s", "120s").
+
+IMPORTANT: Respond ONLY with a valid JSON object in this EXACT structure (no markdown fences, no extra text outside JSON):
+{
+  "name": "Creative Program Title (e.g. 4-Day Upper/Lower Hypertrophy Forge)",
+  "description": "2-3 sentences explaining why this program is optimal for their goal, weekly muscle volume distribution, and progression model.",
+  "template_goal": "${goal}",
+  "template_level": "${level}",
+  "template_days": "${days} Days",
+  "sessions": [
+    {
+      "name": "Day 1 - Upper Body Power (Chest, Back, Delts)",
+      "target_muscles": "Pectorals, Lats, Delts",
+      "exercises": [
+        {
+          "query_name": "dumbbell incline bench press",
+          "target_muscle": "pectorals",
+          "sets": 4,
+          "reps": "6-8",
+          "rest_time": "120s"
+        }
+      ]
+    }
+  ]
+}`;
+
+    console.log('================================================================');
+    console.log('[AI Split] 📥 New Split Generation Request');
+    console.log(`  -> User ID: ${userId} | Goal: ${goal} | Level: ${level}`);
+    console.log(`  -> Frequency: ${days} Days | Style: ${style} | Duration: ${duration}`);
+
+    const rawAI = await callAI(prompt);
+
+    console.log('----------------------------------------------------------------');
+    console.log('[AI Split] 🤖 Raw AI Output:\n', rawAI);
+    console.log('----------------------------------------------------------------');
+
+    const parsed = extractJson(rawAI);
+
+    console.log('[AI Split] 🔍 Parsed JSON Object Keys:', parsed ? Object.keys(parsed) : 'NULL');
+
+    let sessionsArray = [];
+    if (Array.isArray(parsed)) {
+      sessionsArray = parsed;
+    } else if (parsed && typeof parsed === 'object') {
+      sessionsArray = parsed.sessions || parsed.days || parsed.workouts || parsed.program?.sessions || parsed.workout_split?.sessions || parsed.routine || [];
+    }
+
+    if (!parsed || !Array.isArray(sessionsArray) || sessionsArray.length === 0) {
+      console.error('[AI Split] ❌ Extraction Error: Could not find valid sessions array!');
+      console.error('[AI Split] Parsed was:', JSON.stringify(parsed, null, 2));
+      throw new Error('AI failed to generate a structured workout split. Please try again.');
+    }
+
+    console.log(`[AI Split] ✅ Successfully extracted ${sessionsArray.length} sessions from AI response`);
+
+    // 3. Ensure pg_trgm extension is active for similarity matching
+    try {
+      await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm;');
+    } catch (_) {}
+
+    // 4. Match every recommended exercise against SpotMe's 1,324 exercise library
+    const matchedSessions = [];
+
+    for (let i = 0; i < sessionsArray.length; i++) {
+      const sess = sessionsArray[i];
+      const matchedExercises = [];
+      const exercisesList = sess.exercises || sess.workout_exercises || sess.movements || sess.routine || [];
+
+      if (Array.isArray(exercisesList)) {
+        for (let j = 0; j < exercisesList.length; j++) {
+          const ex = exercisesList[j];
+          const queryTerm = (ex.query_name || ex.name || '').toLowerCase().trim();
+
+          let chosenEx = null;
+
+          if (queryTerm) {
+            // Fuzzy match using trigram similarity
+            const simRes = await pool.query(
+              `SELECT id, name, target, equipment, image_url, body_part,
+                      similarity(name, $1) as sim
+               FROM exercises
+               ORDER BY similarity(name, $1) DESC
+               LIMIT 1`,
+              [queryTerm]
+            );
+            if (simRes.rows.length > 0 && simRes.rows[0].sim > 0.22) {
+              chosenEx = simRes.rows[0];
+            }
+          }
+
+          // Fallback: search by target muscle and common equipment
+          if (!chosenEx) {
+            const muscleTarget = (ex.target_muscle || 'pectorals').toLowerCase().trim();
+            const fallbackRes = await pool.query(
+              `SELECT id, name, target, equipment, image_url, body_part
+               FROM exercises
+               WHERE target ILIKE $1 OR body_part ILIKE $1
+               ORDER BY rating_count DESC, id ASC
+               LIMIT 1`,
+              [`%${muscleTarget}%`]
+            );
+            if (fallbackRes.rows.length > 0) {
+              chosenEx = fallbackRes.rows[0];
+            }
+          }
+
+          if (chosenEx) {
+            matchedExercises.push({
+              exercise_id: String(chosenEx.id),
+              name: chosenEx.name,
+              target: chosenEx.target,
+              equipment: chosenEx.equipment,
+              image_url: chosenEx.image_url,
+              sets: Number(ex.sets) || 3,
+              reps: String(ex.reps || '8-12'),
+              rest_time: String(ex.rest_time || '90s'),
+              sort_order: j,
+            });
+          }
+        }
+      }
+
+      matchedSessions.push({
+        name: sess.name || `Day ${i + 1}`,
+        target_muscles: sess.target_muscles || '',
+        sort_order: i,
+        exercises: matchedExercises,
+      });
+    }
+
+    res.json({
+      name: parsed.name || `${days}-Day ${goal} Program`,
+      description: parsed.description || 'Customized science-based training program built by AI.',
+      template_goal: parsed.template_goal || goal,
+      template_level: parsed.template_level || level,
+      template_days: `${days} Days`,
+      sessions: matchedSessions,
+    });
+  } catch (err) {
+    console.error('POST /workouts/splits/ai-generate error:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate AI split' });
+  }
+});
+
+// POST /workouts/splits/save-ai-split – Transactionally save the generated split to user's account
+router.post('/splits/save-ai-split', authenticateToken, async (req, res) => {
+  const { name, description, template_goal, template_level, template_days, sessions } = req.body;
+  const userId = req.user.id;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Program name is required' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Create split
+    const splitRes = await client.query(
+      `INSERT INTO workout_splits (user_id, name, description, template_goal, template_level, template_days, is_template)
+       VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING *`,
+      [
+        userId,
+        name.trim(),
+        description || null,
+        template_goal || null,
+        template_level || null,
+        template_days || null,
+      ]
+    );
+    const split = splitRes.rows[0];
+
+    // 2. Create sessions and exercises
+    if (Array.isArray(sessions)) {
+      for (let i = 0; i < sessions.length; i++) {
+        const sess = sessions[i];
+        const sessRes = await client.query(
+          'INSERT INTO workout_sessions (split_id, name, sort_order) VALUES ($1, $2, $3) RETURNING *',
+          [split.id, sess.name || `Day ${i + 1}`, i]
+        );
+        const session = sessRes.rows[0];
+
+        if (Array.isArray(sess.exercises)) {
+          for (let j = 0; j < sess.exercises.length; j++) {
+            const ex = sess.exercises[j];
+            await client.query(
+              'INSERT INTO workout_session_exercises (session_id, exercise_id, sets, reps, rest_time, weight, sort_order) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+              [session.id, ex.exercise_id, ex.sets || 3, ex.reps || '8-12', ex.rest_time || '90s', '0', j]
+            );
+          }
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      id: split.id,
+      name: split.name,
+      message: 'Program created and saved successfully!',
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('POST /workouts/splits/save-ai-split error:', err);
+    res.status(500).json({ error: err.message || 'Failed to save split' });
+  } finally {
+    client.release();
   }
 });
 

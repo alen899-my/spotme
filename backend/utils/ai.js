@@ -38,7 +38,7 @@ const GROQ_FALLBACK_MODELS = [
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ═══════════════════════════════════════════════════════════════════════════
-// JSON Extractor (handles markdown fences, brackets, raw JSON)
+// JSON Extractor (handles markdown fences, brackets, trailing commas, raw JSON)
 // ═══════════════════════════════════════════════════════════════════════════
 function extractJson(text) {
   if (!text) return null;
@@ -46,27 +46,41 @@ function extractJson(text) {
 
   const raw = String(text).trim();
 
-  try { return JSON.parse(raw); } catch (_) {}
+  // Helper to remove trailing commas before } or ]
+  const cleanTrailingCommas = (str) => str.replace(/,\s*([}\]])/g, '$1');
 
+  // 1. Direct parse
+  try { return JSON.parse(raw); } catch (_) {}
+  try { return JSON.parse(cleanTrailingCommas(raw)); } catch (_) {}
+
+  // 2. Fenced markdown block ```json ... ```
   const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   if (fencedMatch?.[1]) {
-    try { return JSON.parse(fencedMatch[1].trim()); } catch (_) {}
+    const trimmed = fencedMatch[1].trim();
+    try { return JSON.parse(trimmed); } catch (_) {}
+    try { return JSON.parse(cleanTrailingCommas(trimmed)); } catch (_) {}
   }
 
+  // 3. Find bracket array [...]
   const firstBrace = raw.indexOf('{');
   const firstBracket = raw.indexOf('[');
 
   if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
     const lastBracket = raw.lastIndexOf(']');
     if (lastBracket > firstBracket) {
-      try { return JSON.parse(raw.slice(firstBracket, lastBracket + 1)); } catch (_) {}
+      const chunk = raw.slice(firstBracket, lastBracket + 1);
+      try { return JSON.parse(chunk); } catch (_) {}
+      try { return JSON.parse(cleanTrailingCommas(chunk)); } catch (_) {}
     }
   }
 
+  // 4. Find object brace {...}
   if (firstBrace !== -1) {
     const lastBrace = raw.lastIndexOf('}');
     if (lastBrace > firstBrace) {
-      try { return JSON.parse(raw.slice(firstBrace, lastBrace + 1)); } catch (_) {}
+      const chunk = raw.slice(firstBrace, lastBrace + 1);
+      try { return JSON.parse(chunk); } catch (_) {}
+      try { return JSON.parse(cleanTrailingCommas(chunk)); } catch (_) {}
     }
   }
 
