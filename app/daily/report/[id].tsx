@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Image,
-  Animated, Dimensions,
+  Animated, Dimensions, TextInput, KeyboardAvoidingView,
+  Platform, Keyboard, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -21,11 +22,130 @@ import { formatWeightValue, weightUnit } from '../../../utils/units';
 const { width: SCREEN_W } = Dimensions.get('window');
 const coachAvatarSource = require('../../../assets/coach/fit-cartoon-character-training.png');
 
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt?: string;
+}
+
+const QUICK_PROMPTS = [
+  { label: '💡 How to improve next session?', text: 'How can I progressively overload and improve on my next session?' },
+  { label: '⏱️ Rate my rest intervals', text: 'Were my rest intervals optimal for muscle hypertrophy and strength?' },
+  { label: '🏋️‍♂️ Analyze my top sets', text: 'Break down my best sets and where my muscular fatigue started accumulating.' },
+  { label: '🥗 Post-workout nutrition tips', text: 'What should I eat right now to maximize recovery and protein synthesis?' },
+];
+
 const cleanText = (value?: string) => {
   if (!value) return '';
   return String(value).replace(/\r/g, '').trim();
 };
 
+// ── Inline Markdown Renderer ────────────────────────────────────────────────
+function MarkdownText({ content, textColor, primaryColor, isDark }: { content: string; textColor: string; primaryColor: string; isDark: boolean }) {
+  if (!content) return null;
+
+  const lines = content.split('\n');
+  const elements = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+
+    if (!trimmed) {
+      elements.push(<View key={`space-${i}`} style={{ height: 6 }} />);
+      continue;
+    }
+
+    // Heading # or ##
+    if (/^#{1,2}\s/.test(raw)) {
+      const heading = raw.replace(/^#{1,2}\s+/, '');
+      elements.push(
+        <Text key={`h-${i}`} style={[S.mdHeading, { color: textColor }]}>
+          {heading}
+        </Text>
+      );
+      continue;
+    }
+
+    // Bullet item (- or *)
+    if (/^[-*•]\s/.test(trimmed)) {
+      const bulletText = trimmed.replace(/^[-*•]\s+/, '');
+      elements.push(
+        <View key={`li-${i}`} style={S.mdBulletRow}>
+          <Text style={[S.mdBulletDot, { color: primaryColor }]}>•</Text>
+          <Text style={[S.mdBodyText, { color: textColor, flex: 1 }]}>
+            {renderInlineSpans(bulletText, textColor, primaryColor, isDark)}
+          </Text>
+        </View>
+      );
+      continue;
+    }
+
+    // Numbered item (1. 2.)
+    const numMatch = trimmed.match(/^(\d+)[.)]\s+(.*)$/);
+    if (numMatch) {
+      elements.push(
+        <View key={`nl-${i}`} style={S.mdBulletRow}>
+          <Text style={[S.mdNumPrefix, { color: primaryColor }]}>{numMatch[1]}.</Text>
+          <Text style={[S.mdBodyText, { color: textColor, flex: 1 }]}>
+            {renderInlineSpans(numMatch[2], textColor, primaryColor, isDark)}
+          </Text>
+        </View>
+      );
+      continue;
+    }
+
+    // Standard paragraph line
+    elements.push(
+      <Text key={`p-${i}`} style={[S.mdBodyText, { color: textColor }]}>
+        {renderInlineSpans(trimmed, textColor, primaryColor, isDark)}
+      </Text>
+    );
+  }
+
+  return <View style={{ gap: 2 }}>{elements}</View>;
+}
+
+function renderInlineSpans(text: string, textColor: string, primaryColor: string, isDark: boolean) {
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <Text key={index} style={[S.mdBold, { color: textColor }]}>
+          {part.slice(2, -2)}
+        </Text>
+      );
+    }
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return (
+        <Text key={index} style={[S.mdItalic, { color: textColor }]}>
+          {part.slice(1, -1)}
+        </Text>
+      );
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return (
+        <Text
+          key={index}
+          style={[
+            S.mdCode,
+            {
+              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+              color: primaryColor,
+            },
+          ]}
+        >
+          {part.slice(1, -1)}
+        </Text>
+      );
+    }
+    return part;
+  });
+}
+
+// ── Animated Skeleton Block ─────────────────────────────────────────────────
 function SkeletonBlock({ width, height, style, isDark }: any) {
   const opacity = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
@@ -54,12 +174,57 @@ function SkeletonBlock({ width, height, style, isDark }: any) {
   );
 }
 
-// ── Bubble wrapper: coach message bubble ──
-function CoachBubble({ children, style }: { children: React.ReactNode; style?: any }) {
-  return <View style={[S.bubble, style]}>{children}</View>;
+// ── Animated 3-Dot Thinking Bubble ──────────────────────────────────────────
+function ThinkingBubble({ colors, isDark }: { colors: any; isDark: boolean }) {
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dot3 = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = (dot: Animated.Value, delay: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, { toValue: 1, duration: 380, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0.3, duration: 380, useNativeDriver: true }),
+        ])
+      ).start();
+    };
+    pulse(dot1, 0);
+    pulse(dot2, 140);
+    pulse(dot3, 280);
+  }, []);
+
+  return (
+    <View style={S.chatRow}>
+      <Image source={coachAvatarSource} style={S.coachAvatar} />
+      <View
+        style={[
+          S.coachBubble,
+          {
+            backgroundColor: isDark ? '#141A1E' : '#FFFFFF',
+            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)',
+            borderLeftColor: colors.primary,
+          },
+        ]}
+      >
+        <View style={S.thinkingRow}>
+          <Text style={[S.thinkingLabel, { color: colors.textMuted }]}>Coach Spotty is analyzing</Text>
+          <View style={S.dotsWrap}>
+            {[dot1, dot2, dot3].map((dot, i) => (
+              <Animated.View
+                key={i}
+                style={[S.dot, { backgroundColor: colors.primary, opacity: dot }]}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
 }
 
-// ── Stat pill ──
+// ── Stat Pill ───────────────────────────────────────────────────────────────
 function StatPill({ icon, iconColor, value, label, colors }: any) {
   return (
     <View style={S.statPill}>
@@ -72,6 +237,9 @@ function StatPill({ icon, iconColor, value, label, colors }: any) {
   );
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═════════════════════════════════════════════════════════════════════════════
 export default function WorkoutReportScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -93,9 +261,15 @@ export default function WorkoutReportScreen() {
   const [fullContent, setFullContent] = useState<any>(null);
   const [expandedExercises, setExpandedExercises] = useState<Set<string>>(new Set());
 
+  // User profile for chat bubbles
+  const [userProfile, setUserProfile] = useState<{ name: string; picUrl: string | null }>({ name: 'You', picUrl: null });
+
+  // Interactive chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+
   const scrollRef = useRef<ScrollView>(null);
-  const typingOpacity = useRef(new Animated.Value(0.4)).current;
-  const regenerateScale = useRef(new Animated.Value(1)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const progressBarWidth = progressAnim.interpolate({
@@ -150,31 +324,28 @@ export default function WorkoutReportScreen() {
   }, [id]);
 
   useEffect(() => {
-    let animation: Animated.CompositeAnimation | null = null;
-    if (isTyping) {
-      animation = Animated.loop(Animated.sequence([
-        Animated.timing(typingOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(typingOpacity, { toValue: 0.4, duration: 600, useNativeDriver: true }),
-      ]));
-      animation.start();
-    } else typingOpacity.setValue(0.4);
-    return () => animation?.stop();
-  }, [isTyping]);
-
-  useEffect(() => {
     const fetchReport = async () => {
       try {
         const token = await getToken();
-        const res = await axios.get(`${API_URL}/daily/reports/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-        setReport(res.data);
-        setWorkoutId(res.data.daily_workout_id);
-        if (res.data.full_content) setFullContent(res.data.full_content);
-        if (res.data.progress_pct != null) {
-          setProgressPct(res.data.progress_pct);
-          Animated.timing(progressAnim, { toValue: res.data.progress_pct, duration: 300, useNativeDriver: false }).start();
+        const [reportRes, profileRes] = await Promise.all([
+          axios.get(`${API_URL}/daily/reports/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_URL}/profile`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null),
+        ]);
+        setReport(reportRes.data);
+        setWorkoutId(reportRes.data.daily_workout_id);
+        if (reportRes.data.full_content) setFullContent(reportRes.data.full_content);
+        if (reportRes.data.progress_pct != null) {
+          setProgressPct(reportRes.data.progress_pct);
+          Animated.timing(progressAnim, { toValue: reportRes.data.progress_pct, duration: 300, useNativeDriver: false }).start();
         }
-        if (res.data.current_phase) setCurrentPhase(res.data.current_phase);
-        if (res.data.status === 'generating') { setIsTyping(true); startPoll(showSuccessModal); }
+        if (reportRes.data.current_phase) setCurrentPhase(reportRes.data.current_phase);
+        if (reportRes.data.status === 'generating') { setIsTyping(true); startPoll(showSuccessModal); }
+        if (profileRes?.data) {
+          setUserProfile({
+            name: profileRes.data.full_name || profileRes.data.username || 'You',
+            picUrl: profileRes.data.profile_pic_url || null,
+          });
+        }
       } catch (err) { console.error('Failed to load report:', err); }
       finally { setLoading(false); }
     };
@@ -184,14 +355,6 @@ export default function WorkoutReportScreen() {
       if (pollTimeout.current) clearTimeout(pollTimeout.current);
     };
   }, [id, startPoll, showSuccessModal]);
-
-  const initialContentLoaded = useRef(false);
-  useEffect(() => {
-    if (fullContent && isTyping && initialContentLoaded.current && scrollRef.current) {
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 200);
-    }
-    if (fullContent && !initialContentLoaded.current) initialContentLoaded.current = true;
-  }, [fullContent, isTyping]);
 
   const toggleExercise = (name: string) => {
     setExpandedExercises(prev => {
@@ -215,61 +378,74 @@ export default function WorkoutReportScreen() {
     } catch (err) { console.error('Failed to regenerate report:', err); clearPoll(); }
   };
 
+  const handleSendMessage = async (textToSend?: string) => {
+    const messageText = (textToSend || inputValue).trim();
+    if (!messageText || sendingMessage || !workoutId) return;
+
+    setInputValue('');
+
+    const userMsg: ChatMessage = {
+      id: `usr-${Date.now()}`,
+      role: 'user',
+      content: messageText,
+    };
+
+    setChatMessages(prev => [...prev, userMsg]);
+    setSendingMessage(true);
+
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+
+    try {
+      const token = await getToken();
+      const response = await axios.post(
+        `${API_URL}/daily/workouts/${workoutId}/chat`,
+        {
+          message: messageText,
+          history: chatMessages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const aiMsg: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: response.data?.reply || "I've reviewed your workout! Keep pushing with strong progressive overload.",
+      };
+
+      setChatMessages(prev => [...prev, aiMsg]);
+    } catch (err: any) {
+      console.error('Chat error:', err);
+      showToast('Could not send message. Please try again.', 'error');
+      const fallbackMsg: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: "I'm temporarily having trouble connecting. Ensure you stay well hydrated and prioritize adequate rest between heavy sets!",
+      };
+      setChatMessages(prev => [...prev, fallbackMsg]);
+    } finally {
+      setSendingMessage(false);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 200);
+    }
+  };
+
   const durationMin = report?.total_duration_seconds ? `${Math.round((report.total_duration_seconds || 0) / 60)} min` : '-';
   const volumeKg = report?.total_volume ? `${formatWeightValue(Math.round(Number(report.total_volume)), unitSystem)} ${weightUnit(unitSystem)}` : '-';
   const cals = report?.calories_burned ? `${report.calories_burned} kcal` : '-';
   const displayDate = report ? formatDate(report.workout_date) : '';
 
-  const oldSummary = cleanText(report?.summary);
-  const oldWins = report?.good_things ? cleanText(report.good_things).split('\n').filter(Boolean) : [];
-  const oldImprove = report?.areas_to_improve ? cleanText(report.areas_to_improve).split('\n').filter(Boolean) : [];
-  const oldRecommendations = report?.recommendations ? cleanText(report.recommendations).split('\n').filter(Boolean) : [];
-
-  const isLegacy = !fullContent && report?.status === 'completed';
   const isGenerating = (report?.status === 'generating' || isTyping) && !pollFailed;
   const isDone = report?.status === 'completed' || (fullContent && !isGenerating);
 
-  const hasContent = (key: string) =>
-    fullContent && fullContent[key] && (
-      (Array.isArray(fullContent[key]) && fullContent[key].length > 0) ||
-      (typeof fullContent[key] === 'string' && fullContent[key].trim().length > 0)
-    );
-
-  // ── BG tint helpers ──
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';
+  const cardBg = isDark ? '#11161B' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
 
-  const tintBg = (hex: string) =>
-    isDark ? hex + '14' : hex + '0F';
-  const tintBorder = (hex: string) =>
-    isDark ? hex + '28' : hex + '22';
+  const tintBg = (hex: string) => isDark ? hex + '14' : hex + '0F';
+  const tintBorder = (hex: string) => isDark ? hex + '28' : hex + '22';
 
-  // ── Avatar row helper ──
-  const AvatarRow = ({ children }: { children: React.ReactNode }) => (
-    <View style={S.msgRow}>
-      <Image source={coachAvatarSource} style={S.avatar} />
-      <View style={S.msgCol}>{children}</View>
-    </View>
-  );
-
-  const SenderLabel = () => (
-    <Text style={[S.senderLabel, { color: colors.textMuted }]}>Coach Spotty</Text>
-  );
-
-  // ────────────────────────────────────────────
   if (loading) {
     return (
       <View style={[S.center, { backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (!report && !pollFailed) {
-    return (
-      <View style={[S.center, { backgroundColor: colors.bg }]}>
-        <MaterialCommunityIcons name="file-document-outline" size={64} color={colors.textDim} />
-        <Text style={{ fontFamily: FONTS.body, fontSize: 15, color: colors.textMuted }}>Report not found</Text>
       </View>
     );
   }
@@ -280,7 +456,7 @@ export default function WorkoutReportScreen() {
         <MaterialCommunityIcons name="alert-circle-outline" size={64} color="#EF4444" />
         <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 18, color: colors.text, marginTop: 8 }}>Generation Failed</Text>
         <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: colors.textMuted, textAlign: 'center', maxWidth: 260, marginTop: 4 }}>
-          Coach Spotty couldn't generate your report. This might be due to server load or missing data.
+          Coach Spotty couldn't generate your report. Tap below to retry.
         </Text>
         <TouchableOpacity
           onPress={() => {
@@ -288,7 +464,7 @@ export default function WorkoutReportScreen() {
             const retry = async () => {
               try {
                 const token = await getToken();
-                const genRes = await axios.post(`${API_URL}/daily/workouts/${workoutId}/generate-report`, {}, { headers: { Authorization: `Bearer ${token}` } });
+                const genRes = await axios.post(`${API_URL}/daily/workouts/${workoutId}/generate-report`, { force: true }, { headers: { Authorization: `Bearer ${token}` } });
                 if (genRes.data.report_id) router.replace(`/daily/report/${genRes.data.report_id}`);
               } catch {}
               setLoading(false);
@@ -303,19 +479,18 @@ export default function WorkoutReportScreen() {
     );
   }
 
-  // ────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── HEADER ── */}
+      {/* ── TOP HEADER (BankApplication style with SpotMe Theme) ── */}
       <View style={[S.header, { paddingTop: insets.top + 8, backgroundColor: colors.card, borderBottomColor: cardBorder }]}>
         <TouchableOpacity
           onPress={() => router.back()}
-          style={[S.headerBtn, { backgroundColor: colors.inputBg }]}
+          style={[S.headerBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: cardBorder }]}
           activeOpacity={0.75}
         >
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+          <Ionicons name="chevron-back" size={20} color={colors.text} />
         </TouchableOpacity>
 
         <View style={S.headerCenter}>
@@ -324,403 +499,455 @@ export default function WorkoutReportScreen() {
             <View style={S.onlineDot} />
           </View>
           <View style={{ marginLeft: 10 }}>
-            <Text style={[S.headerName, { color: colors.text }]}>Coach Spotty</Text>
-            {isGenerating
-              ? <Text style={[S.headerSub, { color: colors.primary }]}>Analyzing your workout…</Text>
-              : <Text style={[S.headerSub, { color: '#10B981' }]}>Ready</Text>
-            }
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Text style={[S.headerName, { color: colors.text }]}>Coach Spotty</Text>
+              <View style={[S.aiChip, { backgroundColor: colors.primary + '18' }]}>
+                <Ionicons name="sparkles" size={10} color={colors.primary} />
+                <Text style={[S.aiChipText, { color: colors.primary }]}>AI COACH</Text>
+              </View>
+            </View>
+            {isGenerating ? (
+              <Text style={[S.headerSub, { color: colors.primary }]}>Analyzing your workout…</Text>
+            ) : (
+              <Text style={[S.headerSub, { color: '#10B981' }]}>Online • Session Loaded</Text>
+            )}
           </View>
         </View>
 
-        {isDone ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {isDone && (
+            <TouchableOpacity
+              onPress={() => router.push(`/daily/view/${report?.daily_workout_id}`)}
+              style={[S.headerBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: cardBorder }]}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="open-outline" size={17} color={colors.primary} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
-            onPress={() => router.push(`/daily/view/${report.daily_workout_id}`)}
-            style={[S.headerBtn, { backgroundColor: colors.inputBg }]}
+            onPress={handleRegenerate}
+            disabled={regenerating || isGenerating}
+            style={[S.headerBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: cardBorder }]}
             activeOpacity={0.75}
           >
-            <Ionicons name="open-outline" size={18} color={colors.primary} />
+            <Ionicons name="refresh" size={17} color={colors.textMuted} />
           </TouchableOpacity>
-        ) : <View style={{ width: 38 }} />}
+        </View>
       </View>
 
-      {/* ── SCROLL ── */}
-      <ScrollView
-        ref={scrollRef}
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
-        contentContainerStyle={[S.scroll, { paddingBottom: Math.max(insets.bottom, 16) + 40 }]}
-        showsVerticalScrollIndicator={false}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? (insets.top + 56) : 0}
       >
-
-        {/* ─── GENERATING SKELETONS ─── */}
-        {isGenerating && (
-          <>
-            {/* Progress */}
+        {/* ── MAIN SCROLL FEED ── */}
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={[S.scroll, { paddingBottom: 24 }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          onScrollBeginDrag={Keyboard.dismiss}
+        >
+          {/* Progress bar when generating */}
+          {isGenerating && (
             <View style={S.progressWrap}>
               <View style={[S.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-                <Animated.View style={[S.progressFill, { width: progressBarWidth }]} />
+                <Animated.View style={[S.progressFill, { width: progressBarWidth, backgroundColor: colors.primary }]} />
               </View>
               <View style={S.progressLabels}>
-                <Text style={[S.phaseText, { color: colors.textMuted }]}>{currentPhase || 'Analyzing your workout…'}</Text>
+                <Text style={[S.phaseText, { color: colors.textMuted }]}>{currentPhase || 'Coach Spotty is analyzing…'}</Text>
                 <Text style={[S.phasePct, { color: colors.primary }]}>{progressPct}%</Text>
               </View>
             </View>
+          )}
 
-            {[
-              [[80, 10], [100, 10], [85, 10], [60, 10]],
-              [[100, 10], [70, 10]],
-              [[60, 12], [100, 10], [90, 10], [80, 10]],
-              [[35, 10], [100, 10], [100, 10], [75, 10]],
-            ].map((lines, gi) => (
-              <View key={gi} style={[S.msgRow, { marginBottom: 14 }]}>
-                <SkeletonBlock isDark={isDark} width={34} height={34} style={{ borderRadius: 17, marginRight: 10, flexShrink: 0 }} />
-                <View style={{ flex: 1 }}>
-                  <SkeletonBlock isDark={isDark} width={70} height={9} style={{ marginBottom: 8 }} />
-                  <View style={[S.skeletonCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC' }]}>
+          {/* Generating Skeletons */}
+          {isGenerating && (
+            <View style={{ gap: 14, marginVertical: 8 }}>
+              {[
+                [[75, 12], [100, 10], [90, 10], [60, 10]],
+                [[100, 10], [80, 10]],
+                [[60, 12], [100, 10], [85, 10]],
+              ].map((lines, gi) => (
+                <View key={gi} style={S.chatRow}>
+                  <Image source={coachAvatarSource} style={S.coachAvatar} />
+                  <View style={[S.coachBubble, { backgroundColor: cardBg, borderColor: cardBorder }]}>
                     {lines.map(([w, h], li) => (
-                      <SkeletonBlock key={li} isDark={isDark} width={`${w}%`} height={h} style={li > 0 ? { marginTop: 7 } : undefined} />
+                      <SkeletonBlock key={li} isDark={isDark} width={`${w}%`} height={h} style={li > 0 ? { marginTop: 8 } : undefined} />
                     ))}
                   </View>
                 </View>
-              </View>
-            ))}
-          </>
-        )}
+              ))}
+            </View>
+          )}
 
-        {/* ─── COMPLETED ─── */}
-        {isDone && (
-          <>
-            {/* Date divider */}
+          {/* Date Divider */}
+          {displayDate ? (
             <View style={S.dividerRow}>
               <View style={[S.dividerLine, { backgroundColor: cardBorder }]} />
               <View style={[S.dividerPill, { backgroundColor: colors.card, borderColor: cardBorder }]}>
-                <Ionicons name="barbell-outline" size={11} color={colors.textDim} style={{ marginRight: 4 }} />
+                <Ionicons name="barbell-outline" size={12} color={colors.textDim} style={{ marginRight: 4 }} />
                 <Text style={[S.dividerText, { color: colors.textDim }]}>{displayDate}</Text>
               </View>
               <View style={[S.dividerLine, { backgroundColor: cardBorder }]} />
             </View>
+          ) : null}
 
-            {/* Greeting bubble */}
-            <AvatarRow>
-              <SenderLabel />
-              <CoachBubble style={{ backgroundColor: tintBg('#2596BE'), borderColor: tintBorder('#2596BE') }}>
+          {/* Welcome Message */}
+          {isDone && (
+            <View style={S.chatRow}>
+              <Image source={coachAvatarSource} style={S.coachAvatar} />
+              <View style={[S.coachBubble, { backgroundColor: tintBg(colors.primary), borderColor: tintBorder(colors.primary), borderLeftColor: colors.primary }]}>
                 <Text style={[S.bubbleText, { color: colors.text }]}>
-                  Hey! Here's my full coaching analysis for your session. Let's break it down. 💪
+                  Hey! I've completed your post-workout coaching analysis. Here is the full technical breakdown, fatigue metrics, and recommendations! 💪
                 </Text>
-              </CoachBubble>
-            </AvatarRow>
+              </View>
+            </View>
+          )}
 
-            {/* Stats card */}
+          {/* ── STATS CARD ── */}
+          {isDone && (
             <View style={[S.statsCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
               <View style={S.statsCardHeader}>
                 <Ionicons name="pulse-outline" size={15} color={colors.primary} />
-                <Text style={[S.statsCardTitle, { color: colors.textMuted }]}>Session Stats</Text>
+                <Text style={[S.statsCardTitle, { color: colors.textMuted }]}>Session Summary Stats</Text>
               </View>
               <View style={S.statsRow}>
                 <StatPill icon="time-outline" iconColor={colors.primary} value={durationMin} label="Duration" colors={colors} />
                 <View style={[S.statsSep, { backgroundColor: cardBorder }]} />
                 <StatPill icon="barbell-outline" iconColor="#10B981" value={volumeKg} label="Volume" colors={colors} />
                 <View style={[S.statsSep, { backgroundColor: cardBorder }]} />
-                <StatPill icon="flame-outline" iconColor="#EF4444" value={cals} label="Burned" colors={colors} />
+                <StatPill icon="flame-outline" iconColor="#EF4444" value={cals} label="Calories" colors={colors} />
               </View>
             </View>
+          )}
 
-            {/* ─── LEGACY FORMAT ─── */}
-            {isLegacy && (
-              <>
-                {oldSummary ? (
-                  <View style={S.msgRowGrouped}>
-                    <CoachBubble style={{ backgroundColor: cardBg, borderColor: cardBorder }}>
-                      <View style={S.bubbleHeader}>
-                        <Ionicons name="clipboard-outline" size={14} color={colors.primary} />
-                        <Text style={[S.bubbleLabel, { color: colors.primary }]}>Session Summary</Text>
-                      </View>
-                      <Text style={[S.bubbleText, { color: colors.text, marginTop: 8 }]}>{oldSummary}</Text>
-                    </CoachBubble>
-                  </View>
-                ) : null}
-
-                {oldWins.length > 0 && (
-                  <AvatarRow>
-                    <SenderLabel />
-                    <CoachBubble style={{ backgroundColor: tintBg('#10B981'), borderColor: tintBorder('#10B981') }}>
-                      <View style={S.bubbleHeader}>
-                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                        <Text style={[S.bubbleLabel, { color: '#10B981' }]}>Highlights</Text>
-                      </View>
-                      {oldWins.map((w, i) => (
-                        <View key={i} style={[S.listRow, i === 0 && { marginTop: 10 }]}>
-                          <View style={[S.listDot, { backgroundColor: '#10B981' }]} />
-                          <Text style={[S.listText, { color: colors.text }]}>{w}</Text>
-                        </View>
-                      ))}
-                    </CoachBubble>
-                  </AvatarRow>
-                )}
-
-                {oldImprove.length > 0 && (
-                  <AvatarRow>
-                    <SenderLabel />
-                    <CoachBubble style={{ backgroundColor: tintBg('#F59E0B'), borderColor: tintBorder('#F59E0B') }}>
-                      <View style={S.bubbleHeader}>
-                        <Ionicons name="trending-up" size={14} color="#F59E0B" />
-                        <Text style={[S.bubbleLabel, { color: '#F59E0B' }]}>Areas to Improve</Text>
-                      </View>
-                      {oldImprove.map((item, i) => (
-                        <View key={i} style={[S.listRow, i === 0 && { marginTop: 10 }]}>
-                          <View style={[S.listDot, { backgroundColor: '#F59E0B' }]} />
-                          <Text style={[S.listText, { color: colors.text }]}>{item}</Text>
-                        </View>
-                      ))}
-                    </CoachBubble>
-                  </AvatarRow>
-                )}
-
-                {oldRecommendations.length > 0 && (
-                  <AvatarRow>
-                    <SenderLabel />
-                    <CoachBubble style={{ backgroundColor: tintBg('#8B5CF6'), borderColor: tintBorder('#8B5CF6') }}>
-                      <View style={S.bubbleHeader}>
-                        <Ionicons name="bulb-outline" size={14} color="#8B5CF6" />
-                        <Text style={[S.bubbleLabel, { color: '#8B5CF6' }]}>Recommendations</Text>
-                      </View>
-                      {oldRecommendations.map((r, i) => (
-                        <View key={i} style={[S.listRow, i === 0 && { marginTop: 10 }]}>
-                          <View style={[S.numChip, { backgroundColor: '#8B5CF6' }]}>
-                            <Text style={S.numChipText}>{i + 1}</Text>
-                          </View>
-                          <Text style={[S.listText, { color: colors.text }]}>{r}</Text>
-                        </View>
-                      ))}
-                    </CoachBubble>
-                  </AvatarRow>
-                )}
-              </>
-            )}
-
-            {/* ─── NEW full_content FORMAT ─── */}
-            {!isLegacy && (
-              <>
-                {/* Profile Context */}
-                {hasContent('profile_context') && (
-                  <AvatarRow>
-                    <SenderLabel />
-                    <CoachBubble style={{ backgroundColor: tintBg('#8B5CF6'), borderColor: tintBorder('#8B5CF6') }}>
-                      <View style={S.bubbleHeader}>
-                        <Ionicons name="person-circle-outline" size={14} color="#8B5CF6" />
-                        <Text style={[S.bubbleLabel, { color: '#8B5CF6' }]}>Profile Context</Text>
-                      </View>
-                      <Text style={[S.bubbleText, { color: colors.text, marginTop: 8 }]}>{fullContent.profile_context}</Text>
-                    </CoachBubble>
-                  </AvatarRow>
-                )}
-
-                {/* Workout Summary */}
-                {hasContent('workout_summary') && (
-                  <View style={S.msgRowGrouped}>
-                    <CoachBubble style={{ backgroundColor: cardBg, borderColor: cardBorder }}>
-                      <View style={S.bubbleHeader}>
-                        <Ionicons name="clipboard-outline" size={14} color={colors.primary} />
-                        <Text style={[S.bubbleLabel, { color: colors.primary }]}>Workout Summary</Text>
-                      </View>
-                      <Text style={[S.bubbleText, { color: colors.text, marginTop: 8 }]}>{fullContent.workout_summary}</Text>
-                    </CoachBubble>
-                  </View>
-                )}
-
-                {/* Exercise Analyses */}
-                {hasContent('exercise_analyses') && Array.isArray(fullContent.exercise_analyses) && fullContent.exercise_analyses.length > 0 && (
-                  <AvatarRow>
-                    <SenderLabel />
-                    <View style={{ width: '100%' }}>
-                      <Text style={[S.sectionTag, { color: colors.textMuted }]}>
-                        <Ionicons name="fitness-outline" size={12} color={colors.textMuted} /> Exercise Breakdown
-                      </Text>
-                      {fullContent.exercise_analyses.map((ex: any, idx: number) => {
-                        const isExpanded = expandedExercises.has(ex.name);
-                        const isPositive = ex.verdict
-                          ? /good|strong|consistent|solid|great|excellent/i.test(ex.verdict)
-                          : false;
-                        const verdictColor = isPositive ? '#10B981' : '#F59E0B';
-
-                        return (
-                          <View
-                            key={idx}
-                            style={[
-                              S.accordionCard,
-                              idx > 0 && { marginTop: 8 },
-                              { backgroundColor: cardBg, borderColor: cardBorder },
-                            ]}
-                          >
-                            {/* Accordion header */}
-                            <TouchableOpacity
-                              activeOpacity={0.75}
-                              onPress={() => toggleExercise(ex.name)}
-                              style={S.accordionHeader}
-                            >
-                              <View style={S.accordionTopRow}>
-                                {ex.image_url ? (
-                                  <Image source={{ uri: ex.image_url }} style={S.accordionExerciseImg} />
-                                ) : (
-                                  <View style={[S.accordionIconWrap, { backgroundColor: colors.primary + '18' }]}>
-                                    <MaterialCommunityIcons name="dumbbell" size={14} color={colors.primary} />
-                                  </View>
-                                )}
-                                <Text style={[S.accordionName, { color: colors.text }]} numberOfLines={1}>
-                                  {ex.name}
-                                </Text>
-                              </View>
-                              <View style={S.accordionBottomRow}>
-                                {ex.verdict ? (
-                                  <View style={[S.verdictChip, { backgroundColor: verdictColor + '18' }]}>
-                                    <Text style={[S.verdictChipText, { color: verdictColor }]}>{ex.verdict}</Text>
-                                  </View>
-                                ) : null}
-                                <View style={[S.chevronWrap, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
-                                  <Ionicons
-                                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                                    size={14}
-                                    color={colors.textDim}
-                                  />
-                                </View>
-                              </View>
-                            </TouchableOpacity>
-
-                            {/* Accordion body */}
-                            {isExpanded && (
-                              <View style={[S.accordionBody, { borderTopColor: cardBorder }]}>
-                                {ex.sets_detail ? (
-                                  <View style={S.accordionSection}>
-                                    <View style={S.accordionSectionHeader}>
-                                      <Ionicons name="list-outline" size={12} color={colors.textDim} />
-                                      <Text style={[S.accordionSectionLabel, { color: colors.textMuted }]}>Sets Performed</Text>
-                                    </View>
-                                    <Text style={[S.accordionSectionText, { color: colors.textMuted }]}>{ex.sets_detail}</Text>
-                                  </View>
-                                ) : null}
-                                {ex.analysis ? (
-                                  <View style={[S.accordionSection, ex.sets_detail && S.accordionSectionSpaced, { backgroundColor: colors.primary + '0A', borderRadius: 10, padding: 10 }]}>
-                                    <View style={S.accordionSectionHeader}>
-                                      <Ionicons name="analytics-outline" size={12} color={colors.primary} />
-                                      <Text style={[S.accordionSectionLabel, { color: colors.primary }]}>Coach's Take</Text>
-                                    </View>
-                                    <Text style={[S.accordionSectionText, { color: colors.text }]}>{ex.analysis}</Text>
-                                  </View>
-                                ) : null}
-                              </View>
-                            )}
-                          </View>
-                        );
-                      })}
+          {/* ── FULL CONTENT SECTIONS ── */}
+          {fullContent && isDone && (
+            <>
+              {/* Profile Context */}
+              {fullContent.profile_context ? (
+                <View style={S.chatRow}>
+                  <Image source={coachAvatarSource} style={S.coachAvatar} />
+                  <View style={[S.coachBubble, { backgroundColor: tintBg('#8B5CF6'), borderColor: tintBorder('#8B5CF6'), borderLeftColor: '#8B5CF6' }]}>
+                    <View style={S.bubbleHeader}>
+                      <Ionicons name="person-circle-outline" size={14} color="#8B5CF6" />
+                      <Text style={[S.bubbleLabel, { color: '#8B5CF6' }]}>Goal & Profile Alignment</Text>
                     </View>
-                  </AvatarRow>
-                )}
-
-                {/* Overall Assessment */}
-                {hasContent('overall_assessment') && (
-                  <AvatarRow>
-                    <SenderLabel />
-                    <CoachBubble style={{ backgroundColor: tintBg('#10B981'), borderColor: tintBorder('#10B981') }}>
-                      <View style={S.bubbleHeader}>
-                        <Ionicons name="trophy-outline" size={14} color="#10B981" />
-                        <Text style={[S.bubbleLabel, { color: '#10B981' }]}>Overall Assessment</Text>
-                      </View>
-                      <Text style={[S.bubbleText, { color: colors.text, marginTop: 8 }]}>{fullContent.overall_assessment}</Text>
-                    </CoachBubble>
-                  </AvatarRow>
-                )}
-
-                {/* Rest Analysis */}
-                {hasContent('rest_analysis') && (
-                  <View style={S.msgRowGrouped}>
-                    <CoachBubble style={{ backgroundColor: tintBg('#F59E0B'), borderColor: tintBorder('#F59E0B') }}>
-                      <View style={S.bubbleHeader}>
-                        <Ionicons name="timer-outline" size={14} color="#F59E0B" />
-                        <Text style={[S.bubbleLabel, { color: '#F59E0B' }]}>Rest & Recovery</Text>
-                      </View>
-                      <Text style={[S.bubbleText, { color: colors.text, marginTop: 8 }]}>{fullContent.rest_analysis}</Text>
-                    </CoachBubble>
+                    <Text style={[S.bubbleText, { color: colors.text, marginTop: 8 }]}>{fullContent.profile_context}</Text>
                   </View>
-                )}
+                </View>
+              ) : null}
 
-                {/* Skip Analysis */}
-                {hasContent('skip_analysis') && !fullContent.skip_analysis.toLowerCase().includes('no exercises were skipped') && (
-                  <View style={S.msgRowGrouped}>
-                    <CoachBubble style={{ backgroundColor: tintBg('#EF4444'), borderColor: tintBorder('#EF4444') }}>
-                      <View style={S.bubbleHeader}>
-                        <Ionicons name="alert-circle-outline" size={14} color="#EF4444" />
-                        <Text style={[S.bubbleLabel, { color: '#EF4444' }]}>Skipped Exercises</Text>
-                      </View>
-                      <Text style={[S.bubbleText, { color: colors.text, marginTop: 8 }]}>{fullContent.skip_analysis}</Text>
-                    </CoachBubble>
+              {/* Workout Summary */}
+              {fullContent.workout_summary ? (
+                <View style={S.chatRow}>
+                  <Image source={coachAvatarSource} style={S.coachAvatar} />
+                  <View style={[S.coachBubble, { backgroundColor: cardBg, borderColor: cardBorder, borderLeftColor: colors.primary }]}>
+                    <View style={S.bubbleHeader}>
+                      <Ionicons name="clipboard-outline" size={14} color={colors.primary} />
+                      <Text style={[S.bubbleLabel, { color: colors.primary }]}>Coaching Overview</Text>
+                    </View>
+                    <Text style={[S.bubbleText, { color: colors.text, marginTop: 8 }]}>{fullContent.workout_summary}</Text>
                   </View>
-                )}
+                </View>
+              ) : null}
 
-                {/* Recommendations */}
-                {hasContent('recommendations') && Array.isArray(fullContent.recommendations) && fullContent.recommendations.length > 0 && (
-                  <AvatarRow>
-                    <SenderLabel />
-                    <CoachBubble style={{ backgroundColor: tintBg('#8B5CF6'), borderColor: tintBorder('#8B5CF6') }}>
-                      <View style={S.bubbleHeader}>
-                        <Ionicons name="bulb-outline" size={14} color="#8B5CF6" />
-                        <Text style={[S.bubbleLabel, { color: '#8B5CF6' }]}>Recommendations</Text>
-                      </View>
-                      {fullContent.recommendations.map((rec: string, i: number) => (
+              {/* In-depth Exercise Breakdown Accordion */}
+              {Array.isArray(fullContent.exercise_analyses) && fullContent.exercise_analyses.length > 0 && (
+                <View style={S.chatRow}>
+                  <Image source={coachAvatarSource} style={S.coachAvatar} />
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, marginLeft: 2 }}>
+                      <Ionicons name="fitness" size={14} color={colors.primary} />
+                      <Text style={[S.sectionTag, { color: colors.textMuted }]}>Deep Exercise Breakdown</Text>
+                    </View>
+
+                    {fullContent.exercise_analyses.map((ex: any, idx: number) => {
+                      const isExpanded = expandedExercises.has(ex.name);
+                      const isPositive = ex.verdict
+                        ? /good|strong|consistent|solid|great|excellent|pr/i.test(ex.verdict)
+                        : false;
+                      const verdictColor = isPositive ? '#10B981' : '#F59E0B';
+
+                      return (
                         <View
-                          key={i}
+                          key={idx}
                           style={[
-                            S.listRow,
-                            i === 0 && { marginTop: 10 },
-                            i > 0 && { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' },
+                            S.accordionCard,
+                            idx > 0 && { marginTop: 10 },
+                            { backgroundColor: cardBg, borderColor: cardBorder },
                           ]}
                         >
-                          <View style={[S.numChip, { backgroundColor: '#8B5CF6' }]}>
-                            <Text style={S.numChipText}>{i + 1}</Text>
+                          {/* Accordion header */}
+                          <TouchableOpacity
+                            activeOpacity={0.75}
+                            onPress={() => toggleExercise(ex.name)}
+                            style={S.accordionHeader}
+                          >
+                            <View style={S.accordionTopRow}>
+                              {ex.image_url ? (
+                                <Image source={{ uri: ex.image_url }} style={S.accordionExerciseImg} />
+                              ) : (
+                                <View style={[S.accordionIconWrap, { backgroundColor: colors.primary + '18' }]}>
+                                  <MaterialCommunityIcons name="dumbbell" size={14} color={colors.primary} />
+                                </View>
+                              )}
+                              <Text style={[S.accordionName, { color: colors.text }]} numberOfLines={1}>
+                                {ex.name}
+                              </Text>
+                            </View>
+
+                            <View style={S.accordionBottomRow}>
+                              {ex.verdict ? (
+                                <View style={[S.verdictChip, { backgroundColor: verdictColor + '18' }]}>
+                                  <Text style={[S.verdictChipText, { color: verdictColor }]}>{ex.verdict}</Text>
+                                </View>
+                              ) : null}
+                              <View style={[S.chevronWrap, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+                                <Ionicons
+                                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                                  size={14}
+                                  color={colors.textDim}
+                                />
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+
+                          {/* Accordion body */}
+                          {isExpanded && (
+                            <View style={[S.accordionBody, { borderTopColor: cardBorder }]}>
+                              {ex.sets_detail ? (
+                                <View style={S.accordionSection}>
+                                  <View style={S.accordionSectionHeader}>
+                                    <Ionicons name="list-outline" size={12} color={colors.textDim} />
+                                    <Text style={[S.accordionSectionLabel, { color: colors.textMuted }]}>Sets Performed</Text>
+                                  </View>
+                                  <Text style={[S.accordionSectionText, { color: colors.textMuted }]}>{ex.sets_detail}</Text>
+                                </View>
+                              ) : null}
+                              {ex.analysis ? (
+                                <View style={[S.accordionSection, ex.sets_detail && S.accordionSectionSpaced, { backgroundColor: colors.primary + '0A', borderRadius: 10, padding: 10 }]}>
+                                  <View style={S.accordionSectionHeader}>
+                                    <Ionicons name="analytics-outline" size={12} color={colors.primary} />
+                                    <Text style={[S.accordionSectionLabel, { color: colors.primary }]}>Coach's Master Take</Text>
+                                  </View>
+                                  <Text style={[S.accordionSectionText, { color: colors.text }]}>{ex.analysis}</Text>
+                                </View>
+                              ) : null}
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* Overall Assessment */}
+              {fullContent.overall_assessment ? (
+                <View style={S.chatRow}>
+                  <Image source={coachAvatarSource} style={S.coachAvatar} />
+                  <View style={[S.coachBubble, { backgroundColor: tintBg('#10B981'), borderColor: tintBorder('#10B981'), borderLeftColor: '#10B981' }]}>
+                    <View style={S.bubbleHeader}>
+                      <Ionicons name="trophy-outline" size={14} color="#10B981" />
+                      <Text style={[S.bubbleLabel, { color: '#10B981' }]}>Overall Evaluation</Text>
+                    </View>
+                    <Text style={[S.bubbleText, { color: colors.text, marginTop: 8 }]}>{fullContent.overall_assessment}</Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Rest Analysis */}
+              {fullContent.rest_analysis ? (
+                <View style={S.chatRow}>
+                  <Image source={coachAvatarSource} style={S.coachAvatar} />
+                  <View style={[S.coachBubble, { backgroundColor: tintBg('#F59E0B'), borderColor: tintBorder('#F59E0B'), borderLeftColor: '#F59E0B' }]}>
+                    <View style={S.bubbleHeader}>
+                      <Ionicons name="timer-outline" size={14} color="#F59E0B" />
+                      <Text style={[S.bubbleLabel, { color: '#F59E0B' }]}>Rest & Recovery Patterns</Text>
+                    </View>
+                    <Text style={[S.bubbleText, { color: colors.text, marginTop: 8 }]}>{fullContent.rest_analysis}</Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Actionable Recommendations */}
+              {Array.isArray(fullContent.recommendations) && fullContent.recommendations.length > 0 && (
+                <View style={S.chatRow}>
+                  <Image source={coachAvatarSource} style={S.coachAvatar} />
+                  <View style={[S.coachBubble, { backgroundColor: cardBg, borderColor: cardBorder, borderLeftColor: colors.primary }]}>
+                    <View style={S.bubbleHeader}>
+                      <Ionicons name="bulb-outline" size={14} color={colors.primary} />
+                      <Text style={[S.bubbleLabel, { color: colors.primary }]}>Key Directives for Next Session</Text>
+                    </View>
+                    <View style={{ gap: 8, marginTop: 10 }}>
+                      {fullContent.recommendations.map((rec: string, rIdx: number) => (
+                        <View key={rIdx} style={S.recRow}>
+                          <View style={[S.recNum, { backgroundColor: colors.primary }]}>
+                            <Text style={S.recNumText}>{rIdx + 1}</Text>
                           </View>
-                          <Text style={[S.listText, { color: colors.text }]}>{rec}</Text>
+                          <Text style={[S.recText, { color: colors.text }]}>{rec}</Text>
                         </View>
                       ))}
-                    </CoachBubble>
-                  </AvatarRow>
-                )}
-              </>
-            )}
-
-            {/* Regenerate */}
-            <AvatarRow>
-              <SenderLabel />
-              <Animated.View style={{ transform: [{ scale: regenerateScale }], width: '100%' }}>
-                <View style={[S.regenCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-                  <View style={S.regenTop}>
-                    <View style={[S.regenIconWrap, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
-                      <Ionicons name="help-circle-outline" size={18} color={colors.textDim} />
                     </View>
-                    <Text style={[S.regenHint, { color: colors.textMuted }]}>
-                      Not satisfied with this analysis? I can take another look.
-                    </Text>
                   </View>
-                  <TouchableOpacity
-                    onPress={handleRegenerate}
-                    activeOpacity={0.85}
-                    onPressIn={() => Animated.spring(regenerateScale, { toValue: 0.97, useNativeDriver: true, friction: 8 }).start()}
-                    onPressOut={() => Animated.spring(regenerateScale, { toValue: 1, useNativeDriver: true, friction: 8 }).start()}
-                    style={S.regenBtn}
-                  >
-                    <LinearGradient
-                      colors={['#2596BE', '#1A7A9E']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={S.regenBtnInner}
-                    >
-                      <Ionicons name="refresh-outline" size={15} color="#FFF" />
-                      <Text style={S.regenBtnText}>Re-analyze Workout</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
                 </View>
-              </Animated.View>
-            </AvatarRow>
-          </>
-        )}
-      </ScrollView>
+              )}
+            </>
+          )}
+
+          {/* ── CONVERSATIONAL CHAT MESSAGES ── */}
+          {chatMessages.map(msg => {
+            const isUser = msg.role === 'user';
+            const userInitials = userProfile.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+            return (
+              <View
+                key={msg.id}
+                style={[
+                  S.chatRow,
+                  isUser ? S.chatRowUser : S.chatRowCoach,
+                ]}
+              >
+                {/* Coach avatar on left */}
+                {!isUser && <Image source={coachAvatarSource} style={S.coachAvatar} />}
+
+                <View
+                  style={[
+                    S.chatBubble,
+                    isUser
+                      ? [S.userBubble, { backgroundColor: colors.primary }]
+                      : [
+                          S.coachBubble,
+                          {
+                            backgroundColor: cardBg,
+                            borderColor: cardBorder,
+                            borderLeftColor: colors.primary,
+                          },
+                        ],
+                  ]}
+                >
+                  {isUser ? (
+                    <Text style={S.userBubbleText}>{msg.content}</Text>
+                  ) : (
+                    <MarkdownText
+                      content={msg.content}
+                      textColor={colors.text}
+                      primaryColor={colors.primary}
+                      isDark={isDark}
+                    />
+                  )}
+                </View>
+
+                {/* User avatar on right */}
+                {isUser && (
+                  <View style={[S.userAvatarCircle, { backgroundColor: colors.primary + '28' }]}>
+                    {userProfile.picUrl ? (
+                      <Image source={{ uri: userProfile.picUrl }} style={S.userAvatarImg} />
+                    ) : (
+                      <Text style={[S.userAvatarInitials, { color: colors.primary }]}>{userInitials}</Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            );
+          })}
+
+          {/* Thinking Bubble while sending message */}
+          {sendingMessage && <ThinkingBubble colors={colors} isDark={isDark} />}
+
+          {/* Quick Prompt Suggestions */}
+          {isDone && !sendingMessage && (
+            <View style={S.quickSuggestionsWrap}>
+              <Text style={[S.quickSuggestionsTitle, { color: colors.textMuted }]}>
+                Ask Coach Spotty:
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={S.quickSuggestionsList}
+              >
+                {QUICK_PROMPTS.map((qp, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    activeOpacity={0.75}
+                    onPress={() => handleSendMessage(qp.text)}
+                    style={[
+                      S.quickChip,
+                      {
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                        borderColor: cardBorder,
+                      },
+                    ]}
+                  >
+                    <Text style={[S.quickChipText, { color: colors.text }]}>{qp.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* ── BOTTOM INPUT BAR (BankApplication style with SpotMe Theme) ── */}
+        <View
+          style={[
+            S.inputBarContainer,
+            {
+              backgroundColor: colors.card,
+              borderTopColor: cardBorder,
+              paddingBottom: Math.max(insets.bottom, 10),
+            },
+          ]}
+        >
+          <View
+            style={[
+              S.inputWrap,
+              {
+                backgroundColor: isDark ? '#0D1115' : '#F1F5F9',
+                borderColor: cardBorder,
+              },
+            ]}
+          >
+            <TextInput
+              style={[S.inputField, { color: colors.text }]}
+              placeholder="Ask Coach Spotty about your workout..."
+              placeholderTextColor={colors.textMuted}
+              value={inputValue}
+              onChangeText={setInputValue}
+              multiline
+              maxLength={1000}
+              editable={!sendingMessage}
+              onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 350)}
+              returnKeyType="default"
+              blurOnSubmit={false}
+            />
+
+            <TouchableOpacity
+              onPress={() => handleSendMessage()}
+              disabled={!inputValue.trim() || sendingMessage}
+              style={[
+                S.sendBtn,
+                {
+                  backgroundColor: inputValue.trim() && !sendingMessage ? colors.primary : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'),
+                },
+              ]}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="arrow-up"
+                size={18}
+                color={inputValue.trim() && !sendingMessage ? '#FFFFFF' : colors.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[S.disclaimerText, { color: colors.textDim }]}>
+            Coach Spotty AI gives tailored fitness guidance • Train safely & listen to your body
+          </Text>
+        </View>
+      </KeyboardAvoidingView>
 
       {/* ── SUCCESS OVERLAY ── */}
       {showSuccess && (
@@ -734,8 +961,8 @@ export default function WorkoutReportScreen() {
             <View style={S.successIcon}>
               <Ionicons name="checkmark" size={28} color="#10B981" />
             </View>
-            <Text style={[S.successTitle, { color: colors.text }]}>Report Generated!</Text>
-            <Text style={[S.successSub, { color: colors.textMuted }]}>Coach Spotty has analyzed your workout</Text>
+            <Text style={[S.successTitle, { color: colors.text }]}>Master Report Ready!</Text>
+            <Text style={[S.successSub, { color: colors.textMuted }]}>Coach Spotty has completed your full coaching breakdown</Text>
           </View>
         </Animated.View>
       )}
@@ -743,6 +970,9 @@ export default function WorkoutReportScreen() {
   );
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// STYLES
+// ═════════════════════════════════════════════════════════════════════════════
 const S = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
 
@@ -755,10 +985,11 @@ const S = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerBtn: {
-    width: 38, height: 38, borderRadius: 12,
+    width: 36, height: 36, borderRadius: 11,
+    borderWidth: 1,
     justifyContent: 'center', alignItems: 'center',
   },
-  headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', marginHorizontal: 12 },
+  headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', marginHorizontal: 10 },
   avatarWrap: { position: 'relative' },
   headerAvatar: { width: 36, height: 36, borderRadius: 18 },
   onlineDot: {
@@ -766,98 +997,107 @@ const S = StyleSheet.create({
     width: 10, height: 10, borderRadius: 5,
     backgroundColor: '#10B981', borderWidth: 1.5, borderColor: '#FFF',
   },
-  headerName: { fontFamily: FONTS.bodyBold, fontSize: 15 },
+  headerName: { fontFamily: FONTS.bodyBold, fontSize: 14 },
   headerSub: { fontFamily: FONTS.body, fontSize: 11, marginTop: 1 },
+  aiChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  aiChipText: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5 },
 
   // ── Progress ──
-  progressWrap: { paddingHorizontal: 24, paddingVertical: 16 },
-  progressTrack: { width: '100%', height: 5, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: 5, borderRadius: 3, backgroundColor: '#2596BE' },
-  progressLabels: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  phaseText: { fontFamily: FONTS.body, fontSize: 12 },
-  phasePct: { fontFamily: FONTS.bodyBold, fontSize: 15 },
+  progressWrap: { paddingHorizontal: 16, paddingVertical: 12 },
+  progressTrack: { width: '100%', height: 4, borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: 4, borderRadius: 2 },
+  progressLabels: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
+  phaseText: { fontFamily: FONTS.body, fontSize: 11 },
+  phasePct: { fontFamily: FONTS.bodyBold, fontSize: 13 },
 
-  // ── Scroll ──
-  scroll: { paddingHorizontal: 14, paddingTop: 14, flexGrow: 1 },
-
-  // ── Date divider ──
-  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
+  // ── Scroll & Chat Rows ──
+  scroll: { paddingHorizontal: 14, paddingTop: 10, flexGrow: 1 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 14 },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
   dividerPill: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 5,
-    borderRadius: 20, borderWidth: 1, marginHorizontal: 12,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 20, borderWidth: 1, marginHorizontal: 10,
   },
-  dividerText: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  dividerText: { fontFamily: FONTS.bodyBold, fontSize: 10.5 },
 
-  // ── Message rows ──
-  msgRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
-  msgRowGrouped: { paddingLeft: 44, marginBottom: 14 },
-  msgCol: { flex: 1 },
-  avatar: { width: 34, height: 34, borderRadius: 17, marginRight: 10, marginTop: 18 },
-  senderLabel: { fontFamily: FONTS.bodyBold, fontSize: 10.5, marginBottom: 5, marginLeft: 2 },
-  sectionTag: { fontFamily: FONTS.bodyBold, fontSize: 11, marginBottom: 8, marginLeft: 2 },
+  chatRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 12 },
+  chatRowCoach: { justifyContent: 'flex-start' },
+  chatRowUser: { justifyContent: 'flex-end' },
+  coachAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8, flexShrink: 0 },
 
-  // ── Bubble ──
-  bubble: {
-    borderRadius: 18,
+  // User avatar bubble (right side)
+  userAvatarCircle: {
+    width: 32, height: 32, borderRadius: 16,
+    marginLeft: 8, flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  userAvatarImg: { width: 32, height: 32, borderRadius: 16 },
+  userAvatarInitials: { fontFamily: FONTS.bodyBold, fontSize: 12 },
+
+  chatBubble: { borderRadius: 18, padding: 13 },
+  userBubble: {
+    borderBottomRightRadius: 4,
+    maxWidth: '75%',
+  },
+  userBubbleText: {
+    fontFamily: FONTS.body,
+    fontSize: 13.5,
+    lineHeight: 20,
+    color: '#FFFFFF',
+  },
+
+  coachBubble: {
+    flex: 1,
+    borderRadius: 16,
     borderTopLeftRadius: 4,
     borderWidth: 1,
-    padding: 14,
-    alignSelf: 'stretch',
+    borderLeftWidth: 3.5,
+    padding: 13,
   },
   bubbleHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  bubbleLabel: { fontFamily: FONTS.bodyBold, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.5 },
+  bubbleLabel: { fontFamily: FONTS.bodyBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
   bubbleText: { fontFamily: FONTS.body, fontSize: 13.5, lineHeight: 20 },
+  sectionTag: { fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 0.3 },
 
   // ── Stats card ──
   statsCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 16,
-    marginLeft: 44,
-    marginBottom: 14,
-  },
-  statsCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
-  statsCardTitle: { fontFamily: FONTS.bodyBold, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.5 },
-  statsRow: { flexDirection: 'row', alignItems: 'center' },
-  statPill: { flex: 1, alignItems: 'center', gap: 5 },
-  statIconWrap: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  statPillValue: { fontFamily: FONTS.bodyBold, fontSize: 14 },
-  statPillLabel: { fontFamily: FONTS.body, fontSize: 10 },
-  statsSep: { width: StyleSheet.hairlineWidth, height: 36 },
-
-  // ── List items ──
-  listRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  listDot: { width: 6, height: 6, borderRadius: 3, marginTop: 8, flexShrink: 0 },
-  listText: { fontFamily: FONTS.body, fontSize: 13.5, lineHeight: 20, flex: 1 },
-  numChip: {
-    width: 20, height: 20, borderRadius: 6,
-    justifyContent: 'center', alignItems: 'center',
-    marginTop: 1, flexShrink: 0,
-  },
-  numChipText: { fontFamily: FONTS.bodyBold, fontSize: 11, color: '#FFF' },
-
-  // ── Accordion ──
-  accordionCard: {
     borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginLeft: 40,
+    marginBottom: 12,
+  },
+  statsCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  statsCardTitle: { fontFamily: FONTS.bodyBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statsRow: { flexDirection: 'row', alignItems: 'center' },
+  statPill: { flex: 1, alignItems: 'center', gap: 4 },
+  statIconWrap: { width: 30, height: 30, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
+  statPillValue: { fontFamily: FONTS.bodyBold, fontSize: 13.5 },
+  statPillLabel: { fontFamily: FONTS.body, fontSize: 9.5 },
+  statsSep: { width: StyleSheet.hairlineWidth, height: 32 },
+
+  // ── Accordion Exercise Breakdown ──
+  accordionCard: {
+    borderRadius: 14,
     borderWidth: 1,
     overflow: 'hidden',
   },
   accordionHeader: {
-    padding: 13,
-    gap: 8,
+    padding: 12,
+    gap: 6,
   },
   accordionTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   accordionBottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginLeft: 38,
+    justifyContent: 'space-between',
+    marginLeft: 36,
   },
   accordionIconWrap: {
     width: 28, height: 28, borderRadius: 8,
@@ -868,52 +1108,107 @@ const S = StyleSheet.create({
     width: 28, height: 28, borderRadius: 8,
     flexShrink: 0,
   },
-  accordionName: { fontFamily: FONTS.bodyBold, fontSize: 13.5, flex: 1 },
-  verdictChip: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 8 },
-  verdictChipText: { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 0.2 },
+  accordionName: { fontFamily: FONTS.bodyBold, fontSize: 13, flex: 1 },
+  verdictChip: { paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 6 },
+  verdictChipText: { fontFamily: FONTS.bodyBold, fontSize: 9.5, letterSpacing: 0.2 },
   chevronWrap: {
-    width: 24, height: 24, borderRadius: 7,
+    width: 22, height: 22, borderRadius: 6,
     justifyContent: 'center', alignItems: 'center',
   },
   accordionBody: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    padding: 13,
+    padding: 12,
     gap: 8,
   },
   accordionSection: {},
-  accordionSectionSpaced: { marginTop: 10 },
-  accordionSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
-  accordionSectionLabel: { fontFamily: FONTS.bodyBold, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.3 },
-  accordionSectionText: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 19 },
+  accordionSectionSpaced: { marginTop: 8 },
+  accordionSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  accordionSectionLabel: { fontFamily: FONTS.bodyBold, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.3 },
+  accordionSectionText: { fontFamily: FONTS.body, fontSize: 12.5, lineHeight: 18 },
 
-  // ── Skeleton card ──
-  skeletonCard: { borderRadius: 14, padding: 14, gap: 0 },
+  // ── Directives / Recommendations ──
+  recRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  recNum: { width: 18, height: 18, borderRadius: 5, justifyContent: 'center', alignItems: 'center', marginTop: 1, flexShrink: 0 },
+  recNumText: { fontFamily: FONTS.bodyBold, fontSize: 10, color: '#FFF' },
+  recText: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 18.5, flex: 1 },
 
-  // ── Regen ──
-  regenCard: { borderRadius: 18, borderWidth: 1, padding: 14 },
-  regenTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
-  regenIconWrap: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  regenHint: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 18, flex: 1 },
-  regenBtn: { borderRadius: 12, overflow: 'hidden' },
-  regenBtnInner: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 13, paddingHorizontal: 16,
+  // ── Thinking animation ──
+  thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  thinkingLabel: { fontFamily: FONTS.body, fontSize: 12 },
+  dotsWrap: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+
+  // ── Quick suggestions chips ──
+  quickSuggestionsWrap: { marginTop: 8, marginBottom: 4, paddingLeft: 40 },
+  quickSuggestionsTitle: { fontFamily: FONTS.bodyBold, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
+  quickSuggestionsList: { gap: 8, paddingRight: 10 },
+  quickChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  quickChipText: { fontFamily: FONTS.bodyBold, fontSize: 11.5 },
+
+  // ── Input Bar ──
+  inputBarContainer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    gap: 4,
   },
-  regenBtnText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  inputField: {
+    flex: 1,
+    fontFamily: FONTS.body,
+    fontSize: 13.5,
+    maxHeight: 90,
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  sendBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  disclaimerText: {
+    fontFamily: FONTS.body,
+    fontSize: 9.5,
+    textAlign: 'center',
+    marginTop: 2,
+  },
 
-  // ── Success ──
+  // ── Success Modal ──
   successCard: {
-    borderRadius: 24, borderWidth: 1,
-    paddingVertical: 32, paddingHorizontal: 40,
-    alignItems: 'center', gap: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15, shadowRadius: 20, elevation: 12,
+    width: SCREEN_W * 0.78,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'center',
+    gap: 8,
   },
   successIcon: {
-    width: 56, height: 56, borderRadius: 28,
+    width: 52, height: 52, borderRadius: 26,
     backgroundColor: '#10B98118',
     justifyContent: 'center', alignItems: 'center',
+    marginBottom: 4,
   },
-  successTitle: { fontFamily: FONTS.heading, fontSize: 20 },
-  successSub: { fontFamily: FONTS.body, fontSize: 13, textAlign: 'center' },
+  successTitle: { fontFamily: FONTS.bodyBold, fontSize: 17, textAlign: 'center' },
+  successSub: { fontFamily: FONTS.body, fontSize: 12, textAlign: 'center', lineHeight: 17 },
+
+  // ── Markdown Styles ──
+  mdHeading: { fontFamily: FONTS.bodyBold, fontSize: 14.5, marginTop: 4, marginBottom: 2 },
+  mdBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginVertical: 1.5 },
+  mdBulletDot: { fontSize: 16, lineHeight: 19 },
+  mdNumPrefix: { fontFamily: FONTS.bodyBold, fontSize: 12, lineHeight: 19, minWidth: 16 },
+  mdBodyText: { fontFamily: FONTS.body, fontSize: 13.5, lineHeight: 19.5 },
+  mdBold: { fontFamily: FONTS.bodyBold },
+  mdItalic: { fontStyle: 'italic' },
+  mdCode: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, paddingHorizontal: 4, borderRadius: 4 },
 });

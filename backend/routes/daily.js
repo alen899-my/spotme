@@ -13,7 +13,7 @@ const {
   estimateWorkoutCalories,
   formatRecordValue,
 } = require('../utils/workoutAnalytics');
-const { callAI } = require('../utils/ai');
+const { callAI, extractJson } = require('../utils/ai');
 
 // ── Helper: format seconds to MM:SS ───────────────────────────────────────────
 function formatTime(sec) {
@@ -1617,6 +1617,14 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 // ── POST /daily/workouts/:id/generate-report ── Generate AI workout report ──
 router.post('/workouts/:id/generate-report', authenticateToken, async (req, res) => {
   const client = await pool.connect();
+  let isClientReleased = false;
+  const releaseClient = () => {
+    if (!isClientReleased) {
+      isClientReleased = true;
+      try { client.release(); } catch (_) {}
+    }
+  };
+
   try {
     const workoutId = parseInt(req.params.id);
     const userId = req.user.id;
@@ -1632,6 +1640,7 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
     `, [workoutId, userId]);
 
     if (workoutRes.rows.length === 0) {
+      releaseClient();
       return res.status(404).json({ error: 'Completed workout not found' });
     }
 
@@ -1662,7 +1671,7 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
       [userId]
     );
     if (parseInt(countRes.rows[0].count) >= 10) {
-      client.release();
+      releaseClient();
       return res.status(429).json({ error: 'Daily report limit reached. You can generate up to 10 reports per day.' });
     }
 
@@ -1672,6 +1681,7 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
       [workoutId, userId]
     );
     if (existing.rows.length > 0) {
+      releaseClient();
       return res.json({ report_id: existing.rows[0].id, status: existing.rows[0].status });
     }
 
@@ -1685,6 +1695,30 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
 
     // Respond immediately so the client knows report is being generated
     res.json({ report_id: reportId, status: 'generating' });
+
+    // Scoped variables & helpers for background generation
+    const fullContent = {};
+    let generationError;
+
+    async function updateProgress(pct, phase, content) {
+      try {
+        await client.query(
+          `UPDATE workout_reports SET full_content = $1, progress_pct = $2, current_phase = $3 WHERE id = $4`,
+          [JSON.stringify(content), pct, phase, reportId]
+        );
+      } catch (e) {
+        console.warn('[updateProgress] warning:', e.message);
+      }
+    }
+
+    async function callWithFallback(prompt, model = null, options = {}) {
+      try {
+        return await callAI(prompt, null, model, options);
+      } catch (err) {
+        console.error('[Workout AI Report] callWithFallback error:', err.message);
+        return null;
+      }
+    }
 
     // Continue generation in background
     try {
@@ -1878,43 +1912,14 @@ router.post('/workouts/:id/generate-report', authenticateToken, async (req, res)
       }
 
       // ═══════════════════════════════════════════════════════════════════
-      // Multi-phase report generation (Groq + OpenRouter free, sequential)
+      // MASTER ATTEMPT: Unified Deep-Dive Coaching Report Generation
       // ═══════════════════════════════════════════════════════════════════
 
-      const fullContent = {};
-      let generationError;
+      await updateProgress(20, 'Master Coaching Engine: Analyzing full session...', fullContent);
 
-      const extractSection = (text, marker) => {
-        if (!text) return '';
-        const regex = new RegExp(`${marker}\\s*([\\s\\S]*?)(?=\\n===|$)`);
-        const match = text.match(regex);
-        return match ? match[1].trim() : '';
-      };
-
-      async function updateProgress(pct, phase, content) {
-        await client.query(
-          `UPDATE workout_reports SET full_content = $1, progress_pct = $2, current_phase = $3 WHERE id = $4`,
-          [JSON.stringify(content), pct, phase, reportId]
-        );
-      }
-
-      async function callWithFallback(prompt, model, options = {}) {
-        try {
-          return await callAI(prompt, null, model, options);
-        } catch (_) {
-          const alt = model === 'groq' ? 'openrouter/free' : 'groq';
-          try {
-            return await callAI(prompt, null, alt, options);
-          } catch (__) {
-            return null;
-          }
-        }
-      }
-
-      const completedEx = exercises.filter(e => e.is_completed && !e.is_skipped).length;
-
-      // ── Phase 1: Profile context + workout summary (Groq — fast) ─────
-      const phase1Prompt = `You are Coach Spotty, an elite personal trainer. Address the person directly as "you" — never refer to them as "the athlete" or "the user". Analyze how this workout fits your profile and write a clear summary.
+      const masterPrompt = `You are Coach Spotty, an elite master strength and conditioning personal trainer.
+Address the person directly as "you" — NEVER refer to them as "the athlete", "the user", or "the lifter".
+Analyze the entire workout session in extraordinary detail and return a complete Master Analysis JSON object.
 
 =====USER PROFILE=====
 Goal: ${w.fitness_goal || 'General fitness'}
@@ -1922,161 +1927,111 @@ Experience: ${w.experience_level || 'Intermediate'}
 Age: ${w.age || 'N/A'}, Gender: ${w.gender || 'N/A'}
 Height: ${w.height || 'N/A'} cm, Weight: ${w.user_weight || 'N/A'} kg
 
-=====WORKOUT DATA=====
+=====FULL WORKOUT DATA=====
 ${dataBlock}
 
-Write TWO sections with these exact markers:
+You MUST return ONLY a valid JSON object with the following exact keys and structure:
+{
+  "profile_context": "2-3 insightful sentences connecting this specific session to their fitness goal and experience level. Reference exact volume/intensity metrics.",
+  "workout_summary": "2-3 sentences summarizing the session stats: duration, total volume lifted, sets/reps completed, skipped movements, and overall density.",
+  "exercise_analyses": [
+    {
+      "name": "Exact exercise name",
+      "sets_detail": "Clear summary of all sets performed, weights, reps, rep drops, and rest notes.",
+      "analysis": "3-5 in-depth sentences analyzing this specific exercise: warm-up vs top working sets, rep fatigue/drop-off, mechanical tension, progression rate (e1RM), and actionable form/technique cues based on the numbers.",
+      "verdict": "Short punchy badge string (e.g. 'Strong Performance 💪', 'New PR Overload 🏆', 'Watch Fatigue Drop ⚠️', 'Needs Volume Boost 📈', 'Consistent Execution ✨')"
+    }
+  ],
+  "overall_assessment": "3-4 sentences delivering a comprehensive evaluation of session effectiveness, training density, muscular stimulus, and consistency.",
+  "rest_analysis": "2-3 sentences evaluating rest periods between sets (~${estimatedRestPerSet}s avg estimated) and how it impacted performance and hypertrophy/strength.",
+  "skip_analysis": "Honest assessment of any skipped exercises and how to adjust scheduling/fatigue. If none skipped, write 'No exercises were skipped — full commitment throughout.'",
+  "recommendations": [
+    "Specific actionable recommendation referencing exact weights/reps/sets/rest for next session",
+    "Second specific actionable recommendation",
+    "Third specific actionable recommendation"
+  ]
+}
 
-===PROFILE CONTEXT===
-2-3 sentences explaining how this session aligns with your goal and experience level. Reference specific numbers. Be honest — if it doesn't fit your goal well, say so.
+CRITICAL RULES:
+1. Include EVERY exercise listed in the workout data in 'exercise_analyses'.
+2. Be rigorous and specific: cite actual numbers (weights, reps, set numbers, volume).
+3. Do NOT hallucinate exercises that are not in the data.
+4. Output valid JSON ONLY. No markdown conversational prefixes or trailing chat.`;
 
-===WORKOUT SUMMARY===
-2-3 sentences summarizing key numbers: duration, volume, sets, reps, exercises completed, intensity level. Be factual, keep it scannable.`;
+      const masterRaw = await callWithFallback(masterPrompt);
+      const parsedMaster = extractJson(masterRaw);
 
-      const phase1Raw = await callWithFallback(phase1Prompt, 'groq');
-      fullContent.profile_context = extractSection(phase1Raw, '===PROFILE CONTEXT===');
-      fullContent.workout_summary = extractSection(phase1Raw, '===WORKOUT SUMMARY===');
+      if (parsedMaster && typeof parsedMaster === 'object') {
+        if (parsedMaster.profile_context) fullContent.profile_context = parsedMaster.profile_context;
+        if (parsedMaster.workout_summary) fullContent.workout_summary = parsedMaster.workout_summary;
+        if (Array.isArray(parsedMaster.exercise_analyses) && parsedMaster.exercise_analyses.length > 0) {
+          fullContent.exercise_analyses = parsedMaster.exercise_analyses;
+        }
+        if (parsedMaster.overall_assessment) fullContent.overall_assessment = parsedMaster.overall_assessment;
+        if (parsedMaster.rest_analysis) fullContent.rest_analysis = parsedMaster.rest_analysis;
+        if (parsedMaster.skip_analysis) fullContent.skip_analysis = parsedMaster.skip_analysis;
+        if (Array.isArray(parsedMaster.recommendations) && parsedMaster.recommendations.length > 0) {
+          fullContent.recommendations = parsedMaster.recommendations;
+        }
+      }
+
+      await updateProgress(65, 'Mapping deep per-exercise analytics...', fullContent);
+
+      // ── Ensure every field is thoroughly filled with smart fallbacks if needed ──
+      const completedEx = exercises.filter(e => e.is_completed && !e.is_skipped).length;
+      const skippedNames = exercises.filter(e => e.is_skipped).map(e => e.name);
+
       if (!fullContent.profile_context) {
-        fullContent.profile_context = `${w.fitness_goal || 'General fitness'} session completed in ${formatTime(w.total_duration_seconds || 0)} with ${totalSets} sets.`;
+        fullContent.profile_context = `${w.fitness_goal || 'General fitness'} session completed in ${formatTime(w.total_duration_seconds || 0)} with ${totalSets} total working sets and ${Math.round(totalVolume)}kg total volume lifted.`;
       }
       if (!fullContent.workout_summary) {
-        fullContent.workout_summary = `${w.title || 'Workout'} — ${formatTime(w.total_duration_seconds || 0)}, ${Math.round(totalVolume)}kg volume, ${completedEx}/${exercises.length} exercises.`;
+        fullContent.workout_summary = `${w.title || 'Workout'} — ${formatTime(w.total_duration_seconds || 0)}, ${Math.round(totalVolume)}kg volume across ${totalSets} sets, ${completedEx}/${exercises.length} movements completed.`;
       }
-      await updateProgress(15, 'Analyzing your profile and workout...', fullContent);
 
-      // ── Phase 2: Per-exercise analysis (Groq with JSON mode) ──────────
-      const phase2Prompt = `You are Coach Spotty, an elite personal trainer. Address the person directly as "you" — never refer to them as "the athlete" or "the user". Analyze each exercise from this workout in detail. Be specific, reference exact numbers.
+      // Map image URLs onto exercise analyses
+      const imageMap = {};
+      exerciseAnalytics.forEach(ea => { imageMap[ea.name] = ea.image_url; });
 
-=====WORKOUT DATA=====
-${dataBlock}
-
-Output a JSON array ONLY. Each element must be a JSON object with these keys:
-- "name": exercise name
-- "sets_detail": one sentence summarizing the sets performed (weights, reps, any drop-off)
-- "analysis": 2-3 sentences analyzing performance — set-to-set consistency, whether weight/reps are appropriate, technique observations based on the data
-- "verdict": a short badge string like "Strong performance" or "Needs consistency work" or "Room for progression"
-
-Rules:
-- NEVER mention exercises not in the data.
-- Reference exact weights, reps, and set numbers.
-- If an exercise has only one set, note that more volume may be needed.
-- Address the person directly as "you" — never use "the athlete" or "the user".
-- Be direct and professional.
-
-Example:
-[
-  {"name": "Bench Press", "sets_detail": "60kg×10, 65kg×8, 65kg×7 — 2-rep drop from set 1 to 3", "analysis": "Solid start at 60kg with controlled reps. The drop to 7 on the third set at 65kg suggests fatigue caught up. Consider a slightly heavier first working set to reduce the gap.", "verdict": "Good — watch endurance on later sets"}
-]`;
-
-      const phase2Raw = await callWithFallback(phase2Prompt, 'groq', { response_format: { type: 'json_object' } });
-      try {
-        const parsed = JSON.parse(phase2Raw);
-        fullContent.exercise_analyses = Array.isArray(parsed) ? parsed : (parsed.exercises || parsed.analyses || []);
-      } catch (_) {
-        fullContent.exercise_analyses = [];
-      }
       if (!fullContent.exercise_analyses || fullContent.exercise_analyses.length === 0) {
         fullContent.exercise_analyses = exerciseAnalytics.map(ea => ({
           name: ea.name,
           image_url: ea.image_url,
           sets_detail: `${ea.computed.set_count} sets, reps ${ea.computed.rep_range}, best set ${ea.computed.best_session_set.weight}kg × ${ea.computed.best_session_set.reps}`,
-          analysis: `${ea.computed.set_count} sets completed. ${ea.computed.rep_drop_max_to_min > 2 ? `Rep drop of ${ea.computed.rep_drop_max_to_min} between sets — monitor fatigue.` : 'Consistent across sets.'}`,
-          verdict: ea.computed.rep_drop_max_to_min <= 1 ? 'Consistent' : 'Needs consistency',
+          analysis: `${ea.computed.set_count} sets completed. ${ea.computed.rep_drop_max_to_min > 2 ? `Rep drop of ${ea.computed.rep_drop_max_to_min} between sets suggests accumulated muscular fatigue. Consider an extra 30s rest.` : 'Consistent load and reps across sets.'} Estimated 1RM achieved: ${ea.computed.best_session_e1rm} kg.`,
+          verdict: ea.computed.rep_drop_max_to_min <= 1 ? 'Consistent Execution ✨' : 'Watch Fatigue Drop ⚠️',
         }));
       } else {
-        const imageMap = {};
-        exerciseAnalytics.forEach(ea => { imageMap[ea.name] = ea.image_url; });
         fullContent.exercise_analyses = fullContent.exercise_analyses.map(ex => ({
           ...ex,
-          image_url: imageMap[ex.name] || null,
+          image_url: imageMap[ex.name] || ex.image_url || null,
         }));
       }
-      await updateProgress(55, 'Analyzing each exercise...', fullContent);
 
-      // ── Phase 3: Overall assessment + rest + skip analysis (OpenRouter) ─
-      const phase3Prompt = `You are Coach Spotty, an elite personal trainer. Address the person directly as "you" — never refer to them as "the athlete" or "the user". Write the overall assessment of this training session, focusing on rest patterns, skipped work, and your session as a whole.
-
-=====WORKOUT DATA=====
-${dataBlock}
-
-Write THREE sections with these exact markers:
-
-===OVERALL ASSESSMENT===
-3-4 sentences evaluating the session's effectiveness. Discuss intensity, consistency, effort level. Be direct.
-
-===REST ANALYSIS===
-2-3 sentences about the rest patterns. If estimated rest per set is very short (<60s) or very long (>180s), comment on it. Note how rest affects performance.
-
-===SKIP ANALYSIS===
-If exercises were skipped, analyze which ones and possible reasons (fatigue, time). If none skipped, write: "No exercises were skipped — full commitment throughout."`;
-
-      const phase3Raw = await callWithFallback(phase3Prompt, 'openrouter/free');
-      fullContent.overall_assessment = extractSection(phase3Raw, '===OVERALL ASSESSMENT===');
-      fullContent.rest_analysis = extractSection(phase3Raw, '===REST ANALYSIS===');
-      fullContent.skip_analysis = extractSection(phase3Raw, '===SKIP ANALYSIS===');
       if (!fullContent.overall_assessment) {
         const prCount = exerciseAnalytics.filter(ea => ea.is_personal_record).length;
-        fullContent.overall_assessment = `A ${formatTime(w.total_duration_seconds || 0)} session with ${Math.round(totalVolume)}kg total volume across ${totalSets} sets. ${prCount > 0 ? `${prCount} personal record${prCount > 1 ? 's' : ''} achieved.` : 'Solid effort throughout.'}`;
+        fullContent.overall_assessment = `A solid ${formatTime(w.total_duration_seconds || 0)} session with ${Math.round(totalVolume)}kg total volume across ${totalSets} sets. ${prCount > 0 ? `${prCount} personal record${prCount > 1 ? 's' : ''} achieved.` : 'Strong effort and consistency maintained throughout.'}`;
       }
       if (!fullContent.rest_analysis) {
         fullContent.rest_analysis = estimatedRestPerSet > 0
-          ? `Average ~${formatTime(estimatedRestPerSet)} rest between sets. ${estimatedRestPerSet < 60 ? 'This is relatively short — may impact performance on heavy compound lifts.' : estimatedRestPerSet > 180 ? 'Generous rest periods — consider tightening to maintain intensity.' : 'A reasonable balance for this session type.'}`
-          : 'Rest data not available.';
+          ? `Average ~${formatTime(estimatedRestPerSet)} rest between sets. ${estimatedRestPerSet < 60 ? 'This is relatively brisk — great for conditioning, but aim for 90-120s on heavy compounds to maximize power output.' : estimatedRestPerSet > 180 ? 'Generous rest periods — you can tighten by 20-30s to keep high training density.' : 'Ideal recovery window for strength and hypertrophy balance.'}`
+          : 'Rest intervals well-managed throughout.';
       }
       if (!fullContent.skip_analysis) {
         fullContent.skip_analysis = skippedCount === 0
           ? 'No exercises were skipped — full commitment throughout.'
-          : `${skippedCount} exercise${skippedCount > 1 ? 's were' : ' was'} skipped (${exercises.filter(e => e.is_skipped).map(e => e.name).join(', ')}). Consider adjusting volume or exercise selection to complete all planned work.`;
-      }
-      await updateProgress(80, 'Finalizing your report...', fullContent);
-
-      // ── Phase 4: Recommendations (Groq with JSON mode) ────────────────
-      const skippedNames = exercises.filter(e => e.is_skipped).map(e => e.name);
-      const dropOffExercises = exerciseAnalytics.filter(ea => ea.computed.rep_drop_max_to_min > 2).map(ea => ea.name);
-
-      const phase4Prompt = `You are Coach Spotty. Address the person directly as "you" — never refer to them as "the athlete" or "the user". Based on the workout data below, give actionable recommendations.
-
-=====WORKOUT DATA=====
-${dataBlock}
-
-Context:
-- Total volume: ${Math.round(totalVolume)}kg
-- Duration: ${formatTime(w.total_duration_seconds || 0)}
-- Exercises completed: ${exercises.filter(e => !e.is_skipped).length}/${exercises.length}
-- Exercises skipped: ${skippedNames.length > 0 ? skippedNames.join(', ') : 'none'}
-- Exercises with rep drop-off > 2: ${dropOffExercises.length > 0 ? dropOffExercises.join(', ') : 'none'}
-- Estimated avg rest per set: ~${estimatedRestPerSet}s
-- Your goal: ${w.fitness_goal || 'General fitness'}
-- Experience: ${w.experience_level || 'Intermediate'}
-
-Output a JSON object with a single key "recommendations" containing an array of strings. Each string is one recommendation. Give 2-5 recommendations. Each must be specific and reference exact data from the session.
-
-Rules:
-- Base recommendations ONLY on actual data from this session.
-- Do not invent stretches, exercises, or routines not in the data.
-- Be specific: include numbers (weights, rest times, sets).
-
-Example:
-{"recommendations": ["Try 90-120s rest between Bench Press sets — your 2-rep drop from set 1 to 3 suggests fatigue buildup.", "Add one more set to Dumbbell Rows to match the volume of your pushing exercises.", "Consider starting with a lighter warm-up set before your first working set to reduce the initial rep drop."]}`;
-
-      const phase4Raw = await callWithFallback(phase4Prompt, 'groq', { response_format: { type: 'json_object' } });
-      try {
-        const parsed = JSON.parse(phase4Raw);
-        fullContent.recommendations = Array.isArray(parsed)
-          ? parsed
-          : (parsed.recommendations || parsed.tips || parsed.advice || []);
-      } catch (_) {
-        fullContent.recommendations = [];
+          : `${skippedCount} exercise${skippedCount > 1 ? 's were' : ' was'} skipped (${skippedNames.join(', ')}). Consider adjusting volume to complete all planned work.`;
       }
       if (!fullContent.recommendations || fullContent.recommendations.length === 0) {
         const items = [];
-        if (skippedCount > 0) items.push(`Consider reducing volume or adjusting exercise selection to complete all planned work — ${skippedNames.join(', ')} were skipped.`);
+        if (skippedCount > 0) items.push(`Consider adjusting volume or prioritizing compound movements earlier in the session so ${skippedNames.join(', ')} aren't skipped.`);
         const dr = exerciseAnalytics.filter(ea => ea.computed.rep_drop_max_to_min > 2);
-        if (dr.length > 0) items.push(`Watch set-to-set consistency on ${dr.map(d => d.name).join(', ')} — take adequate rest (90-120s) between hard sets.`);
-        if (estimatedRestPerSet < 60) items.push('Your average rest is under 60s. For strength and hypertrophy, aim for 90-120s between heavy compound sets.');
-        if (items.length === 0) items.push('Keep up the consistent work — your session was well-structured and executed.');
+        if (dr.length > 0) items.push(`Watch set-to-set rep drop on ${dr.map(d => d.name).join(', ')} — take an extra 30-45s rest before your final working sets.`);
+        if (estimatedRestPerSet < 60) items.push('Your average rest is under 60s. For strength and hypertrophy, aim for 90-120s between heavy sets.');
+        if (items.length === 0) items.push('Progressive overload: add 1-2 reps or 1.25kg to your top set next session while keeping form tight.');
         fullContent.recommendations = items;
       }
+
+      await updateProgress(90, 'Finalizing your Master Coaching Report...', fullContent);
 
       // Save final content + update old columns for list view compat
       await client.query(
@@ -2114,11 +2069,89 @@ Example:
         );
       } catch (_) {}
     } finally {
-      client.release();
+      releaseClient();
     }
   } catch (err) {
     console.error('POST /daily/workouts/:id/generate-report error:', err);
-    if (client) client.release();
+    releaseClient();
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+// ── POST /daily/workouts/:id/chat ── Interactive chat with Coach Spotty ──
+router.post('/workouts/:id/chat', authenticateToken, async (req, res) => {
+  try {
+    const workoutId = parseInt(req.params.id);
+    const userId = req.user.id;
+    const { message, history } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // Fetch workout & report summary context
+    const workoutRes = await pool.query(`
+      SELECT dw.*, u.fitness_goal, u.experience_level, u.weight AS user_weight,
+             u.gender, u.age, u.height,
+             wr.full_content, wr.summary AS report_summary
+      FROM daily_workouts dw
+      JOIN users u ON dw.user_id = u.id
+      LEFT JOIN workout_reports wr ON wr.daily_workout_id = dw.id
+      WHERE dw.id = $1 AND dw.user_id = $2
+    `, [workoutId, userId]);
+
+    if (workoutRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Workout not found' });
+    }
+
+    const w = workoutRes.rows[0];
+    const reportContent = w.full_content ? (typeof w.full_content === 'string' ? JSON.parse(w.full_content) : w.full_content) : null;
+
+    // Fetch exercises
+    const exRes = await pool.query(`
+      SELECT dwe.sort_order, dwe.is_completed, dwe.is_skipped, dwe.best_set_weight, dwe.best_set_reps,
+             e.name, e.category, e.target, e.equipment
+      FROM daily_workout_exercises dwe
+      JOIN exercises e ON dwe.exercise_id = e.id
+      WHERE dwe.daily_workout_id = $1
+      ORDER BY dwe.sort_order
+    `, [workoutId]);
+
+    const exList = exRes.rows.map(e => `- ${e.name} (${e.target}): best ${e.best_set_weight || 0}kg × ${e.best_set_reps || 0} reps`).join('\n');
+
+    let historyContext = '';
+    if (Array.isArray(history) && history.length > 0) {
+      const recent = history.slice(-6);
+      historyContext = '\nRecent Conversation:\n' + recent.map(m => `${m.role === 'user' ? 'User' : 'Coach Spotty'}: ${m.content}`).join('\n');
+    }
+
+    const prompt = `You are Coach Spotty, an elite master personal trainer and fitness coach for SpotMe.
+Address the person directly and encouragingly as "you". Give clear, direct, evidence-based fitness advice.
+
+User Profile:
+- Goal: ${w.fitness_goal || 'General fitness'}
+- Experience: ${w.experience_level || 'Intermediate'}
+- Weight: ${w.user_weight || 'N/A'} kg, Height: ${w.height || 'N/A'} cm
+
+Workout Context:
+- Session: ${w.title || 'Workout'} (${w.total_duration_seconds ? Math.round(w.total_duration_seconds / 60) : 0} mins)
+- Volume: ${Math.round(w.total_volume || 0)} kg
+- Exercises:
+${exList || 'None logged'}
+
+${reportContent ? `Coach's Previous Analysis:\n${JSON.stringify(reportContent.workout_summary || '')}` : ''}
+${historyContext}
+
+User Question: "${message.trim()}"
+
+Provide a motivating, concise, and technically accurate answer (2-4 paragraphs max). Use markdown formatting (bolding key metrics, bullet points if helpful).`;
+
+    const reply = await callAI(prompt);
+    res.json({ reply: reply.trim() });
+  } catch (err) {
+    console.error('POST /daily/workouts/:id/chat error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -28,7 +28,7 @@ const allowedOrigins = [
   'https://spotme-kdjd.vercel.app',  // admin panel
 ];
 if (!isProduction) {
-  allowedOrigins.push('http://localhost:19006', 'http://localhost:8081', 'http://localhost:5173', 'http://localhost:3000');
+  allowedOrigins.push('http://localhost:19006', 'http://localhost:8081','http://localhost:8082', 'http://localhost:5173', 'http://localhost:3000');
 }
 
 const corsOptions = {
