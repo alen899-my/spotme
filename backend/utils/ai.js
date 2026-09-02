@@ -7,28 +7,32 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // ── OpenRouter free model fallback chain ─────────────────────────────────────
-// Tried in order on 429 / 5xx errors
 const OPENROUTER_FALLBACK_MODELS = [
   'openrouter/free',
-  'google/gemini-2.0-flash-exp:free',
   'meta-llama/llama-3.3-70b-instruct:free',
   'mistralai/mistral-small-24b-instruct-2501:free',
   'qwen/qwen-2.5-72b-instruct:free',
 ];
 
-// ── Gemini model fallback chain (highest RPM limit first) ────────────────────
-// Only models with RPM > 0 from your account are listed here.
-// Models: RPM listed in parentheses
+// ── Gemini verified available model fallback chain ───────────────────────────
+// Ordered by highest quality and massive daily quotas (14.4K RPD)
 const GEMINI_FALLBACK_MODELS = [
-  'gemini-3.1-flash-lite-latest',    // 15 RPM, 250K TPM
-  'gemini-3.5-flash-lite-latest',    // 15 RPM, 250K TPM
-  'gemini-2.5-flash-lite-latest',    // 10 RPM, 250K TPM
-  'gemini-3.8-flash-latest',         // 5 RPM, 250K TPM
-  'gemini-3.7-flash-latest',         // 5 RPM, 250K TPM
-  'gemini-3.6-flash-latest',         // 5 RPM, 250K TPM
-  'gemini-3.5-flash-latest',         // 5 RPM, 250K TPM
-  'gemini-3-flash-latest',           // 5 RPM, 250K TPM
-  'gemini-2.5-flash-latest',         // 5 RPM, 250K TPM
+  'gemini-3.1-flash-lite',   // 15 RPM, 500 RPD (Google's best efficient reasoning)
+  'gemini-3.5-flash-lite',   // 15 RPM, 500 RPD
+  'gemma-4-31b-it',          // 30 RPM, 14,400 RPD (High capacity open weights)
+  'gemma-4-26b-a4b-it',      // 30 RPM, 14,400 RPD
+  'gemini-3.7-flash',        // 5 RPM, 20 RPD
+  'gemini-3.6-flash',        // 5 RPM, 20 RPD
+  'gemini-3.5-flash',        // 5 RPM, 20 RPD
+  'gemini-3.8-flash',        // 5 RPM, 20 RPD
+];
+
+// ── Groq verified available models ───────────────────────────────────────────
+const GROQ_FALLBACK_MODELS = [
+  'openai/gpt-oss-120b',
+  'qwen/qwen3.8-27b',
+  'openai/gpt-oss-20b',
+  'groq/compound',
 ];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,9 +74,9 @@ function extractJson(text) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PROVIDER 1: OpenRouter (Primary)
+// PROVIDER 1: OpenRouter (Priority 1)
 // ═══════════════════════════════════════════════════════════════════════════
-async function callOpenRouter(prompt, imageUrl = null, model = null, options = {}, maxRetries = 3) {
+async function callOpenRouter(prompt, imageUrl = null, model = null, options = {}, maxRetries = 2) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is not defined in .env');
 
@@ -105,7 +109,7 @@ async function callOpenRouter(prompt, imageUrl = null, model = null, options = {
           'X-Title': 'SpotMe Workout AI',
           'Content-Type': 'application/json',
         },
-        timeout: 90000,
+        timeout: 60000,
       });
 
       const content = response.data?.choices?.[0]?.message?.content;
@@ -115,7 +119,7 @@ async function callOpenRouter(prompt, imageUrl = null, model = null, options = {
       lastError = err;
       const statusCode = err.response?.status;
       const responseData = err.response?.data;
-      const isRetryable = statusCode === 429 || (statusCode >= 500 && statusCode <= 504) || err.code === 'ECONNABORTED';
+      const errorMsg = responseData?.error?.message || '';
 
       console.warn(
         `[OpenRouter] Attempt ${attempt + 1} failed — status ${statusCode || err.code || 'UNKNOWN'}\n` +
@@ -123,9 +127,15 @@ async function callOpenRouter(prompt, imageUrl = null, model = null, options = {
         `  -> Response: ${JSON.stringify(responseData || err.message)}`
       );
 
+      // If account-level daily free tier quota is exhausted, fail fast over to Gemini
+      if (errorMsg.includes('free-models-per-day') || responseData?.error?.metadata?.limit_source === 'openrouter_free_tier_daily') {
+        console.warn('[OpenRouter] Daily free limit exhausted. Fast-failing immediately to Google Gemini...');
+        break;
+      }
+
+      const isRetryable = statusCode === 429 || (statusCode >= 500 && statusCode <= 504) || err.code === 'ECONNABORTED';
       if (isRetryable && attempt < maxRetries - 1) {
-        const backoffMs = 2000 * (attempt + 1);
-        console.log(`[OpenRouter] Backing off ${backoffMs}ms before retry with alternate model...`);
+        const backoffMs = 1500 * (attempt + 1);
         await sleep(backoffMs);
         continue;
       }
@@ -133,18 +143,17 @@ async function callOpenRouter(prompt, imageUrl = null, model = null, options = {
     }
   }
 
-  throw lastError || new Error('OpenRouter call failed after all retries');
+  throw lastError || new Error('OpenRouter call failed');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PROVIDER 2: Google Gemini (Secondary Fallback)
-// Uses Google's generateContent REST API, rotating through available models
+// PROVIDER 2: Google Gemini (Priority 2)
 // ═══════════════════════════════════════════════════════════════════════════
 async function callGemini(prompt, imageUrl = null, model = null, options = {}) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   if (!apiKey) throw new Error('GEMINI_API_KEY is not defined in .env');
 
-  const primaryModel = model || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite-latest';
+  const primaryModel = model || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
   const modelsToTry = [primaryModel, ...GEMINI_FALLBACK_MODELS.filter((m) => m !== primaryModel)];
 
   let lastError = null;
@@ -153,10 +162,8 @@ async function callGemini(prompt, imageUrl = null, model = null, options = {}) {
     const currentModel = modelsToTry[attempt];
     const url = `${GEMINI_API_BASE}/${currentModel}:generateContent?key=${apiKey}`;
 
-    // Build parts for Gemini content API
     const parts = [];
     if (imageUrl) {
-      // Fetch image as base64
       try {
         const imgResponse = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 15000 });
         const contentType = imgResponse.headers['content-type'] || 'image/jpeg';
@@ -173,7 +180,6 @@ async function callGemini(prompt, imageUrl = null, model = null, options = {}) {
       generationConfig: {
         temperature: options.temperature !== undefined ? options.temperature : 0.2,
         maxOutputTokens: options.max_tokens || 4096,
-        candidateCount: 1,
       },
     };
 
@@ -181,7 +187,7 @@ async function callGemini(prompt, imageUrl = null, model = null, options = {}) {
       console.log(`[Gemini] Sending request → model: ${currentModel} (Attempt ${attempt + 1}/${modelsToTry.length})`);
       const response = await axios.post(url, payload, {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 90000,
+        timeout: 60000,
       });
 
       const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -191,21 +197,20 @@ async function callGemini(prompt, imageUrl = null, model = null, options = {}) {
       lastError = err;
       const statusCode = err.response?.status;
       const responseData = err.response?.data;
-      const isRetryable = statusCode === 429 || statusCode === 503 || err.code === 'ECONNABORTED';
 
       console.warn(
-        `[Gemini] Attempt ${attempt + 1} failed — status ${statusCode || err.code || 'UNKNOWN'}\n` +
-        `  -> Model: ${currentModel}\n` +
+        `[Gemini] Model ${currentModel} failed — status ${statusCode || err.code || 'UNKNOWN'}\n` +
         `  -> Response: ${JSON.stringify(responseData || err.message)}`
       );
 
-      if (isRetryable && attempt < modelsToTry.length - 1) {
-        const backoffMs = 1500 * (attempt + 1);
-        console.log(`[Gemini] Backing off ${backoffMs}ms before trying next model...`);
-        await sleep(backoffMs);
+      // If rate limited or service busy (429, 503), try next model in available chain
+      if ((statusCode === 429 || statusCode === 503) && attempt < modelsToTry.length - 1) {
+        await sleep(1000);
         continue;
       }
-      if (!isRetryable) break; // Non-retryable error — skip to next model immediately
+      if (statusCode === 404 && attempt < modelsToTry.length - 1) {
+        continue; // Try next model immediately
+      }
     }
   }
 
@@ -213,83 +218,97 @@ async function callGemini(prompt, imageUrl = null, model = null, options = {}) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PROVIDER 3: Groq (Last Resort Fallback)
+// PROVIDER 3: Groq (Priority 3 - Last Resort)
 // ═══════════════════════════════════════════════════════════════════════════
 async function callGroq(prompt, imageUrl = null, model = null, options = {}) {
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) throw new Error('GROQ_API_KEY is not defined in .env');
 
-  const groqModel = (model && model.includes('llama'))
-    ? model
-    : (imageUrl ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile');
+  const modelsToTry = GROQ_FALLBACK_MODELS;
+  let lastError = null;
 
-  let messages;
-  if (imageUrl) {
-    messages = [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: imageUrl } },
-        ],
-      },
-    ];
-  } else {
-    messages = [{ role: 'user', content: prompt }];
+  for (let attempt = 0; attempt < modelsToTry.length; attempt++) {
+    const groqModel = modelsToTry[attempt];
+    let messages;
+
+    if (imageUrl) {
+      messages = [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: imageUrl } },
+          ],
+        },
+      ];
+    } else {
+      messages = [{ role: 'user', content: prompt }];
+    }
+
+    const payload = {
+      model: groqModel,
+      messages,
+      temperature: options.temperature !== undefined ? options.temperature : 0.3,
+      max_tokens: options.max_tokens || 4096,
+    };
+
+    try {
+      console.log(`[Groq] Sending request → model: ${groqModel} (Attempt ${attempt + 1}/${modelsToTry.length})`);
+      const response = await axios.post(GROQ_API_URL, payload, {
+        headers: {
+          'Authorization': `Bearer ${groqKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 60000,
+      });
+
+      const content = response.data?.choices?.[0]?.message?.content;
+      if (content) return content;
+      throw new Error('Empty response from Groq');
+    } catch (err) {
+      lastError = err;
+      const statusCode = err.response?.status;
+      console.warn(`[Groq] Model ${groqModel} failed (${statusCode}):`, JSON.stringify(err.response?.data || err.message));
+      if (attempt < modelsToTry.length - 1) continue;
+    }
   }
 
-  const payload = {
-    model: groqModel,
-    messages,
-    temperature: options.temperature !== undefined ? options.temperature : 0.3,
-    max_tokens: options.max_tokens || 4096,
-  };
-
-  console.log(`[Groq] Sending request → model: ${groqModel}`);
-  const response = await axios.post(GROQ_API_URL, payload, {
-    headers: {
-      'Authorization': `Bearer ${groqKey}`,
-      'Content-Type': 'application/json',
-    },
-    timeout: 60000,
-  });
-
-  return response.data?.choices?.[0]?.message?.content || '';
+  throw lastError || new Error('Groq call failed on all models');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MAIN ENTRY POINT — Priority: OpenRouter → Gemini → Groq
+// MAIN ENTRY POINT — 1. OpenRouter → 2. Gemini → 3. Groq
 // ═══════════════════════════════════════════════════════════════════════════
 async function callAI(prompt, imageUrl = null, model = null, options = {}) {
-  // ── TIER 1: OpenRouter (Primary) ──
+  // ── TIER 1: OpenRouter (Priority 1) ──
   try {
     const result = await callOpenRouter(prompt, imageUrl, model, options);
     return result;
   } catch (openRouterError) {
     console.warn(
-      '[AI Service] OpenRouter failed. Attempting Gemini fallback.\n' +
-      `  -> Error: ${JSON.stringify(openRouterError.response?.data || openRouterError.message)}`
+      '[AI Service] OpenRouter failed. Falling back to Google Gemini.\n' +
+      `  -> Reason: ${openRouterError.response?.data?.error?.message || openRouterError.message}`
     );
   }
 
-  // ── TIER 2: Google Gemini ──
+  // ── TIER 2: Google Gemini (Priority 2) ──
   try {
     console.info('[AI Service] Attempting Google Gemini provider...');
     const geminiResult = await callGemini(prompt, imageUrl, null, options);
-    console.info('[AI Service] ✅ Recovered via Google Gemini');
+    console.info('[AI Service] ✅ Successfully generated response via Google Gemini');
     return geminiResult;
   } catch (geminiError) {
     console.warn(
-      '[AI Service] Gemini also failed. Attempting Groq last-resort fallback.\n' +
-      `  -> Error: ${JSON.stringify(geminiError.response?.data || geminiError.message)}`
+      '[AI Service] Gemini also failed. Falling back to Groq (Last Resort).\n' +
+      `  -> Reason: ${geminiError.response?.data?.error?.message || geminiError.message}`
     );
   }
 
-  // ── TIER 3: Groq (Last Resort) ──
+  // ── TIER 3: Groq (Priority 3 - Last Resort) ──
   try {
-    console.info('[AI Service] Attempting Groq last-resort provider...');
+    console.info('[AI Service] Attempting Groq provider...');
     const groqResult = await callGroq(prompt, imageUrl, null, options);
-    console.info('[AI Service] ✅ Recovered via Groq');
+    console.info('[AI Service] ✅ Successfully generated response via Groq');
     return groqResult;
   } catch (groqError) {
     console.error(

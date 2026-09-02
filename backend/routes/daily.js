@@ -2146,10 +2146,22 @@ ${historyContext}
 
 User Question: "${message.trim()}"
 
-Provide a motivating, concise, and technically accurate answer (2-4 paragraphs max). Use markdown formatting (bolding key metrics, bullet points if helpful).`;
+Provide a motivating, concise, and technically accurate answer (2-4 paragraphs max). Do not use markdown syntax symbols like hashes (#), dashes (-), asterisks (* or **), or divider lines. Format cleanly in natural paragraphs or numbered steps.`;
 
-    const reply = await callAI(prompt);
-    res.json({ reply: reply.trim() });
+    const rawReply = await callAI(prompt);
+    let reply = (rawReply || '').trim();
+    reply = reply
+      .replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, '')
+      .replace(/^[ \t]*#{1,6}[ \t]*/gm, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      .replace(/^[ \t]*[-*+][ \t]+/gm, '• ')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\n{3,}/g, '\n\n').trim();
+
+    res.json({ reply });
   } catch (err) {
     console.error('POST /daily/workouts/:id/chat error:', err);
     res.status(500).json({ error: err.message });

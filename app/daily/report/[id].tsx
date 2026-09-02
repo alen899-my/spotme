@@ -42,6 +42,14 @@ const cleanText = (value?: string) => {
 };
 
 // ── Inline Markdown Renderer ────────────────────────────────────────────────
+// ── Neat Formatter & Markdown Cleaner ───────────────────────────────────────
+function cleanRawMarkdownTokens(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/^#{1,6}\s*/g, '')
+    .replace(/[*_~`]/g, '');
+}
+
 function MarkdownText({ content, textColor, primaryColor, isDark }: { content: string; textColor: string; primaryColor: string; isDark: boolean }) {
   if (!content) return null;
 
@@ -57,9 +65,24 @@ function MarkdownText({ content, textColor, primaryColor, isDark }: { content: s
       continue;
     }
 
-    // Heading # or ##
-    if (/^#{1,2}\s/.test(raw)) {
-      const heading = raw.replace(/^#{1,2}\s+/, '');
+    // Horizontal divider (---, ***, ___)
+    if (/^[-*_]{3,}$/.test(trimmed)) {
+      elements.push(
+        <View
+          key={`hr-${i}`}
+          style={{
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
+            marginVertical: 6,
+          }}
+        />
+      );
+      continue;
+    }
+
+    // Heading #, ##, ###, ####
+    if (/^#{1,6}\s+/.test(raw)) {
+      const heading = raw.replace(/^#{1,6}\s+/, '').replace(/[*_`]/g, '').trim();
       elements.push(
         <Text key={`h-${i}`} style={[S.mdHeading, { color: textColor }]}>
           {heading}
@@ -68,9 +91,9 @@ function MarkdownText({ content, textColor, primaryColor, isDark }: { content: s
       continue;
     }
 
-    // Bullet item (- or *)
-    if (/^[-*•]\s/.test(trimmed)) {
-      const bulletText = trimmed.replace(/^[-*•]\s+/, '');
+    // Bullet item (-, *, +, •, with any spacing)
+    if (/^[-*+•]\s+/.test(trimmed)) {
+      const bulletText = trimmed.replace(/^[-*+•]\s+/, '');
       elements.push(
         <View key={`li-${i}`} style={S.mdBulletRow}>
           <Text style={[S.mdBulletDot, { color: primaryColor }]}>•</Text>
@@ -108,24 +131,31 @@ function MarkdownText({ content, textColor, primaryColor, isDark }: { content: s
 }
 
 function renderInlineSpans(text: string, textColor: string, primaryColor: string, isDark: boolean) {
-  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|__.*?__|_.*?_|`.*?`)/g);
 
   return parts.map((part, index) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
+    // Bold: **text** or __text__
+    if ((part.startsWith('**') && part.endsWith('**') && part.length >= 4) ||
+        (part.startsWith('__') && part.endsWith('__') && part.length >= 4)) {
+      const inner = part.slice(2, -2).replace(/[*_]/g, '');
       return (
         <Text key={index} style={[S.mdBold, { color: textColor }]}>
-          {part.slice(2, -2)}
+          {inner}
         </Text>
       );
     }
-    if (part.startsWith('*') && part.endsWith('*')) {
+    // Italic/Emphasis: *text* or _text_
+    if ((part.startsWith('*') && part.endsWith('*') && part.length >= 2) ||
+        (part.startsWith('_') && part.endsWith('_') && part.length >= 2)) {
+      const inner = part.slice(1, -1).replace(/[*_]/g, '');
       return (
-        <Text key={index} style={[S.mdItalic, { color: textColor }]}>
-          {part.slice(1, -1)}
+        <Text key={index} style={[S.mdBold, { color: textColor }]}>
+          {inner}
         </Text>
       );
     }
-    if (part.startsWith('`') && part.endsWith('`')) {
+    // Code: `text`
+    if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
       return (
         <Text
           key={index}
@@ -141,7 +171,8 @@ function renderInlineSpans(text: string, textColor: string, primaryColor: string
         </Text>
       );
     }
-    return part;
+    const cleanChunk = cleanRawMarkdownTokens(part);
+    return cleanChunk;
   });
 }
 

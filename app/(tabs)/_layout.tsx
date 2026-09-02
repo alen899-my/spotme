@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppHeader from "../../components/ui/AppHeader";
 import ProfileSidebar from "../../components/ui/ProfileSidebar";
 import FloatingTimerBar from "../../components/ui/FloatingTimerBar";
+import AIChatFAB from "../../components/ai/AIChatFAB";
 import { useTheme } from "../../contexts/ThemeContext";
 import { FONTS } from "../../constants/theme";
 import { api } from "../../utils/api";
@@ -158,6 +159,7 @@ export default function TabsLayout() {
       </View>
       <BottomTabBar />
       <FloatingTimerBar />
+      <AIChatFAB user={user} />
       <ProfileSidebar
         visible={sidebarOpen}
         user={user}

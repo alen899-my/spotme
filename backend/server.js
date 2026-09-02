@@ -20,6 +20,7 @@ const adminRoutes = require('./routes/admin');
 const imagesRoutes = require('./routes/images');
 const feedbackRoutes = require('./routes/feedback');
 const fileReplacerRoutes = require('./routes/file-replacer');
+const aiRoutes = require('./routes/ai');
 
 const app = express();
 
@@ -68,6 +69,7 @@ app.use('/api/weight', weightRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/physique', physiqueRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/ai', aiRoutes);
 
 const authenticateAdmin = require('./middleware/adminAuth');
 app.use('/api/images', authenticateAdmin, imagesRoutes);
