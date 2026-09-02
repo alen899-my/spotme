@@ -9,6 +9,7 @@ import {
   Image,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +17,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
+import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
 import { API_URL } from '../../utils/api';
@@ -25,26 +27,68 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const coachAvatarSource = require('../../assets/coach/fit-cartoon-character-training.png');
 
 const DAYS_OPTIONS = [
-  { value: 3, label: '3 Days', sub: 'Balanced & efficient' },
-  { value: 4, label: '4 Days', sub: 'Optimal Upper/Lower' },
-  { value: 5, label: '5 Days', sub: 'PPL + Upper/Lower' },
-  { value: 6, label: '6 Days', sub: 'High volume PPL/Arnold' },
+  { value: 3, label: '3 Days / Week', sub: 'Balanced & high recovery', icon: 'calendar-outline', color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
+  { value: 4, label: '4 Days / Week', sub: 'Optimal Upper / Lower split', icon: 'barbell-outline', color: '#2596BE', bg: 'rgba(37,150,190,0.12)' },
+  { value: 5, label: '5 Days / Week', sub: 'PPL + Upper/Lower power', icon: 'flame-outline', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
+  { value: 6, label: '6 Days / Week', sub: 'High volume hypertrophy', icon: 'flash-outline', color: '#FF6B35', bg: 'rgba(255,107,53,0.12)' },
 ];
 
 const SPLIT_STYLES = [
-  { key: 'AI Choice', label: 'AI Choice', desc: 'Coach Spotty recommends best' },
-  { key: 'Push / Pull / Legs', label: 'Push / Pull / Legs', desc: 'Classic functional split' },
-  { key: 'Upper / Lower', label: 'Upper / Lower', desc: 'High frequency & recovery' },
-  { key: 'Arnold Split', label: 'Arnold Split', desc: 'Chest/Back, Delts/Arms, Legs' },
-  { key: 'Full Body', label: 'Full Body', desc: 'Total body every session' },
-  { key: 'Bro Split', label: 'Bro Split', desc: 'One muscle group per day' },
+  {
+    key: 'AI Choice',
+    label: 'AI Choice (Recommended)',
+    desc: 'Coach Spotty selects the scientifically proven split for your goal',
+    icon: 'sparkles-outline',
+    color: '#2596BE',
+    bg: 'rgba(37,150,190,0.12)',
+  },
+  {
+    key: 'Push / Pull / Legs',
+    label: 'Push / Pull / Legs (PPL)',
+    desc: 'Chest, Shoulders & Tris • Back & Bis • Quads & Hamstrings',
+    icon: 'barbell-outline',
+    color: '#10B981',
+    bg: 'rgba(16,185,129,0.12)',
+  },
+  {
+    key: 'Upper / Lower',
+    label: 'Upper / Lower Split',
+    desc: 'High weekly frequency, optimal strength progression & recovery',
+    icon: 'layers-outline',
+    color: '#8B5CF6',
+    bg: 'rgba(139,92,246,0.12)',
+  },
+  {
+    key: 'Arnold Split',
+    label: 'Arnold Golden Era Split',
+    desc: 'Chest & Back • Shoulders & Arms • Quads, Hamstrings & Calves',
+    icon: 'trophy-outline',
+    color: '#F59E0B',
+    bg: 'rgba(245,158,11,0.12)',
+  },
+  {
+    key: 'Full Body',
+    label: 'Full Body Stimulation',
+    desc: 'Total body muscular stimulus on every single training day',
+    icon: 'fitness-outline',
+    color: '#EC4899',
+    bg: 'rgba(236,72,153,0.12)',
+  },
+  {
+    key: 'Bro Split',
+    label: 'Classic Bodypart Split',
+    desc: 'Deep isolation focusing on one primary muscle group per day',
+    icon: 'body-outline',
+    color: '#3B82F6',
+    bg: 'rgba(59,130,246,0.12)',
+  },
 ];
 
 const DURATION_OPTIONS = [
-  '45 mins',
-  '60 mins',
-  '75 mins',
-  '90 mins',
+  { value: '45 mins', label: '45 min', sub: 'Short & intense' },
+  { value: '60 mins', label: '60 min', sub: 'Recommended' },
+  { value: '75 mins', label: '75 min', sub: 'High volume' },
+  { value: '90 mins', label: '90 min', sub: 'Extended' },
 ];
 
 export default function AISplitBuilderScreen() {
@@ -100,9 +144,9 @@ export default function AISplitBuilderScreen() {
         ])
       ).start();
 
-      const timer1 = setTimeout(() => setProgressStep(1), 2200);
-      const timer2 = setTimeout(() => setProgressStep(2), 5000);
-      const timer3 = setTimeout(() => setProgressStep(3), 8000);
+      const timer1 = setTimeout(() => setProgressStep(1), 2000);
+      const timer2 = setTimeout(() => setProgressStep(2), 4500);
+      const timer3 = setTimeout(() => setProgressStep(3), 7500);
 
       return () => {
         clearTimeout(timer1);
@@ -136,7 +180,7 @@ export default function AISplitBuilderScreen() {
       setSelectedDayIdx(0);
     } catch (err: any) {
       console.error('Split generation error:', err);
-      showToast(err.response?.data?.error || 'Failed to generate workout split. Please retry.', 'error');
+      showToast(err.response?.data?.error || 'Failed to generate workout split. Please try again.', 'error');
     } finally {
       setGenerating(false);
     }
@@ -169,7 +213,7 @@ export default function AISplitBuilderScreen() {
   const cardBg = isDark ? '#11161B' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
 
-  const userGoal = userProfile?.fitness_goal || 'Muscle Hypertrophy';
+  const userGoal = userProfile?.fitness_goal || 'Build Muscle';
   const userLevel = userProfile?.experience_level || 'Intermediate';
   const userName = userProfile?.full_name?.split(' ')[0] || userProfile?.username || 'Lifter';
 
@@ -179,19 +223,16 @@ export default function AISplitBuilderScreen() {
       <View style={[styles.header, { borderBottomColor: cardBorder, backgroundColor: colors.card }]}>
         <TouchableOpacity
           onPress={() => router.back()}
-          style={[styles.backBtn, { borderColor: cardBorder }]}
+          style={[styles.backBtn, { borderColor: cardBorder, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
           activeOpacity={0.75}
         >
-          <Ionicons name="close" size={22} color={colors.text} />
+          <Ionicons name="close" size={20} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>AI Split Builder</Text>
-            <View style={[styles.sparkleTag, { backgroundColor: colors.primary + '18' }]}>
-              <Ionicons name="sparkles" size={10} color={colors.primary} />
-              <Text style={[styles.sparkleTagText, { color: colors.primary }]}>SMART</Text>
-            </View>
+            
           </View>
           <Text style={[styles.headerSub, { color: colors.textMuted }]}>
             Personalized progressive overload routine
@@ -206,12 +247,15 @@ export default function AISplitBuilderScreen() {
         /* ── GENERATING ANIMATION ── */
         <View style={styles.centerContainer}>
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <View style={[styles.avatarGlow, { borderColor: colors.primary }]}>
+            <View style={[styles.avatarGlow, { borderColor: colors.primary, backgroundColor: cardBg }]}>
               <Image source={coachAvatarSource} style={styles.avatarImg} />
             </View>
           </Animated.View>
 
           <Text style={[styles.genTitle, { color: colors.text }]}>Coach Spotty is Designing Your Split</Text>
+          <Text style={[styles.genSub, { color: colors.textMuted }]}>
+            Structuring volume, selecting library exercises, and tuning rest periods
+          </Text>
 
           {/* Progress Steps */}
           <View style={styles.stepsWrap}>
@@ -229,7 +273,7 @@ export default function AISplitBuilderScreen() {
                     style={[
                       styles.stepDot,
                       {
-                        backgroundColor: isDone ? '#10B981' : isCurrent ? colors.primary : colors.border,
+                        backgroundColor: isDone ? '#10B981' : isCurrent ? colors.primary : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
                       },
                     ]}
                   >
@@ -256,7 +300,7 @@ export default function AISplitBuilderScreen() {
           </View>
         </View>
       ) : generatedSplit ? (
-        /* ── SPLIT PREVIEW ── */
+        /* ── SPLIT PREVIEW (ONBOARDING CARD AESTHETIC) ── */
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[styles.previewScroll, { paddingBottom: insets.bottom + 80 }]}
@@ -264,16 +308,16 @@ export default function AISplitBuilderScreen() {
         >
           {/* Program Overview Banner */}
           <View style={[styles.programCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <View style={[styles.goalBadge, { backgroundColor: colors.primary + '18' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <View style={[styles.badgePill, { backgroundColor: colors.primary + '18' }]}>
                 <Ionicons name="flame" size={12} color={colors.primary} />
-                <Text style={[styles.goalBadgeText, { color: colors.primary }]}>{generatedSplit.template_goal}</Text>
+                <Text style={[styles.badgePillText, { color: colors.primary }]}>{generatedSplit.template_goal}</Text>
               </View>
-              <View style={[styles.goalBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
-                <Text style={[styles.goalBadgeText, { color: colors.textMuted }]}>{generatedSplit.template_level}</Text>
+              <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+                <Text style={[styles.badgePillText, { color: colors.textMuted }]}>{generatedSplit.template_level}</Text>
               </View>
-              <View style={[styles.goalBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
-                <Text style={[styles.goalBadgeText, { color: colors.textMuted }]}>{generatedSplit.template_days}</Text>
+              <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+                <Text style={[styles.badgePillText, { color: colors.textMuted }]}>{generatedSplit.template_days}</Text>
               </View>
             </View>
 
@@ -282,7 +326,11 @@ export default function AISplitBuilderScreen() {
           </View>
 
           {/* Day Navigation Tabs */}
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Program Sessions</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>PROGRAM SESSIONS</Text>
+            <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
+          </View>
+
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -303,7 +351,7 @@ export default function AISplitBuilderScreen() {
                     },
                   ]}
                 >
-                  <Text style={[styles.dayTabNum, { color: isSelected ? '#FFF' : colors.textMuted }]}>
+                  <Text style={[styles.dayTabNum, { color: isSelected ? '#FFF' : colors.primary }]}>
                     Day {idx + 1}
                   </Text>
                   <Text
@@ -319,7 +367,7 @@ export default function AISplitBuilderScreen() {
 
           {/* Selected Session Details & Exercises */}
           {generatedSplit.sessions[selectedDayIdx] && (
-            <View style={{ marginTop: 16 }}>
+            <View style={{ marginTop: 14 }}>
               <View style={[styles.sessionHeaderBox, { backgroundColor: cardBg, borderColor: cardBorder }]}>
                 <Text style={[styles.sessionHeaderName, { color: colors.text }]}>
                   {generatedSplit.sessions[selectedDayIdx].name}
@@ -344,7 +392,7 @@ export default function AISplitBuilderScreen() {
                     {ex.image_url ? (
                       <Image source={{ uri: ex.image_url }} style={styles.exerciseThumb} />
                     ) : (
-                      <View style={[styles.exerciseThumbPlaceholder, { backgroundColor: colors.inputBg }]}>
+                      <View style={[styles.exerciseThumbPlaceholder, { backgroundColor: isDark ? '#141E24' : '#E2E8F0' }]}>
                         <Ionicons name="barbell-outline" size={24} color={colors.textDim} />
                       </View>
                     )}
@@ -384,14 +432,14 @@ export default function AISplitBuilderScreen() {
               activeOpacity={0.85}
               onPress={handleSaveSplit}
               disabled={saving}
-              style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+              style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
             >
               {saving ? (
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
                 <>
                   <Ionicons name="checkmark-circle" size={18} color="#FFF" />
-                  <Text style={styles.saveBtnText}>Save Program to My Splits</Text>
+                  <Text style={styles.primaryBtnText}>Save Program to My Splits</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -400,145 +448,162 @@ export default function AISplitBuilderScreen() {
               activeOpacity={0.8}
               onPress={() => setGeneratedSplit(null)}
               disabled={saving}
-              style={[styles.tweakBtn, { borderColor: cardBorder, backgroundColor: cardBg }]}
+              style={[styles.secondaryBtn, { borderColor: cardBorder, backgroundColor: cardBg }]}
             >
               <Ionicons name="options-outline" size={16} color={colors.text} />
-              <Text style={[styles.tweakBtnText, { color: colors.text }]}>Tweak Preferences</Text>
+              <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Tweak Preferences</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       ) : (
-        /* ── QUESTIONNAIRE FORM ── */
+        /* ── QUESTIONNAIRE FORM (COMPLETE PROFILE AESTHETIC) ── */
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[styles.formScroll, { paddingBottom: insets.bottom + 80 }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* User Profile Sync Card */}
-          <View style={[styles.syncCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-            <View style={[styles.syncAvatarBox, { backgroundColor: colors.primary + '18' }]}>
-              <Ionicons name="person" size={20} color={colors.primary} />
+          {/* User Profile Sync Card (Matches Complete Profile Header) */}
+          <View style={[styles.profileSyncCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+            <View style={[styles.profileSyncAvatar, { backgroundColor: colors.primary + '18' }]}>
+              <Ionicons name="person" size={22} color={colors.primary} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.syncTitle, { color: colors.text }]}>Synced for {userName}</Text>
-                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                <Text style={[styles.profileSyncName, { color: colors.text }]}>Synced for {userName}</Text>
+                <Ionicons name="checkmark-circle" size={15} color="#10B981" />
               </View>
-              <Text style={[styles.syncSub, { color: colors.textMuted }]}>
+              <Text style={[styles.profileSyncDetail, { color: colors.textMuted }]}>
                 Goal: <Text style={{ fontFamily: FONTS.bodyBold, color: colors.text }}>{userGoal}</Text> • Level: {userLevel}
               </Text>
-              <Text style={[styles.syncMeta, { color: colors.primary }]}>
+              <Text style={[styles.profileSyncNote, { color: colors.primary }]}>
                 Equipment & focus areas automatically optimized by AI
               </Text>
             </View>
           </View>
 
-          {/* 1. Training Days Per Week */}
-          <View style={styles.formSection}>
-            <Text style={[styles.formLabel, { color: colors.text }]}>Training Days Per Week</Text>
-            <View style={styles.grid2}>
-              {DAYS_OPTIONS.map((opt) => {
-                const isSelected = daysPerWeek === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    activeOpacity={0.8}
-                    onPress={() => setDaysPerWeek(opt.value)}
-                    style={[
-                      styles.choiceCard,
-                      {
-                        backgroundColor: isSelected ? colors.primary + '18' : cardBg,
-                        borderColor: isSelected ? colors.primary : cardBorder,
-                      },
-                    ]}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={[styles.choiceValue, { color: isSelected ? colors.primary : colors.text }]}>
-                        {opt.label}
-                      </Text>
-                      <Ionicons
-                        name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                        size={18}
-                        color={isSelected ? colors.primary : colors.textDim}
-                      />
-                    </View>
-                    <Text style={[styles.choiceSub, { color: colors.textMuted }]}>{opt.sub}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          {/* Section 1: Training Frequency */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>TRAINING FREQUENCY</Text>
+            <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
           </View>
 
-          {/* 2. Split Style Preference */}
-          <View style={styles.formSection}>
-            <Text style={[styles.formLabel, { color: colors.text }]}>Split Style Preference</Text>
-            <View style={{ gap: 8 }}>
-              {SPLIT_STYLES.map((style) => {
-                const isSelected = splitStyle === style.key;
-                return (
-                  <TouchableOpacity
-                    key={style.key}
-                    activeOpacity={0.8}
-                    onPress={() => setSplitStyle(style.key)}
-                    style={[
-                      styles.styleRow,
-                      {
-                        backgroundColor: isSelected ? colors.primary + '18' : cardBg,
-                        borderColor: isSelected ? colors.primary : cardBorder,
-                      },
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.styleRowTitle, { color: isSelected ? colors.primary : colors.text }]}>
-                        {style.label}
-                      </Text>
-                      <Text style={[styles.styleRowDesc, { color: colors.textMuted }]}>{style.desc}</Text>
+          <View style={styles.daysGrid}>
+            {DAYS_OPTIONS.map((opt) => {
+              const isSelected = daysPerWeek === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  activeOpacity={0.82}
+                  onPress={() => setDaysPerWeek(opt.value)}
+                  style={[
+                    styles.dayCard,
+                    {
+                      borderColor: isSelected ? opt.color : cardBorder,
+                      backgroundColor: isSelected ? opt.bg : cardBg,
+                    },
+                  ]}
+                >
+                  <View style={[styles.dayIconWrap, { backgroundColor: isSelected ? opt.bg : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') }]}>
+                    <Ionicons name={opt.icon as any} size={22} color={isSelected ? opt.color : colors.textMuted} />
+                  </View>
+                  <Text style={[styles.dayCardLabel, { color: isSelected ? colors.text : colors.textMuted }]}>
+                    {opt.label}
+                  </Text>
+                  <Text style={[styles.dayCardSub, { color: colors.textDim }]}>{opt.sub}</Text>
+                  {isSelected && (
+                    <View style={styles.selectedCheckBadge}>
+                      <Ionicons name="checkmark-circle" size={17} color={opt.color} />
                     </View>
-                    <Ionicons
-                      name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={20}
-                      color={isSelected ? colors.primary : colors.textDim}
-                    />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          {/* 3. Session Duration */}
-          <View style={styles.formSection}>
-            <Text style={[styles.formLabel, { color: colors.text }]}>Target Workout Duration</Text>
-            <View style={styles.durationRow}>
-              {DURATION_OPTIONS.map((dur) => {
-                const isSelected = sessionDuration === dur;
-                return (
-                  <TouchableOpacity
-                    key={dur}
-                    activeOpacity={0.8}
-                    onPress={() => setSessionDuration(dur)}
-                    style={[
-                      styles.durChip,
-                      {
-                        backgroundColor: isSelected ? colors.primary : cardBg,
-                        borderColor: isSelected ? colors.primary : cardBorder,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.durChipText, { color: isSelected ? '#FFF' : colors.text }]}>{dur}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          {/* Section 2: Split Style */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SPLIT STYLE PREFERENCE</Text>
+            <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
+          </View>
+
+          <View style={{ gap: 10 }}>
+            {SPLIT_STYLES.map((style) => {
+              const isSelected = splitStyle === style.key;
+              return (
+                <TouchableOpacity
+                  key={style.key}
+                  activeOpacity={0.82}
+                  onPress={() => setSplitStyle(style.key)}
+                  style={[
+                    styles.styleCard,
+                    {
+                      borderColor: isSelected ? style.color : cardBorder,
+                      backgroundColor: isSelected ? style.bg : cardBg,
+                    },
+                  ]}
+                >
+                  <View style={[styles.styleIconWrap, { backgroundColor: isSelected ? style.bg : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') }]}>
+                    <Ionicons name={style.icon as any} size={24} color={isSelected ? style.color : colors.textMuted} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.styleCardLabel, { color: isSelected ? colors.text : colors.textMuted }]}>
+                      {style.label}
+                    </Text>
+                    <Text style={[styles.styleCardDesc, { color: colors.textDim }]}>{style.desc}</Text>
+                  </View>
+                  {isSelected ? (
+                    <View style={[styles.styleCheckBadge, { backgroundColor: style.color }]}>
+                      <Ionicons name="checkmark" size={14} color="#FFF" />
+                    </View>
+                  ) : (
+                    <Ionicons name="ellipse-outline" size={20} color={colors.textDim} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Section 3: Duration */}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SESSION DURATION</Text>
+            <View style={[styles.sectionLine, { backgroundColor: cardBorder }]} />
+          </View>
+
+          <View style={styles.durationRow}>
+            {DURATION_OPTIONS.map((dur) => {
+              const isSelected = sessionDuration === dur.value;
+              return (
+                <TouchableOpacity
+                  key={dur.value}
+                  activeOpacity={0.8}
+                  onPress={() => setSessionDuration(dur.value)}
+                  style={[
+                    styles.durationCard,
+                    {
+                      backgroundColor: isSelected ? colors.primary : cardBg,
+                      borderColor: isSelected ? colors.primary : cardBorder,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.durationCardText, { color: isSelected ? '#FFF' : colors.text }]}>
+                    {dur.label}
+                  </Text>
+                  <Text style={[styles.durationCardSub, { color: isSelected ? 'rgba(255,255,255,0.85)' : colors.textDim }]}>
+                    {dur.sub}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* Submit Button */}
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={handleGenerate}
-            style={[styles.generateBtn, { backgroundColor: colors.primary }]}
+            style={[styles.primaryBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
           >
             <Ionicons name="sparkles" size={18} color="#FFF" />
-            <Text style={styles.generateBtnText}>Build My Split with AI</Text>
+            <Text style={styles.primaryBtnText}>Build My Split with AI</Text>
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -547,6 +612,7 @@ export default function AISplitBuilderScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -568,7 +634,134 @@ const styles = StyleSheet.create({
   },
   sparkleTagText: { fontFamily: FONTS.bodyBold, fontSize: 9.5, letterSpacing: 0.5 },
 
-  // Center Generating State
+  // Section Dividers (Matches Complete Profile)
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  sectionTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11.5,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  sectionLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+
+  // Profile Sync Card
+  profileSyncCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    gap: 12,
+  },
+  profileSyncAvatar: {
+    width: 44, height: 44, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  profileSyncName: { fontFamily: FONTS.bodyBold, fontSize: 14.5 },
+  profileSyncDetail: { fontFamily: FONTS.body, fontSize: 12.5 },
+  profileSyncNote: { fontFamily: FONTS.bodySemiBold, fontSize: 11, marginTop: 2 },
+
+  // Form Scroll
+  formScroll: { paddingHorizontal: 16, paddingTop: 14, gap: 14 },
+
+  // Days Grid (Matches Goal Grid in Onboarding)
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  dayCard: {
+    width: (SCREEN_W - 42) / 2,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    position: 'relative',
+    gap: 4,
+  },
+  dayIconWrap: {
+    width: 42, height: 42, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: 4,
+  },
+  dayCardLabel: { fontFamily: FONTS.bodyBold, fontSize: 14 },
+  dayCardSub: { fontFamily: FONTS.body, fontSize: 11, lineHeight: 15 },
+  selectedCheckBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+
+  // Split Styles (Matches Experience Level Cards in Onboarding)
+  styleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 15,
+    gap: 14,
+  },
+  styleIconWrap: {
+    width: 46, height: 46, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  styleCardLabel: { fontFamily: FONTS.bodyBold, fontSize: 14.5, marginBottom: 2 },
+  styleCardDesc: { fontFamily: FONTS.body, fontSize: 11.5, lineHeight: 16 },
+  styleCheckBadge: {
+    width: 24, height: 24, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+  },
+
+  // Duration Row
+  durationRow: { flexDirection: 'row', gap: 8 },
+  durationCard: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  durationCardText: { fontFamily: FONTS.bodyBold, fontSize: 13 },
+  durationCardSub: { fontFamily: FONTS.body, fontSize: 9.5 },
+
+  // Primary Button (Matches Onboarding PrimaryBtn)
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  primaryBtnText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: '#FFF' },
+
+  secondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  secondaryBtnText: { fontFamily: FONTS.bodyBold, fontSize: 14 },
+
+  // Generating State
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -576,155 +769,75 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   avatarGlow: {
-    width: 84, height: 84, borderRadius: 42,
+    width: 88, height: 88, borderRadius: 44,
     borderWidth: 3,
     padding: 3,
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  avatarImg: { width: 72, height: 72, borderRadius: 36 },
-  genTitle: { fontFamily: FONTS.bodyBold, fontSize: 18, textAlign: 'center', marginBottom: 28 },
+  avatarImg: { width: 76, height: 76, borderRadius: 38 },
+  genTitle: { fontFamily: FONTS.bodyBold, fontSize: 18, textAlign: 'center', marginBottom: 4 },
+  genSub: { fontFamily: FONTS.body, fontSize: 12.5, textAlign: 'center', marginBottom: 28, maxWidth: 300 },
   stepsWrap: { width: '100%', gap: 14, maxWidth: 340 },
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stepDot: { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
   stepLabel: { fontSize: 13, flex: 1, lineHeight: 18 },
 
-  // Form Scroll
-  formScroll: { paddingHorizontal: 16, paddingTop: 16, gap: 20 },
-  syncCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 14,
-    gap: 12,
-  },
-  syncAvatarBox: {
-    width: 42, height: 42, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  syncTitle: { fontFamily: FONTS.bodyBold, fontSize: 14 },
-  syncSub: { fontFamily: FONTS.body, fontSize: 12.5 },
-  syncMeta: { fontFamily: FONTS.bodySemiBold, fontSize: 11, marginTop: 2 },
-
-  formSection: { gap: 10 },
-  formLabel: { fontFamily: FONTS.bodyBold, fontSize: 14 },
-
-  grid2: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  choiceCard: {
-    width: (SCREEN_W - 42) / 2,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    padding: 12,
-    gap: 4,
-  },
-  choiceValue: { fontFamily: FONTS.bodyBold, fontSize: 14.5 },
-  choiceSub: { fontFamily: FONTS.body, fontSize: 11 },
-
-  styleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    padding: 12,
-    gap: 12,
-  },
-  styleRowTitle: { fontFamily: FONTS.bodyBold, fontSize: 14 },
-  styleRowDesc: { fontFamily: FONTS.body, fontSize: 11.5, marginTop: 1 },
-
-  durationRow: { flexDirection: 'row', gap: 8 },
-  durChip: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  durChipText: { fontFamily: FONTS.bodyBold, fontSize: 12 },
-
-  generateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 16,
-    marginTop: 8,
-  },
-  generateBtnText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: '#FFF' },
-
   // Preview Styles
   previewScroll: { paddingHorizontal: 16, paddingTop: 16 },
   programCard: {
     borderRadius: 18,
-    borderWidth: 1,
+    borderWidth: 1.5,
     padding: 16,
-    gap: 8,
+    gap: 10,
     marginBottom: 16,
   },
-  goalBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  goalBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 10.5 },
-  programName: { fontFamily: FONTS.bodyBold, fontSize: 18 },
+  badgePill: { paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  badgePillText: { fontFamily: FONTS.bodyBold, fontSize: 10.5 },
+  programName: { fontFamily: FONTS.bodyBold, fontSize: 18.5 },
   programDesc: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 19 },
 
-  sectionTitle: { fontFamily: FONTS.bodyBold, fontSize: 15, marginBottom: 10 },
-  dayTabsList: { gap: 8, paddingBottom: 4 },
+  dayTabsList: { gap: 8, paddingBottom: 6 },
   dayTab: {
-    width: 120,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 10,
+    width: 124,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 11,
     gap: 2,
   },
-  dayTabNum: { fontFamily: FONTS.bodySemiBold, fontSize: 10.5 },
-  dayTabTitle: { fontFamily: FONTS.bodyBold, fontSize: 12 },
+  dayTabNum: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  dayTabTitle: { fontFamily: FONTS.bodyBold, fontSize: 12.5 },
 
   sessionHeaderBox: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
   },
-  sessionHeaderName: { fontFamily: FONTS.bodyBold, fontSize: 14.5 },
-  targetMusclesText: { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  sessionHeaderName: { fontFamily: FONTS.bodyBold, fontSize: 15 },
+  targetMusclesText: { fontFamily: FONTS.bodyBold, fontSize: 11.5 },
 
   exerciseCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 10,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 12,
     gap: 12,
   },
-  exerciseThumb: { width: 56, height: 56, borderRadius: 10 },
+  exerciseThumb: { width: 58, height: 58, borderRadius: 12 },
   exerciseThumbPlaceholder: {
-    width: 56, height: 56, borderRadius: 10,
+    width: 58, height: 58, borderRadius: 12,
     justifyContent: 'center', alignItems: 'center',
   },
-  exerciseName: { fontFamily: FONTS.bodyBold, fontSize: 13.5 },
-  exTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
-  exTagText: { fontFamily: FONTS.bodyBold, fontSize: 10 },
-  setsRepsText: { fontFamily: FONTS.bodyBold, fontSize: 12 },
-  restTimeText: { fontFamily: FONTS.body, fontSize: 11 },
+  exerciseName: { fontFamily: FONTS.bodyBold, fontSize: 14 },
+  exTag: { paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6 },
+  exTagText: { fontFamily: FONTS.bodyBold, fontSize: 10.5 },
+  setsRepsText: { fontFamily: FONTS.bodyBold, fontSize: 12.5 },
+  restTimeText: { fontFamily: FONTS.body, fontSize: 11.5 },
 
   previewActions: { marginTop: 24, gap: 10 },
-  saveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 16,
-  },
-  saveBtnText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: '#FFF' },
-  tweakBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  tweakBtnText: { fontFamily: FONTS.bodyBold, fontSize: 13 },
 });
