@@ -507,12 +507,11 @@ export default function WorkoutCompleteScreen() {
 
         {/* ═══ MOVEMENT SUMMARY ═══ */}
         {workout?.exercises?.length > 0 && (
-          <View style={{ paddingHorizontal: s(16) }}>
-            <WorkoutMovementSummaryList
-              exercises={workout.exercises}
-              title="Movement Summary"
-            />
-          </View>
+          <WorkoutMovementSummaryList
+            exercises={workout.exercises}
+            title="Movement Summary"
+            containerStyle={{ marginTop: vs(8) }}
+          />
         )}
 
         {/* Reopen padded container for remaining sections */}

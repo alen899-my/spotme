@@ -24,12 +24,14 @@ function formatTime(sec: number) {
 
 export interface WorkoutExerciseLogCardProps {
   exercise: any;
+  cardWidth?: number;
   defaultExpanded?: boolean;
   onOpenGuide?: (exercise: any) => void;
 }
 
 export const WorkoutExerciseLogCard: React.FC<WorkoutExerciseLogCardProps> = React.memo(({
   exercise,
+  cardWidth,
   defaultExpanded = true,
   onOpenGuide,
 }) => {
@@ -66,10 +68,8 @@ export const WorkoutExerciseLogCard: React.FC<WorkoutExerciseLogCardProps> = Rea
         styles.card,
         {
           backgroundColor: isDark ? colors.card : '#FFFFFF',
-          borderColor: isDark
-            ? (isSkipped ? 'rgba(255,255,255,0.1)' : isDone ? 'rgba(16,185,129,0.35)' : colors.border)
-            : (isSkipped ? '#E2E8F0' : isDone ? '#A7F3D0' : '#E2E8F0'),
         },
+        cardWidth ? { width: cardWidth } : undefined,
         isSkipped && completedSets === 0 && { opacity: 0.7 },
       ]}
     >
@@ -296,10 +296,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 1.5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.07,
     shadowRadius: 8,
     elevation: 3,
     overflow: 'hidden',
