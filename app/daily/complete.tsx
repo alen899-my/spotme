@@ -24,6 +24,7 @@ import { getToken } from '../../utils/tokenStorage';
 import { formatDurationShort as formatDuration } from '../../utils/datetime';
 import { useUnits } from '../../contexts/UnitContext';
 import { formatWeight, formatWeightValue, formatRecordValue, weightUnit, formatHeight, heightUnit, formatBodyWeight, UnitSystem } from '../../utils/units';
+import WorkoutMovementSummaryList from '../../components/workout/WorkoutMovementSummaryList';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -115,194 +116,12 @@ function BentoTile({
   );
 }
 
-const CAROUSEL_CARD_W = SCREEN_WIDTH - s(64);
-const CAROUSEL_SNAP = CAROUSEL_CARD_W + s(12);
-
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60).toString().padStart(2, '0');
   const s = (sec % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
 }
 
-function formatRecord(metricType?: string, value?: number | string, system?: UnitSystem) {
-  return formatRecordValue(metricType, value, system || 'metric');
-}
-
-function ExerciseCarouselCard({ ex, colors, isDark, unitSystem }: { ex: any; colors: any; isDark: boolean; unitSystem: UnitSystem }) {
-  const isSkipped = ex.is_skipped;
-  const isCardio = ex.category?.toLowerCase() === 'cardio';
-  const isBodyweight = ex.equipment?.toLowerCase() === 'body weight';
-  const completedSets = ex.sets?.filter((s: any) => !s.is_skipped) || [];
-  const hasCompletedData = completedSets.length > 0;
-  const totalReps = completedSets.reduce((acc: number, s: any) => acc + (parseInt(s.reps) || 0), 0);
-  const totalWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0);
-  const totalSetWeight = completedSets.reduce((acc: number, s: any) => acc + (parseFloat(s.weight) || 0), 0);
-  const totalTime = completedSets.reduce((acc: number, s: any) => acc + (s.duration_seconds || 0), 0);
-  const avgWeight = completedSets.length > 0 ? (totalSetWeight / completedSets.length).toFixed(1) : '0';
-  const avgTime = completedSets.length > 0 ? Math.round(totalTime / completedSets.length) : 0;
-
-  return (
-    <View
-      style={[
-        carouselStyles.card,
-        {
-          width: CAROUSEL_CARD_W,
-          backgroundColor: isDark ? '#0D0D0D' : '#FFFFFF',
-          borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
-          opacity: isSkipped && !hasCompletedData ? 0.55 : 1,
-        },
-      ]}
-    >
-      {/* Header */}
-      <View style={carouselStyles.exHeader}>
-        <OptimizedImage uri={ex.image_url} style={carouselStyles.exImage} />
-        <View style={carouselStyles.exMeta}>
-          <Text style={[carouselStyles.exName, { color: isDark ? '#F1F5F9' : '#0F1923' }]} numberOfLines={2}>
-            {ex.name}
-          </Text>
-          <Text style={[carouselStyles.exSetsSub, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>
-            {isSkipped && !hasCompletedData ? 'Movement skipped' : isSkipped && hasCompletedData ? `Partially completed — ${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} logged, then skipped` : isCardio ? `${formatTime(totalTime)} logged` : `${completedSets.length} set${completedSets.length !== 1 ? 's' : ''} completed`}
-          </Text>
-        </View>
-        {isSkipped && (
-          <View style={carouselStyles.badgeSkipped}>
-            <Text style={carouselStyles.badgeText}>SKIPPED</Text>
-          </View>
-        )}
-        {!isSkipped && ex.is_world_record && (
-          <View style={carouselStyles.badgeWorld}>
-            <Ionicons name="earth" size={10} color="#FFF" style={{ marginRight: 3 }} />
-            <Text style={carouselStyles.badgeText}>WORLD PR</Text>
-          </View>
-        )}
-        {!isSkipped && !ex.is_world_record && ex.is_personal_record && (
-          <View style={carouselStyles.badgePR}>
-            <Ionicons name="ribbon" size={10} color="#1a1a1a" style={{ marginRight: 3 }} />
-            <Text style={[carouselStyles.badgeText, { color: '#1a1a1a' }]}>NEW PR</Text>
-          </View>
-        )}
-        {!isSkipped && !ex.is_world_record && !ex.is_personal_record && ex.rating !== null && ex.rating !== undefined && (
-          <View style={carouselStyles.badgeRating}>
-            <Ionicons name="star" size={10} color={P.sun} style={{ marginRight: 3 }} />
-            <Text style={[carouselStyles.badgeText, { color: P.sun }]}>{ex.rating}/10</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Record row (non-cardio, has completed data) */}
-      {!isCardio && hasCompletedData && (
-        <View style={carouselStyles.recordRow}>
-          <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
-            <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>BEST SET</Text>
-            <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {isBodyweight ? `${ex.best_set_reps || 0} reps` : `${formatWeightValue(Number(ex.best_set_weight || 0), unitSystem)} ${weightUnit(unitSystem)} × ${ex.best_set_reps || 0}`}
-            </Text>
-          </View>
-          <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
-            <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>MY PR</Text>
-            <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {formatRecord(ex.record_metric_type, ex.personal_record_value, unitSystem)}
-            </Text>
-          </View>
-          <View style={[carouselStyles.recordPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
-            <Text style={[carouselStyles.recordPillLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>WORLD PR</Text>
-            <Text style={[carouselStyles.recordPillVal, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>
-              {formatRecord(ex.record_metric_type, ex.world_record_value, unitSystem)}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* Stats grid — show for non-skipped OR skipped with completed data */}
-      {(!isSkipped || hasCompletedData) && completedSets.length > 0 && (
-        <View style={carouselStyles.exStatsGrid}>
-          {isCardio ? (
-            <>
-              <View style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
-                <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>TOTAL TIME</Text>
-                <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{formatTime(totalTime)}</Text>
-              </View>
-              <View style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
-                <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>AVG TIME</Text>
-                <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{formatTime(avgTime)}</Text>
-              </View>
-            </>
-          ) : isBodyweight ? (
-            <>
-              <View style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
-                <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>TOTAL REPS</Text>
-                <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{totalReps}</Text>
-              </View>
-              <View style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
-                <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>AVG TIME</Text>
-                <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{formatTime(avgTime)}</Text>
-              </View>
-            </>
-          ) : (
-            [
-              { label: 'TOTAL WEIGHT', value: `${formatWeightValue(totalWeight, unitSystem)} ${weightUnit(unitSystem)}` },
-              { label: 'AVG / SET', value: `${formatWeightValue(Number(avgWeight), unitSystem)} ${weightUnit(unitSystem)}` },
-              { label: 'TOTAL REPS', value: `${totalReps}` },
-              { label: 'AVG TIME / SET', value: formatTime(avgTime) },
-            ].map((item, idx) => (
-              <View key={idx} style={[carouselStyles.exStatCell, { backgroundColor: isDark ? colors.inputBg : 'rgba(0,0,0,0.03)' }]}>
-                <Text style={[carouselStyles.exStatLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#64748B' }]}>{item.label}</Text>
-                <Text style={[carouselStyles.exStatValue, { color: isDark ? '#F1F5F9' : '#0F1923' }]}>{item.value}</Text>
-              </View>
-            ))
-          )}
-        </View>
-      )}
-    </View>
-  );
-}
-
-// ── Exercise Carousel with pagination dots ──────────────────────────────────
-function ExerciseCarousel({ exercises, colors, isDark, unitSystem }: { exercises: any[]; colors: any; isDark: boolean; unitSystem: UnitSystem }) {
-  const [activeIdx, setActiveIdx] = useState(0);
-  const onScroll = (e: any) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / CAROUSEL_SNAP);
-    setActiveIdx(idx);
-  };
-
-  return (
-    <View>
-      <ScrollView
-        horizontal
-        pagingEnabled={false}
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToInterval={CAROUSEL_SNAP}
-        snapToAlignment="start"
-        contentContainerStyle={{ paddingLeft: s(16), paddingRight: s(16), gap: s(12) }}
-        onMomentumScrollEnd={onScroll}
-      >
-        {exercises.map((ex: any) => (
-          <ExerciseCarouselCard key={ex.id} ex={ex} colors={colors} isDark={isDark} unitSystem={unitSystem} />
-        ))}
-      </ScrollView>
-      {/* Pagination dots */}
-      {exercises.length > 1 && (
-        <View style={carouselStyles.dotRow}>
-          {exercises.map((_: any, i: number) => (
-            <View
-              key={i}
-              style={[
-                carouselStyles.dot,
-                {
-                  backgroundColor: i === activeIdx
-                    ? P.cta
-                    : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'),
-                  width: i === activeIdx ? s(20) : s(6),
-                },
-              ]}
-            />
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN SCREEN
@@ -684,17 +503,16 @@ export default function WorkoutCompleteScreen() {
             )}
           </View>
 
-          {/* ═══ EXERCISE CAROUSEL ═══ */}
-          {workout?.exercises?.length > 0 && (
-            <>
-              <Text style={[st.sectionLabel, { color: colors.text, fontSize: fs(18), marginTop: vs(8) }]}>Exercises</Text>
-            </>
-          )}
         </View>
 
-        {/* Carousel lives outside the padded container for edge-to-edge snap */}
+        {/* ═══ MOVEMENT SUMMARY ═══ */}
         {workout?.exercises?.length > 0 && (
-          <ExerciseCarousel exercises={workout.exercises} colors={colors} isDark={isDark} unitSystem={unitSystem} />
+          <View style={{ paddingHorizontal: s(16) }}>
+            <WorkoutMovementSummaryList
+              exercises={workout.exercises}
+              title="Movement Summary"
+            />
+          </View>
         )}
 
         {/* Reopen padded container for remaining sections */}
@@ -1160,137 +978,4 @@ const bentoStyles = StyleSheet.create({
   },
 });
 
-const carouselStyles = StyleSheet.create({
-  card: {
-    borderRadius: s(20),
-    padding: s(16),
-    borderWidth: 1,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-  },
-  exHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: s(12),
-    marginBottom: vs(12),
-  },
-  exImage: {
-    width: s(52),
-    height: s(52),
-    borderRadius: s(12),
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  exMeta: {
-    flex: 1,
-    paddingTop: vs(2),
-  },
-  exName: {
-    fontFamily: FONTS.heading,
-    fontSize: fs(15),
-    lineHeight: fs(20),
-    marginBottom: vs(4),
-  },
-  exSetsSub: {
-    fontFamily: FONTS.body,
-    fontSize: fs(12),
-  },
-  badgeSkipped: {
-    backgroundColor: '#374151',
-    paddingHorizontal: s(8),
-    paddingVertical: vs(4),
-    borderRadius: s(6),
-    alignSelf: 'flex-start',
-  },
-  badgeWorld: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#10B981',
-    paddingHorizontal: s(8),
-    paddingVertical: vs(4),
-    borderRadius: s(6),
-    alignSelf: 'flex-start',
-  },
-  badgePR: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FBBF24',
-    paddingHorizontal: s(8),
-    paddingVertical: vs(4),
-    borderRadius: s(6),
-    alignSelf: 'flex-start',
-  },
-  badgeRating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(245,158,11,0.2)',
-    paddingHorizontal: s(8),
-    paddingVertical: vs(4),
-    borderRadius: s(6),
-    alignSelf: 'flex-start',
-  },
-  badgeText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: fs(9),
-    color: '#FFF',
-    letterSpacing: 0.5,
-  },
-  recordRow: {
-    flexDirection: 'row',
-    gap: s(8),
-    marginBottom: vs(12),
-    flexWrap: 'wrap',
-  },
-  recordPill: {
-    flex: 1,
-    minWidth: s(90),
-    borderRadius: s(10),
-    paddingVertical: vs(8),
-    paddingHorizontal: s(10),
-  },
-  recordPillLabel: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: fs(9),
-    letterSpacing: 0.8,
-    marginBottom: vs(3),
-  },
-  recordPillVal: {
-    fontFamily: FONTS.heading,
-    fontSize: fs(13),
-  },
-  exStatsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: s(8),
-  },
-  exStatCell: {
-    width: '47%',
-    borderRadius: s(12),
-    paddingVertical: vs(10),
-    paddingHorizontal: s(12),
-  },
-  exStatLabel: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: fs(8),
-    letterSpacing: 0.8,
-    marginBottom: vs(4),
-  },
-  exStatValue: {
-    fontFamily: FONTS.heading,
-    fontSize: fs(18),
-  },
-  dotRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: s(5),
-    marginTop: vs(12),
-    paddingBottom: vs(4),
-  },
-  dot: {
-    height: s(6),
-    borderRadius: s(3),
-  },
-});
+
