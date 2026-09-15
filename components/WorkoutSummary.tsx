@@ -21,7 +21,18 @@ function formatTime(sec: number) {
   return `${m}:${s}`;
 }
 
-
+const METRIC_COLORS: Record<string, string> = {
+  DURATION: '#2596BE',
+  'ACTIVE TIME': '#00C9C8',
+  CALORIES: '#EF4444',
+  VOLUME: '#10B981',
+  'REST TIME': '#F59E0B',
+  SETS: '#8B5CF6',
+  'BODY WEIGHT': '#10B981',
+  EXERCISES: '#2596BE',
+  'BEST SET': '#FBBF24',
+  'AVG RATING': '#F59E0B',
+};
 
 interface WorkoutSummaryProps {
   workout: any;
