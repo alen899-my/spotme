@@ -71,8 +71,10 @@ export default function WorkoutSummary({
   const rest = displayRest ?? workout?.total_rest_seconds ?? 0;
   const caloriesBurned = Number(workout?.calories_burned) || 0;
 
-  const activeTime = workout?.exercises?.reduce((acc: number, ex: any) =>
+  // Active time: sum of per-set durations if available, else fall back to duration - rest
+  const setActiveTime = workout?.exercises?.reduce((acc: number, ex: any) =>
     acc + (ex.sets?.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0) || 0), 0) || 0;
+  const activeTime = setActiveTime > 0 ? setActiveTime : Math.max(0, duration - rest);
 
   const calculatedTotalSets = workout?.exercises?.reduce((acc: number, ex: any) =>
     acc + (ex.sets?.filter((s: any) => !s.is_skipped).length || 0), 0) || 0;
@@ -82,16 +84,26 @@ export default function WorkoutSummary({
   const skippedExercises = workout?.exercises?.filter((e: any) => e.is_skipped).length || 0;
   const completedExercises = workout?.exercises?.filter((e: any) => e.is_completed && !e.is_skipped).length || 0;
 
+  // Best set: for weighted exercises use weight*reps, for bodyweight use reps only
   let bestSet: any = null;
   if (workout?.exercises) {
     for (const ex of workout.exercises) {
       if (ex.is_skipped) continue;
+      const isBodyweight = ex.equipment?.toLowerCase() === 'body weight';
       for (const set of (ex.sets || [])) {
         if (set.is_skipped) continue;
         const w = parseFloat(set.weight) || 0;
         const r = parseInt(set.reps) || 0;
-        if (!bestSet || (w * r) > (bestSet.w * bestSet.r)) {
-          bestSet = { w, r, name: ex.name };
+        if (isBodyweight) {
+          if (!bestSet || (bestSet.isBodyweight && r > bestSet.r) || (!bestSet.isBodyweight && false)) {
+            if (!bestSet || bestSet.isBodyweight) {
+              if (!bestSet || r > bestSet.r) bestSet = { w: 0, r, name: ex.name, isBodyweight: true };
+            }
+          }
+        } else {
+          if (!bestSet || (!bestSet.isBodyweight && (w * r) > (bestSet.w * bestSet.r))) {
+            bestSet = { w, r, name: ex.name, isBodyweight: false };
+          }
         }
       }
     }
@@ -109,7 +121,8 @@ export default function WorkoutSummary({
     { key: 'ACTIVE TIME', icon: 'stopwatch-outline', value: formatDuration(activeTime), sub: 'Active exercising' },
     { key: 'REST TIME', icon: 'hourglass-outline', value: formatDuration(rest), sub: 'Recovery' },
     { key: 'CALORIES', icon: 'flame-outline', value: `${caloriesBurned} kcal`, sub: 'Est. burn' },
-    { key: 'VOLUME', icon: 'barbell-outline', value: `${formatWeightValue(Math.round(volume), unitSystem)}${weightUnit(unitSystem)}`, sub: 'Weight lifted' },
+    // volume is already stored in the user's unit (no conversion needed)
+    { key: 'VOLUME', icon: 'barbell-outline', value: `${Math.round(volume)}${weightUnit(unitSystem)}`, sub: 'Weight lifted' },
     { key: 'SETS', icon: 'layers-outline', value: `${totalSets}`, sub: 'Completed sets' },
     {
       key: 'EXERCISES',
@@ -117,8 +130,15 @@ export default function WorkoutSummary({
       value: `${completedExercises}/${totalExercises}`,
       sub: skippedExercises > 0 ? `${skippedExercises} skipped` : 'All completed',
     },
-    ...(bestSet ? [{ key: 'BEST SET', icon: 'trophy-outline', value: `${formatWeightValue(bestSet.w, unitSystem)}${weightUnit(unitSystem)} × ${bestSet.r}`, sub: bestSet.name }] : []),
-
+    ...(bestSet ? [{
+      key: 'BEST SET',
+      icon: 'trophy-outline',
+      value: bestSet.isBodyweight
+        ? `${bestSet.r} reps BW`
+        : `${Math.round(bestSet.w)}${weightUnit(unitSystem)} × ${bestSet.r}`,
+      sub: bestSet.name,
+    }] : []),
+    ...(avgRating !== null ? [{ key: 'AVG RATING', icon: 'star-outline', value: `${avgRating}/10`, sub: 'Effort rating' }] : []),
     ...(showBodyWeight ? [{ key: 'BODY WEIGHT', icon: 'scale-outline', value: `${formatBodyWeight(workout?.post_workout_weight || 0, unitSystem)}`, sub: 'Current mass' }] : []),
   ];
 

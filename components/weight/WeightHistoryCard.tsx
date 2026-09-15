@@ -48,12 +48,7 @@ export default function WeightHistoryCard({ item, onDelete }: WeightHistoryCardP
             {formatWeightValue(weightVal, unitSystem)}
             <Text style={[styles.weightUnit, { color: colors.textMuted }]}> {weightUnit(unitSystem)}</Text>
           </Text>
-          {isPostWorkout && (
-            <View style={[styles.postBadge, { backgroundColor: isDark ? '#3B82F618' : '#3B82F610' }]}>
-              <Ionicons name="barbell-outline" size={10} color="#3B82F6" />
-              <Text style={styles.postBadgeText}>Post-Workout</Text>
-            </View>
-          )}
+          
         </View>
         {item.notes && !isPostWorkout && (
           <Text style={[styles.notes, { color: colors.textDim }]} numberOfLines={1}>

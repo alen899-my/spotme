@@ -347,7 +347,21 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const currentUserId = req.user.id;
 
     const userQuery = await pool.query(`
-      SELECT id, full_name, profile_pic_url, gender, age, height, weight, 
+      SELECT id, full_name, profile_pic_url, gender, age, height,
+             COALESCE(
+               (
+                 SELECT weight FROM (
+                   SELECT weight::numeric AS weight, logged_at AS ts FROM weight_logs WHERE user_id = $1
+                   UNION ALL
+                   SELECT post_workout_weight::numeric AS weight, completed_at AS ts
+                   FROM daily_workouts
+                   WHERE user_id = $1 AND post_workout_weight IS NOT NULL AND status = 'completed'
+                 ) latest_weights
+                 ORDER BY ts DESC
+                 LIMIT 1
+               ),
+               weight::numeric
+             ) AS weight,
              total_xp AS xp, level, league_tier, current_streak, last_workout_date, 
              fitness_goal, experience_level, is_private,
         (SELECT COUNT(*) FROM follows WHERE following_id = $1 AND status = 'accepted') AS follower_count,

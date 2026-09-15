@@ -348,10 +348,12 @@ export default function WorkoutCompleteScreen() {
   }, [workout]);
 
   const displayActive = useMemo(() => {
-    if (!workout?.exercises) return 0;
-    return workout.exercises.reduce((acc: number, ex: any) =>
+    if (!workout?.exercises) return Math.max(0, displayDuration - displayRest);
+    const setTime = workout.exercises.reduce((acc: number, ex: any) =>
       acc + (ex.sets?.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0) || 0), 0);
-  }, [workout]);
+    // Fall back to duration - rest if no per-set durations were recorded
+    return setTime > 0 ? setTime : Math.max(0, displayDuration - displayRest);
+  }, [workout, displayDuration, displayRest]);
 
   const exerciseStats = useMemo(() => {
     if (!workout?.exercises) return { total: 0, completed: 0, skipped: 0 };
@@ -366,16 +368,32 @@ export default function WorkoutCompleteScreen() {
     let best: any = null;
     for (const ex of workout.exercises) {
       if (ex.is_skipped) continue;
+      const isBodyweight = ex.equipment?.toLowerCase() === 'body weight';
       for (const set of (ex.sets || [])) {
         if (set.is_skipped) continue;
         const w = parseFloat(set.weight) || 0;
         const r = parseInt(set.reps) || 0;
-        if (!best || (w * r) > (best.w * best.r)) {
-          best = { w, r, name: ex.name };
+        if (isBodyweight) {
+          if (!best || (best.isBodyweight && r > best.r)) {
+            best = { w: 0, r, name: ex.name, isBodyweight: true };
+          }
+        } else {
+          if (!best || (!best.isBodyweight && (w * r) > (best.w * best.r))) {
+            best = { w, r, name: ex.name, isBodyweight: false };
+          }
         }
       }
     }
     return best;
+  }, [workout]);
+
+  const avgRating = useMemo(() => {
+    if (!workout?.exercises) return null;
+    const ratings = workout.exercises
+      .map((e: any) => e.rating)
+      .filter((r: any) => r !== null && r !== undefined);
+    if (ratings.length === 0) return null;
+    return (ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(1);
   }, [workout]);
 
   // ── Confetti particles ──
@@ -491,15 +509,27 @@ export default function WorkoutCompleteScreen() {
         <View style={[st.bentoContainer, { paddingHorizontal: s(16) }]}>
           <Text style={[st.sectionLabel, { color: colors.text, fontSize: fs(18) }]}>Session Summary</Text>
           <View style={st.bentoGrid}>
-            <BentoTile icon="time-outline" iconColor="#2596BE" label="DURATION" value={formatDuration(displayDuration)} sub="Total session" colors={colors} isDark={isDark} />
+          <BentoTile icon="time-outline" iconColor="#2596BE" label="DURATION" value={formatDuration(displayDuration)} sub="Total session" colors={colors} isDark={isDark} />
             <BentoTile icon="stopwatch-outline" iconColor="#00C9C8" label="Active time" value={formatDuration(displayActive)} sub="Active exercising" colors={colors} isDark={isDark} />
             <BentoTile icon="hourglass-outline" iconColor="#F59E0B" label="REST TIME" value={formatDuration(displayRest)} sub="Recovery" colors={colors} isDark={isDark} />
             <BentoTile icon="flame-outline" iconColor="#EF4444" label="CALORIES" value={`${caloriesBurned}`} sub="Est. kcal burn" colors={colors} isDark={isDark} />
-            <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${formatWeightValue(displayVolume, unitSystem)} ${weightUnit(unitSystem)}`} sub="Weight lifted" colors={colors} isDark={isDark} />
+            {/* volume already stored in user's unit — no formatWeightValue conversion */}
+            <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${Math.round(displayVolume)} ${weightUnit(unitSystem)}`} sub="Weight lifted" colors={colors} isDark={isDark} />
             <BentoTile icon="layers-outline" iconColor="#8B5CF6" label="TOTAL SETS" value={`${totalSets}`} sub="Completed" colors={colors} isDark={isDark} />
             <BentoTile icon="fitness-outline" iconColor="#2596BE" label="EXERCISES" value={`${exerciseStats.completed}/${exerciseStats.total}`} sub={exerciseStats.skipped > 0 ? `${exerciseStats.skipped} skipped` : 'All completed'} colors={colors} isDark={isDark} />
             {bestSet && (
-              <BentoTile icon="trophy-outline" iconColor="#FBBF24" label="BEST SET" value={`${formatWeightValue(bestSet.w, unitSystem)} ${weightUnit(unitSystem)} × ${bestSet.r}`} sub={bestSet.name} colors={colors} isDark={isDark} />
+              <BentoTile
+                icon="trophy-outline"
+                iconColor="#FBBF24"
+                label="BEST SET"
+                value={bestSet.isBodyweight ? `${bestSet.r} reps BW` : `${Math.round(bestSet.w)} ${weightUnit(unitSystem)} × ${bestSet.r}`}
+                sub={bestSet.name}
+                colors={colors}
+                isDark={isDark}
+              />
+            )}
+            {avgRating !== null && (
+              <BentoTile icon="star-outline" iconColor="#F59E0B" label="AVG RATING" value={`${avgRating}/10`} sub="Effort rating" colors={colors} isDark={isDark} />
             )}
           </View>
 
