@@ -32,6 +32,7 @@ import { getToken } from '../../utils/tokenStorage';
 import * as Notifications from 'expo-notifications';
 import { useUnits } from '../../contexts/UnitContext';
 import { formatWeight, formatWeightValue, formatRecordValue, weightUnit, formatHeight, heightUnit, formatBodyWeight } from '../../utils/units';
+import SetLoggerModal from '../../components/workout/SetLoggerModal';
 
 
 function formatTime(sec: number) {
@@ -1160,100 +1161,38 @@ export default function ActiveWorkoutScreen() {
         />
       </View>
 
-      {/* Set Logger Modal */}
-      <Modal visible={setModalVisible} transparent animationType="none" onRequestClose={closeModal}>
-        <Animated.View style={[styles.modalOverlay, { opacity: setModalFadeAnim }]}>
-          <Animated.View style={[styles.modalContentAnimated, {
-            backgroundColor: colors.card,
-            paddingBottom: Math.max(insets.bottom, 16) + 16 + keyboardHeight,
-            transform: [{
-              translateY: setModalSlideAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [600, 0],
-              }),
-            }],
-          }]}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-              {(() => {
-                const isCardio = activeExercise?.category?.toLowerCase() === 'cardio';
-                const isBodyweight = activeExercise?.equipment?.toLowerCase() === 'body weight';
-                return (
-                  <>
-                    <View style={styles.modalHeader}>
-                      {(activeExercise?.gif_url || activeExercise?.image_url) && (
-                        <OptimizedImage uri={activeExercise.gif_url || activeExercise.image_url} style={styles.exerciseGif} />
-                      )}
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.modalTitle, { color: colors.text }]} numberOfLines={1}>{activeExercise?.name}</Text>
-                        <Text style={[styles.modalSub, { color: colors.textMuted }]}>
-                          {editingSet ? `Editing Set ${editingSet.set_number}` : (isCardio ? 'Log duration' : `Set ${activeSetNum} of ${activeExercise?.target_sets}`)}
-                        </Text>
-                      </View>
-                      <TouchableOpacity onPress={closeModal} style={styles.modalCloseBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Ionicons name="close" size={22} color={colors.text} />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.clockWrap}>
-                      <Text style={[styles.inputLabel, { color: colors.textMuted, textAlign: 'center', marginBottom: 4 }]}>DURATION</Text>
-                      <Text style={[styles.clockTime, { color: colors.text }]}>{formatTime(setTimer)}</Text>
-                      <TouchableOpacity style={styles.clockBtn} onPress={toggleSetTimer}>
-                        <LinearGradient colors={setTimerRunning ? [P.ctaDark, P.ctaDeep] : [P.cta, P.ctaDark]} style={styles.clockBtnGrad}>
-                          <Ionicons name={setTimerRunning ? 'pause' : 'play'} size={26} color="#FFF" />
-                        </LinearGradient>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => { setSetTimer(0); setTimerStartedAtRef.current = Date.now(); clearInterval(setTimerRef.current); setSetTimerRunning(false); }}>
-                        <Text style={[styles.resetText, { color: colors.textMuted }]}>Reset</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.inputRow}>
-                      {!isCardio && !isBodyweight && (
-                        <View style={styles.inputGroup}>
-                          <Text style={[styles.inputLabel, { color: colors.textMuted }]}>WEIGHT ({weightUnit(unitSystem).toUpperCase()})</Text>
-                          <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="decimal-pad" value={inputWeight} onChangeText={setInputWeight} placeholder="0" placeholderTextColor={colors.textDim} />
-                        </View>
-                      )}
-                      <View style={[styles.inputGroup, (isCardio || isBodyweight) && styles.inputGroupCentered]}>
-                        <Text style={[styles.inputLabel, { color: colors.textMuted, textAlign: (isCardio || isBodyweight) ? 'center' : 'left' }]}>REPS</Text>
-                        <TextInput style={[styles.numInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} keyboardType="numeric" value={inputReps} onChangeText={setInputReps} placeholder="0" placeholderTextColor={colors.textDim} />
-                      </View>
-                    </View>
-                    <View style={styles.setModalActions}>
-                      {!editingSet && (
-                        <TouchableOpacity style={[styles.modalSkipBtn, { borderColor: colors.border, opacity: loadingSkip ? 0.5 : 1 }]} onPress={handleSkipSet} disabled={loadingSkip}>
-                          <Text style={[styles.modalSkipBtnText, { color: colors.textMuted }]}>{loadingSkip ? 'SKIPPING...' : 'SKIP'}</Text>
-                        </TouchableOpacity>
-                      )}
-                      {editingSet ? (
-                        <TouchableOpacity style={[styles.saveSetBtn, { opacity: loadingEditSet ? 0.8 : 1 }]} onPress={handleEditSet} disabled={loadingEditSet}>
-                          <LinearGradient colors={['#3B82F6', '#2563EB']} style={styles.saveSetBtnGrad}>
-                            {loadingEditSet ? <ActivityIndicator color="#FFF" /> : (
-                              <>
-                                <Ionicons name="checkmark" size={20} color="#FFF" />
-                                <Text style={styles.saveSetBtnText}>UPDATE</Text>
-                              </>
-                            )}
-                          </LinearGradient>
-                        </TouchableOpacity>
-                      ) : (
-                        <TouchableOpacity style={[styles.saveSetBtn, { opacity: loadingLogSet ? 0.8 : 1 }]} onPress={handleLogSet} disabled={loadingLogSet}>
-                          <LinearGradient colors={['#10B981', '#059669']} style={styles.saveSetBtnGrad}>
-                            {loadingLogSet ? <ActivityIndicator color="#FFF" /> : (
-                              <>
-                                <Ionicons name="checkmark" size={20} color="#FFF" />
-                                <Text style={styles.saveSetBtnText}>{isCardio ? 'SAVE DURATION' : 'SAVE SET'}</Text>
-                              </>
-                            )}
-                          </LinearGradient>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </>
-                );
-              })()}
-            </ScrollView>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
+      {/* Set Logger Modal — redesigned premium cross-platform experience */}
+      <SetLoggerModal
+        visible={setModalVisible}
+        activeExercise={activeExercise}
+        activeSetNum={activeSetNum}
+        editingSet={editingSet}
+        setTimer={setTimer}
+        setTimerRunning={setTimerRunning}
+        inputWeight={inputWeight}
+        inputReps={inputReps}
+        loadingLogSet={loadingLogSet}
+        loadingEditSet={loadingEditSet}
+        loadingSkip={loadingSkip}
+        keyboardHeight={keyboardHeight}
+        workoutElapsed={workoutElapsed}
+        restTimer={restTimer}
+        setModalSlideAnim={setModalSlideAnim}
+        setModalFadeAnim={setModalFadeAnim}
+        onClose={closeModal}
+        onToggleTimer={toggleSetTimer}
+        onResetTimer={() => {
+          setSetTimer(0);
+          setTimerStartedAtRef.current = Date.now();
+          clearInterval(setTimerRef.current);
+          setSetTimerRunning(false);
+        }}
+        onChangeWeight={setInputWeight}
+        onChangeReps={setInputReps}
+        onLogSet={handleLogSet}
+        onEditSet={handleEditSet}
+        onSkipSet={handleSkipSet}
+      />
 
       <ActionModal visible={showFinishModal} type="confirm" title="Finish Session?" message="Are you sure you want to end this workout? All your stats will be finalized." confirmText={finishing ? 'FINISHING...' : 'YES, FINISH'} onConfirm={handleFinishWorkout} onCancel={() => setShowFinishModal(false)} />
       <ActionModal visible={showExitModal} type="confirm" title="Save & Exit?" message="Your workout is in progress. Save current progress and continue later?" confirmText={updatingMetrics ? 'SAVING...' : 'SAVE & EXIT'} onConfirm={handleSaveAndExit} onCancel={() => setShowExitModal(false)} />

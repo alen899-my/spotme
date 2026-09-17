@@ -65,17 +65,17 @@ export function displayStoredHeight(val: string | number | null | undefined, sys
 export function formatWeight(kg: number, system: UnitSystem): string {
   const val = Number(kg) || 0;
   if (system === 'imperial') {
-    return `${(kgToLbs(val)).toFixed(1)} lbs`;
+    return `${Number(kgToLbs(val).toFixed(2))} lbs`;
   }
-  return `${Number(val.toFixed(1))} kg`;
+  return `${Number(val.toFixed(2))} kg`;
 }
 
 export function formatWeightValue(kg: number, system: UnitSystem): string {
   const val = Number(kg) || 0;
   if (system === 'imperial') {
-    return (kgToLbs(val)).toFixed(1);
+    return Number(kgToLbs(val).toFixed(2)).toString();
   }
-  return Number(val.toFixed(1)).toString();
+  return Number(val.toFixed(2)).toString();
 }
 
 export function formatHeight(cm: number, system: UnitSystem): string {

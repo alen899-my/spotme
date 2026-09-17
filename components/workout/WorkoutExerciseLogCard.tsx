@@ -13,6 +13,7 @@ import { P } from '../../constants/homeTheme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useUnits } from '../../contexts/UnitContext';
 import { formatWeightValue, weightUnit } from '../../utils/units';
+import { getPlateSwatchesForWeight, normalizeEquipment } from './setLogger/equipmentUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -216,6 +217,10 @@ export const WorkoutExerciseLogCard: React.FC<WorkoutExerciseLogCardProps> = Rea
                   );
                 }
 
+                const swatches = !isCardio && !isBodyweight && Number(s.weight) > 0
+                  ? getPlateSwatchesForWeight(Number(s.weight), normalizeEquipment(exercise.equipment), unitSystem === 'imperial')
+                  : [];
+
                 return (
                   <View
                     key={s.id || `set-${idx}`}
@@ -250,6 +255,23 @@ export const WorkoutExerciseLogCard: React.FC<WorkoutExerciseLogCardProps> = Rea
                           </View>
                         )}
                       </View>
+
+                      {/* Plate swatches visual */}
+                      {swatches.length > 0 && (
+                        <View style={styles.setCardPlatesWrap}>
+                          {swatches.slice(0, 5).map((sw, pIdx) => (
+                            <View
+                              key={`sw-${pIdx}`}
+                              style={[styles.setCardPlateSwatch, { backgroundColor: sw.color }]}
+                            />
+                          ))}
+                          {swatches.length > 5 && (
+                            <Text style={[styles.setCardPlateMore, { color: isDark ? colors.textMuted : '#94A3B8' }]}>
+                              +{swatches.length - 5}
+                            </Text>
+                          )}
+                        </View>
+                      )}
                     </View>
                   </View>
                 );
@@ -438,6 +460,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(239,68,68,0.7)',
     letterSpacing: 0.3,
+  },
+  setCardPlatesWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 8,
+    alignSelf: 'center',
+  },
+  setCardPlateSwatch: {
+    width: 8,
+    height: 18,
+    borderRadius: 2.5,
+    marginRight: -2,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  setCardPlateMore: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    marginLeft: 5,
   },
   noSetsWrap: {
     paddingVertical: 12,
