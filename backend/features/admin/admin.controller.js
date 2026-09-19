@@ -406,6 +406,221 @@ function makeDeleteEntityHandler(table, entityName) {
   };
 }
 
+// ─── Nutrition / Food Database ────────────────────────────────────────────────
+async function listFoods(req, res) {
+  try {
+    const { page = 1, limit = 30, search, category } = req.query;
+    const data = await adminService.listFoodItems({ page, limit, search, category });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin listFoods error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function createFood(req, res) {
+  try {
+    const item = await adminService.createFoodItem(req.body);
+    res.status(201).json({ success: true, food: item });
+  } catch (error) {
+    console.error('Admin createFood error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function deleteFood(req, res) {
+  try {
+    await adminService.deleteFoodItem(req.params.id);
+    res.json({ success: true, message: 'Food item deleted' });
+  } catch (error) {
+    console.error('Admin deleteFood error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function listMeals(req, res) {
+  try {
+    const { page = 1, limit = 30 } = req.query;
+    const data = await adminService.listLoggedMeals({ page, limit });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin listMeals error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// ─── Physique Moderation ──────────────────────────────────────────────────────
+async function listPhysique(req, res) {
+  try {
+    const { page = 1, limit = 30, status } = req.query;
+    const data = await adminService.listPhysiqueAnalyses({ page, limit, status });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin listPhysique error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function updatePhysiqueStatus(req, res) {
+  try {
+    const { status } = req.body;
+    const item = await adminService.updatePhysiqueStatus(req.params.id, status);
+    res.json({ success: true, item });
+  } catch (error) {
+    console.error('Admin updatePhysiqueStatus error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function deletePhysique(req, res) {
+  try {
+    await adminService.deletePhysiqueAnalysis(req.params.id);
+    res.json({ success: true, message: 'Physique entry removed' });
+  } catch (error) {
+    console.error('Admin deletePhysique error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// ─── Push Notifications ───────────────────────────────────────────────────────
+async function broadcastPush(req, res) {
+  try {
+    const { title, body, screen, targetAudience = 'all' } = req.body;
+    if (!title || !body) {
+      return res.status(400).json({ message: 'Title and body are required' });
+    }
+    const { sendBroadcastPush } = require('../../utils/pushNotifications');
+    const result = await sendBroadcastPush({
+      title,
+      body,
+      data: { screen: screen || 'home' },
+      targetAudience,
+    });
+    res.json({ success: true, sentCount: result.count, message: `Dispatched to ${result.count} active devices` });
+  } catch (error) {
+    console.error('Admin broadcastPush error:', error);
+    res.status(500).json({ message: 'Failed to send broadcast push notification' });
+  }
+}
+
+async function listCampaigns(req, res) {
+  try {
+    const { page = 1, limit = 30 } = req.query;
+    const data = await adminService.listNotificationHistory({ page, limit });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin listCampaigns error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// ─── Workouts ─────────────────────────────────────────────────────────────────
+async function listWorkouts(req, res) {
+  try {
+    const { page = 1, limit = 30 } = req.query;
+    const data = await adminService.listWorkoutSessionsAdmin({ page, limit });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin listWorkouts error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// ─── Phase 2 Controllers ──────────────────────────────────────────────────────
+async function getOnboarding(req, res) {
+  try {
+    const data = await adminService.getOnboardingAnalytics();
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getOnboarding error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function getHabits(req, res) {
+  try {
+    const data = await adminService.getHabitsAnalytics();
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getHabits error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function getUser360(req, res) {
+  try {
+    const profile = await adminService.getUser360Profile(req.params.id);
+    if (!profile) return res.status(404).json({ message: 'User not found' });
+    res.json(profile);
+  } catch (error) {
+    console.error('Admin getUser360 error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+// ─── Phase 3: AI Intelligence, Remote Config & Gamification ──────────────────
+
+async function getAiAnalytics(req, res) {
+  try {
+    const { sessionPage = 1, sessionLimit = 15, reportPage = 1, reportLimit = 10 } = req.query;
+    const data = await adminService.getAiIntelligenceAnalytics({
+      sessionPage: parseInt(sessionPage) || 1,
+      sessionLimit: parseInt(sessionLimit) || 15,
+      reportPage: parseInt(reportPage) || 1,
+      reportLimit: parseInt(reportLimit) || 10,
+    });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getAiAnalytics error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function getAiSessionDetails(req, res) {
+  try {
+    const data = await adminService.getAiSessionMessages(req.params.id);
+    if (!data) return res.status(404).json({ message: 'Session not found' });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getAiSessionDetails error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function getRemoteConfig(req, res) {
+  try {
+    const data = await adminService.getRemoteConfig();
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getRemoteConfig error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function updateRemoteConfig(req, res) {
+  try {
+    const data = await adminService.updateRemoteConfig(req.body);
+    res.json(data);
+  } catch (error) {
+    console.error('Admin updateRemoteConfig error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function getGamification(req, res) {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const data = await adminService.getGamificationAnalytics({
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 20,
+    });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getGamification error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
 module.exports = {
   login,
   getMe,
@@ -434,4 +649,22 @@ module.exports = {
   makeCreateEntityHandler,
   makeUpdateEntityHandler,
   makeDeleteEntityHandler,
+  listFoods,
+  createFood,
+  deleteFood,
+  listMeals,
+  listPhysique,
+  updatePhysiqueStatus,
+  deletePhysique,
+  broadcastPush,
+  listCampaigns,
+  listWorkouts,
+  getOnboarding,
+  getHabits,
+  getUser360,
+  getAiAnalytics,
+  getAiSessionDetails,
+  getRemoteConfig,
+  updateRemoteConfig,
+  getGamification,
 };

@@ -93,8 +93,8 @@ export function DataTable<T extends { id: string }>({
         </div>
       )}
 
-      <div className="max-h-[calc(100vh-18rem)] overflow-auto rounded-lg border">
-        <Table>
+      <div className="w-full max-w-full overflow-hidden rounded-lg border bg-card">
+        <Table className="min-w-[680px]">
           <TableHeader>
             <TableRow>
               {columns.map((col) => (

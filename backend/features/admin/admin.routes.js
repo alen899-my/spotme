@@ -80,4 +80,34 @@ router.post('/builds', authenticateAdmin, upload.single('build_file'), adminCont
 router.put('/builds/:id', authenticateAdmin, upload.single('build_file'), adminController.updateBuild);
 router.delete('/builds/:id', authenticateAdmin, adminController.deleteBuild);
 
+// ─── Nutrition & Food Database ────────────────────────────────────────────────
+router.get('/nutrition/foods', authenticateAdmin, adminController.listFoods);
+router.post('/nutrition/foods', authenticateAdmin, adminController.createFood);
+router.delete('/nutrition/foods/:id', authenticateAdmin, adminController.deleteFood);
+router.get('/nutrition/meals', authenticateAdmin, adminController.listMeals);
+
+// ─── Physique Moderation ──────────────────────────────────────────────────────
+router.get('/physique', authenticateAdmin, adminController.listPhysique);
+router.put('/physique/:id/status', authenticateAdmin, adminController.updatePhysiqueStatus);
+router.delete('/physique/:id', authenticateAdmin, adminController.deletePhysique);
+
+// ─── Push Notifications ───────────────────────────────────────────────────────
+router.post('/notifications/broadcast', authenticateAdmin, adminController.broadcastPush);
+router.get('/notifications/campaigns', authenticateAdmin, adminController.listCampaigns);
+
+// ─── Workouts Activity ────────────────────────────────────────────────────────
+router.get('/workouts/sessions', authenticateAdmin, adminController.listWorkouts);
+
+// ─── Phase 2: Onboarding, Habits & User 360 ───────────────────────────────────
+router.get('/onboarding/analytics', authenticateAdmin, adminController.getOnboarding);
+router.get('/habits/analytics', authenticateAdmin, adminController.getHabits);
+router.get('/users/:id/full-profile', authenticateAdmin, adminController.getUser360);
+
+// ─── Phase 3: AI Intelligence, Remote Config & Gamification ───────────────────
+router.get('/ai/analytics', authenticateAdmin, adminController.getAiAnalytics);
+router.get('/ai/sessions/:id', authenticateAdmin, adminController.getAiSessionDetails);
+router.get('/remote-config', authenticateAdmin, adminController.getRemoteConfig);
+router.put('/remote-config', authenticateAdmin, adminController.updateRemoteConfig);
+router.get('/gamification/analytics', authenticateAdmin, adminController.getGamification);
+
 module.exports = router;

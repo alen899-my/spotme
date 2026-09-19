@@ -76,6 +76,7 @@ export interface Feedback {
   created_at: string
   userName?: string
   userEmail?: string
+  userAvatar?: string | null
 }
 
 export interface Exercise {

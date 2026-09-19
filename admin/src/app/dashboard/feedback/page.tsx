@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { DataTable } from "@/components/data-table"
 import { DetailModal, type DetailField } from "@/components/detail-modal"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import type { Feedback } from "@/types"
 import api from "@/lib/api"
 
@@ -62,7 +63,7 @@ export default function FeedbackPage() {
   ]
 
   return (
-    <div>
+    <div className="min-w-0 max-w-full space-y-4">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Feedback</h1>
@@ -82,7 +83,10 @@ export default function FeedbackPage() {
             <span className="text-sm capitalize">{f.category}</span>
           ), hideOnMobile: true },
           { key: "userName", label: "User", sortable: true, render: (f) => (
-            <span className="text-sm">{f.userName ?? "\u2014"}</span>
+            <div className="flex items-center gap-2">
+              <UserAvatar src={f.userAvatar} name={f.userName} size="xs" />
+              <span className="text-sm font-medium">{f.userName ?? "—"}</span>
+            </div>
           )},
           { key: "userEmail", label: "Email", render: (f) => (
             <span className="text-sm text-muted-foreground">{f.userEmail ?? "\u2014"}</span>

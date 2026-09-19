@@ -20,19 +20,35 @@ import {
   Image as ImageIcon,
   RefreshCw,
   Smartphone,
+  Utensils,
+  Camera,
+  Bell,
+  Flame,
+  Compass,
+  CalendarCheck,
+  Bot,
+  Sliders,
+  Trophy,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/users", label: "Users", icon: Users },
+  { href: "/dashboard/nutrition", label: "Nutrition & Meals", icon: Utensils },
+  { href: "/dashboard/physique", label: "Physique Moderation", icon: Camera },
+  { href: "/dashboard/notifications", label: "Push Campaigns", icon: Bell },
+  { href: "/dashboard/workouts", label: "Live Workouts & PRs", icon: Flame },
+  { href: "/dashboard/onboarding", label: "Onboarding Funnel", icon: Compass },
+  { href: "/dashboard/habits", label: "Habits & Retention", icon: CalendarCheck },
+  { href: "/dashboard/gamification", label: "Gamification & XP", icon: Trophy },
+  { href: "/dashboard/ai", label: "AI Intelligence", icon: Bot },
+  { href: "/dashboard/remote-config", label: "Remote Config", icon: Sliders },
   { href: "/dashboard/exercises", label: "Exercises", icon: Dumbbell },
+  { href: "/dashboard/analytics", label: "Analytics & APM", icon: BarChart3 },
   { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/dashboard/activity", label: "Activity", icon: Activity },
-  { href: "/dashboard/active-users", label: "Active Users", icon: Users },
-  { href: "/dashboard/images", label: "Image Vault", icon: ImageIcon },
   { href: "/dashboard/workout-splits", label: "Workout Splits", icon: Activity },
+  { href: "/dashboard/images", label: "Image Vault", icon: ImageIcon },
   { href: "/dashboard/file-replacer", label: "File Replacer", icon: RefreshCw },
   { href: "/dashboard/builds", label: "App Builds", icon: Smartphone },
 ]
@@ -71,16 +87,16 @@ export function AdminSidebar({ open, onClose }: SidebarProps) {
       )}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r bg-card transition-transform duration-200 md:relative",
-          open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          "fixed inset-y-0 left-0 z-50 flex h-full w-60 shrink-0 flex-col border-r bg-card transition-transform duration-200 md:static md:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-14 items-center border-b px-4">
+        <div className="flex h-14 shrink-0 items-center border-b px-4">
           <span className="text-lg font-black tracking-tight text-foreground">spot</span>
           <span className="text-lg font-black tracking-tight" style={{ color: "#F7CB16" }}>ME</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className="flex-1 overflow-y-auto overscroll-contain py-2">
           <div className="px-3 pb-1 pt-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Menu
@@ -163,7 +179,7 @@ export function AdminSidebar({ open, onClose }: SidebarProps) {
           </nav>
         </div>
 
-        <div className="border-t p-2">
+        <div className="shrink-0 border-t p-2">
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"

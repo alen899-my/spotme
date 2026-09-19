@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { DataTable } from "@/components/data-table"
 import { DetailModal, type DetailField } from "@/components/detail-modal"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Users, Activity, Calendar, Clock } from "lucide-react"
 import api from "@/lib/api"
 
@@ -11,6 +12,7 @@ interface ActiveUser {
   name: string
   email: string
   status: string
+  profile_pic_url?: string | null
   last_active_at: string | null
   created_at: string
   total_workouts: number
@@ -173,9 +175,11 @@ export default function ActiveUsersPage() {
               )},
               { key: "name", label: "Name", render: (e) => (
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-xs font-bold text-muted-foreground">
-                    {e.name?.charAt(0)?.toUpperCase() ?? "?"}
-                  </div>
+                  <UserAvatar
+                    src={e.profile_pic_url}
+                    name={e.name}
+                    size="sm"
+                  />
                   <div>
                     <p className="text-sm font-medium">{e.name}</p>
                     <p className="text-xs text-muted-foreground">{e.email}</p>

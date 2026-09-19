@@ -3,12 +3,54 @@
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Plus, Download, Star } from "lucide-react"
+import { Plus, Download, Star, Copy, Check } from "lucide-react"
 import { DataTable } from "@/components/data-table"
 import { DetailModal, type DetailField } from "@/components/detail-modal"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import type { AppBuild } from "@/types"
 import api from "@/lib/api"
+
+function CopyLinkButton({ url, label = "Copy Link" }: { url: string; label?: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error("Failed to copy link:", err)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-mono transition-colors",
+        copied
+          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 font-semibold"
+          : "border-border bg-secondary/60 text-foreground hover:bg-secondary"
+      )}
+      title="Copy direct download URL"
+    >
+      {copied ? (
+        <>
+          <Check className="h-3.5 w-3.5 text-emerald-500" />
+          <span>Copied!</span>
+        </>
+      ) : (
+        <>
+          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+          <span>{label}</span>
+        </>
+      )}
+    </button>
+  )
+}
 
 function formatSize(bytes: number | null) {
   if (bytes == null) return "—"
@@ -87,7 +129,19 @@ export function BuildsList() {
     { key: "is_latest", label: "Latest", render: (v) => <span>{v ? "Yes" : "No"}</span> },
     { key: "force_update", label: "Force Update", render: (v) => <span>{v ? "Required" : "Optional"}</span> },
     { key: "file_url", label: "Download", render: (v) => (
-      v ? <a href={v} download className="text-primary underline">Download file</a> : "—"
+      v ? (
+        <div className="flex items-center gap-2">
+          <a
+            href={v}
+            download
+            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium shadow-xs hover:bg-accent text-primary underline"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download file
+          </a>
+          <CopyLinkButton url={v} />
+        </div>
+      ) : "—"
     )},
     { key: "created_at", label: "Uploaded At", render: (v) => (
       <span>{v ? new Date(v).toLocaleString() : "—"}</span>
@@ -95,7 +149,7 @@ export function BuildsList() {
   ]
 
   return (
-    <div>
+    <div className="min-w-0 max-w-full space-y-4">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">App Builds</h1>
@@ -148,15 +202,18 @@ export function BuildsList() {
           ), hideOnMobile: true },
           { key: "file_url", label: "File", render: (b) => (
             <div className="flex flex-col items-start gap-1">
-              <a
-                href={b.file_url}
-                download
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs font-medium shadow-sm hover:bg-accent"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Download
-              </a>
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={b.file_url}
+                  download
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-xs font-medium shadow-xs hover:bg-accent"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download
+                </a>
+                <CopyLinkButton url={b.file_url} label="Copy" />
+              </div>
               {b.file_type === "aab" && (
                 <span className="text-[10px] leading-tight text-muted-foreground">Play Store only — not installable</span>
               )}

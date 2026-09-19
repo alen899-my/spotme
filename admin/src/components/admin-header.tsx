@@ -28,7 +28,7 @@ export function AdminHeader({ onMenuClick, title }: HeaderProps) {
   }
 
   return (
-    <header className="flex h-14 items-center gap-3 border-b px-4 lg:px-6">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4 lg:px-6">
       <button
         onClick={onMenuClick}
         className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary md:hidden"

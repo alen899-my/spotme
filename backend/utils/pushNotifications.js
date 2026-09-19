@@ -119,4 +119,61 @@ async function sendRandomMotivation(userId) {
   }
 }
 
-module.exports = { registerToken, removeToken, sendPush, sendRandomMotivation };
+/**
+ * Broadcast push notification to all or targeted active devices
+ */
+async function sendBroadcastPush({ title, body, data = {}, targetAudience = 'all' }) {
+  try {
+    let query = 'SELECT pt.user_id, pt.token FROM push_tokens pt JOIN users u ON pt.user_id = u.id';
+    if (targetAudience === 'inactive_3d') {
+      query += ' WHERE u.last_login < NOW() - INTERVAL \'3 days\' OR u.last_login IS NULL';
+    }
+
+    const res = await pool.query(query);
+    const tokens = res.rows.filter(r => isValidExpoPushToken(r.token));
+
+    if (tokens.length === 0) {
+      return { success: true, count: 0, message: 'No registered push tokens found for audience' };
+    }
+
+    // Expo allows chunks of up to 100 messages in 1 request
+    const messages = tokens.map(r => ({
+      to: r.token,
+      sound: 'default',
+      title,
+      body,
+      data,
+      priority: 'high',
+    }));
+
+    // Send in chunks of 100
+    for (let i = 0; i < messages.length; i += 100) {
+      const chunk = messages.slice(i, i + 100);
+      await axios.post(EXPO_PUSH_URL, chunk, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Also insert to in-app notifications table
+    for (const r of tokens) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, body, data, created_at)
+         VALUES ($1, 'broadcast', $2, $3, $4, NOW())`,
+        [r.user_id, title, body, JSON.stringify(data)]
+      ).catch(() => {});
+    }
+
+    return { success: true, count: tokens.length };
+  } catch (err) {
+    console.error('sendBroadcastPush error:', err.message);
+    throw err;
+  }
+}
+
+module.exports = {
+  registerToken,
+  removeToken,
+  sendPush,
+  sendRandomMotivation,
+  sendBroadcastPush,
+};

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { DataTable } from "@/components/data-table"
 import { Badge } from "@/components/ui/badge"
 import type { User } from "@/types"
@@ -59,7 +60,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div>
+    <div className="min-w-0 max-w-full space-y-4">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Users</h1>
@@ -71,13 +72,7 @@ export default function UsersPage() {
         columns={[
           { key: "name", label: "Name", sortable: true, render: (u) => (
             <div className="flex items-center gap-2.5">
-              {u.avatar ? (
-                <img src={u.avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
-              ) : (
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                  {u.name.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <UserAvatar src={u.avatar} name={u.name} size="sm" />
               <span className="text-sm font-medium">{u.name}</span>
             </div>
           )},

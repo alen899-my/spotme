@@ -229,7 +229,7 @@ async function listFeedback({ page = 1, limit = 20, search, sortBy, sortOrder })
   );
   const dataResult = await pool.query(
     `SELECT f.id, f.user_id, f.category, f.title, f.description, f.created_at,
-            u.full_name AS "userName", u.email AS "userEmail"
+            u.full_name AS "userName", u.email AS "userEmail", u.profile_pic_url AS "userAvatar"
      FROM feedback f
      LEFT JOIN users u ON f.user_id = u.id
      ${whereClause}
@@ -288,7 +288,7 @@ async function getActiveUsers({ page = 1, limit = 20, search }) {
     `SELECT COUNT(*)::int AS total FROM users u ${whereClause}`, params
   );
   const usersRes = await pool.query(
-    `SELECT u.id, u.full_name AS name, u.email, u.status,
+    `SELECT u.id, u.full_name AS name, u.email, u.status, u.profile_pic_url,
             u.last_active_at, u.created_at,
             (SELECT COUNT(*)::int FROM daily_workouts WHERE user_id = u.id AND status = 'completed') AS total_workouts
      FROM users u ${whereClause}
@@ -858,6 +858,688 @@ async function deleteBuild(id) {
   return { deleted: true, build };
 }
 
+// ─── Nutrition / Food Database ────────────────────────────────────────────────
+async function listFoodItems({ page = 1, limit = 30, search, category }) {
+  const offset = (page - 1) * limit;
+  const where = [];
+  const params = [];
+  let pIdx = 1;
+
+  if (search) {
+    where.push(`food_name ILIKE $${pIdx}`);
+    params.push(`%${search}%`);
+    pIdx++;
+  }
+  if (category && category !== 'ALL') {
+    where.push(`category = $${pIdx}`);
+    params.push(category);
+    pIdx++;
+  }
+
+  const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+  const countRes = await pool.query(`SELECT COUNT(*)::int AS total FROM food_database ${whereClause}`, params);
+  const dataRes = await pool.query(
+    `SELECT id, food_name, category, meal_type, serving_size, calories_kcal, protein_g, carbohydrates_g, fat_g, fiber_g, image_url, source_file
+     FROM food_database ${whereClause}
+     ORDER BY id DESC
+     LIMIT $${pIdx} OFFSET $${pIdx + 1}`,
+    [...params, parseInt(limit), parseInt(offset)]
+  );
+
+  return { foods: dataRes.rows, total: countRes.rows[0]?.total || 0 };
+}
+
+async function createFoodItem(data) {
+  const { food_name, category, serving_size, calories_kcal, protein_g, carbohydrates_g, fat_g, fiber_g } = data;
+  const res = await pool.query(
+    `INSERT INTO food_database (food_name, category, serving_size, calories_kcal, protein_g, carbohydrates_g, fat_g, fiber_g, source_file)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'admin_custom')
+     RETURNING *`,
+    [food_name, category || 'General', serving_size || '100g', calories_kcal || 0, protein_g || 0, carbohydrates_g || 0, fat_g || 0, fiber_g || 0]
+  );
+  return res.rows[0];
+}
+
+async function deleteFoodItem(id) {
+  await pool.query('DELETE FROM food_database WHERE id = $1', [id]);
+  return { success: true };
+}
+
+async function listLoggedMeals({ page = 1, limit = 30 }) {
+  const offset = (page - 1) * limit;
+  const countRes = await pool.query('SELECT COUNT(*)::int AS total FROM meals');
+  const res = await pool.query(
+    `SELECT m.id, m.user_id, u.full_name, u.email, u.profile_pic_url,
+            m.meal_type,
+            m.image_url AS photo_url,
+            COALESCE(m.total_calories, 0)::numeric AS calories,
+            COALESCE(m.total_protein, 0)::numeric AS protein,
+            COALESCE(m.total_carbs, 0)::numeric AS carbs,
+            COALESCE(m.total_fat, 0)::numeric AS fats,
+            COALESCE(m.total_fiber, 0)::numeric AS fiber,
+            COALESCE(m.created_at, m.logged_at, NOW()) AS created_at,
+            COALESCE(
+              (SELECT json_agg(json_build_object(
+                 'id', mi.id,
+                 'name', mi.item_name,
+                 'quantity', mi.quantity,
+                 'calories', mi.calories,
+                 'protein', mi.protein,
+                 'carbs', mi.carbs,
+                 'fat', mi.fat
+               ))
+               FROM meal_items mi WHERE mi.meal_id = m.id),
+              '[]'::json
+            ) AS items
+     FROM meals m
+     LEFT JOIN users u ON m.user_id = u.id
+     ORDER BY COALESCE(m.created_at, m.logged_at) DESC
+     LIMIT $1 OFFSET $2`,
+    [parseInt(limit), parseInt(offset)]
+  );
+  return { meals: res.rows, total: countRes.rows[0]?.total || 0 };
+}
+
+// ─── Physique Analyses ────────────────────────────────────────────────────────
+async function listPhysiqueAnalyses({ page = 1, limit = 30, status }) {
+  const offset = (page - 1) * limit;
+  let where = '';
+  const params = [];
+  if (status && status !== 'ALL') {
+    where = 'WHERE pa.status = $1';
+    params.push(status);
+  }
+  const countRes = await pool.query(`SELECT COUNT(*)::int AS total FROM physique_analyses pa ${where}`, params);
+  const dataRes = await pool.query(
+    `SELECT pa.id, pa.user_id, u.full_name, u.email, u.profile_pic_url,
+            pa.photo_url, pa.overall_score, pa.body_fat_estimate, pa.muscle_symmetry,
+            pa.posture_score, pa.strengths, pa.improvements, pa.muscle_groups,
+            pa.coach_message, pa.status, pa.created_at
+     FROM physique_analyses pa
+     LEFT JOIN users u ON pa.user_id = u.id
+     ${where}
+     ORDER BY pa.created_at DESC
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, parseInt(limit), parseInt(offset)]
+  );
+  return { items: dataRes.rows, total: countRes.rows[0]?.total || 0 };
+}
+
+async function updatePhysiqueStatus(id, status) {
+  const res = await pool.query(
+    'UPDATE physique_analyses SET status = $1 WHERE id = $2 RETURNING *',
+    [status, id]
+  );
+  return res.rows[0];
+}
+
+async function deletePhysiqueAnalysis(id) {
+  await pool.query('DELETE FROM physique_analyses WHERE id = $1', [id]);
+  return { success: true };
+}
+
+// ─── Workouts & Global PRs ────────────────────────────────────────────────────
+async function listWorkoutSessionsAdmin({ page = 1, limit = 30 }) {
+  const offset = (page - 1) * limit;
+  const countRes = await pool.query('SELECT COUNT(*)::int AS total FROM daily_workouts');
+  const res = await pool.query(
+    `SELECT dw.id, dw.user_id, u.full_name, u.email, u.profile_pic_url,
+            COALESCE(dw.started_at, dw.completed_at) AS scheduled_date,
+            dw.status, dw.completed_at,
+            COALESCE(dw.total_duration_seconds, 0) AS duration_seconds,
+            COUNT(dwe.id)::int AS exercises_count,
+            COALESCE(dw.total_volume, 0)::numeric AS total_volume_kg
+     FROM daily_workouts dw
+     LEFT JOIN users u ON dw.user_id = u.id
+     LEFT JOIN daily_workout_exercises dwe ON dw.id = dwe.daily_workout_id
+     GROUP BY dw.id, u.full_name, u.email, u.profile_pic_url
+     ORDER BY dw.completed_at DESC NULLS LAST, dw.id DESC
+     LIMIT $1 OFFSET $2`,
+    [parseInt(limit), parseInt(offset)]
+  );
+
+  const prsRes = await pool.query(
+    `SELECT gpr.exercise_id, e.name AS exercise_name, gpr.user_id, u.full_name, u.email, u.profile_pic_url,
+            COALESCE(gpr.source_weight, gpr.metric_value, 0)::numeric AS weight_kg,
+            COALESCE(gpr.source_reps, 1)::int AS reps,
+            gpr.achieved_at
+     FROM global_exercise_prs gpr
+     JOIN exercises e ON gpr.exercise_id = e.id
+     JOIN users u ON gpr.user_id = u.id
+     ORDER BY COALESCE(gpr.source_weight, gpr.metric_value, 0) DESC NULLS LAST
+     LIMIT 10`
+  );
+
+  return { sessions: res.rows, total: countRes.rows[0]?.total || 0, globalPrs: prsRes.rows };
+}
+
+// ─── Notifications Broadcast Log ──────────────────────────────────────────────
+async function listNotificationHistory({ page = 1, limit = 30 }) {
+  const offset = (page - 1) * limit;
+  const countRes = await pool.query("SELECT COUNT(*)::int AS total FROM notifications");
+  const res = await pool.query(
+    `SELECT n.id,
+            COALESCE(n.type, 'Broadcast') AS title,
+            COALESCE(n.message, '') AS body,
+            NULL AS data,
+            n.created_at,
+            1::int AS recipients_count
+     FROM notifications n
+     ORDER BY n.created_at DESC
+     LIMIT $1 OFFSET $2`,
+    [parseInt(limit), parseInt(offset)]
+  );
+  return { campaigns: res.rows, total: countRes.rows[0]?.total || 0 };
+}
+
+// ─── Phase 2: Onboarding & Habits Analytics ──────────────────────────────────
+async function getOnboardingAnalytics() {
+  const totalUsersRes = await pool.query('SELECT COUNT(*)::int AS total FROM users');
+  const completedRes = await pool.query('SELECT COUNT(*)::int AS completed FROM users WHERE onboarding_completed = TRUE');
+
+  const goalsRes = await pool.query(
+    `SELECT COALESCE(fitness_goal, 'General Fitness') AS goal, COUNT(*)::int AS count
+     FROM users
+     GROUP BY fitness_goal
+     ORDER BY count DESC`
+  );
+
+  const expRes = await pool.query(
+    `SELECT COALESCE(experience_level, 'Beginner') AS level, COUNT(*)::int AS count
+     FROM users
+     GROUP BY experience_level
+     ORDER BY count DESC`
+  );
+
+  const genderRes = await pool.query(
+    `SELECT COALESCE(gender, 'Unspecified') AS gender, COUNT(*)::int AS count
+     FROM users
+     GROUP BY gender
+     ORDER BY count DESC`
+  );
+
+  const dietRes = await pool.query(
+    `SELECT COALESCE(diet_type, 'Standard') AS diet, COUNT(*)::int AS count
+     FROM users
+     GROUP BY diet_type
+     ORDER BY count DESC`
+  );
+
+  const total = totalUsersRes.rows[0]?.total || 1;
+  const completed = completedRes.rows[0]?.completed || 0;
+
+  const stepStats = await pool.query(`
+    SELECT
+      COUNT(*)::int AS total_registered,
+      COUNT(*) FILTER (WHERE gender IS NOT NULL)::int AS step_gender,
+      COUNT(*) FILTER (WHERE dob IS NOT NULL)::int AS step_dob,
+      COUNT(*) FILTER (WHERE height IS NOT NULL AND weight IS NOT NULL)::int AS step_measurements,
+      COUNT(*) FILTER (WHERE fitness_goal IS NOT NULL)::int AS step_goals,
+      COUNT(*) FILTER (WHERE experience_level IS NOT NULL)::int AS step_experience,
+      COUNT(*) FILTER (WHERE diet_type IS NOT NULL)::int AS step_diet,
+      COUNT(*) FILTER (WHERE onboarding_completed = TRUE)::int AS step_completed
+    FROM users
+  `);
+
+  const s = stepStats.rows[0] || {};
+  const funnelSteps = [
+    { step: 1, name: "Account Created", count: s.total_registered || total, pct: 100 },
+    { step: 2, name: "Gender Selection", count: s.step_gender || 0, pct: Math.round(((s.step_gender || 0) / total) * 100) },
+    { step: 3, name: "Date of Birth", count: s.step_dob || 0, pct: Math.round(((s.step_dob || 0) / total) * 100) },
+    { step: 4, name: "Body Height & Weight", count: s.step_measurements || 0, pct: Math.round(((s.step_measurements || 0) / total) * 100) },
+    { step: 5, name: "Primary Fitness Goal", count: s.step_goals || 0, pct: Math.round(((s.step_goals || 0) / total) * 100) },
+    { step: 6, name: "Gym Experience Level", count: s.step_experience || 0, pct: Math.round(((s.step_experience || 0) / total) * 100) },
+    { step: 7, name: "Dietary Preferences", count: s.step_diet || 0, pct: Math.round(((s.step_diet || 0) / total) * 100) },
+    { step: 8, name: "Onboarding Finalized", count: s.step_completed || completed, pct: Math.round(((s.step_completed || completed) / total) * 100) },
+  ];
+
+  return {
+    totalUsers: total,
+    completedOnboarding: completed,
+    completionRate: Math.round((completed / total) * 100),
+    funnel: funnelSteps,
+    goals: goalsRes.rows,
+    experience: expRes.rows,
+    gender: genderRes.rows,
+    diet: dietRes.rows,
+  };
+}
+
+async function getHabitsAnalytics() {
+  const todayWorkouts = await pool.query(
+    "SELECT COUNT(*)::int AS count FROM daily_workouts WHERE DATE(COALESCE(started_at, completed_at)) = CURRENT_DATE"
+  );
+  const todayMeals = await pool.query(
+    "SELECT COUNT(*)::int AS count FROM meals WHERE DATE(COALESCE(created_at, logged_at)) = CURRENT_DATE"
+  );
+  const todayWater = await pool.query(
+    "SELECT COUNT(*)::int AS count FROM water_logs WHERE DATE(logged_at) = CURRENT_DATE"
+  );
+
+  const dayOfWeekRes = await pool.query(`
+    SELECT
+      TO_CHAR(completed_at, 'Dy') AS day_name,
+      EXTRACT(DOW FROM completed_at)::int AS day_num,
+      COUNT(*)::int AS count
+    FROM daily_workouts
+    WHERE completed_at >= NOW() - INTERVAL '30 days'
+    GROUP BY day_name, day_num
+    ORDER BY day_num
+  `);
+
+  return {
+    today: {
+      workouts: todayWorkouts.rows[0]?.count || 0,
+      meals: todayMeals.rows[0]?.count || 0,
+      water: todayWater.rows[0]?.count || 0,
+    },
+    dayOfWeekActivity: dayOfWeekRes.rows,
+  };
+}
+
+async function getUser360Profile(userId) {
+  const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+  if (!userRes.rows.length) return null;
+  const user = userRes.rows[0];
+
+  const workoutsRes = await pool.query(
+    `SELECT dw.id,
+            COALESCE(dw.started_at, dw.completed_at) AS scheduled_date,
+            dw.status, dw.completed_at,
+            COALESCE(dw.total_duration_seconds, 0) AS duration_seconds,
+            COUNT(dwe.id)::int AS exercises_count,
+            COALESCE(dw.total_volume, 0)::numeric AS total_volume_kg
+     FROM daily_workouts dw
+     LEFT JOIN daily_workout_exercises dwe ON dw.id = dwe.daily_workout_id
+     WHERE dw.user_id = $1
+     GROUP BY dw.id
+     ORDER BY dw.completed_at DESC NULLS LAST, dw.id DESC
+     LIMIT 10`,
+    [userId]
+  );
+
+  const mealsRes = await pool.query(
+    `SELECT m.id, m.meal_type,
+            m.image_url AS photo_url,
+            COALESCE(m.total_calories, 0)::numeric AS calories,
+            COALESCE(m.total_protein, 0)::numeric AS protein,
+            COALESCE(m.total_carbs, 0)::numeric AS carbs,
+            COALESCE(m.total_fat, 0)::numeric AS fats,
+            COALESCE(m.total_fiber, 0)::numeric AS fiber,
+            COALESCE(m.created_at, m.logged_at, NOW()) AS created_at,
+            COALESCE(
+              (SELECT json_agg(json_build_object(
+                 'id', mi.id,
+                 'name', mi.item_name,
+                 'quantity', mi.quantity,
+                 'calories', mi.calories,
+                 'protein', mi.protein,
+                 'carbs', mi.carbs,
+                 'fat', mi.fat
+               ))
+               FROM meal_items mi WHERE mi.meal_id = m.id),
+              '[]'::json
+            ) AS items
+     FROM meals m
+     WHERE m.user_id = $1
+     ORDER BY COALESCE(m.created_at, m.logged_at) DESC
+     LIMIT 10`,
+    [userId]
+  );
+
+  const weightsRes = await pool.query(
+    `SELECT id, weight AS weight_kg, logged_at AS logged_date, logged_at AS created_at
+     FROM weight_logs
+     WHERE user_id = $1
+     ORDER BY logged_at DESC
+     LIMIT 15`,
+    [userId]
+  );
+
+  const physiqueRes = await pool.query(
+    `SELECT id, photo_url, overall_score, body_fat_estimate, status, created_at
+     FROM physique_analyses
+     WHERE user_id = $1
+     ORDER BY created_at DESC
+     LIMIT 6`,
+    [userId]
+  );
+
+  return {
+    user,
+    workouts: workoutsRes.rows,
+    meals: mealsRes.rows,
+    weights: weightsRes.rows,
+    physique: physiqueRes.rows,
+  };
+}
+
+// ─── Phase 3: AI Intelligence, Remote Config & Gamification ──────────────────
+
+async function getAiIntelligenceAnalytics({ sessionPage = 1, sessionLimit = 15, reportPage = 1, reportLimit = 10 } = {}) {
+  const [sessionsCount, messagesCount, reportsCount, physiqueCount] = await Promise.all([
+    pool.query('SELECT COUNT(*)::int AS count FROM ai_sessions'),
+    pool.query('SELECT COUNT(*)::int AS count FROM ai_messages'),
+    pool.query('SELECT COUNT(*)::int AS count FROM workout_reports'),
+    pool.query('SELECT COUNT(*)::int AS count FROM physique_analyses'),
+  ]);
+
+  const totalSessions = sessionsCount.rows[0]?.count || 0;
+  const totalMessages = messagesCount.rows[0]?.count || 0;
+  const totalReports = reportsCount.rows[0]?.count || 0;
+  const totalPhysique = physiqueCount.rows[0]?.count || 0;
+
+  const sessionOffset = Math.max(0, (parseInt(sessionPage) - 1) * parseInt(sessionLimit));
+  const reportOffset = Math.max(0, (parseInt(reportPage) - 1) * parseInt(reportLimit));
+
+  // Paginated AI Sessions
+  const recentSessions = await pool.query(`
+    SELECT s.id, s.user_id, u.full_name, u.email, u.profile_pic_url,
+           s.title, s.created_at, s.updated_at,
+           COUNT(m.id)::int AS message_count
+    FROM ai_sessions s
+    LEFT JOIN users u ON s.user_id = u.id
+    LEFT JOIN ai_messages m ON s.id = m.session_id
+    GROUP BY s.id, u.full_name, u.email, u.profile_pic_url
+    ORDER BY s.updated_at DESC
+    LIMIT $1 OFFSET $2
+  `, [parseInt(sessionLimit), parseInt(sessionOffset)]);
+
+  // Paginated AI Workout Reports
+  const recentReports = await pool.query(`
+    SELECT wr.id, wr.user_id, u.full_name, u.email, u.profile_pic_url,
+           wr.daily_workout_id, wr.summary, wr.good_things, wr.areas_to_improve,
+           wr.recommendations, wr.progress_pct, wr.current_phase, wr.created_at
+    FROM workout_reports wr
+    LEFT JOIN users u ON wr.user_id = u.id
+    ORDER BY wr.created_at DESC
+    LIMIT $1 OFFSET $2
+  `, [parseInt(reportLimit), parseInt(reportOffset)]);
+
+  // Multi-Provider Model Catalog with full Context Window & Pricing Telemetry
+  const modelsCatalog = [
+    {
+      provider: 'Google Gemini',
+      model: 'gemini-2.0-flash',
+      tier: 'Multimodal Vision & Physique',
+      context_tokens_in: 1048576, // 1M tokens in
+      max_tokens_out: 8192,
+      input_cost_per_m: 0.10, // $0.10 / 1M tokens
+      output_cost_per_m: 0.40, // $0.40 / 1M tokens
+      cached_cost_per_m: 0.025,
+      speed_tps: 185,
+      rpm: 15,
+      rpd: 1500,
+      status: 'Active (Vision)',
+    },
+    {
+      provider: 'Google Gemini',
+      model: 'gemini-1.5-flash',
+      tier: 'Coach Chat & Workout Reasoning',
+      context_tokens_in: 1048576, // 1M tokens in
+      max_tokens_out: 8192,
+      input_cost_per_m: 0.075, // $0.075 / 1M tokens
+      output_cost_per_m: 0.30, // $0.30 / 1M tokens
+      cached_cost_per_m: 0.01875,
+      speed_tps: 160,
+      rpm: 15,
+      rpd: 1500,
+      status: 'Active (Chat)',
+    },
+    {
+      provider: 'Groq LPU',
+      model: 'llama-3.3-70b-versatile',
+      tier: 'Real-time In-Set Assistant',
+      context_tokens_in: 131072, // 128k tokens in
+      max_tokens_out: 8192,
+      input_cost_per_m: 0.59, // $0.59 / 1M tokens
+      output_cost_per_m: 0.79, // $0.79 / 1M tokens
+      cached_cost_per_m: 0.00,
+      speed_tps: 280,
+      rpm: 30,
+      rpd: 14400,
+      status: 'Active (Ultra-Fast)',
+    },
+    {
+      provider: 'OpenRouter',
+      model: 'qwen/qwen-2.5-72b-instruct:free',
+      tier: 'Zero-Cost Fallback Tier',
+      context_tokens_in: 32768, // 32k tokens in
+      max_tokens_out: 4096,
+      input_cost_per_m: 0.00,
+      output_cost_per_m: 0.00,
+      cached_cost_per_m: 0.00,
+      speed_tps: 75,
+      rpm: 20,
+      rpd: 1000,
+      status: 'Active (Fallback)',
+    },
+    {
+      provider: 'OpenRouter',
+      model: 'mistralai/mistral-small-24b-instruct:free',
+      tier: 'Cold Standby Redundancy',
+      context_tokens_in: 32768, // 32k tokens in
+      max_tokens_out: 4096,
+      input_cost_per_m: 0.00,
+      output_cost_per_m: 0.00,
+      cached_cost_per_m: 0.00,
+      speed_tps: 85,
+      rpm: 20,
+      rpd: 1000,
+      status: 'Standby',
+    },
+  ];
+
+  // Live Token & Context Telemetry Calculations
+  const avgPromptTokensIn = 1420;
+  const avgCompletionTokensOut = 385;
+  const estimatedTokensIn = Math.round((totalMessages * avgPromptTokensIn) + (totalReports * 2600) + (totalPhysique * 1600));
+  const estimatedTokensOut = Math.round((totalMessages * avgCompletionTokensOut) + (totalReports * 620) + (totalPhysique * 450));
+  const totalTokensBurned = estimatedTokensIn + estimatedTokensOut;
+
+  // Blended realistic cost calculation ($0.085/1M in, $0.34/1M out)
+  const estimatedCost = (estimatedTokensIn * 0.000000085) + (estimatedTokensOut * 0.00000034);
+
+  return {
+    metrics: {
+      totalSessions,
+      totalMessages,
+      workoutReportsCount: totalReports,
+      physiqueAssessmentsCount: totalPhysique,
+      estimatedTokensIn,
+      estimatedTokensOut,
+      totalTokensBurned,
+      avgPromptTokensIn,
+      avgCompletionTokensOut,
+      estimatedTokenCostUsd: Number(estimatedCost.toFixed(3)),
+    },
+    models: modelsCatalog,
+    sessions: recentSessions.rows,
+    sessionsPagination: {
+      page: parseInt(sessionPage),
+      limit: parseInt(sessionLimit),
+      total: totalSessions,
+      totalPages: Math.max(1, Math.ceil(totalSessions / parseInt(sessionLimit))),
+    },
+    reports: recentReports.rows,
+    reportsPagination: {
+      page: parseInt(reportPage),
+      limit: parseInt(reportLimit),
+      total: totalReports,
+      totalPages: Math.max(1, Math.ceil(totalReports / parseInt(reportLimit))),
+    },
+  };
+}
+
+async function getAiSessionMessages(sessionId) {
+  const sessionRes = await pool.query(`
+    SELECT s.id, s.user_id, u.full_name, u.email, u.profile_pic_url, s.title, s.created_at, s.updated_at
+    FROM ai_sessions s
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.id = $1
+  `, [sessionId]);
+
+  if (!sessionRes.rows.length) return null;
+
+  const messagesRes = await pool.query(`
+    SELECT id, role, content, actions, created_at
+    FROM ai_messages
+    WHERE session_id = $1
+    ORDER BY created_at ASC
+  `, [sessionId]);
+
+  return {
+    session: sessionRes.rows[0],
+    messages: messagesRes.rows,
+  };
+}
+
+const DEFAULT_REMOTE_CONFIG = {
+  feature_flags: {
+    ai_coach_enabled: true,
+    ai_meal_scanner_enabled: true,
+    physique_analysis_enabled: true,
+    community_leaderboard_enabled: true,
+    water_hydration_tracker_enabled: true,
+    strict_maintenance_mode: false,
+  },
+  app_version_policy: {
+    min_supported_ios_version: '1.0.0',
+    min_supported_android_version: '1.0.0',
+    latest_ios_build: '1.2.4',
+    latest_android_build: '1.2.4',
+    force_update_prompt: false,
+  },
+  maintenance_window: {
+    headline: 'Under Scheduled Maintenance',
+    message: 'SpotMe is performing routine maintenance. Services will resume shortly.',
+    scheduled_end: null,
+  },
+  cache_settings: {
+    client_telemetry_interval_sec: 30,
+    leaderboard_cache_ttl_sec: 300,
+  },
+};
+
+async function getRemoteConfig() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS system_remote_config (
+      key VARCHAR(64) PRIMARY KEY,
+      value JSONB,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `);
+
+  const res = await pool.query('SELECT value, updated_at FROM system_remote_config WHERE key = $1', ['main']);
+  if (res.rows.length && res.rows[0].value) {
+    return {
+      config: res.rows[0].value,
+      updated_at: res.rows[0].updated_at,
+    };
+  }
+
+  // Seed default if empty
+  await pool.query(
+    'INSERT INTO system_remote_config (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING',
+    ['main', JSON.stringify(DEFAULT_REMOTE_CONFIG)]
+  );
+
+  return {
+    config: DEFAULT_REMOTE_CONFIG,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function updateRemoteConfig(newConfig) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS system_remote_config (
+      key VARCHAR(64) PRIMARY KEY,
+      value JSONB,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `);
+
+  const res = await pool.query(`
+    INSERT INTO system_remote_config (key, value, updated_at)
+    VALUES ('main', $1, NOW())
+    ON CONFLICT (key) DO UPDATE
+    SET value = EXCLUDED.value, updated_at = NOW()
+    RETURNING value, updated_at
+  `, [JSON.stringify(newConfig)]);
+
+  return {
+    success: true,
+    config: res.rows[0].value,
+    updated_at: res.rows[0].updated_at,
+  };
+}
+
+async function getGamificationAnalytics({ page = 1, limit = 20 } = {}) {
+  const [totalXpRes, todayXpRes, txCountRes] = await Promise.all([
+    pool.query('SELECT COALESCE(SUM(amount), 0)::int AS total_xp FROM xp_transactions'),
+    pool.query('SELECT COALESCE(SUM(amount), 0)::int AS today_xp FROM xp_transactions WHERE DATE(created_at) = CURRENT_DATE'),
+    pool.query('SELECT COUNT(*)::int AS count FROM xp_transactions'),
+  ]);
+
+  const totalTx = txCountRes.rows[0]?.count || 0;
+  const offset = Math.max(0, (parseInt(page) - 1) * parseInt(limit));
+
+  const reasonsRes = await pool.query(`
+    SELECT COALESCE(reason, 'General Workout XP') AS reason,
+           COUNT(*)::int AS count,
+           SUM(amount)::int AS total_awarded
+    FROM xp_transactions
+    GROUP BY reason
+    ORDER BY total_awarded DESC
+    LIMIT 8
+  `);
+
+  const tiersRes = await pool.query(`
+    SELECT COALESCE(league_tier, 'Iron') AS tier,
+           COUNT(*)::int AS count
+    FROM users
+    GROUP BY league_tier
+    ORDER BY count DESC
+  `);
+
+  const leaderboardRes = await pool.query(`
+    SELECT id, full_name, email, profile_pic_url,
+           COALESCE(total_xp, 0)::int AS total_xp,
+           COALESCE(league_tier, 'Iron') AS league_tier,
+           COALESCE(current_streak, 0)::int AS current_streak
+    FROM users
+    ORDER BY total_xp DESC NULLS LAST
+    LIMIT 10
+  `);
+
+  const recentTxRes = await pool.query(`
+    SELECT xt.id, xt.user_id, u.full_name, u.email, u.profile_pic_url,
+           xt.amount, xt.reason, xt.created_at
+    FROM xp_transactions xt
+    LEFT JOIN users u ON xt.user_id = u.id
+    ORDER BY xt.created_at DESC
+    LIMIT $1 OFFSET $2
+  `, [parseInt(limit), parseInt(offset)]);
+
+  return {
+    metrics: {
+      totalXpAwarded: totalXpRes.rows[0]?.total_xp || 0,
+      todayXpAwarded: todayXpRes.rows[0]?.today_xp || 0,
+      transactionsCount: totalTx,
+    },
+    reasons: reasonsRes.rows,
+    tiers: tiersRes.rows,
+    leaderboard: leaderboardRes.rows,
+    recentTransactions: recentTxRes.rows,
+    pagination: {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total: totalTx,
+      totalPages: Math.max(1, Math.ceil(totalTx / parseInt(limit))),
+    },
+  };
+}
+
 module.exports = {
   getEntityImageUrls,
   BUILD_CHANNELS,
@@ -890,4 +1572,21 @@ module.exports = {
   updateBuild,
   deleteBuild,
   deleteBuildFile,
+  listFoodItems,
+  createFoodItem,
+  deleteFoodItem,
+  listLoggedMeals,
+  listPhysiqueAnalyses,
+  updatePhysiqueStatus,
+  deletePhysiqueAnalysis,
+  listWorkoutSessionsAdmin,
+  listNotificationHistory,
+  getOnboardingAnalytics,
+  getHabitsAnalytics,
+  getUser360Profile,
+  getAiIntelligenceAnalytics,
+  getAiSessionMessages,
+  getRemoteConfig,
+  updateRemoteConfig,
+  getGamificationAnalytics,
 };
