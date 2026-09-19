@@ -2,15 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Modal, View, Text, TextInput, TouchableOpacity,
   ScrollView, StyleSheet, KeyboardAvoidingView, Platform,
-  Animated, Dimensions, Image, Keyboard, ActivityIndicator,
+  Animated, Image, Keyboard, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { FONTS } from '../../constants/theme';
 import { aiApi, AIChatMessage, AIChatSession } from '../../utils/aiApi';
-
-const { width: SCREEN_W } = Dimensions.get('window');
 const coachAvatarSource = require('../../assets/coach/fit-cartoon-character-training.png');
 
 interface AIChatModalProps {
@@ -206,6 +204,13 @@ function ThinkingBubble({ colors, isDark }: { colors: any; isDark: boolean }) {
 export default function AIChatModal({ visible, onClose, user }: AIChatModalProps) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: SW } = useWindowDimensions();
+
+  // Responsive helpers
+  const isSmall = SW < 360;
+  const cardGap = isSmall ? 8 : 10;
+  const heroPx = isSmall ? 56 : 72;
+  const starterCardBasis = SW < 340 ? '100%' : '48%';
 
   const [sessions, setSessions] = useState<AIChatSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -217,7 +222,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
   const [showHistory, setShowHistory] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
-  const historyPanelAnim = useRef(new Animated.Value(SCREEN_W)).current;
+  const historyPanelAnim = useRef(new Animated.Value(SW)).current;
 
   const userName = user?.full_name || user?.username || 'Athlete';
   const firstName = userName.split(' ')[0] || 'Athlete';
@@ -247,12 +252,12 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
 
   useEffect(() => {
     Animated.spring(historyPanelAnim, {
-      toValue: showHistory ? 0 : SCREEN_W,
+      toValue: showHistory ? 0 : SW,
       useNativeDriver: true,
       tension: 70,
       friction: 14,
     }).start();
-  }, [showHistory, historyPanelAnim]);
+  }, [showHistory, historyPanelAnim, SW]);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -406,7 +411,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
               /* ── EMPTY / STARTER STATE ── */
               <View style={S.emptyState}>
                 <View style={S.heroAvatarWrap}>
-                  <Image source={coachAvatarSource} style={S.heroAvatar} />
+                  <Image source={coachAvatarSource} style={[S.heroAvatar, { width: heroPx, height: heroPx, borderRadius: heroPx / 2 }]} />
                   <View style={S.heroOnlineBadge}>
                     <View style={S.heroOnlineInner} />
                   </View>
@@ -425,7 +430,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
                 </Text>
 
                 {/* 2-column starter card grid */}
-                <View style={S.starterGrid}>
+                <View style={[S.starterGrid, { gap: cardGap }]}>
                   {STARTER_CARDS.map((card, idx) => (
                     <TouchableOpacity
                       key={idx}
@@ -434,6 +439,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
                       style={[
                         S.starterCard,
                         {
+                          flexBasis: starterCardBasis,
                           backgroundColor: card.color,
                           borderColor: 'rgba(255,255,255,0.18)',
                           shadowColor: card.color,
@@ -509,10 +515,10 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
           </ScrollView>
 
           {/* ── BOTTOM INPUT BAR ── */}
-          <View style={[S.inputBar, { backgroundColor: colors.card, borderTopColor: cardBorder, paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <View style={[S.inputBar, { backgroundColor: colors.card, borderTopColor: cardBorder, paddingBottom: Math.max(insets.bottom, 14), paddingHorizontal: isSmall ? 10 : 14 }]}>
             <View style={[S.inputWrapper, { backgroundColor: isDark ? '#0D1115' : '#F1F5F9', borderColor: cardBorder }]}>
               <TextInput
-                style={[S.textInput, { color: colors.text }]}
+                style={[S.textInput, { color: colors.text, fontSize: isSmall ? 13 : 14 }]}
                 placeholder={sending ? 'Typing…' : 'Message Coach Spotty…'}
                 placeholderTextColor={colors.textMuted}
                 value={inputValue}
@@ -624,9 +630,9 @@ const S = StyleSheet.create({
     gap: 8,
   },
   headerIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -698,22 +704,22 @@ const S = StyleSheet.create({
   // ── Messages ──
   messagesContent: {
     flexGrow: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
   },
   messagesList: {
-    gap: 14,
+    gap: 12,
   },
 
   // ── Empty / Starter State ──
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 4,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
   },
   heroAvatarWrap: {
     position: 'relative',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   heroAvatar: {
     width: 72,
@@ -739,7 +745,7 @@ const S = StyleSheet.create({
   },
   welcomeTitle: {
     fontFamily: FONTS.heading,
-    fontSize: 24,
+    fontSize: 22,
     textAlign: 'center',
     letterSpacing: 0.3,
     marginBottom: 6,
@@ -753,16 +759,17 @@ const S = StyleSheet.create({
   },
   coachRoleText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 10.5,
+    fontSize: 10,
     letterSpacing: 0.8,
   },
   welcomeSub: {
     fontFamily: FONTS.body,
-    fontSize: 13,
+    fontSize: 12.5,
     textAlign: 'center',
-    lineHeight: 19,
-    marginBottom: 22,
-    maxWidth: 340,
+    lineHeight: 18,
+    marginBottom: 18,
+    maxWidth: '100%',
+    paddingHorizontal: 8,
   },
 
   starterGrid: {
@@ -770,19 +777,20 @@ const S = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     width: '100%',
-    marginBottom: 22,
+    marginBottom: 18,
   },
   starterCard: {
     flexBasis: '48%',
     flexGrow: 1,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 14,
-    gap: 6,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    padding: 13,
+    gap: 5,
+    minHeight: 44,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
   },
   starterIconBox: {
     width: 32,
@@ -876,24 +884,26 @@ const S = StyleSheet.create({
 
   chatBubble: {
     borderRadius: 18,
-    paddingHorizontal: 13,
-    paddingTop: 11,
-    paddingBottom: 9,
-    maxWidth: '82%',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+    maxWidth: '80%',
+    flexShrink: 1,
   },
   userBubble: {
     borderBottomRightRadius: 4,
   },
   userBubbleText: {
     fontFamily: FONTS.body,
-    fontSize: 14,
+    fontSize: 13.5,
     lineHeight: 20,
     color: '#FFFFFF',
   },
   coachBubble: {
     borderTopLeftRadius: 4,
     borderWidth: 1,
-    maxWidth: '84%',
+    maxWidth: '82%',
+    flexShrink: 1,
   },
   msgTime: {
     fontFamily: FONTS.body,
@@ -934,25 +944,27 @@ const S = StyleSheet.create({
     alignItems: 'flex-end',
     borderRadius: 24,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    gap: 6,
+    minHeight: 48,
   },
   textInput: {
     flex: 1,
     fontFamily: FONTS.body,
     fontSize: 14,
-    maxHeight: 100,
-    paddingTop: 5,
-    paddingBottom: 5,
+    maxHeight: 110,
+    minHeight: 36,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   sendBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 1,
+    flexShrink: 0,
   },
 
   // ── History slide-over ──

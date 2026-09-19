@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Image,
-  Animated, Dimensions, TextInput, KeyboardAvoidingView,
-  Platform, Keyboard, StatusBar,
+  Animated, TextInput, KeyboardAvoidingView,
+  Platform, Keyboard, StatusBar, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -19,7 +19,6 @@ import { formatDateWithWeekday as formatDate } from '../../../utils/datetime';
 import { useUnits } from '../../../contexts/UnitContext';
 import { formatWeightValue, weightUnit } from '../../../utils/units';
 
-const { width: SCREEN_W } = Dimensions.get('window');
 const coachAvatarSource = require('../../../assets/coach/fit-cartoon-character-training.png');
 
 interface ChatMessage {
@@ -30,10 +29,10 @@ interface ChatMessage {
 }
 
 const QUICK_PROMPTS = [
-  { label: '💡 How to improve next session?', text: 'How can I progressively overload and improve on my next session?' },
-  { label: '⏱️ Rate my rest intervals', text: 'Were my rest intervals optimal for muscle hypertrophy and strength?' },
-  { label: '🏋️‍♂️ Analyze my top sets', text: 'Break down my best sets and where my muscular fatigue started accumulating.' },
-  { label: '🥗 Post-workout nutrition tips', text: 'What should I eat right now to maximize recovery and protein synthesis?' },
+  { label: 'How to improve next session?', text: 'How can I progressively overload and improve on my next session?' },
+  { label: 'Rate my rest intervals', text: 'Were my rest intervals optimal for muscle hypertrophy and strength?' },
+  { label: 'Analyze my top sets', text: 'Break down my best sets and where my muscular fatigue started accumulating.' },
+  { label: 'Post-workout nutrition tips', text: 'What should I eat right now to maximize recovery and protein synthesis?' },
 ];
 
 const cleanText = (value?: string) => {
@@ -240,7 +239,7 @@ function ThinkingBubble({ colors, isDark }: { colors: any; isDark: boolean }) {
         ]}
       >
         <View style={S.thinkingRow}>
-          <Text style={[S.thinkingLabel, { color: colors.textMuted }]}>Coach Spotty is analyzing</Text>
+          <Text style={[S.thinkingLabel, { color: colors.textMuted }]}>Typing</Text>
           <View style={S.dotsWrap}>
             {[dot1, dot2, dot3].map((dot, i) => (
               <Animated.View
@@ -278,6 +277,12 @@ export default function WorkoutReportScreen() {
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const { unitSystem } = useUnits();
+  const { width: SW } = useWindowDimensions();
+
+  // Responsive helpers
+  const isSmall = SW < 360;
+  const avatarIndent = isSmall ? 36 : 40;
+  const bubbleMaxW = isSmall ? '90%' : '82%';
 
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -305,7 +310,7 @@ export default function WorkoutReportScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const progressBarWidth = progressAnim.interpolate({
     inputRange: [0, 100],
-    outputRange: [0, SCREEN_W - 48],
+    outputRange: [0, SW - 48],
   });
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -530,17 +535,11 @@ export default function WorkoutReportScreen() {
             <View style={S.onlineDot} />
           </View>
           <View style={{ marginLeft: 10 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Text style={[S.headerName, { color: colors.text }]}>Coach Spotty</Text>
-              <View style={[S.aiChip, { backgroundColor: colors.primary + '18' }]}>
-                <Ionicons name="sparkles" size={10} color={colors.primary} />
-                <Text style={[S.aiChipText, { color: colors.primary }]}>AI COACH</Text>
-              </View>
-            </View>
+            <Text style={[S.headerName, { color: colors.text }]}>Coach Spotty</Text>
             {isGenerating ? (
-              <Text style={[S.headerSub, { color: colors.primary }]}>Analyzing your workout…</Text>
+              <Text style={[S.headerSub, { color: colors.textMuted }]}>Reviewing your session…</Text>
             ) : (
-              <Text style={[S.headerSub, { color: '#10B981' }]}>Online • Session Loaded</Text>
+              <Text style={[S.headerSub, { color: '#10B981' }]}>Online</Text>
             )}
           </View>
         </View>
@@ -588,7 +587,7 @@ export default function WorkoutReportScreen() {
                 <Animated.View style={[S.progressFill, { width: progressBarWidth, backgroundColor: colors.primary }]} />
               </View>
               <View style={S.progressLabels}>
-                <Text style={[S.phaseText, { color: colors.textMuted }]}>{currentPhase || 'Coach Spotty is analyzing…'}</Text>
+                <Text style={[S.phaseText, { color: colors.textMuted }]}>{currentPhase || 'Reviewing your session…'}</Text>
                 <Text style={[S.phasePct, { color: colors.primary }]}>{progressPct}%</Text>
               </View>
             </View>
@@ -632,7 +631,7 @@ export default function WorkoutReportScreen() {
               <Image source={coachAvatarSource} style={S.coachAvatar} />
               <View style={[S.coachBubble, { backgroundColor: tintBg(colors.primary), borderColor: tintBorder(colors.primary), borderLeftColor: colors.primary }]}>
                 <Text style={[S.bubbleText, { color: colors.text }]}>
-                  Hey! I've completed your post-workout coaching analysis. Here is the full technical breakdown, fatigue metrics, and recommendations! 💪
+                  Your post-workout analysis is ready. Here's the full breakdown with fatigue metrics and recommendations for your next session.
                 </Text>
               </View>
             </View>
@@ -640,7 +639,7 @@ export default function WorkoutReportScreen() {
 
           {/* ── STATS CARD ── */}
           {isDone && (
-            <View style={[S.statsCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+            <View style={[S.statsCard, { backgroundColor: cardBg, borderColor: cardBorder, marginLeft: avatarIndent }]}>
               <View style={S.statsCardHeader}>
                 <Ionicons name="pulse-outline" size={15} color={colors.primary} />
                 <Text style={[S.statsCardTitle, { color: colors.textMuted }]}>Session Summary Stats</Text>
@@ -848,6 +847,7 @@ export default function WorkoutReportScreen() {
                 <View
                   style={[
                     S.chatBubble,
+                    { maxWidth: bubbleMaxW },
                     isUser
                       ? [S.userBubble, { backgroundColor: colors.primary }]
                       : [
@@ -891,7 +891,7 @@ export default function WorkoutReportScreen() {
 
           {/* Quick Prompt Suggestions */}
           {isDone && !sendingMessage && (
-            <View style={S.quickSuggestionsWrap}>
+            <View style={[S.quickSuggestionsWrap, { paddingLeft: avatarIndent }]}>
               <Text style={[S.quickSuggestionsTitle, { color: colors.textMuted }]}>
                 Ask Coach Spotty:
               </Text>
@@ -921,14 +921,15 @@ export default function WorkoutReportScreen() {
           )}
         </ScrollView>
 
-        {/* ── BOTTOM INPUT BAR (BankApplication style with SpotMe Theme) ── */}
+        {/* ── BOTTOM INPUT BAR ── */}
         <View
           style={[
             S.inputBarContainer,
             {
               backgroundColor: colors.card,
               borderTopColor: cardBorder,
-              paddingBottom: Math.max(insets.bottom, 10),
+              paddingBottom: Math.max(insets.bottom, 12),
+              paddingHorizontal: isSmall ? 10 : 14,
             },
           ]}
         >
@@ -942,7 +943,7 @@ export default function WorkoutReportScreen() {
             ]}
           >
             <TextInput
-              style={[S.inputField, { color: colors.text }]}
+              style={[S.inputField, { color: colors.text, fontSize: isSmall ? 13 : 13.5 }]}
               placeholder="Ask Coach Spotty about your workout..."
               placeholderTextColor={colors.textMuted}
               value={inputValue}
@@ -975,7 +976,7 @@ export default function WorkoutReportScreen() {
           </View>
 
           <Text style={[S.disclaimerText, { color: colors.textDim }]}>
-            Coach Spotty AI gives tailored fitness guidance • Train safely & listen to your body
+            Coach Spotty gives tailored fitness guidance • Train safely
           </Text>
         </View>
       </KeyboardAvoidingView>
@@ -1016,7 +1017,7 @@ const S = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerBtn: {
-    width: 36, height: 36, borderRadius: 11,
+    width: 44, height: 44, borderRadius: 12,
     borderWidth: 1,
     justifyContent: 'center', alignItems: 'center',
   },
@@ -1030,8 +1031,7 @@ const S = StyleSheet.create({
   },
   headerName: { fontFamily: FONTS.bodyBold, fontSize: 14 },
   headerSub: { fontFamily: FONTS.body, fontSize: 11, marginTop: 1 },
-  aiChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  aiChipText: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5 },
+
 
   // ── Progress ──
   progressWrap: { paddingHorizontal: 16, paddingVertical: 12 },
@@ -1042,7 +1042,7 @@ const S = StyleSheet.create({
   phasePct: { fontFamily: FONTS.bodyBold, fontSize: 13 },
 
   // ── Scroll & Chat Rows ──
-  scroll: { paddingHorizontal: 14, paddingTop: 10, flexGrow: 1 },
+  scroll: { paddingHorizontal: 12, paddingTop: 10, flexGrow: 1 },
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 14 },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
   dividerPill: {
@@ -1052,7 +1052,7 @@ const S = StyleSheet.create({
   },
   dividerText: { fontFamily: FONTS.bodyBold, fontSize: 10.5 },
 
-  chatRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 12 },
+  chatRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 10 },
   chatRowCoach: { justifyContent: 'flex-start' },
   chatRowUser: { justifyContent: 'flex-end' },
   coachAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8, flexShrink: 0 },
@@ -1067,10 +1067,10 @@ const S = StyleSheet.create({
   userAvatarImg: { width: 32, height: 32, borderRadius: 16 },
   userAvatarInitials: { fontFamily: FONTS.bodyBold, fontSize: 12 },
 
-  chatBubble: { borderRadius: 18, padding: 13 },
+  chatBubble: { borderRadius: 18, padding: 12, flexShrink: 1 },
   userBubble: {
     borderBottomRightRadius: 4,
-    maxWidth: '75%',
+    maxWidth: '78%',
   },
   userBubbleText: {
     fontFamily: FONTS.body,
@@ -1085,7 +1085,8 @@ const S = StyleSheet.create({
     borderTopLeftRadius: 4,
     borderWidth: 1,
     borderLeftWidth: 3.5,
-    padding: 13,
+    padding: 12,
+    flexShrink: 1,
   },
   bubbleHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   bubbleLabel: { fontFamily: FONTS.bodyBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -1170,43 +1171,45 @@ const S = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
 
   // ── Quick suggestions chips ──
-  quickSuggestionsWrap: { marginTop: 8, marginBottom: 4, paddingLeft: 40 },
+  quickSuggestionsWrap: { marginTop: 8, marginBottom: 4 },
   quickSuggestionsTitle: { fontFamily: FONTS.bodyBold, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
   quickSuggestionsList: { gap: 8, paddingRight: 10 },
-  quickChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  quickChipText: { fontFamily: FONTS.bodyBold, fontSize: 11.5 },
+  quickChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1, minHeight: 36, justifyContent: 'center' },
+  quickChipText: { fontFamily: FONTS.bodyBold, fontSize: 12 },
 
   // ── Input Bar ──
   inputBarContainer: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingTop: 8,
     gap: 4,
   },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    gap: 8,
+    paddingVertical: 4,
+    gap: 6,
+    minHeight: 48,
   },
   inputField: {
     flex: 1,
     fontFamily: FONTS.body,
     fontSize: 13.5,
-    maxHeight: 90,
-    paddingTop: 4,
-    paddingBottom: 4,
+    maxHeight: 110,
+    minHeight: 36,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   sendBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 2,
+    flexShrink: 0,
   },
   disclaimerText: {
     fontFamily: FONTS.body,
@@ -1217,7 +1220,7 @@ const S = StyleSheet.create({
 
   // ── Success Modal ──
   successCard: {
-    width: SCREEN_W * 0.78,
+    width: '78%',
     borderRadius: 22,
     borderWidth: 1,
     padding: 24,
