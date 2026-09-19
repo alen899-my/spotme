@@ -65,8 +65,8 @@ export default function AIChatFAB({ user }: AIChatFABProps) {
             ]}
           >
             <Image source={coachAvatarSource} style={styles.coachImg} />
-            <View style={[styles.sparkleBadge, { backgroundColor: colors.primary }]}>
-              <Ionicons name="sparkles" size={11} color="#FFFFFF" />
+            <View style={[styles.chatBadge, { backgroundColor: colors.primary }]}>
+              <Ionicons name="chatbubble-ellipses" size={11} color="#FFFFFF" />
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
   },
-  sparkleBadge: {
+  chatBadge: {
     position: 'absolute',
     bottom: -2,
     right: -2,

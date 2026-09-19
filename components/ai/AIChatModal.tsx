@@ -22,39 +22,39 @@ interface AIChatModalProps {
 const STARTER_CARDS = [
   {
     icon: 'dumbbell' as const,
-    title: 'Workout Analysis',
-    desc: 'Volume, intensity & fatigue',
-    prompt: 'Analyze my recent workouts and tell me where my strength and fatigue patterns stand.',
-    color: '#2596BE',
+    title: 'Workout Routine',
+    desc: 'Volume, sets & intensity advice',
+    prompt: 'Review my recent workouts and tell me where my strength and volume progression stand.',
+    color: '#1D4ED8',
   },
   {
-    icon: 'food-apple' as const,
+    icon: 'silverware-fork-knife' as const,
     title: 'Nutrition & Macros',
-    desc: 'Calories, protein & diet',
+    desc: 'Calorie & protein targets',
     prompt: 'Review my logged meals this week. Am I hitting optimal protein and calories for my goal?',
-    color: '#10B981',
+    color: '#059669',
   },
   {
     icon: 'calendar-sync' as const,
-    title: 'Personalize Split',
-    desc: 'Routines & muscle focus',
-    prompt: 'Look at my active training split and recommend any exercise adjustments for better muscle growth.',
-    color: '#8B5CF6',
+    title: 'Training Split',
+    desc: 'Exercise selection & balance',
+    prompt: 'Look at my active training split and recommend any exercise adjustments for better progression.',
+    color: '#7C3AED',
   },
   {
     icon: 'water-percent' as const,
-    title: 'Recovery & Water',
+    title: 'Rest & Recovery',
     desc: 'Hydration & rest intervals',
-    prompt: 'Check my hydration logs and tell me how my water intake and recovery are supporting my workouts.',
-    color: '#F59E0B',
+    prompt: 'Check my hydration and rest days and tell me how my recovery is supporting my training.',
+    color: '#EA580C',
   },
 ];
 
 const QUICK_TAGS = [
-  { label: '🥗 High protein snacks', prompt: 'Give me 5 quick high-protein snack ideas suited for my goal.' },
-  { label: '📈 Break bench plateau', prompt: 'How can I break through my current bench press plateau?' },
-  { label: '⏱️ Ideal rest intervals', prompt: 'What are the ideal rest periods between heavy compound sets for hypertrophy?' },
-  { label: '🔥 Warm-up routine', prompt: 'Suggest a quick 5-minute dynamic warm-up before my next lifting session.' },
+  { label: 'High protein snacks', prompt: 'Give me 5 quick high-protein snack ideas suited for my goal.' },
+  { label: 'Break bench plateau', prompt: 'How can I break through my current bench press plateau?' },
+  { label: 'Ideal rest intervals', prompt: 'What are the ideal rest periods between heavy compound sets for hypertrophy?' },
+  { label: 'Warm-up routine', prompt: 'Suggest a quick 5-minute dynamic warm-up before my next lifting session.' },
 ];
 
 function formatRelativeDate(isoString: string): string {
@@ -68,6 +68,16 @@ function formatRelativeDate(isoString: string): string {
     if (diffDays < 7) return `${diffDays}d ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
     return `${Math.floor(diffDays / 30)}mo ago`;
+  } catch {
+    return '';
+  }
+}
+
+function formatTime(isoString?: string): string {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   } catch {
     return '';
   }
@@ -154,7 +164,7 @@ function renderInlineSpans(text: string, textColor: string, primaryColor: string
   });
 }
 
-// ── Animated 3-Dot Thinking Bubble ───────────────────────────────────────────
+// ── Animated Typing Indicator (Standard Modern Chat) ─────────────────────────
 function ThinkingBubble({ colors, isDark }: { colors: any; isDark: boolean }) {
   const dot1 = useRef(new Animated.Value(0.3)).current;
   const dot2 = useRef(new Animated.Value(0.3)).current;
@@ -171,14 +181,14 @@ function ThinkingBubble({ colors, isDark }: { colors: any; isDark: boolean }) {
       ).start();
     };
     pulse(dot1, 0); pulse(dot2, 140); pulse(dot3, 280);
-  }, []);
+  }, [dot1, dot2, dot3]);
 
   return (
     <View style={S.chatRowCoach}>
       <Image source={coachAvatarSource} style={S.coachAvatar} />
-      <View style={[S.coachBubble, { backgroundColor: isDark ? '#141A1E' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)', borderLeftColor: colors.primary }]}>
+      <View style={[S.coachBubble, { backgroundColor: isDark ? '#141A1E' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)' }]}>
         <View style={S.thinkingRow}>
-          <Text style={[S.thinkingLabel, { color: colors.textMuted }]}>Coach Spotty is thinking…</Text>
+          <Text style={[S.thinkingLabel, { color: colors.textMuted }]}>Typing</Text>
           <View style={S.dotsWrap}>
             {[dot1, dot2, dot3].map((dot, i) => (
               <Animated.View key={i} style={[S.dot, { backgroundColor: colors.primary, opacity: dot }]} />
@@ -209,7 +219,8 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
   const scrollRef = useRef<ScrollView>(null);
   const historyPanelAnim = useRef(new Animated.Value(SCREEN_W)).current;
 
-  const userName = user?.full_name || user?.username || 'You';
+  const userName = user?.full_name || user?.username || 'Athlete';
+  const firstName = userName.split(' ')[0] || 'Athlete';
   const userInitials = userName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
   const userAvatar = user?.profile_pic_url || null;
 
@@ -241,7 +252,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
       tension: 70,
       friction: 14,
     }).start();
-  }, [showHistory]);
+  }, [showHistory, historyPanelAnim]);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -309,7 +320,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
       const fallbackMsg: AIChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'assistant',
-        content: "I'm having trouble connecting right now. Don't forget: stay hydrated, eat your protein, and keep consistent!",
+        content: "I'm having trouble connecting right now. Keep your hydration up, hit your protein targets, and stay consistent!",
         created_at: new Date().toISOString(),
       };
       setMessages(prev => [...prev, fallbackMsg]);
@@ -319,7 +330,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
     }
   };
 
-  const cardBg = isDark ? '#11161B' : '#FFFFFF';
+  const cardBg = isDark ? '#141A1E' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
 
   return (
@@ -327,13 +338,13 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
       <View style={[S.root, { backgroundColor: colors.bg }]}>
 
         {/* ── TOP HEADER ── */}
-        <View style={[S.header, { paddingTop: insets.top + 10, backgroundColor: colors.card, borderBottomColor: cardBorder }]}>
+        <View style={[S.header, { paddingTop: insets.top + 8, backgroundColor: colors.card, borderBottomColor: cardBorder }]}>
           <TouchableOpacity
             onPress={onClose}
             style={[S.headerIconBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: cardBorder }]}
             activeOpacity={0.75}
           >
-            <Ionicons name="close" size={20} color={colors.text} />
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
           </TouchableOpacity>
 
           {/* Coach identity */}
@@ -344,7 +355,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
             </View>
             <View style={{ marginLeft: 10, flex: 1 }}>
               <Text style={[S.headerName, { color: colors.text }]} numberOfLines={1}>Coach Spotty</Text>
-              <Text style={[S.headerSub, { color: '#10B981' }]} numberOfLines={1}>● Live context connected</Text>
+           
             </View>
           </View>
 
@@ -354,6 +365,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
               onPress={() => setShowHistory(true)}
               style={[S.headerIconBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: cardBorder }]}
               activeOpacity={0.75}
+              accessibilityLabel="Chat History"
             >
               <Ionicons name="time-outline" size={18} color={colors.text} />
               {sessions.length > 0 && <View style={[S.badgeDot, { backgroundColor: colors.primary }]} />}
@@ -362,8 +374,9 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
               onPress={handleNewChat}
               style={[S.headerIconBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: cardBorder }]}
               activeOpacity={0.75}
+              accessibilityLabel="New Chat"
             >
-              <Ionicons name="add" size={20} color={colors.primary} />
+              <Ionicons name="create-outline" size={19} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -392,17 +405,23 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
 
               /* ── EMPTY / STARTER STATE ── */
               <View style={S.emptyState}>
-                <View style={[S.welcomeBadge, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '33' }]}>
-                  <Ionicons name="sparkles" size={13} color={colors.primary} />
-                  <Text style={[S.welcomeBadgeText, { color: colors.primary }]}>PERSONAL AI TRAINER</Text>
+                <View style={S.heroAvatarWrap}>
+                  <Image source={coachAvatarSource} style={S.heroAvatar} />
+                  <View style={S.heroOnlineBadge}>
+                    <View style={S.heroOnlineInner} />
+                  </View>
                 </View>
 
                 <Text style={[S.welcomeTitle, { color: colors.text }]}>
-                  Hey, {userName.split(' ')[0]}! 💪
+                  Welcome, {firstName}
                 </Text>
 
+                <View style={[S.coachRolePill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: cardBorder }]}>
+                  <Text style={[S.coachRoleText, { color: colors.primary }]}>PERSONAL FITNESS COACH</Text>
+                </View>
+
                 <Text style={[S.welcomeSub, { color: colors.textMuted }]}>
-                  I know all your workouts, meals, weights, water & active splits. Ask me anything to crush your goals!
+                  Ask me about your workout programming, nutrition targets, exercise form, or recovery.
                 </Text>
 
                 {/* 2-column starter card grid */}
@@ -410,22 +429,29 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
                   {STARTER_CARDS.map((card, idx) => (
                     <TouchableOpacity
                       key={idx}
-                      activeOpacity={0.8}
+                      activeOpacity={0.85}
                       onPress={() => handleSend(card.prompt)}
-                      style={[S.starterCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
+                      style={[
+                        S.starterCard,
+                        {
+                          backgroundColor: card.color,
+                          borderColor: 'rgba(255,255,255,0.18)',
+                          shadowColor: card.color,
+                        },
+                      ]}
                     >
-                      <View style={[S.starterIconBox, { backgroundColor: card.color + '18' }]}>
-                        <MaterialCommunityIcons name={card.icon} size={18} color={card.color} />
+                      <View style={S.starterIconBox}>
+                        <MaterialCommunityIcons name={card.icon} size={18} color="#FFFFFF" />
                       </View>
-                      <Text style={[S.starterTitle, { color: colors.text }]}>{card.title}</Text>
-                      <Text style={[S.starterDesc, { color: colors.textMuted }]}>{card.desc}</Text>
+                      <Text style={S.starterTitle}>{card.title}</Text>
+                      <Text style={S.starterDesc}>{card.desc}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
 
                 {/* Quick tags */}
                 <View style={S.quickTagsWrap}>
-                  <Text style={[S.quickTagsTitle, { color: colors.textDim }]}>Popular Questions</Text>
+                  <Text style={[S.quickTagsTitle, { color: colors.textDim }]}>Suggested Topics</Text>
                   <View style={S.quickTags}>
                     {QUICK_TAGS.map((tag, idx) => (
                       <TouchableOpacity
@@ -453,13 +479,18 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
                         S.chatBubble,
                         isUser
                           ? [S.userBubble, { backgroundColor: colors.primary }]
-                          : [S.coachBubble, { backgroundColor: cardBg, borderColor: cardBorder, borderLeftColor: colors.primary }],
+                          : [S.coachBubble, { backgroundColor: cardBg, borderColor: cardBorder }],
                       ]}>
                         {isUser ? (
                           <Text style={S.userBubbleText}>{msg.content}</Text>
                         ) : (
                           <MarkdownText content={msg.content} textColor={colors.text} primaryColor={colors.primary} isDark={isDark} />
                         )}
+                        {msg.created_at ? (
+                          <Text style={[S.msgTime, { color: isUser ? 'rgba(255,255,255,0.65)' : colors.textDim, alignSelf: isUser ? 'flex-end' : 'flex-start' }]}>
+                            {formatTime(msg.created_at)}
+                          </Text>
+                        ) : null}
                       </View>
                       {isUser && (
                         <View style={[S.userAvatarCircle, { backgroundColor: colors.primary + '28' }]}>
@@ -482,7 +513,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
             <View style={[S.inputWrapper, { backgroundColor: isDark ? '#0D1115' : '#F1F5F9', borderColor: cardBorder }]}>
               <TextInput
                 style={[S.textInput, { color: colors.text }]}
-                placeholder={sending ? 'Coach Spotty is thinking…' : 'Ask about workouts, diet, recovery…'}
+                placeholder={sending ? 'Typing…' : 'Message Coach Spotty…'}
                 placeholderTextColor={colors.textMuted}
                 value={inputValue}
                 onChangeText={setInputValue}
@@ -496,19 +527,17 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
                 disabled={!inputValue.trim() || sending}
                 style={[S.sendBtn, { backgroundColor: inputValue.trim() && !sending ? colors.primary : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)') }]}
                 activeOpacity={0.8}
+                accessibilityLabel="Send message"
               >
                 <Ionicons name="arrow-up" size={17} color={inputValue.trim() && !sending ? '#FFFFFF' : colors.textMuted} />
               </TouchableOpacity>
             </View>
-            <Text style={[S.disclaimerText, { color: colors.textDim }]}>
-              Coach Spotty references your live fitness logs. Train safely & listen to your body.
-            </Text>
           </View>
         </KeyboardAvoidingView>
 
         {/* ── PAST CHATS HISTORY PANEL (SLIDE-OVER) ── */}
         <Animated.View style={[S.historyPanel, { backgroundColor: colors.bg, transform: [{ translateX: historyPanelAnim }] }]}>
-          <View style={[S.historyHeader, { paddingTop: insets.top + 10, backgroundColor: colors.card, borderBottomColor: cardBorder }]}>
+          <View style={[S.historyHeader, { paddingTop: insets.top + 8, backgroundColor: colors.card, borderBottomColor: cardBorder }]}>
             <TouchableOpacity
               onPress={() => setShowHistory(false)}
               style={[S.headerIconBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: cardBorder }]}
@@ -516,7 +545,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
             >
               <Ionicons name="chevron-back" size={20} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[S.historyTitle, { color: colors.text }]}>Past Conversations</Text>
+            <Text style={[S.historyTitle, { color: colors.text }]}>Chat History</Text>
             <TouchableOpacity
               onPress={handleNewChat}
               style={[S.headerIconBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '33' }]}
@@ -535,7 +564,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
               <Ionicons name="chatbubbles-outline" size={48} color={colors.textDim} />
               <Text style={{ fontFamily: FONTS.bodyBold, color: colors.text, marginTop: 12, fontSize: 15 }}>No Past Chats</Text>
               <Text style={{ fontFamily: FONTS.body, color: colors.textMuted, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
-                Ask Coach Spotty anything to start your first session!
+                Start a chat to keep track of your coaching sessions.
               </Text>
             </View>
           ) : (
@@ -580,7 +609,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// STYLES  –  mobile-first, no hard-coded widths
+// STYLES
 // ═════════════════════════════════════════════════════════════════════════════
 const S = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden' },
@@ -589,60 +618,151 @@ const S = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 8,
   },
   headerIconBtn: {
-    width: 36, height: 36, borderRadius: 11,
+    width: 36,
+    height: 36,
+    borderRadius: 11,
     borderWidth: 1,
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
     flexShrink: 0,
     position: 'relative',
   },
   badgeDot: {
-    position: 'absolute', top: 6, right: 6,
-    width: 7, height: 7, borderRadius: 4,
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   headerCenter: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 0,          // allow shrink
+    minWidth: 0,
   },
-  avatarWrap: { position: 'relative', flexShrink: 0 },
-  headerAvatar: { width: 34, height: 34, borderRadius: 17 },
+  avatarWrap: {
+    position: 'relative',
+    flexShrink: 0,
+  },
+  headerAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
   onlineDot: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 9, height: 9, borderRadius: 5,
-    backgroundColor: '#10B981', borderWidth: 1.5, borderColor: '#FFF',
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
-  headerName: { fontFamily: FONTS.bodyBold, fontSize: 14 },
-  headerSub: { fontFamily: FONTS.body, fontSize: 10, marginTop: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  headerName: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+    letterSpacing: 0.2,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 1,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  headerSub: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
 
   // ── Messages ──
-  messagesContent: { flexGrow: 1, paddingHorizontal: 14, paddingVertical: 14 },
-  messagesList: { gap: 12 },
+  messagesContent: {
+    flexGrow: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+  },
+  messagesList: {
+    gap: 14,
+  },
 
   // ── Empty / Starter State ──
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 0,
+    paddingVertical: 20,
+    paddingHorizontal: 4,
   },
-  welcomeBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 5,
-    borderRadius: 20, borderWidth: 1, marginBottom: 14,
+  heroAvatarWrap: {
+    position: 'relative',
+    marginBottom: 14,
   },
-  welcomeBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 0.5 },
-  welcomeTitle: { fontFamily: FONTS.bodyBold, fontSize: 22, textAlign: 'center', marginBottom: 8 },
+  heroAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
+  heroOnlineBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroOnlineInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+  },
+  welcomeTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 24,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    marginBottom: 6,
+  },
+  coachRolePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  coachRoleText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10.5,
+    letterSpacing: 0.8,
+  },
   welcomeSub: {
-    fontFamily: FONTS.body, fontSize: 13, textAlign: 'center',
-    lineHeight: 19, marginBottom: 20,
-    paddingHorizontal: 8,           // responsive – no maxWidth
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 22,
+    maxWidth: 340,
   },
 
   starterGrid: {
@@ -650,73 +770,169 @@ const S = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 22,
   },
   starterCard: {
-    // Take exactly half the row minus the gap (responsive on any screen)
-    width: (SCREEN_W - 14 * 2 - 10) / 2,
+    flexBasis: '48%',
+    flexGrow: 1,
     borderRadius: 16,
     borderWidth: 1,
-    padding: 13,
+    padding: 14,
     gap: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   starterIconBox: {
-    width: 32, height: 32, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 2,
   },
-  starterTitle: { fontFamily: FONTS.bodyBold, fontSize: 13 },
-  starterDesc: { fontFamily: FONTS.body, fontSize: 11, lineHeight: 15 },
+  starterTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 13.5,
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  starterDesc: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+    lineHeight: 15,
+    color: 'rgba(255, 255, 255, 0.88)',
+  },
 
-  quickTagsWrap: { width: '100%', gap: 8 },
-  quickTagsTitle: { fontFamily: FONTS.bodyBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' },
-  quickTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
-  quickTag: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  quickTagText: { fontFamily: FONTS.body, fontSize: 12 },
+  quickTagsWrap: {
+    width: '100%',
+    gap: 10,
+  },
+  quickTagsTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  quickTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  quickTag: {
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  quickTagText: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+  },
 
   // ── Chat rows ──
-  chatRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 4 },
-  chatRowCoach: { justifyContent: 'flex-start' },
-  chatRowUser: { justifyContent: 'flex-end' },
-  coachAvatar: { width: 30, height: 30, borderRadius: 15, marginRight: 8, flexShrink: 0 },
-  userAvatarCircle: {
-    width: 30, height: 30, borderRadius: 15,
-    marginLeft: 8, flexShrink: 0,
-    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  chatRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
-  userAvatarImg: { width: 30, height: 30, borderRadius: 15 },
-  userAvatarInitials: { fontFamily: FONTS.bodyBold, fontSize: 11 },
-
-  chatBubble: { borderRadius: 18, padding: 12, maxWidth: '80%' },
-  userBubble: { borderBottomRightRadius: 4 },
-  userBubbleText: { fontFamily: FONTS.body, fontSize: 13.5, lineHeight: 20, color: '#FFFFFF' },
-  coachBubble: {
-    flex: 1,
-    maxWidth: '88%',
+  chatRowCoach: {
+    justifyContent: 'flex-start',
+  },
+  chatRowUser: {
+    justifyContent: 'flex-end',
+  },
+  coachAvatar: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
+    marginRight: 8,
+    flexShrink: 0,
+    marginBottom: 2,
+  },
+  userAvatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginLeft: 8,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 2,
+  },
+  userAvatarImg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  userAvatarInitials: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+  },
+
+  chatBubble: {
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingTop: 11,
+    paddingBottom: 9,
+    maxWidth: '82%',
+  },
+  userBubble: {
+    borderBottomRightRadius: 4,
+  },
+  userBubbleText: {
+    fontFamily: FONTS.body,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#FFFFFF',
+  },
+  coachBubble: {
     borderTopLeftRadius: 4,
     borderWidth: 1,
-    borderLeftWidth: 3.5,
-    padding: 12,
+    maxWidth: '84%',
+  },
+  msgTime: {
+    fontFamily: FONTS.body,
+    fontSize: 10,
+    marginTop: 4,
   },
 
-  // ── Thinking ──
-  thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  thinkingLabel: { fontFamily: FONTS.body, fontSize: 12 },
-  dotsWrap: { flexDirection: 'row', gap: 4, alignItems: 'center' },
-  dot: { width: 6, height: 6, borderRadius: 3 },
+  // ── Thinking / Typing ──
+  thinkingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  thinkingLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+  },
+  dotsWrap: {
+    flexDirection: 'row',
+    gap: 4,
+    alignItems: 'center',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
 
   // ── Input bar ──
   inputBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
-    paddingTop: 8,
-    gap: 4,
+    paddingTop: 10,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -727,33 +943,39 @@ const S = StyleSheet.create({
     fontFamily: FONTS.body,
     fontSize: 14,
     maxHeight: 100,
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: 5,
+    paddingBottom: 5,
   },
   sendBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    justifyContent: 'center', alignItems: 'center',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 1,
-  },
-  disclaimerText: {
-    fontFamily: FONTS.body,
-    fontSize: 9.5,
-    textAlign: 'center',
-    marginTop: 2,
   },
 
   // ── History slide-over ──
-  historyPanel: { ...StyleSheet.absoluteFillObject, zIndex: 10 },
+  historyPanel: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+  },
   historyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  historyTitle: { fontFamily: FONTS.bodyBold, fontSize: 15 },
-  historyList: { padding: 14, gap: 10 },
+  historyTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 15,
+  },
+  historyList: {
+    padding: 14,
+    gap: 10,
+  },
   sessionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -762,22 +984,77 @@ const S = StyleSheet.create({
     padding: 14,
     gap: 12,
   },
-  sessionTitle: { fontFamily: FONTS.bodyBold, fontSize: 13.5 },
-  sessionLastMsg: { fontFamily: FONTS.body, fontSize: 12, lineHeight: 16 },
-  sessionDate: { fontFamily: FONTS.body, fontSize: 11 },
-  sessionCount: { fontFamily: FONTS.bodySemiBold, fontSize: 11 },
-  sessionDeleteBtn: { padding: 6 },
+  sessionTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 13.5,
+  },
+  sessionLastMsg: {
+    fontFamily: FONTS.body,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  sessionDate: {
+    fontFamily: FONTS.body,
+    fontSize: 11,
+  },
+  sessionCount: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 11,
+  },
+  sessionDeleteBtn: {
+    padding: 6,
+  },
 
-  centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
-  loadingText: { fontFamily: FONTS.body, fontSize: 13, marginTop: 10 },
+  centerLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+  },
+  loadingText: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    marginTop: 10,
+  },
 
   // ── Markdown ──
-  mdHeading: { fontFamily: FONTS.bodyBold, fontSize: 14.5, marginTop: 4, marginBottom: 2 },
-  mdBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginVertical: 1.5 },
-  mdBulletDot: { fontSize: 16, lineHeight: 19 },
-  mdNumPrefix: { fontFamily: FONTS.bodyBold, fontSize: 12, lineHeight: 19, minWidth: 16 },
-  mdBodyText: { fontFamily: FONTS.body, fontSize: 13.5, lineHeight: 19.5 },
-  mdBold: { fontFamily: FONTS.bodyBold },
-  mdItalic: { fontStyle: 'italic' },
-  mdCode: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, paddingHorizontal: 4, borderRadius: 4 },
+  mdHeading: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 14.5,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  mdBulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginVertical: 1.5,
+  },
+  mdBulletDot: {
+    fontSize: 16,
+    lineHeight: 19,
+  },
+  mdNumPrefix: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+    lineHeight: 19,
+    minWidth: 16,
+  },
+  mdBodyText: {
+    fontFamily: FONTS.body,
+    fontSize: 13.5,
+    lineHeight: 19.5,
+  },
+  mdBold: {
+    fontFamily: FONTS.bodyBold,
+  },
+  mdItalic: {
+    fontStyle: 'italic',
+  },
+  mdCode: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 12,
+    paddingHorizontal: 4,
+    borderRadius: 4,
+  },
 });
