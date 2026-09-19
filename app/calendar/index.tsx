@@ -10,8 +10,8 @@ import {
   Modal,
   Image,
   FlatList,
-  ImageBackground,
 } from "react-native";
+import AppImageBackground from "../../components/ui/AppImageBackground";
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -186,7 +186,7 @@ export default function CalendarScreen() {
         </ScrollView>
 
         {/* ── Heatmap ── */}
-        <ImageBackground
+        <AppImageBackground
           source={bgImage}
           style={[styles.card, { overflow: "hidden" }]}
           imageStyle={{ borderRadius: 16 }}
@@ -203,7 +203,7 @@ export default function CalendarScreen() {
             onDayPress={handleDayPress}
             vibrant
           />
-        </ImageBackground>
+        </AppImageBackground>
 
         {/* ── Rest & Leave Legend ── */}
         <View style={[styles.legendCard, { backgroundColor: colors.card, borderColor: colors.border }]}>

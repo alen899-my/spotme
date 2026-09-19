@@ -46,7 +46,7 @@ export default function AIChatFAB({ user }: AIChatFABProps) {
         style={[
           styles.container,
           {
-            bottom: Math.max(insets.bottom, 12) + 72,
+            bottom: Math.max(insets.bottom, 20) + 120,
           },
         ]}
         pointerEvents="box-none"

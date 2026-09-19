@@ -1188,7 +1188,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
 
                 return (
                   <View key={`${food.id}-${idx}`} style={[styles.databaseMealCard, isDark ? { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border } : { backgroundColor: '#0B7EA4' }]}>
-                    {imageUri ? <Image source={{ uri: imageUri }} style={styles.recommendedMealHero} /> : null}
+                    {imageUri ? <OptimizedImage uri={imageUri} style={styles.recommendedMealHero} /> : null}
                     <View style={[styles.databaseMealIconWrap, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.14)', borderWidth: isDark ? 1 : 0, borderColor: colors.border }]}>
                       <Ionicons name={(food.icon || visual.icon) as any} size={20} color={isDark ? colors.primary : '#D9F3FF'} />
                     </View>

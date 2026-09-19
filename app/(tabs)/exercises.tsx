@@ -6,11 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  ImageBackground,
   ActivityIndicator,
   Modal,
   Dimensions,
 } from 'react-native';
+import AppImageBackground from '../../components/ui/AppImageBackground';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -265,7 +265,7 @@ export default function ExercisesScreen() {
       {viewMode === 'categories' && (
         <ScrollView contentContainerStyle={[styles.scrollContent, { flexGrow: 1, paddingBottom: Math.max(insets.bottom + 24, 64) }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View>
-            <ImageBackground source={HEADER_IMAGE} style={[styles.hero, { paddingTop: heroTopPadding }]} imageStyle={styles.heroImage}>
+            <AppImageBackground source={HEADER_IMAGE} style={[styles.hero, { paddingTop: heroTopPadding }]} imageStyle={styles.heroImage}>
               <View style={styles.heroOverlay} />
               <View style={styles.header}>
                 <View style={styles.headerTitleRow}>
@@ -278,7 +278,7 @@ export default function ExercisesScreen() {
                   <Ionicons name="fitness" size={24} color={P.ink} />
                 </View>
               </View>
-            </ImageBackground>
+            </AppImageBackground>
           </View>
           {renderCategoryState()}
         </ScrollView>
@@ -287,7 +287,7 @@ export default function ExercisesScreen() {
       {viewMode === 'exercises' && (
         <View style={{ flex: 1 }}>
           <View>
-            <ImageBackground source={HEADER_IMAGE} style={[styles.hero, { paddingTop: heroTopPadding }]} imageStyle={styles.heroImage}>
+            <AppImageBackground source={HEADER_IMAGE} style={[styles.hero, { paddingTop: heroTopPadding }]} imageStyle={styles.heroImage}>
               <View style={styles.heroOverlay} />
               <View style={styles.header}>
                 <View style={styles.headerTitleRow}>
@@ -305,7 +305,7 @@ export default function ExercisesScreen() {
                   <Ionicons name="fitness" size={24} color={P.ink} />
                 </View>
               </View>
-            </ImageBackground>
+            </AppImageBackground>
           </View>
           <ExerciseBrowser
             apiEndpoint="/exercises"

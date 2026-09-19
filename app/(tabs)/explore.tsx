@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
-  ImageBackground,
+  useWindowDimensions,
 } from "react-native";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
@@ -28,13 +28,13 @@ const BG_IMAGES: Record<string, any> = {
 };
 
 const CARD_TINTS: Record<string, [string, string]> = {
-  exercises: ["rgba(155,89,182,0.28)",  "rgba(155,89,182,0.04)"],
-  weight:    ["rgba(52,152,219,0.28)",   "rgba(52,152,219,0.04)"],
-  splits:    ["rgba(46,204,113,0.28)",   "rgba(46,204,113,0.04)"],
-  reports:   ["rgba(231,76,60,0.28)",    "rgba(231,76,60,0.04)"],
-  calendar:  ["rgba(241,196,15,0.28)",   "rgba(241,196,15,0.04)"],
-  followers: ["rgba(230,126,34,0.28)",   "rgba(230,126,34,0.04)"],
-  physique:  ["rgba(142,68,173,0.28)",   "rgba(142,68,173,0.04)"],
+  exercises: ["rgba(155,89,182,0.22)",  "rgba(155,89,182,0.02)"],
+  weight:    ["rgba(52,152,219,0.22)",   "rgba(52,152,219,0.02)"],
+  splits:    ["rgba(46,204,113,0.22)",   "rgba(46,204,113,0.02)"],
+  reports:   ["rgba(231,76,60,0.22)",    "rgba(231,76,60,0.02)"],
+  calendar:  ["rgba(241,196,15,0.22)",   "rgba(241,196,15,0.02)"],
+  followers: ["rgba(230,126,34,0.22)",   "rgba(230,126,34,0.02)"],
+  physique:  ["rgba(142,68,173,0.22)",   "rgba(142,68,173,0.02)"],
 };
 
 interface ExploreItem {
@@ -57,14 +57,17 @@ const EXPLORE_ITEMS: ExploreItem[] = [
   { id: "physique",  title: "Physique Analysis",   subtitle: "AI body assessment",     icon: "body-outline",            iconType: "Ionicons",               href: "/physique" },
 ];
 
-const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_GAP = scale(10);
-const CARD_W = Math.floor((SCREEN_W - scale(16) * 2 - CARD_GAP) / 2);
 
 export default function ExploreScreen() {
+  const { width: windowWidth } = useWindowDimensions();
   const { colors, isDark } = useTheme();
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
+
+  // Responsive 2-column calculation that dynamically adapts to mobile web and devices
+  const horizontalPadding = scale(16) * 2;
+  const cardW = Math.max(120, Math.floor((windowWidth - horizontalPadding - CARD_GAP - 1) / 2));
 
   useEffect(() => {
     (async () => {
@@ -105,17 +108,18 @@ export default function ExploreScreen() {
             key={item.id}
             activeOpacity={0.85}
             onPress={() => handleNav(item)}
-            style={{ width: CARD_W, height: CARD_W, marginBottom: CARD_GAP }}
+            style={{ width: cardW, height: cardW, position: "relative" }}
           >
             <View style={styles.glassCard}>
-              <ImageBackground
+              <Image
                 source={BG_IMAGES[item.id]}
-                style={styles.card}
-                imageStyle={{ borderRadius: scale(18) }}
-                resizeMode="cover"
+                style={styles.cardImage}
+                contentFit="cover"
+                cachePolicy="disk"
+                priority="high"
               />
               <BlurView
-                intensity={50}
+                intensity={30}
                 tint="dark"
                 style={[StyleSheet.absoluteFill, styles.cardRadius]}
               />
@@ -184,18 +188,24 @@ const styles = StyleSheet.create({
   },
   glassCard: {
     flex: 1,
+    width: "100%",
+    height: "100%",
+    position: "relative",
     borderRadius: scale(18),
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "#0F172A",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 4,
   },
-  card: {
+  cardImage: {
     ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
     borderRadius: scale(18),
   },
   cardRadius: {
@@ -206,6 +216,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: vs(8),
+    zIndex: 2,
   },
   cardIconWrap: {
     width: scale(52),

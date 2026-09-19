@@ -6,8 +6,8 @@ import {
   Animated,
   Easing,
   Image,
-  ImageBackground,
 } from "react-native";
+import AppImageBackground from "./AppImageBackground";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -109,7 +109,7 @@ export default function GreetingCard({ firstName }: GreetingCardProps) {
         },
       ]}
     >
-      <ImageBackground
+      <AppImageBackground
         source={timeImages[slot]}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"

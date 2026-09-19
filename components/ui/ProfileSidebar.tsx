@@ -11,7 +11,6 @@ import {
   Platform,
   ScrollView,
   Modal,
-  ImageBackground,
   StatusBar,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";

@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Modal, Pressable, ImageBackground,
+  TouchableOpacity, Modal, Pressable,
 } from 'react-native';
+import AppImageBackground from './AppImageBackground';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -514,7 +515,7 @@ export default function DatePicker({
 
   return backgroundImage ? (
     <View style={wrapperStyle}>
-      <ImageBackground source={backgroundImage} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+      <AppImageBackground source={backgroundImage} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
       <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 0 }]} />
       <View style={{ zIndex: 1 }}>{content}</View>
     </View>
@@ -532,6 +533,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 12,
     borderRadius: 22,
+    overflow: 'hidden',
     borderWidth: 1,
     marginBottom: 12,
     shadowOffset: { width: 0, height: 10 },

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity, Image, ImageBackground, ActivityIndicator,
+  TouchableOpacity, Image, ActivityIndicator,
   Dimensions, Animated, ScrollView, TextInput,
 } from 'react-native';
+import AppImageBackground from '../../components/ui/AppImageBackground';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import OptimizedImage from '../../components/ui/OptimizedImage';
@@ -931,7 +932,7 @@ export default function LeaderboardScreen() {
                 {/* ── PODIUM ── */}
                 {top3.length >= 3 && tab === 'All' && (
                   <View style={styles.podiumWrap}>
-                    <ImageBackground
+                    <AppImageBackground
                       source={require('../../assets/coach/workoutlog.jpg')}
                       style={StyleSheet.absoluteFill}
                       resizeMode="cover"

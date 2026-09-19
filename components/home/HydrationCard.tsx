@@ -6,8 +6,8 @@ import {
   StyleSheet,
   Animated,
   Easing,
-  ImageBackground,
 } from "react-native";
+import AppImageBackground from "../ui/AppImageBackground";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
@@ -195,7 +195,7 @@ const HydrationCard = React.memo(function HydrationCard({ waterMl, onLogWaterPre
         },
       ]}
     >
-      <ImageBackground
+      <AppImageBackground
         source={drinkBg}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"

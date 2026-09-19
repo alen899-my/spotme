@@ -477,11 +477,6 @@ export default function DailyTab() {
                 </View>
                 <View style={[styles.statLine, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]} />
                 <View style={styles.statItem}>
-                  <Text style={[styles.statVal, { color: isDark ? colors.text : '#FFF' }]}>{formatWeightValue(Math.round(item.total_volume), unitSystem)}</Text>
-                  <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>{weightUnit(unitSystem)}</Text>
-                </View>
-                <View style={[styles.statLine, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]} />
-                <View style={styles.statItem}>
                   <Text style={[styles.statVal, { color: isDark ? colors.text : '#FFF' }]}>{formatDuration(item.total_duration_seconds)}</Text>
                   <Text style={[styles.statLbl, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.72)' }]}>Time</Text>
                 </View>

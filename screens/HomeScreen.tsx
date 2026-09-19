@@ -7,8 +7,8 @@ import {
   ScrollView,
   Platform,
   useWindowDimensions,
-  ImageBackground,
 } from "react-native";
+import AppImageBackground from "../components/ui/AppImageBackground";
 import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "../utils/api";
@@ -210,7 +210,7 @@ export default function HomeScreen() {
               onPress={() => router.push("/daily/new")}
               activeOpacity={0.82}
             >
-              <ImageBackground source={workoutBg} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+              <AppImageBackground source={workoutBg} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
               <View style={[StyleSheet.absoluteFillObject, styles.loggerOverlay]} />
               <View style={[styles.quickLoggerIconWrap, { backgroundColor: isDark ? "rgba(37,150,190,0.15)" : "#E0F2FE" }]}>
                 <Ionicons name="barbell" size={scale(20)} color="#2596BE" />
@@ -233,7 +233,7 @@ export default function HomeScreen() {
               onPress={() => router.push("/(tabs)/meals")}
               activeOpacity={0.82}
             >
-              <ImageBackground source={foodBg} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+              <AppImageBackground source={foodBg} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
               <View style={[StyleSheet.absoluteFillObject, styles.loggerOverlay]} />
               <View style={[styles.quickLoggerIconWrap, { backgroundColor: isDark ? "rgba(245,158,11,0.15)" : "#FEF3C7" }]}>
                 <Ionicons name="restaurant" size={scale(20)} color={isDark ? "#F59E0B" : "#D97706"} />

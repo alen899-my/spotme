@@ -4,8 +4,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ImageBackground,
 } from "react-native";
+import AppImageBackground from "../ui/AppImageBackground";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { FONTS } from "../../constants/theme";
@@ -112,7 +112,7 @@ const MiniCalendar = React.memo(function MiniCalendar() {
       onPress={() => router.push("/calendar")}
       activeOpacity={0.92}
     >
-      <ImageBackground
+      <AppImageBackground
         source={bgImage}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
