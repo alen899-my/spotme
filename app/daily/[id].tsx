@@ -33,6 +33,7 @@ import * as Notifications from 'expo-notifications';
 import { useUnits } from '../../contexts/UnitContext';
 import { formatWeight, formatWeightValue, formatRecordValue, weightUnit, formatHeight, heightUnit, formatBodyWeight } from '../../utils/units';
 import SetLoggerModal from '../../components/workout/SetLoggerModal';
+import SwipeableRow from '../../components/ui/SwipeableRow';
 
 
 function formatTime(sec: number) {
@@ -62,6 +63,9 @@ const ExerciseCard = React.memo(({
 }) => {
   const { isDark } = useTheme();
   const { unitSystem } = useUnits();
+  const { width: screenWidth } = useWindowDimensions();
+  const isSmallMobile = screenWidth < 380;
+
   const [localRating, setLocalRating] = useState<number | null>(item.rating || null);
   const [expanded, setExpanded] = useState(!item.is_completed && !item.is_skipped);
 
@@ -78,219 +82,468 @@ const ExerciseCard = React.memo(({
   const isSkipped = item.is_skipped;
 
   const isActive = activeExerciseId === item.id;
-  const isPending = !isDone && !isSkipped && completedSets === 0;
+  const isPending = !isDone && !isSkipped && !isActive && completedSets === 0;
+
+  const cardPadding = isSmallMobile ? 12 : 16;
+  const imageSize = isSmallMobile ? 66 : 74;
 
   return (
-    <View style={[
-      styles.exCard,
-      { 
-        backgroundColor: isDark ? colors.card : P.cta, 
-        borderColor: isDark ? colors.border : (isSkipped ? P.border : (isDone ? '#10B981' : (isActive ? P.cta : P.ctaDark))),
-        borderWidth: isActive ? 2 : (isDark ? 1 : 0),
-      },
-      isSkipped && { opacity: 0.7 },
-      isActive && !isDark && { borderColor: P.sun },
-    ]}>
-      {/* ── HEADER (always visible) ── */}
-      <TouchableOpacity
-        style={styles.exHeader}
-        onPress={() => setExpanded(v => !v)}
-        activeOpacity={0.8}
-      >
-        <TouchableOpacity onPress={(e) => { e.stopPropagation(); openGuide(item); }} activeOpacity={0.7} style={{ alignItems: 'center', gap: 10 }}>
-          <OptimizedImage uri={item.gif_url || item.image_url} style={styles.exImage} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          {/* ── 3. Title wraps, no truncation ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap' }}>
-            <Text style={[styles.exName, { color: isDark ? colors.text : '#FFF' }]}>{item.name}</Text>
-            {isDone && !isSkipped && (
-              <View style={[styles.statusPill, { backgroundColor: '#10B981', marginTop: 3 }]}>
-                <Ionicons name="checkmark-circle" size={11} color="#FFF" />
-                <Text style={styles.statusPillText}>DONE</Text>
-              </View>
-            )}
-            {isActive && !isDone && !isSkipped && (
-              <View style={[styles.statusPill, { backgroundColor: P.cta, marginTop: 3 }]}>
-                <Ionicons name="flash" size={11} color="#FFF" />
-                <Text style={styles.statusPillText}>ACTIVE</Text>
-              </View>
-            )}
-            {isPending && !isSkipped && (
-              <View style={[styles.statusPill, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.2)', marginTop: 3 }]}>
-                <Ionicons name="hourglass-outline" size={11} color={isDark ? colors.textMuted : '#FFF'} />
-                <Text style={[styles.statusPillText, { color: isDark ? colors.textMuted : '#FFF' }]}>PENDING</Text>
-              </View>
-            )}
-            {isSkipped && (
-              <View style={[styles.statusPill, { backgroundColor: isDark ? '#444' : 'rgba(255,255,255,0.2)', marginTop: 3 }]}>
-                <Text style={styles.statusPillText}>SKIPPED</Text>
-              </View>
-            )}
-          </View>
-          {/* ── 4. Progress bar instead of meta text ── */}
-          {item.category?.toLowerCase() === 'cardio' ? (
-            <View style={styles.headerProgressWrap}>
-              <Text style={[styles.headerProgressLabel, { color: isDark ? colors.textMuted : '#FFF' }]}>
-                {formatTime(item.sets?.reduce((acc: number, s: any) => acc + (s.duration_seconds || 0), 0) || 0)} logged
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.headerProgressWrap}>
-              <View style={[styles.headerProgressBar, { backgroundColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
+    <SwipeableRow
+      onDelete={() => removeExercise(item.id)}
+      deleteLabel="DELETE"
+      iconName="trash-outline"
+      iconSize={isSmallMobile ? 18 : 20}
+      revealedWidth={isSmallMobile ? 74 : 80}
+      borderRadius={22}
+      style={[
+        styles.exCardWrapper,
+        isDark ? styles.cardFloatingDark : styles.cardFloatingLight,
+        isActive && (isDark ? styles.cardActiveFloatingDark : styles.cardActiveFloatingLight),
+      ]}
+      disabled={workoutStatus === 'completed'}
+    >
+      <View style={[
+        styles.exCard,
+        { 
+          backgroundColor: isDark ? (isActive ? '#18181D' : '#131317') : '#FFFFFF', 
+          borderWidth: 0,
+          padding: cardPadding,
+        },
+        isSkipped && { opacity: 0.65 },
+      ]}>
+        {/* ── HEADER (always visible) ── */}
+        <TouchableOpacity
+          style={styles.exHeader}
+          onPress={() => setExpanded(v => !v)}
+          activeOpacity={0.85}
+        >
+          {/* Top meta row: Category pill with image + Equipment + Status pill + Chevron */}
+          <View style={styles.topMetaRow}>
+            <View style={styles.catEquipWrap}>
+              {item.category ? (
                 <View style={[
-                  styles.headerProgressFill,
-                  {
-                    width: `${Math.min((completedSets / targetSets) * 100, 100)}%` as any,
-                    backgroundColor: isDone ? '#10B981' : (isDark ? colors.primary : P.sun),
-                  },
-                ]} />
-              </View>
-              <Text style={[styles.headerProgressLabel, { color: isDark ? colors.textMuted : '#FFF' }]}>{completedSets}/{targetSets} sets</Text>
-            </View>
-          )}
-        </View>
-        <View style={{ alignItems: 'center', gap: 4, marginLeft: 8 }}>
-          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={isDark ? colors.textMuted : "rgba(255,255,255,0.6)"} />
-        </View>
-      </TouchableOpacity>
-
-      {/* ── ACCORDION BODY ── */}
-      {expanded && (
-        <>
-          {/* Sets */}
-          {item.sets && item.sets.length > 0 && (
-              <>
-              {(() => {
-                const isCardio = item.category?.toLowerCase() === 'cardio';
-                const isBodyweight = item.equipment?.toLowerCase() === 'body weight';
-                const activeSets = item.sets.filter((x: any) => !x.is_skipped);
-                const maxWeight = (isCardio || isBodyweight) ? 0 : Math.max(...activeSets.map((x: any) => Number(x.weight) || 0));
-                const getBadgeColor = (set: any) => {
-                  if (isCardio || isBodyweight || maxWeight === 0) return colors.primary;
-                  const intensity = Math.min(1, (Number(set.weight) || 0) / maxWeight);
-                  const alpha = Math.round((0.3 + intensity * 0.7) * 255).toString(16).padStart(2, '0');
-                  return colors.primary + alpha;
-                };
-                return (
-                  <>
-                    <View style={[styles.tableHeader, { justifyContent: 'space-between', alignItems: 'center' }]}>
-                      <Text style={styles.tableHeaderText}>SETS</Text>
-                      {workoutStatus === 'active' && (
-                        <TouchableOpacity
-                          onPress={() => openSetModal(item)}
-                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                          <Ionicons name="add-circle" size={14} color={isDark ? colors.primary : '#FFF'} />
-                          <Text style={[styles.tableHeaderText, { color: isDark ? colors.primary : '#FFF' }]}>ADD SET</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    {item.sets.map((s: any) => (
-                      s.is_skipped ? (
-                        <View key={s.id} style={styles.setCard}>
-                          <View style={styles.setCardBody}>
-                            <View style={[styles.setCardBadge, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
-                              <Text style={[styles.setCardBadgeText, { color: '#EF4444' }]}>{s.set_number}</Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                              <Ionicons name="close" size={14} color="rgba(239,68,68,0.6)" />
-                              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 14, color: 'rgba(239,68,68,0.6)', letterSpacing: 0.5 }}>Skipped</Text>
-                            </View>
-                          </View>
-                        </View>
-                      ) : (
-                        <View key={s.id} style={styles.setCard}>
-                          <View style={styles.setCardBody}>
-                            <View style={[styles.setCardBadge, { backgroundColor: getBadgeColor(s) }]}>
-                              <Text style={styles.setCardBadgeText}>{s.set_number}</Text>
-                            </View>
-                            <View style={styles.setCardInfo}>
-                              <Text style={styles.setCardMainStat}>
-                                {isCardio
-                                  ? formatTime(s.duration_seconds || 0)
-                                  : isBodyweight
-                                    ? `${s.reps} reps`
-                                    : `${formatWeightValue(Number(s.weight), unitSystem)} ${weightUnit(unitSystem)} × ${s.reps} reps`
-                                }
-                              </Text>
-                              {!isCardio && (
-                                <Text style={styles.setCardSubStat}>{formatTime(s.duration_seconds || 0)}</Text>
-                              )}
-                            </View>
-                            {workoutStatus === 'active' && !isSkipped && (
-                              <TouchableOpacity onPress={() => openEditSet(s, item)} style={styles.setCardEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                                <Ionicons name="pencil" size={14} color="#FFF" />
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        </View>
-                      )
-                    ))}
-                  </>
-                );
-              })()}
-              </>
-          )}
-
-          {/* ── Rating pill — opens modal ── */}
-          {isDone && !isSkipped && (
-            <TouchableOpacity
-              style={[styles.ratingPill, { backgroundColor: isDark ? colors.inputBg : '#FEF3C7', borderColor: isDark ? colors.border : '#F5C842' }]}
-              onPress={() => onOpenRating(item.id)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="star" size={15} color={P.sun} />
-              <Text style={[styles.ratingPillTitle, { color: P.sun }]}>RATE THIS EXERCISE</Text>
-              {localRating ? (
-                <View style={[styles.ratingPillBadge, { backgroundColor: P.sun }]}>
-                  <Text style={[styles.ratingPillBadgeText, { color: isDark ? '#000' : '#FFF' }]}>{localRating}/10</Text>
+                  styles.catPill,
+                  { 
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9',
+                    paddingHorizontal: isSmallMobile ? 7 : 9,
+                  }
+                ]}>
+                  {item.category_image_url ? (
+                    <OptimizedImage
+                      uri={item.category_image_url}
+                      style={[styles.catPillThumb, { width: isSmallMobile ? 14 : 16, height: isSmallMobile ? 14 : 16 }]}
+                    />
+                  ) : (
+                    <Ionicons name="fitness-outline" size={12} color={isDark ? colors.primary : P.cta} />
+                  )}
+                  <Text
+                    style={[
+                      styles.catPillText,
+                      { color: isDark ? '#FFFFFF' : '#1E293B', fontSize: isSmallMobile ? 9 : 10 }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.category.toUpperCase()}
+                  </Text>
                 </View>
               ) : null}
-              <Ionicons name="chevron-forward" size={15} color={isDark ? colors.textMuted : '#92610A'} />
-            </TouchableOpacity>
-          )}
 
-          {/* Footer */}
-          <View style={styles.exFooter}>
-            {!isSkipped && workoutStatus === 'active' && (completedSets < targetSets || !isDone) && (
-              <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
-                <TouchableOpacity
-                  style={[styles.skipBtn, { borderColor: 'rgba(255,255,255,0.3)', opacity: loadingSkip ? 0.5 : 1 }]}
-                  onPress={() => handleSkipExercise(item.id)}
-                  disabled={loadingSkip}
-                >
-                  <Text style={styles.skipBtnText}>{loadingSkip ? '...' : 'SKIP'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.logSetBtn, { opacity: loadingLogSet ? 0.8 : 1, flex: 1 }]}
-                  onPress={() => openSetModal(item)}
-                  disabled={loadingLogSet}
-                >
-                  <View style={styles.logSetBtnGrad}>
-                    {loadingLogSet ? <ActivityIndicator size="small" color="#FFF" /> : (
-                      <>
-                        <Ionicons name={activeExerciseId === item.id && setTimer > 0 ? 'play' : 'add'} size={16} color="#FFF" />
-                        <Text style={styles.logSetBtnText}>
-                          {activeExerciseId === item.id && setTimerRunning ? 'CONTINUE SET' : `LOG SET ${completedSets + 1}`}
-                        </Text>
-                      </>
-                    )}
-                  </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={(e) => { e.stopPropagation(); removeExercise(item.id); }}
-                  style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)', justifyContent: 'center', alignItems: 'center' }}
-                >
-                  <Ionicons name="trash-outline" size={18} color="rgba(255,255,255,0.6)" />
-                </TouchableOpacity>
+              {item.equipment ? (
+                <View style={[
+                  styles.equipPill,
+                  { 
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
+                    maxWidth: isSmallMobile ? 105 : 130,
+                    paddingHorizontal: isSmallMobile ? 6 : 8,
+                  }
+                ]}>
+                  {item.equipment_image_url ? (
+                    <OptimizedImage
+                      uri={item.equipment_image_url}
+                      style={[styles.equipPillThumb, { width: isSmallMobile ? 13 : 14, height: isSmallMobile ? 13 : 14 }]}
+                    />
+                  ) : null}
+                  <Text
+                    style={[
+                      styles.equipPillText,
+                      { color: isDark ? colors.textMuted : '#64748B', fontSize: isSmallMobile ? 9 : 10 }
+                    ]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {item.equipment}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.topRightActions}>
+              {isDone && !isSkipped && (
+                <View style={[styles.statusPill, { backgroundColor: '#10B981', paddingHorizontal: isSmallMobile ? 6 : 8 }]}>
+                  <Ionicons name="checkmark-circle" size={11} color="#FFF" />
+                  <Text style={[styles.statusPillText, { fontSize: isSmallMobile ? 8.5 : 9 }]}>DONE</Text>
+                </View>
+              )}
+              {isActive && !isDone && !isSkipped && (
+                <View style={[styles.statusPill, { backgroundColor: P.cta, paddingHorizontal: isSmallMobile ? 6 : 8 }]}>
+                  <Ionicons name="flash" size={11} color="#FFF" />
+                  <Text style={[styles.statusPillText, { fontSize: isSmallMobile ? 8.5 : 9 }]}>ACTIVE</Text>
+                </View>
+              )}
+              {isPending && !isActive && !isSkipped && (
+                <View style={[styles.statusPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0', paddingHorizontal: isSmallMobile ? 6 : 8 }]}>
+                  <Ionicons name="hourglass-outline" size={11} color={isDark ? colors.textMuted : '#64748B'} />
+                  <Text style={[styles.statusPillText, { color: isDark ? colors.textMuted : '#64748B', fontSize: isSmallMobile ? 8.5 : 9 }]}>PENDING</Text>
+                </View>
+              )}
+              {isSkipped && (
+                <View style={[styles.statusPill, { backgroundColor: isDark ? '#334155' : '#CBD5E1', paddingHorizontal: isSmallMobile ? 6 : 8 }]}>
+                  <Text style={[styles.statusPillText, { color: isDark ? '#94A3B8' : '#475569', fontSize: isSmallMobile ? 8.5 : 9 }]}>SKIPPED</Text>
+                </View>
+              )}
+
+              <View style={[
+                styles.chevronWrap,
+                { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }
+              ]}>
+                <Ionicons
+                  name={expanded ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  color={isDark ? '#FFFFFF' : '#64748B'}
+                />
               </View>
-            )}
+            </View>
           </View>
-        </>
-      )}
-    </View>
+
+          {/* Main content row: Exercise Image + Name & Progress */}
+          <View style={[styles.mainContentRow, { gap: isSmallMobile ? 10 : 14 }]}>
+            {/* Exercise thumbnail / GIF with guide hint */}
+            <TouchableOpacity
+              onPress={(e) => { e.stopPropagation(); openGuide(item); }}
+              activeOpacity={0.8}
+              style={[
+                styles.exImageWrap,
+                {
+                  width: imageSize,
+                  height: imageSize,
+                }
+              ]}
+            >
+              <OptimizedImage uri={item.gif_url || item.image_url} style={styles.exImage} />
+              <View style={styles.guidePlayHint}>
+                <Ionicons name="play" size={10} color="#FFF" />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.exTitleCol}>
+              {/* Exercise Name with ellipsis if large */}
+              <Text
+                style={[
+                  styles.exName,
+                  { 
+                    color: isDark ? '#FFFFFF' : '#0F172A',
+                    fontSize: isSmallMobile ? 15 : 16,
+                  }
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {item.name}
+              </Text>
+
+              {/* Target info */}
+              <Text
+                style={[
+                  styles.targetSubText,
+                  { 
+                    color: isDark ? colors.textMuted : '#64748B',
+                    fontSize: isSmallMobile ? 10.5 : 11.5,
+                  }
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                Target: {targetSets} sets • {item.target_reps || '10-12'} reps
+              </Text>
+
+              {/* Progress bar / set summary */}
+              {item.category?.toLowerCase() === 'cardio' ? (
+                <View style={styles.headerProgressWrap}>
+                  <Ionicons name="time-outline" size={13} color={isDark ? colors.textMuted : '#64748B'} />
+                  <Text
+                    style={[
+                      styles.headerProgressLabel,
+                      { color: isDark ? colors.textMuted : '#64748B', fontSize: isSmallMobile ? 10 : 11 }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {formatTime(item.sets?.reduce((acc: number, s: any) => acc + (s.duration_seconds || 0), 0) || 0)} logged
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.headerProgressWrap}>
+                  <View style={[styles.headerProgressBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0' }]}>
+                    <View style={[
+                      styles.headerProgressFill,
+                      {
+                        width: `${Math.min((completedSets / targetSets) * 100, 100)}%` as any,
+                        backgroundColor: isDone ? '#10B981' : (isActive ? P.cta : (isDark ? colors.primary : '#3B82F6')),
+                      },
+                    ]} />
+                  </View>
+                  <Text
+                    style={[
+                      styles.headerProgressLabel,
+                      { color: isDark ? colors.textMuted : '#64748B', fontSize: isSmallMobile ? 10 : 11 }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {completedSets}/{targetSets} sets
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* ── ACCORDION BODY ── */}
+        {expanded && (
+          <View style={styles.accordionBody}>
+            {/* Sets Header */}
+            {item.sets && item.sets.length > 0 && (
+              <>
+                {(() => {
+                  const isCardio = item.category?.toLowerCase() === 'cardio';
+                  const isBodyweight = item.equipment?.toLowerCase() === 'body weight';
+                  const activeSets = item.sets.filter((x: any) => !x.is_skipped);
+                  const maxWeight = (isCardio || isBodyweight) ? 0 : Math.max(...activeSets.map((x: any) => Number(x.weight) || 0));
+                  const getBadgeColor = (set: any) => {
+                    if (isCardio || isBodyweight || maxWeight === 0) return isDark ? colors.primary : P.cta;
+                    return isDark ? colors.primary : P.cta;
+                  };
+
+                  return (
+                    <>
+                      <View style={[styles.tableHeader, { justifyContent: 'space-between', alignItems: 'center', borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}>
+                        <Text style={[styles.tableHeaderText, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>SETS</Text>
+                        {workoutStatus === 'active' && (
+                          <TouchableOpacity
+                            onPress={() => openSetModal(item)}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <Ionicons name="add-circle" size={14} color={isDark ? colors.primary : P.cta} />
+                            <Text style={[styles.tableHeaderText, { color: isDark ? colors.primary : P.cta }]}>ADD SET</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Clean Set Rows without SwipeableRow */}
+                      {item.sets.map((s: any) => (
+                        s.is_skipped ? (
+                          <View
+                            key={s.id}
+                            style={[
+                              styles.setCard,
+                              {
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8FAFC',
+                                borderColor: isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0',
+                              }
+                            ]}
+                          >
+                            <View style={styles.setCardBody}>
+                              <View style={[styles.setCardBadge, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
+                                <Text style={[styles.setCardBadgeText, { color: '#EF4444' }]}>{s.set_number}</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                                <Ionicons name="close" size={14} color="rgba(239,68,68,0.6)" />
+                                <Text style={[styles.setCardSkippedLabel, { color: 'rgba(239,68,68,0.6)' }]}>Skipped</Text>
+                              </View>
+                              {workoutStatus === 'active' && (
+                                <TouchableOpacity
+                                  onPress={() => removeSet(s.id)}
+                                  style={[styles.setCardEdit, { backgroundColor: isDark ? 'rgba(239,68,68,0.15)' : '#FEE2E2' }]}
+                                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                  <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </View>
+                        ) : (
+                          <View
+                            key={s.id}
+                            style={[
+                              styles.setCard,
+                              {
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8FAFC',
+                                borderColor: isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0',
+                              }
+                            ]}
+                          >
+                            <View style={styles.setCardBody}>
+                              <View style={[styles.setCardBadge, { backgroundColor: getBadgeColor(s) }]}>
+                                <Text style={styles.setCardBadgeText}>{s.set_number}</Text>
+                              </View>
+                              <View style={styles.setCardInfo}>
+                                <Text style={[styles.setCardMainStat, { color: isDark ? '#FFF' : '#0F172A' }]}>
+                                  {isCardio
+                                    ? formatTime(s.duration_seconds || 0)
+                                    : isBodyweight
+                                      ? `${s.reps} reps`
+                                      : `${formatWeightValue(Number(s.weight), unitSystem)} ${weightUnit(unitSystem)} × ${s.reps} reps`
+                                  }
+                                </Text>
+                                {!isCardio && (
+                                  <Text style={[styles.setCardSubStat, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>
+                                    {formatTime(s.duration_seconds || 0)}
+                                  </Text>
+                                )}
+                              </View>
+                              {workoutStatus === 'active' && !isSkipped && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <TouchableOpacity
+                                    onPress={() => openEditSet(s, item)}
+                                    style={[styles.setCardEdit, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0' }]}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                  >
+                                    <Ionicons name="pencil" size={14} color={isDark ? '#FFF' : '#334155'} />
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    onPress={() => removeSet(s.id)}
+                                    style={[styles.setCardEdit, { backgroundColor: isDark ? 'rgba(239,68,68,0.15)' : '#FEE2E2' }]}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                  >
+                                    <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                                  </TouchableOpacity>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        )
+                      ))}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+
+            {/* Rating pill — opens modal */}
+            {isDone && !isSkipped && (
+              <TouchableOpacity
+                style={[
+                  styles.ratingPill,
+                  {
+                    backgroundColor: isDark ? colors.inputBg : '#FEF3C7',
+                    paddingHorizontal: isSmallMobile ? 12 : 16,
+                  }
+                ]}
+                onPress={() => onOpenRating(item.id)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="star" size={14} color={P.sun} />
+                <Text
+                  style={[
+                    styles.ratingPillTitle,
+                    { color: P.sun, fontSize: isSmallMobile ? 11 : 12 }
+                  ]}
+                  numberOfLines={1}
+                >
+                  RATE THIS EXERCISE
+                </Text>
+                {localRating ? (
+                  <View style={[styles.ratingPillBadge, { backgroundColor: P.sun }]}>
+                    <Text style={[styles.ratingPillBadgeText, { color: isDark ? '#000' : '#FFF' }]}>{localRating}/10</Text>
+                  </View>
+                ) : null}
+                <Ionicons name="chevron-forward" size={14} color={isDark ? colors.textMuted : '#92610A'} />
+              </TouchableOpacity>
+            )}
+
+            {/* Footer */}
+            <View style={styles.exFooter}>
+              {!isSkipped && workoutStatus === 'active' && (completedSets < targetSets || !isDone) && (
+                <View style={styles.footerButtonsRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.skipBtn,
+                      {
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8FAFC',
+                        opacity: loadingSkip ? 0.5 : 1,
+                        paddingHorizontal: isSmallMobile ? 10 : 13,
+                      }
+                    ]}
+                    onPress={() => handleSkipExercise(item.id)}
+                    disabled={loadingSkip}
+                  >
+                    <Ionicons name="play-skip-forward-outline" size={13} color={isDark ? colors.textMuted : '#64748B'} />
+                    <Text
+                      style={[
+                        styles.skipBtnText,
+                        { color: isDark ? colors.textMuted : '#64748B', fontSize: isSmallMobile ? 10.5 : 11 }
+                      ]}
+                    >
+                      {loadingSkip ? '...' : 'SKIP'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.logSetBtn, { opacity: loadingLogSet ? 0.8 : 1 }]}
+                    onPress={() => openSetModal(item)}
+                    disabled={loadingLogSet}
+                  >
+                    <LinearGradient
+                      colors={isActive ? [P.sun, P.sunDeep] : [P.cta, P.ctaDark]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[styles.logSetBtnGrad, { paddingHorizontal: isSmallMobile ? 10 : 14 }]}
+                    >
+                      {loadingLogSet ? <ActivityIndicator size="small" color={isActive ? '#000' : '#FFF'} /> : (
+                        <>
+                          <Ionicons
+                            name={activeExerciseId === item.id && setTimer > 0 ? 'play' : 'add-circle'}
+                            size={15}
+                            color={isActive ? '#000' : '#FFF'}
+                          />
+                          <Text
+                            style={[
+                              styles.logSetBtnText,
+                              { 
+                                color: isActive ? '#000' : '#FFF',
+                                fontSize: isSmallMobile ? 12 : 13,
+                              }
+                            ]}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            {activeExerciseId === item.id && setTimerRunning
+                              ? (isSmallMobile ? 'CONTINUE' : 'CONTINUE SET')
+                              : `LOG SET ${completedSets + 1}`}
+                          </Text>
+                        </>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={(e) => { e.stopPropagation(); removeExercise(item.id); }}
+                    style={[
+                      styles.cardTrashBtn,
+                      {
+                        backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : '#FEE2E2',
+                      }
+                    ]}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+      </View>
+    </SwipeableRow>
   );
 });
 
@@ -1356,12 +1609,12 @@ export default function ActiveWorkoutScreen() {
 
 const styles = StyleSheet.create({
   container:       { flex: 1 },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 12, marginBottom: 8 },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, marginBottom: 8 },
   finishBtn:       { backgroundColor: P.cta, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
   finishBtnText:   { fontFamily: FONTS.bodyBold, fontSize: 13, color: '#FFF', letterSpacing: 1 },
 
   // Dashboard
-  dashboardRow:    { paddingHorizontal: 20, marginBottom: 24 },
+  dashboardRow:    { paddingHorizontal: 16, marginBottom: 20 },
   dashboardPill:   { flexDirection: 'row', alignItems: 'center', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, elevation: 4, shadowColor: P.ctaDeep, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 10, backgroundColor: P.cta, borderColor: P.ctaDark },
   dashSegment:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
   dashIconBox:     { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
@@ -1372,62 +1625,86 @@ const styles = StyleSheet.create({
   skipRestBtn:     { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
   // List
-  listContent:     { paddingHorizontal: 20, paddingBottom: 40 },
-  listHeader:      { marginBottom: 20 },
+  listContent:     { paddingHorizontal: 16, paddingBottom: 40 },
+  listHeader:      { marginBottom: 18 },
   workoutTitle:    { fontFamily: FONTS.heading, fontSize: 20, marginBottom: 6 },
   progressRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   progressText:    { fontFamily: FONTS.body, fontSize: 13 },
   progressPercent: { fontFamily: FONTS.heading, fontSize: 16 },
   progressBar:     { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressFill:    { height: '100%', backgroundColor: P.cta, borderRadius: 3 },
-  statusPill:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  statusPill:      { flexDirection: 'row', alignItems: 'center', gap: 3.5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, flexShrink: 0 },
   statusPillText:  { fontFamily: FONTS.bodyBold, fontSize: 9, color: '#FFF', letterSpacing: 0.5 },
 
-  // Exercise card
-  exCard:          { borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1.5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 4, overflow: 'hidden' },
-  exHeader:        { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 0, gap: 20 },
-  exImage:         { width: 88, height: 88, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)' },
-  // ── 3. Name wraps ──
-  exName:          { fontFamily: FONTS.heading, fontSize: 20, marginBottom: 8, color: P.sun, flexShrink: 1, letterSpacing: 0.3 },
-  // ── 4. Header progress ──
-  headerProgressWrap:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
-  headerProgressBar:   { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
+  // Exercise card (3D floating effect, no borders, mobile-first responsive)
+  exCardWrapper:          { marginBottom: 16, borderRadius: 22 },
+  cardFloatingDark:       { shadowColor: '#000000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.95, shadowRadius: 20, elevation: 12 },
+  cardFloatingLight:      { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.14, shadowRadius: 22, elevation: 10 },
+  cardActiveFloatingDark: { shadowColor: P.cta, shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.7, shadowRadius: 24, elevation: 16 },
+  cardActiveFloatingLight:{ shadowColor: P.cta, shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.4, shadowRadius: 24, elevation: 14 },
+
+  exCard:              { borderRadius: 22, overflow: 'hidden' },
+  exHeader:            { flexDirection: 'column', gap: 10 },
+  topMetaRow:          { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', gap: 8 },
+  catEquipWrap:        { flexDirection: 'row', alignItems: 'center', gap: 6, rowGap: 4, flex: 1, minWidth: 0, flexWrap: 'wrap' },
+  topRightActions:     { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0, alignSelf: 'flex-start' },
+  catPill:             { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, borderRadius: 8, flexShrink: 0 },
+  catPillThumb:        { borderRadius: 4 },
+  catPillText:         { fontFamily: FONTS.bodyBold, letterSpacing: 0.5 },
+  equipPill:           { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, borderRadius: 8, flexShrink: 1 },
+  equipPillThumb:      { borderRadius: 3 },
+  equipPillText:       { fontFamily: FONTS.body },
+
+  mainContentRow:      { flexDirection: 'row', alignItems: 'center', width: '100%' },
+  exImageWrap:         { borderRadius: 15, overflow: 'hidden', position: 'relative', flexShrink: 0 },
+  exImage:             { width: '100%', height: '100%', borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.08)' },
+  guidePlayHint:       { position: 'absolute', bottom: 4, right: 4, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center' },
+  exTitleCol:          { flex: 1, minWidth: 0, justifyContent: 'center' },
+  exName:              { fontFamily: FONTS.bodyBold, letterSpacing: 0.1, marginBottom: 2, flexShrink: 1 },
+  targetSubText:       { fontFamily: FONTS.body, marginBottom: 5, flexShrink: 1 },
+  headerProgressWrap:  { flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%' },
+  headerProgressBar:   { flex: 1, height: 5, borderRadius: 3, overflow: 'hidden', minWidth: 35 },
   headerProgressFill:  { height: '100%', borderRadius: 3 },
-  headerProgressLabel: { fontFamily: FONTS.bodyBold, fontSize: 11, color: 'rgba(255,255,255,0.72)', minWidth: 48 },
+  headerProgressLabel: { fontFamily: FONTS.bodyBold, flexShrink: 0 },
+  chevronWrap:         { width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  accordionBody:       { marginTop: 12, paddingTop: 12 },
 
-  tableHeader:       { flexDirection: 'row', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
-  tableHeaderText:   { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 0.5, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' },
-  // ── 5. Set cards ──
-  setCard:           { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, marginBottom: 10, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  setCardBody:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 14 },
-  setCardBadge:      { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  setCardBadgeText:  { fontFamily: FONTS.bodyBold, fontSize: 13, color: '#FFF' },
+  tableHeader:         { flexDirection: 'row', marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
+  tableHeaderText:     { fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 0.5, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' },
 
-  setCardInfo:       { flex: 1 },
-  setCardMainStat:   { fontFamily: FONTS.heading, fontSize: 16, color: '#FFF' },
-  setCardSubStat:    { fontFamily: FONTS.body, fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
-  setCardSkippedLabel:{ fontFamily: FONTS.bodyBold, fontSize: 14, color: 'rgba(255,255,255,0.35)', letterSpacing: 0.5 },
-  setCardEdit:       { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', marginTop: 2 },
+  // ── Set cards (clean old design, no swipe delete) ──
+  setCard:             { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, marginBottom: 10, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  setCardBody:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 14 },
+  setCardBadge:        { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  setCardBadgeText:    { fontFamily: FONTS.bodyBold, fontSize: 13, color: '#FFF' },
 
-  // ── Rating pill ──
-  ratingPill:           { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 14, marginTop: 10, marginBottom: 14, borderWidth: 1 },
-  ratingPillTitle:      { flex: 1, fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 0.8 },
-  ratingPillBadge:      { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
-  ratingPillBadgeText:  { fontFamily: FONTS.bodyBold, fontSize: 11 },
+  setCardInfo:         { flex: 1 },
+  setCardMainStat:     { fontFamily: FONTS.heading, fontSize: 16, color: '#FFF' },
+  setCardSubStat:      { fontFamily: FONTS.body, fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  setCardSkippedLabel: { fontFamily: FONTS.bodyBold, fontSize: 14, color: 'rgba(255,255,255,0.35)', letterSpacing: 0.5 },
+  setCardEdit:         { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
+
+  // Rating pill
+  ratingPill:          { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderRadius: 14, marginTop: 10, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 5, elevation: 2 },
+  ratingPillTitle:     { flex: 1, fontFamily: FONTS.bodyBold, letterSpacing: 0.7 },
+  ratingPillBadge:     { borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, flexShrink: 0 },
+  ratingPillBadgeText: { fontFamily: FONTS.bodyBold, fontSize: 10.5 },
 
   // Footer
-  exFooter:          { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
-  skipLabel:         { fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 1, color: 'rgba(255,255,255,0.72)' },
-  skipBtn:           { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, justifyContent: 'center' },
-  skipBtnText:       { fontFamily: FONTS.bodyBold, fontSize: 11, color: 'rgba(255,255,255,0.78)' },
-  logSetBtn:         { borderRadius: 12, overflow: 'hidden' },
-  logSetBtnGrad:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: P.ctaDark },
-  logSetBtnText:     { fontFamily: FONTS.bodyBold, fontSize: 13, color: '#FFF' },
+  exFooter:            { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  footerButtonsRow:    { flexDirection: 'row', gap: 8, flex: 1, alignItems: 'center', width: '100%' },
+  skipLabel:           { fontFamily: FONTS.bodyBold, fontSize: 12, letterSpacing: 1, color: 'rgba(255,255,255,0.72)' },
+  skipBtn:             { flexDirection: 'row', alignItems: 'center', gap: 4, height: 44, borderRadius: 12, justifyContent: 'center', flexShrink: 0 },
+  skipBtnText:         { fontFamily: FONTS.bodyBold },
+  logSetBtn:           { borderRadius: 12, overflow: 'hidden', height: 44, flex: 1, minWidth: 0 },
+  logSetBtnGrad:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: '100%' },
+  logSetBtnText:       { fontFamily: FONTS.bodyBold, color: '#FFF' },
+  cardTrashBtn:        { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
 
   // Footer add button
   footerContainer:   { gap: 20, marginTop: 10, marginBottom: 40 },
-  addExFooterBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 20, borderStyle: 'dashed', borderWidth: 1.5, borderRadius: 20, marginTop: 10, marginBottom: 40 },
-  addExFooterText:   { fontFamily: FONTS.bodyBold, fontSize: 14, letterSpacing: 0.5 },
+  addExFooterBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16, borderStyle: 'dashed', borderWidth: 1.5, borderRadius: 18, marginTop: 8, marginBottom: 40 },
+  addExFooterText:   { fontFamily: FONTS.bodyBold, fontSize: 13.5, letterSpacing: 0.5 },
 
   // Photos
   sectionHeader:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },

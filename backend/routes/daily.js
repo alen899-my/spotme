@@ -423,6 +423,7 @@ router.get('/workouts/:id', authenticateToken, async (req, res) => {
 
     const exercises = await pool.query(
       `SELECT dwe.*, e.name, e.image_url, e.gif_url, e.instructions_en, e.target, e.equipment, e.category,
+              e.category_image_url, e.body_part_image_url, e.equipment_image_url,
               e.avg_rating::float8 AS rating, e.rating_count
        FROM daily_workout_exercises dwe
        JOIN exercises e ON dwe.exercise_id = e.id
