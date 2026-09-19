@@ -12,7 +12,6 @@ import {
   NativeScrollEvent,
   Platform,
   Alert,
-  Linking,
 } from "react-native";
 import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -26,13 +25,10 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { useUnits } from "../../contexts/UnitContext";
 import { FONTS } from "../../constants/theme";
 import { API_URL } from "../../utils/api";
+import { APP_VERSION, APP_VERSION_CODE } from "../../utils/appVersion";
 import ActionModal from "../../components/ui/ActionModal";
 
 const ITEM_H = 44;
-
-// ── App update check (matches android.versionCode in app.json — bump together) ──
-const APP_VERSION = "1.0.4";
-const APP_VERSION_CODE = 1;
 
 interface UpdateInfo {
   update_available: boolean;
@@ -414,17 +410,8 @@ export default function SettingsScreen() {
     }
   };
 
-  const openBuildDownload = async (url: string) => {
-    try {
-      const supported = await Linking.canOpenURL(url);
-      if (!supported) {
-        setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Cannot open download link on this device.' });
-        return;
-      }
-      await Linking.openURL(url);
-    } catch {
-      setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Failed to open download link.' });
-    }
+  const openUpdateScreen = () => {
+    router.push("/profile/app-update");
   };
 
   const togglePrivacy = async (value: boolean) => {
@@ -751,7 +738,7 @@ export default function SettingsScreen() {
 
         <Text style={[sectionStyles.label, { color: colors.textDim }]}>ABOUT</Text>
         <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[cardStyles.row, { borderBottomWidth: updateInfo?.build ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border }]}>
+          <View style={[cardStyles.row, { borderBottomWidth: Platform.OS === 'android' ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border }]}>
             <View style={cardStyles.left}>
               <Ionicons name="information-circle-outline" size={20} color={colors.textDim} style={{ width: 28 }} />
               <Text style={[cardStyles.title, { color: colors.text }]}>SpotMe v{APP_VERSION}</Text>
@@ -759,33 +746,42 @@ export default function SettingsScreen() {
             <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim }}>Beta</Text>
           </View>
 
-          {updateInfo?.build && (
+          {/* Always visible on Android — opens the Latest Update screen.
+              When there is nothing to show, the row stays neutral and the
+              screen itself renders its empty state. */}
+          {Platform.OS === 'android' && (
             <TouchableOpacity
-              onPress={() => openBuildDownload(updateInfo.build!.file_url)}
+              onPress={openUpdateScreen}
               activeOpacity={0.6}
             >
               <View style={[cardStyles.row, { borderBottomWidth: 0 }]}>
                 <View style={cardStyles.left}>
                   <Ionicons
-                    name={updateInfo.update_available ? "cloud-download-outline" : "checkmark-circle-outline"}
+                    name={!updateInfo?.build
+                      ? "cloud-download-outline"
+                      : updateInfo.update_available
+                        ? "cloud-download-outline"
+                        : "checkmark-circle-outline"}
                     size={20}
-                    color={updateInfo.update_available && updateInfo.force_update ? "#FF4444" : colors.textMuted}
+                    color={updateInfo?.update_available && updateInfo?.force_update ? "#FF4444" : colors.textMuted}
                     style={{ width: 28 }}
                   />
                   <View style={{ flex: 1 }}>
                     <Text style={[cardStyles.title, { color: colors.text }]}>App Update</Text>
                     <Text style={[cardStyles.subtitle, {
-                      color: updateInfo.update_available && updateInfo.force_update ? "#FF4444" : colors.textDim,
+                      color: updateInfo?.update_available && updateInfo?.force_update ? "#FF4444" : colors.textDim,
                     }]}>
-                      {updateInfo.update_available
-                        ? (updateInfo.force_update
-                            ? `Update required · v${updateInfo.build.version ?? "?"} available`
-                            : `v${updateInfo.build.version ?? "?"} available — tap to download`)
-                        : "You're up to date"}
+                      {!updateInfo?.build
+                        ? "Check latest version"
+                        : updateInfo.update_available
+                          ? (updateInfo.force_update
+                              ? `Update required · v${updateInfo.build.version ?? "?"} available`
+                              : `v${updateInfo.build.version ?? "?"} available — tap to view`)
+                          : "You're up to date"}
                     </Text>
                   </View>
                 </View>
-                {updateInfo.update_available ? (
+                {updateInfo?.update_available ? (
                   <View style={{
                     backgroundColor: updateInfo.force_update ? "#FF4444" : colors.primary,
                     borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7,
