@@ -4,24 +4,26 @@ const cors = require('cors');
 const { initDB } = require('./db');
 
 const isProduction = process.env.NODE_ENV === 'production';
-const authRoutes = require('./routes/auth');
-const onboardingRoutes = require('./routes/onboarding');
-const profileRoutes = require('./routes/profile');
-const exercisesRoutes = require('./routes/exercises');
-const workoutRoutes = require('./routes/workouts');
-const dailyRoutes = require('./routes/daily');
-const mealsRoutes = require('./routes/meals');
-const waterRoutes = require('./routes/water');
-const leaderboardRoutes = require('./routes/leaderboard');
-const weightRoutes = require('./routes/weight');
-const notificationRoutes = require('./routes/notifications');
-const physiqueRoutes = require('./routes/physique');
-const adminRoutes = require('./routes/admin');
-const imagesRoutes = require('./routes/images');
-const feedbackRoutes = require('./routes/feedback');
-const fileReplacerRoutes = require('./routes/file-replacer');
-const aiRoutes = require('./routes/ai');
-const updatesRoutes = require('./routes/updates');
+
+// Feature Routes
+const authRoutes = require('./features/auth/auth.routes');
+const onboardingRoutes = require('./features/onboarding/onboarding.routes');
+const profileRoutes = require('./features/profile/profile.routes');
+const exercisesRoutes = require('./features/exercises/exercises.routes');
+const workoutRoutes = require('./features/workouts/workouts.routes');
+const dailyRoutes = require('./features/daily/daily.routes');
+const mealsRoutes = require('./features/meals/meals.routes');
+const waterRoutes = require('./features/water/water.routes');
+const leaderboardRoutes = require('./features/leaderboard/leaderboard.routes');
+const weightRoutes = require('./features/weight/weight.routes');
+const notificationRoutes = require('./features/notifications/notifications.routes');
+const physiqueRoutes = require('./features/physique/physique.routes');
+const adminRoutes = require('./features/admin/admin.routes');
+const imagesRoutes = require('./features/images/images.routes');
+const feedbackRoutes = require('./features/feedback/feedback.routes');
+const fileReplacerRoutes = require('./features/file-replacer/file-replacer.routes');
+const aiRoutes = require('./features/ai/ai.routes');
+const updatesRoutes = require('./features/updates/updates.routes');
 
 const app = express();
 

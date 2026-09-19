@@ -1,15 +1,6 @@
 /**
  * utils/cache.js
  * Lightweight in-memory TTL cache for route-level caching.
- *
- * Usage:
- *   const { TTLCache } = require('../utils/cache');
- *   const cache = new TTLCache(10_000); // 10s default TTL
- *
- *   const hit = cache.get('my-key');
- *   if (hit) return res.json(hit);
- *   // ... fetch data ...
- *   cache.set('my-key', data);
  */
 
 class TTLCache {
@@ -48,4 +39,16 @@ class TTLCache {
   }
 }
 
-module.exports = { TTLCache };
+// Global leaderboard cache instance
+const lbCache = new TTLCache(10_000);
+
+function invalidateLeaderboardCache() {
+  lbCache.clear();
+  console.log('[lbCache] invalidated');
+}
+
+module.exports = {
+  TTLCache,
+  lbCache,
+  invalidateLeaderboardCache,
+};
