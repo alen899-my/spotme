@@ -198,8 +198,10 @@ export default function WorkoutCompleteScreen() {
       });
       setWorkout(response.data);
       if (response.data.post_workout_weight) setWeight(String(response.data.post_workout_weight));
-      if (response.data.streak_at_completion > 0) {
-        setNewStreak(response.data.streak_at_completion);
+      // Only show streak overlay on the first load (not re-fetch), and only if workout just completed
+      const streakVal = response.data.streak_at_completion ?? response.data.new_streak;
+      if (streakVal >= 1) {
+        setNewStreak(streakVal);
       }
     } catch (err) {
       console.error('Error fetching workout summary:', err);
@@ -312,9 +314,15 @@ export default function WorkoutCompleteScreen() {
         })).catch(() => {});
       }
 
-      if (completeRes.data.new_streak !== undefined) {
-        setNewStreak(completeRes.data.new_streak);
-        if (completeRes.data.new_streak > 0) setShowStreakOverlay(true);
+      const rawStreak = completeRes.data.new_streak;
+      if (rawStreak !== undefined && rawStreak !== null) {
+        const streakNum = Number(rawStreak);
+        setNewStreak(streakNum);
+        if (streakNum >= 1) {
+          setShowStreakOverlay(true);
+          // Auto-dismiss after 3.5 s
+          setTimeout(() => setShowStreakOverlay(false), 3500);
+        }
       }
 
       showToast('Workout finalized! Great job! 🏆');
@@ -327,7 +335,7 @@ export default function WorkoutCompleteScreen() {
             headers: { Authorization: `Bearer ${token}` }
           }).catch(() => {});
         }, 3000);
-      }, completeRes.data.new_streak > 0 ? 3500 : 1500);
+      }, 1500);
     } catch (err: any) {
       console.error('Error saving final metrics:', err);
       showToast(err.response?.data?.error || 'Failed to update metrics', 'error');
@@ -646,15 +654,24 @@ export default function WorkoutCompleteScreen() {
       </View>
 
       {/* ═══ STREAK OVERLAY ═══ */}
-      {showStreakOverlay && (
-        <View style={st.streakOverlay}>
-          <LinearGradient colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.95)']} style={StyleSheet.absoluteFill} />
+      {showStreakOverlay && newStreak !== null && newStreak >= 1 && (
+        <TouchableOpacity
+          activeOpacity={1}
+          style={st.streakOverlay}
+          onPress={() => setShowStreakOverlay(false)}
+        >
+          <LinearGradient colors={['rgba(0,0,0,0.82)', 'rgba(0,0,0,0.96)']} style={StyleSheet.absoluteFill} />
           <Animated.View style={st.streakPopup}>
-            <StreakIcon streak={newStreak || 0} size={s(120)} />
+            <StreakIcon streak={newStreak} size={s(120)} />
             <Text style={[st.streakPopupTitle, { fontSize: fs(34) }]}>STREAK UP!</Text>
-            <Text style={[st.streakPopupSub, { fontSize: fs(15) }]}>Consistency is key. Keep it up!</Text>
+            <Text style={[st.streakPopupSub, { fontSize: fs(15) }]}>
+              {newStreak} day streak — consistency is key!
+            </Text>
+            <Text style={[st.streakPopupSub, { fontSize: fs(12), marginTop: vs(8), opacity: 0.55 }]}>
+              Tap anywhere to continue
+            </Text>
           </Animated.View>
-        </View>
+        </TouchableOpacity>
       )}
     </View>
   );
