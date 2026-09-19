@@ -1,12 +1,12 @@
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useRef, useMemo, memo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   Animated,
   Easing,
-  Image,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import AppImageBackground from "./AppImageBackground";
 import { FONTS } from "../../constants/theme";
 import { scale, vs } from "../../constants/homeTheme";
@@ -70,7 +70,7 @@ interface GreetingCardProps {
 
 const CARD_HEIGHT = vs(120);
 
-export default function GreetingCard({ firstName }: GreetingCardProps) {
+function GreetingCard({ firstName }: GreetingCardProps) {
   const { isDark } = useTheme();
   const hour = new Date().getHours();
   const slot = useMemo(() => getSlot(hour), [hour]);
@@ -117,10 +117,12 @@ export default function GreetingCard({ firstName }: GreetingCardProps) {
       />
       <View style={[StyleSheet.absoluteFill, styles.imageOverlay]} />
 
-      <Image
+      <ExpoImage
         source={coachImage}
         style={styles.coachImage}
-        resizeMode="contain"
+        contentFit="contain"
+        cachePolicy="memory-disk"
+        allowDownscaling={true}
       />
 
       <View style={styles.content}>
@@ -215,3 +217,5 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 });
+
+export default memo(GreetingCard);

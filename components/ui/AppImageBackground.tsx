@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle, ImageStyle } from 'react-native';
 import { Image, type ImageProps } from 'expo-image';
 
@@ -17,7 +17,7 @@ export interface AppImageBackgroundProps {
  * blows up to natural image dimensions (e.g. 1920x1080) or collapses to 0 height on web,
  * while maintaining 100% native performance on Android and iOS.
  */
-export default function AppImageBackground({
+function AppImageBackground({
   source,
   style,
   imageStyle,
@@ -50,7 +50,8 @@ export default function AppImageBackground({
           imageStyle,
         ]}
         contentFit={contentFit}
-        cachePolicy="disk"
+        cachePolicy="memory-disk"
+        allowDownscaling={true}
       />
       {children}
     </View>
@@ -66,3 +67,5 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 });
+
+export default memo(AppImageBackground);

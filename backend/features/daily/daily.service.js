@@ -594,6 +594,7 @@ async function buildDashboardData(userId) {
 
   const topExerciseRes = await pool.query(
     `SELECT e.id AS exercise_id, e.name AS exercise_name, e.target, e.category, e.image_url, e.gif_url, e.equipment,
+            e.category_image_url, e.equipment_image_url,
             e.avg_rating::float8 AS rating
      FROM exercises e
      WHERE e.rating_count > 0

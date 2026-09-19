@@ -40,6 +40,8 @@ const foodBg    = require("../assets/coach/foodlog.jpg");
 
 
 
+
+
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
@@ -94,24 +96,18 @@ export default function HomeScreen() {
 
   useFocusEffect(useCallback(() => { fetchDashboard(); }, []));
 
-  const { isWorkoutActive, activeWorkoutId, workoutElapsed } = useWorkoutTimer();
-  const [apiActiveWorkout, setApiActiveWorkout] = useState<any>(null);
-  const resumeWorkout = isWorkoutActive || apiActiveWorkout;
-
-  // Also check API for active workouts (handles app restart where context is lost)
-  useEffect(() => {
-    if (isWorkoutActive) return;
-    (async () => {
-      try {
-        const token = await getToken();
-        const res = await api.get('/daily/workouts', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const active = res.data.workouts.find((w: any) => w.status === 'active');
-        setApiActiveWorkout(active || null);
-      } catch {}
-    })();
-  }, [isWorkoutActive]);
+  const handleWaterLogged = useCallback((amount: number) => {
+    setDashboard((prev: any) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        today: {
+          ...prev.today,
+          water_ml: (prev.today.water_ml || 0) + amount,
+        },
+      };
+    });
+  }, []);
 
   if (loading) {
     return <HomeSkeleton />;
@@ -162,6 +158,8 @@ export default function HomeScreen() {
     >
       {/* ── Greeting ─────────────────────────────────────────────────────── */}
       <GreetingCard firstName={firstName} />
+
+    
 
       {/* ── Profile Incomplete Banner ────────────────────────────────────── */}
       {!isProfileComplete && (
@@ -251,18 +249,7 @@ export default function HomeScreen() {
           <HydrationCard
             waterMl={today.water_ml || 0}
             onLogWaterPress={() => router.push("/(tabs)/meals")}
-            onWaterLogged={(amount: number) => {
-              setDashboard((prev: any) => {
-                if (!prev) return prev;
-                return {
-                  ...prev,
-                  today: {
-                    ...prev.today,
-                    water_ml: (prev.today.water_ml || 0) + amount,
-                  },
-                };
-              });
-            }}
+            onWaterLogged={handleWaterLogged}
           />
 
          
@@ -280,16 +267,30 @@ export default function HomeScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingRight: 16, gap: 16 }}
-              snapToInterval={width * 0.75 + 16}
+              contentContainerStyle={{ paddingRight: scale(20), gap: scale(14) }}
+              snapToInterval={Math.min(width * 0.86, 360) + scale(14)}
               decelerationRate="fast"
-              style={{ marginLeft: -16, marginBottom: vs(20) }}
+              style={{ marginLeft: -scale(4), marginBottom: vs(20) }}
             >
-              {recs.map((item: any, i: number) => (
-                <View key={i} style={{ width: width * 0.75 }}>
-                  <RecommendationCard rec={item} onBrowsePress={() => router.push("/(tabs)/exercises")} />
-                </View>
-              ))}
+              {recs.map((item: any, i: number) => {
+                const cardW = Math.min(width * 0.86, 360);
+                const targetId = item.exercise_id || item.id;
+                return (
+                  <View key={item.exercise_id || item.id || i} style={{ width: cardW }}>
+                    <RecommendationCard
+                      rec={item}
+                      onPress={() => {
+                        if (targetId) {
+                          router.push(`/exercises/${targetId}`);
+                        } else {
+                          router.push("/(tabs)/exercises");
+                        }
+                      }}
+                      onBrowsePress={() => router.push("/(tabs)/exercises")}
+                    />
+                  </View>
+                );
+              })}
             </ScrollView>
           )}
 
