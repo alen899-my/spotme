@@ -23,6 +23,7 @@ const upload = multer({
       const folder = req.originalUrl.includes('/physique') ? 'physique'
                    : req.originalUrl.includes('/daily') ? 'daily'
                    : req.originalUrl.includes('/meals') ? 'meals'
+                   : req.originalUrl.includes('/builds') ? 'builds'
                    : req.originalUrl.includes('/file-replacer') ? 'file-replacer'
                    : req.originalUrl.includes('/exercises') ? 'exercises'
                    : req.originalUrl.includes('/categories') ? 'categories'

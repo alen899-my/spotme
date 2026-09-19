@@ -107,6 +107,24 @@ export interface LibraryEntity {
   created_at: string
 }
 
+export type BuildChannel = "production" | "preview" | "development"
+
+export interface AppBuild {
+  id: string
+  title: string
+  description: string | null
+  build_channel: BuildChannel
+  file_type: "apk" | "aab"
+  version: string | null
+  version_code: number | null
+  file_key: string
+  file_url: string
+  file_size: number | null
+  is_latest: boolean
+  force_update: boolean
+  created_at: string
+}
+
 export type EntityType = "categories" | "body_parts" | "equipment" | "targets" | "muscle_groups" | "secondary_muscles"
 
 export type ReplacerStatus = "pending" | "uploading" | "frames_ready" | "generating_gif" | "replaced" | "failed"

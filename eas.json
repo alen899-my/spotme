@@ -30,6 +30,13 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://spotme-smoky.vercel.app/api"
       }
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

@@ -12,6 +12,7 @@ import {
   NativeScrollEvent,
   Platform,
   Alert,
+  Linking,
 } from "react-native";
 import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -28,6 +29,24 @@ import { API_URL } from "../../utils/api";
 import ActionModal from "../../components/ui/ActionModal";
 
 const ITEM_H = 44;
+
+// ── App update check (matches android.versionCode in app.json — bump together) ──
+const APP_VERSION = "1.0.4";
+const APP_VERSION_CODE = 1;
+
+interface UpdateInfo {
+  update_available: boolean;
+  force_update: boolean;
+  build: {
+    id: number;
+    title: string;
+    version: string | null;
+    version_code: number | null;
+    file_url: string;
+    file_size: number | null;
+    description: string | null;
+  } | null;
+}
 
 function WheelPicker({
   items,
@@ -279,6 +298,7 @@ export default function SettingsScreen() {
   const [clearing, setClearing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [alertModal, setAlertModal] = useState<{ visible: boolean; type: 'info' | 'success' | 'error'; title: string; message: string }>({ visible: false, type: 'info', title: '', message: '' });
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 
   const formatBytes = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -377,6 +397,33 @@ export default function SettingsScreen() {
       console.error('Failed to load settings:', err);
     } finally {
       setLoading(false);
+    }
+    // APK updates are Android-only — fail silent, About keeps showing the version row
+    if (Platform.OS === 'android') {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await axios.get(
+          `${API_URL}/updates/latest?channel=production&version_code=${APP_VERSION_CODE}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.data?.build) setUpdateInfo(res.data);
+      } catch {
+        // No update info — About section stays as-is
+      }
+    }
+  };
+
+  const openBuildDownload = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Cannot open download link on this device.' });
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      setAlertModal({ visible: true, type: 'error', title: 'Error', message: 'Failed to open download link.' });
     }
   };
 
@@ -704,13 +751,55 @@ export default function SettingsScreen() {
 
         <Text style={[sectionStyles.label, { color: colors.textDim }]}>ABOUT</Text>
         <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[cardStyles.row, { borderBottomWidth: 0 }]}>
+          <View style={[cardStyles.row, { borderBottomWidth: updateInfo?.build ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border }]}>
             <View style={cardStyles.left}>
               <Ionicons name="information-circle-outline" size={20} color={colors.textDim} style={{ width: 28 }} />
-              <Text style={[cardStyles.title, { color: colors.text }]}>SpotMe v1.0.4</Text>
+              <Text style={[cardStyles.title, { color: colors.text }]}>SpotMe v{APP_VERSION}</Text>
             </View>
             <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: colors.textDim }}>Beta</Text>
           </View>
+
+          {updateInfo?.build && (
+            <TouchableOpacity
+              onPress={() => openBuildDownload(updateInfo.build!.file_url)}
+              activeOpacity={0.6}
+            >
+              <View style={[cardStyles.row, { borderBottomWidth: 0 }]}>
+                <View style={cardStyles.left}>
+                  <Ionicons
+                    name={updateInfo.update_available ? "cloud-download-outline" : "checkmark-circle-outline"}
+                    size={20}
+                    color={updateInfo.update_available && updateInfo.force_update ? "#FF4444" : colors.textMuted}
+                    style={{ width: 28 }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[cardStyles.title, { color: colors.text }]}>App Update</Text>
+                    <Text style={[cardStyles.subtitle, {
+                      color: updateInfo.update_available && updateInfo.force_update ? "#FF4444" : colors.textDim,
+                    }]}>
+                      {updateInfo.update_available
+                        ? (updateInfo.force_update
+                            ? `Update required · v${updateInfo.build.version ?? "?"} available`
+                            : `v${updateInfo.build.version ?? "?"} available — tap to download`)
+                        : "You're up to date"}
+                    </Text>
+                  </View>
+                </View>
+                {updateInfo.update_available ? (
+                  <View style={{
+                    backgroundColor: updateInfo.force_update ? "#FF4444" : colors.primary,
+                    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7,
+                  }}>
+                    <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: "#FFF" }}>
+                      {updateInfo.force_update ? "Update Now" : "Update"}
+                    </Text>
+                  </View>
+                ) : (
+                  <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={[sectionStyles.label, { color: colors.textDim }]}>LEGAL</Text>

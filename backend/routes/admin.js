@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../db');
 const authenticateAdmin = require('../middleware/adminAuth');
 const upload = require('../uploadConfig');
+const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { validate, schemas } = require('../middleware/validate');
 
 const router = express.Router();
@@ -928,5 +929,237 @@ const entityNameMap = {
 for (const [table, entityName] of Object.entries(entityNameMap)) {
   createEntityRoutes(table, entityName);
 }
+
+// ─── App builds (admin-uploaded APK/AAB releases, stored on R2) ───────────────
+const BUILD_CHANNELS = ['production', 'preview', 'development'];
+
+// FormData sends booleans as strings — accept true/'true'/'1'/1, everything else false.
+// Returns null when the field was omitted entirely (PUT keeps the current value).
+function parseBuildFlag(value) {
+  if (value === undefined) return null;
+  return value === true || value === 'true' || value === '1' || value === 1;
+}
+
+async function promoteLatestBuild(channel) {
+  await pool.query(
+    `UPDATE app_builds SET is_latest = TRUE WHERE id = (
+       SELECT id FROM app_builds WHERE build_channel = $1
+       ORDER BY created_at DESC, id DESC LIMIT 1
+     )`,
+    [channel]
+  );
+}
+
+async function deleteBuildFile(fileKey) {
+  if (!fileKey) return;
+  try {
+    await upload.s3.send(new DeleteObjectCommand({
+      Bucket: process.env.CLOUDFLARE_R2_BUCKET,
+      Key: fileKey,
+    }));
+  } catch (err) {
+    console.error('Admin delete build file from R2 failed:', err.message);
+  }
+}
+
+// GET /admin/builds – list
+router.get('/builds', authenticateAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, search, sortBy, sortOrder } = req.query;
+    const offset = (page - 1) * limit;
+    let whereClause = '';
+    const params = [];
+    let paramIndex = 1;
+
+    if (search) {
+      whereClause = `WHERE (title ILIKE $${paramIndex} OR description ILIKE $${paramIndex} OR version ILIKE $${paramIndex})`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    const allowedSort = ['created_at', 'title', 'version', 'file_size'];
+    const col = allowedSort.includes(sortBy) ? sortBy : 'created_at';
+    const dir = sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM app_builds ${whereClause}`, params
+    );
+
+    const dataResult = await pool.query(
+      `SELECT * FROM app_builds ${whereClause} ORDER BY ${col} ${dir} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, parseInt(limit), parseInt(offset)]
+    );
+
+    res.json({ builds: dataResult.rows, total: countResult.rows[0].total });
+  } catch (error) {
+    console.error('Admin list builds error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /admin/builds/:id – single build
+router.get('/builds/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM app_builds WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Build not found' });
+    }
+    res.json({ build: result.rows[0] });
+  } catch (error) {
+    console.error('Admin get build error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /admin/builds – upload APK/AAB + metadata (newest per channel becomes latest)
+router.post('/builds', authenticateAdmin, upload.single('build_file'), async (req, res) => {
+  try {
+    const { title, description, build_channel, version, version_code, force_update } = req.body;
+    if (!title) return res.status(400).json({ message: 'Title is required' });
+    if (!BUILD_CHANNELS.includes(build_channel)) {
+      return res.status(400).json({ message: 'build_channel must be production, preview or development' });
+    }
+    if (!req.file) return res.status(400).json({ message: 'Build file (.apk or .aab) is required' });
+
+    const ext = (req.file.originalname.split('.').pop() || '').toLowerCase();
+    if (!['apk', 'aab'].includes(ext)) {
+      await deleteBuildFile(req.file.key);
+      return res.status(400).json({ message: 'Only .apk and .aab files are allowed' });
+    }
+
+    const fileKey = req.file.key;
+    const fileUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${fileKey}`;
+
+    await pool.query('UPDATE app_builds SET is_latest = FALSE WHERE build_channel = $1', [build_channel]);
+    const forceUpdate = parseBuildFlag(force_update) === true;
+    const result = await pool.query(
+      `INSERT INTO app_builds
+         (title, description, build_channel, file_type, version, version_code, file_key, file_url, file_size, is_latest, force_update)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, $10)
+       RETURNING *`,
+      [
+        title.trim(),
+        description || null,
+        build_channel,
+        ext,
+        version || null,
+        version_code ? parseInt(version_code) : null,
+        fileKey,
+        fileUrl,
+        req.file.size || null,
+        forceUpdate,
+      ]
+    );
+
+    res.status(201).json({ success: true, build: result.rows[0] });
+  } catch (error) {
+    console.error('Admin create build error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /admin/builds/:id – update metadata, optionally replace file
+router.put('/builds/:id', authenticateAdmin, upload.single('build_file'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await pool.query('SELECT * FROM app_builds WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      if (req.file) await deleteBuildFile(req.file.key);
+      return res.status(404).json({ message: 'Build not found' });
+    }
+    const current = existing.rows[0];
+
+    const { title, description, build_channel, version, version_code, force_update } = req.body;
+    const nextChannel = build_channel || current.build_channel;
+    const nextForceUpdate = parseBuildFlag(force_update);
+    const forceUpdate = nextForceUpdate === null ? current.force_update : nextForceUpdate;
+    if (!BUILD_CHANNELS.includes(nextChannel)) {
+      if (req.file) await deleteBuildFile(req.file.key);
+      return res.status(400).json({ message: 'build_channel must be production, preview or development' });
+    }
+
+    let fileKey = current.file_key;
+    let fileUrl = current.file_url;
+    let fileSize = current.file_size;
+    let fileType = current.file_type;
+    if (req.file) {
+      const ext = (req.file.originalname.split('.').pop() || '').toLowerCase();
+      if (!['apk', 'aab'].includes(ext)) {
+        await deleteBuildFile(req.file.key);
+        return res.status(400).json({ message: 'Only .apk and .aab files are allowed' });
+      }
+      await deleteBuildFile(current.file_key);
+      fileKey = req.file.key;
+      fileUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${fileKey}`;
+      fileSize = req.file.size || null;
+      fileType = ext;
+    }
+
+    const channelChanged = nextChannel !== current.build_channel;
+    const result = await pool.query(
+      `UPDATE app_builds SET
+         title = COALESCE($1, title),
+         description = COALESCE($2, description),
+         build_channel = $3,
+         file_type = $4,
+         version = COALESCE($5, version),
+         version_code = COALESCE($6, version_code),
+         file_key = $7,
+         file_url = $8,
+         file_size = $9,
+         force_update = $10
+       WHERE id = $11 RETURNING *`,
+      [
+        title?.trim() || null,
+        description ?? null,
+        nextChannel,
+        fileType,
+        version || null,
+        version_code ? parseInt(version_code) : null,
+        fileKey,
+        fileUrl,
+        fileSize,
+        forceUpdate,
+        id,
+      ]
+    );
+
+    if (req.file || channelChanged) {
+      await pool.query('UPDATE app_builds SET is_latest = FALSE WHERE build_channel = $1 AND id <> $2', [nextChannel, id]);
+      await pool.query('UPDATE app_builds SET is_latest = TRUE WHERE id = $1', [id]);
+      if (channelChanged && current.is_latest) {
+        await promoteLatestBuild(current.build_channel);
+      }
+    }
+
+    res.json({ success: true, build: result.rows[0] });
+  } catch (error) {
+    console.error('Admin update build error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// DELETE /admin/builds/:id – remove row + R2 object, promote next latest
+router.delete('/builds/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const existing = await pool.query('SELECT * FROM app_builds WHERE id = $1', [req.params.id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ message: 'Build not found' });
+    }
+    const build = existing.rows[0];
+
+    await deleteBuildFile(build.file_key);
+    await pool.query('DELETE FROM app_builds WHERE id = $1', [req.params.id]);
+
+    if (build.is_latest) {
+      await promoteLatestBuild(build.build_channel);
+    }
+
+    res.json({ message: 'Build deleted' });
+  } catch (error) {
+    console.error('Admin delete build error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 module.exports = router;

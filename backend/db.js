@@ -582,6 +582,35 @@ const initDB = async () => {
       );
     `);
 
+    // ── App builds (admin-uploaded APK/AAB releases) ──────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS app_builds (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        build_channel VARCHAR(20) NOT NULL DEFAULT 'production',
+        file_type VARCHAR(10) NOT NULL,
+        version VARCHAR(50),
+        version_code INT,
+        file_key TEXT NOT NULL,
+        file_url VARCHAR(1000) NOT NULL,
+        file_size BIGINT,
+        is_latest BOOLEAN DEFAULT FALSE,
+        force_update BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_app_builds_channel
+      ON app_builds (build_channel, created_at DESC);
+    `);
+    // Safety net for databases created before the force_update flag existed
+    try {
+      await pool.query(`ALTER TABLE app_builds ADD COLUMN IF NOT EXISTS force_update BOOLEAN DEFAULT FALSE`);
+    } catch (_) {
+      console.warn('Could not add force_update column (may already exist):', _);
+    }
+
     // ── Entity library tables ─────────────────────────────────────────────────
     const entityTables = [
       'categories', 'body_parts', 'equipment', 'targets', 'muscle_groups', 'secondary_muscles',

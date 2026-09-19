@@ -19,6 +19,7 @@ import {
   ListTree,
   Image as ImageIcon,
   RefreshCw,
+  Smartphone,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -33,6 +34,7 @@ const navItems = [
   { href: "/dashboard/images", label: "Image Vault", icon: ImageIcon },
   { href: "/dashboard/workout-splits", label: "Workout Splits", icon: Activity },
   { href: "/dashboard/file-replacer", label: "File Replacer", icon: RefreshCw },
+  { href: "/dashboard/builds", label: "App Builds", icon: Smartphone },
 ]
 
 const libraryItems = [
