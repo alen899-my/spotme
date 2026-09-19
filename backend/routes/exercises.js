@@ -79,32 +79,94 @@ router.get('/categories', async (req, res) => {
 // ─── GET /meta/filters ── must come BEFORE /:id ──────────────────────────────
 router.get('/meta/filters', async (req, res) => {
   try {
-    const { category } = req.query;
+    const { category, equipment } = req.query;
 
-    const categoryFilter = category ? ' AND category = $1' : '';
-    const filterParam = category || null;
+    const catParam = category ? String(category).trim().toLowerCase() : null;
+    const equipList = equipment ? String(equipment).split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
 
-    const [categories, bodyParts, equipment, targets, muscleGroups] = await Promise.all([
-      pool.query('SELECT DISTINCT category   FROM exercises WHERE category   IS NOT NULL ORDER BY category'),
-      filterParam
-        ? pool.query(`SELECT DISTINCT body_part  FROM exercises WHERE body_part  IS NOT NULL${categoryFilter} ORDER BY body_part`, [filterParam])
-        : pool.query('SELECT DISTINCT body_part  FROM exercises WHERE body_part  IS NOT NULL ORDER BY body_part'),
-      filterParam
-        ? pool.query(`SELECT DISTINCT equipment  FROM exercises WHERE equipment  IS NOT NULL${categoryFilter} ORDER BY equipment`, [filterParam])
-        : pool.query('SELECT DISTINCT equipment  FROM exercises WHERE equipment  IS NOT NULL ORDER BY equipment'),
-      filterParam
-        ? pool.query(`SELECT DISTINCT target     FROM exercises WHERE target     IS NOT NULL${categoryFilter} ORDER BY target`, [filterParam])
-        : pool.query('SELECT DISTINCT target     FROM exercises WHERE target     IS NOT NULL ORDER BY target'),
-      filterParam
-        ? pool.query(`SELECT DISTINCT muscle_group FROM exercises WHERE muscle_group IS NOT NULL${categoryFilter} ORDER BY muscle_group`, [filterParam])
-        : pool.query('SELECT DISTINCT muscle_group FROM exercises WHERE muscle_group IS NOT NULL ORDER BY muscle_group'),
+    // Conditions for equipment query
+    const equipConditions = ['equipment IS NOT NULL'];
+    const equipParams = [];
+    if (catParam) {
+      equipConditions.push(`category = $${equipParams.length + 1}`);
+      equipParams.push(catParam);
+    }
+
+    // Conditions for targets query
+    const targetConditions = ['target IS NOT NULL'];
+    const targetParams = [];
+    if (catParam) {
+      targetConditions.push(`category = $${targetParams.length + 1}`);
+      targetParams.push(catParam);
+    }
+    if (equipList.length === 1) {
+      targetConditions.push(`equipment = $${targetParams.length + 1}`);
+      targetParams.push(equipList[0]);
+    } else if (equipList.length > 1) {
+      const orClauses = equipList.map((_, i) => `equipment = $${targetParams.length + i + 1}`);
+      targetConditions.push(`(${orClauses.join(' OR ')})`);
+      targetParams.push(...equipList);
+    }
+
+    const [categoriesRes, bodyPartsRes, equipmentRes, targetsRes, muscleGroupsRes] = await Promise.all([
+      pool.query(`
+        SELECT category, MAX(category_image_url) AS image_url, COUNT(*)::int AS count
+        FROM exercises
+        WHERE category IS NOT NULL
+        GROUP BY category
+        ORDER BY category ASC
+      `),
+      pool.query(`
+        SELECT DISTINCT body_part
+        FROM exercises
+        WHERE body_part IS NOT NULL
+        ORDER BY body_part ASC
+      `),
+      pool.query(`
+        SELECT equipment, MAX(equipment_image_url) AS image_url, COUNT(*)::int AS count
+        FROM exercises
+        WHERE ${equipConditions.join(' AND ')}
+        GROUP BY equipment
+        ORDER BY count DESC, equipment ASC
+      `, equipParams),
+      pool.query(`
+        SELECT target, MAX(target_image_url) AS image_url, COUNT(*)::int AS count
+        FROM exercises
+        WHERE ${targetConditions.join(' AND ')}
+        GROUP BY target
+        ORDER BY count DESC, target ASC
+      `, targetParams),
+      pool.query(`
+        SELECT DISTINCT muscle_group
+        FROM exercises
+        WHERE muscle_group IS NOT NULL
+        ORDER BY muscle_group ASC
+      `),
     ]);
+
     res.json({
-      categories:     categories.rows.map(r => r.category),
-      body_parts:     bodyParts.rows.map(r => r.body_part),
-      equipment:      equipment.rows.map(r => r.equipment),
-      targets:        targets.rows.map(r => r.target),
-      muscle_groups:  muscleGroups.rows.map(r => r.muscle_group),
+      // Legacy arrays for backwards compatibility
+      categories:     categoriesRes.rows.map(r => r.category),
+      body_parts:     bodyPartsRes.rows.map(r => r.body_part),
+      equipment:      equipmentRes.rows.map(r => r.equipment),
+      targets:        targetsRes.rows.map(r => r.target),
+      muscle_groups:  muscleGroupsRes.rows.map(r => r.muscle_group),
+      // Enhanced items with images and counts
+      category_items: categoriesRes.rows.map(r => ({
+        name: r.category,
+        image_url: r.image_url,
+        count: r.count,
+      })),
+      equipment_items: equipmentRes.rows.map(r => ({
+        name: r.equipment,
+        image_url: r.image_url,
+        count: r.count,
+      })),
+      target_items: targetsRes.rows.map(r => ({
+        name: r.target,
+        image_url: r.image_url,
+        count: r.count,
+      })),
     });
   } catch (err) {
     console.error('GET /exercises/meta/filters error:', err);

@@ -99,7 +99,10 @@ export default function ExerciseBrowser({
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeFilterCount = (f: ExerciseFilters) => {
-    let c = f.categories.length + f.bodyParts.length + f.equipment.length + f.targets.length;
+    const catCount = f.categories.length > 0
+      ? f.categories.length
+      : f.bodyParts.length;
+    let c = catCount + f.equipment.length + f.targets.length;
     if (f.minRating > 0) c++;
     return c;
   };
