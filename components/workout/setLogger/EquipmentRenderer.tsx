@@ -16,6 +16,7 @@ import CableBuilder from './equipment/CableBuilder';
 import MachineBuilder from './equipment/MachineBuilder';
 import BandBuilder from './equipment/BandBuilder';
 import GenericEquipmentBuilder from './equipment/GenericEquipmentBuilder';
+import PlateLoadedMachineBuilder from './equipment/PlateLoadedMachineBuilder';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EquipmentRenderer
@@ -62,12 +63,13 @@ const EquipmentRenderer = React.memo(({
       equipmentType === 'barbell' ||
       equipmentType === 'ez_barbell' ||
       equipmentType === 'olympic_barbell' ||
-      equipmentType === 'trap_bar'
+      equipmentType === 'trap_bar' ||
+      equipmentType === 'smith_machine'
     ) {
       const cfg = initialConfig as any;
       return !isExactReconstruction(
         cfg.plateQuantities ?? {},
-        cfg.barWeightKg ?? 20,
+        cfg.barWeightKg ?? (equipmentType === 'smith_machine' ? 15 : 20),
         storedWeightKg,
       );
     }
@@ -80,11 +82,20 @@ const EquipmentRenderer = React.memo(({
     case 'ez_barbell':
     case 'olympic_barbell':
     case 'trap_bar':
+    case 'smith_machine':
       return (
         <BarbellBuilder
           equipmentType={equipmentType}
           initialConfig={initialConfig as any}
           isApproximate={isApproximate}
+          onWeightChange={onWeightChange}
+        />
+      );
+
+    case 'plate_loaded_machine':
+      return (
+        <PlateLoadedMachineBuilder
+          initialConfig={initialConfig as any}
           onWeightChange={onWeightChange}
         />
       );

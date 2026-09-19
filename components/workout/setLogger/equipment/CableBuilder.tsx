@@ -1,51 +1,68 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Platform,
 } from 'react-native';
 import Svg, {
-  Defs, LinearGradient, Stop, Rect, Circle, Line, G, Text as SvgText, Path,
+  Defs, LinearGradient, Stop, Rect, Circle, Line, G, Text as SvgText,
 } from 'react-native-svg';
 import { useTheme } from '../../../../contexts/ThemeContext';
 import { useUnits } from '../../../../contexts/UnitContext';
 import { FONTS } from '../../../../constants/theme';
 import { CableConfig } from '../types';
-import { CABLE_WEIGHTS_KG, getPlateOptions, plateConfigFromSideWeight } from '../equipmentUtils';
-import { PlateChip } from './PlateChip';
+import {
+  CABLE_STACK_WEIGHTS_KG,
+  CABLE_STACK_WEIGHTS_LBS,
+  LB_TO_KG,
+} from '../equipmentUtils';
 import { formatWeightValue, weightUnit } from '../../../../utils/units';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Realistic Cable Column SVG
+// ─────────────────────────────────────────────────────────────────────────────
+// Pure Realistic Weight Stack SVG (No Pulley UI, Pure Centered Weight Stack)
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface CableColumnSvgProps {
+interface WeightStackSvgProps {
   selectedKg: number;
+  isImperial: boolean;
   width: number;
 }
 
-const CableColumnSvg = React.memo(({ selectedKg, width: svgWidth }: CableColumnSvgProps) => {
-  const viewBoxWidth = 360;
-  const viewBoxHeight = 220;
+const WeightStackSvg = React.memo(({
+  selectedKg,
+  isImperial,
+  width: svgWidth,
+}: WeightStackSvgProps) => {
+  const viewBoxWidth = 320;
+  const viewBoxHeight = 180;
 
-  const stackPlates = [5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 75, 90];
+  const stackPlates = useMemo(() => {
+    if (isImperial) {
+      return [10, 20, 30, 40, 50, 60, 70, 80, 100, 120, 150, 180];
+    }
+    return [5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 75, 90];
+  }, [isImperial]);
 
   const selectedIdx = useMemo(() => {
     let bestIdx = 0;
     let minDiff = Infinity;
     stackPlates.forEach((w, i) => {
-      const diff = Math.abs(w - selectedKg);
+      const kg = isImperial ? w * LB_TO_KG : w;
+      const diff = Math.abs(kg - selectedKg);
       if (diff < minDiff) {
         minDiff = diff;
         bestIdx = i;
       }
     });
     return bestIdx;
-  }, [selectedKg]);
+  }, [selectedKg, stackPlates, isImperial]);
 
-  const STACK_X = 80;
-  const STACK_W = 110;
+  const STACK_X = 75;
+  const STACK_W = 150;
   const PLATE_H = 10;
   const PLATE_GAP = 2;
-  const STACK_START_Y = 58;
+  const STACK_START_Y = 24;
+  const ROD_L_X = STACK_X + 22;
+  const ROD_R_X = STACK_X + STACK_W - 22;
 
   return (
     <Svg
@@ -55,77 +72,58 @@ const CableColumnSvg = React.memo(({ selectedKg, width: svgWidth }: CableColumnS
       style={{ alignSelf: 'center' }}
     >
       <Defs>
-        <LinearGradient id="cableTower" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor="#1e293b" />
-          <Stop offset="0.5" stopColor="#334155" />
-          <Stop offset="1" stopColor="#0f172a" />
-        </LinearGradient>
         <LinearGradient id="cableRods" x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0" stopColor="#4b5563" />
-          <Stop offset="0.4" stopColor="#f3f4f6" />
+          <Stop offset="0.3" stopColor="#e2e8f0" />
+          <Stop offset="0.6" stopColor="#f8fafc" />
+          <Stop offset="0.85" stopColor="#94a3b8" />
           <Stop offset="1" stopColor="#374151" />
         </LinearGradient>
         <LinearGradient id="cablePlate" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#334155" />
-          <Stop offset="0.4" stopColor="#1e293b" />
+          <Stop offset="0.35" stopColor="#1e293b" />
+          <Stop offset="0.8" stopColor="#111827" />
           <Stop offset="1" stopColor="#0f172a" />
         </LinearGradient>
         <LinearGradient id="cableActivePlate" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#0284c7" />
-          <Stop offset="0.5" stopColor="#0369a1" />
+          <Stop offset="0.4" stopColor="#0369a1" />
           <Stop offset="1" stopColor="#075985" />
         </LinearGradient>
         <LinearGradient id="cablePin" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#fde047" />
+          <Stop offset="0" stopColor="#fef08a" />
+          <Stop offset="0.4" stopColor="#facc15" />
           <Stop offset="1" stopColor="#ca8a04" />
         </LinearGradient>
-        <LinearGradient id="wireGrad" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor="#94a3b8" />
-          <Stop offset="0.5" stopColor="#f1f5f9" />
-          <Stop offset="1" stopColor="#64748b" />
+        <LinearGradient id="topPlateGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#475569" />
+          <Stop offset="0.5" stopColor="#1e293b" />
+          <Stop offset="1" stopColor="#0f172a" />
         </LinearGradient>
       </Defs>
 
-      {/* Outer Column Upright */}
-      <Rect x={60} y={16} width={8} height={196} rx={3} fill="url(#cableTower)" />
-      <Rect x={206} y={16} width={8} height={196} rx={3} fill="url(#cableTower)" />
-      <Rect x={56} y={14} width={162} height={10} rx={3} fill="#0f172a" />
-      <Rect x={52} y={204} width={170} height={12} rx={3} fill="#0f172a" />
+      {/* Chrome Guide Rods */}
+      <Rect x={ROD_L_X - 2.5} y={10} width={5} height={160} rx={2.5} fill="url(#cableRods)" />
+      <Rect x={ROD_R_X - 2.5} y={10} width={5} height={160} rx={2.5} fill="url(#cableRods)" />
 
-      {/* Guide Rods */}
-      <Rect x={STACK_X + 16} y={24} width={4} height={180} rx={2} fill="url(#cableRods)" />
-      <Rect x={STACK_X + STACK_W - 20} y={24} width={4} height={180} rx={2} fill="url(#cableRods)" />
+      {/* Center Selector Stem */}
+      <Rect x={158} y={12} width={4} height={158} rx={2} fill="url(#cableRods)" />
 
-      {/* Top Main Pulley Wheel */}
-      <Circle cx={135} cy={26} r={13} fill="#0f172a" stroke="#475569" strokeWidth={1.5} />
-      <Circle cx={135} cy={26} r={4.5} fill="#94a3b8" />
+      {/* Top Header Plate */}
+      <Rect x={STACK_X} y={12} width={STACK_W} height={9} rx={2} fill="url(#topPlateGrad)" stroke="#334155" strokeWidth={0.8} />
 
-      {/* Output Pulley on right column */}
-      <Circle cx={256} cy={88} r={12} fill="#0f172a" stroke="#475569" strokeWidth={1.5} />
-      <Circle cx={256} cy={88} r={4} fill="#94a3b8" />
+      {/* Bottom Shock Absorption Base */}
+      <Rect x={STACK_X - 10} y={170} width={STACK_W + 20} height={7} rx={3} fill="#090d16" />
+      <Rect x={ROD_L_X - 7} y={166} width={14} height={4} rx={2} fill="#18181b" />
+      <Rect x={ROD_R_X - 7} y={166} width={14} height={4} rx={2} fill="#18181b" />
 
-      {/* Cable Wire: from weight stack -> top pulley -> carriage pulley -> handle */}
-      <Line x1={135} y1={26} x2={135} y2={STACK_START_Y + selectedIdx * (PLATE_H + PLATE_GAP)} stroke="url(#wireGrad)" strokeWidth={2.4} />
-      <Line x1={135} y1={13} x2={256} y2={76} stroke="url(#wireGrad)" strokeWidth={2.4} />
-      <Line x1={256} y1={100} x2={294} y2={142} stroke="url(#wireGrad)" strokeWidth={2.4} />
-
-      {/* Carabiner & D-Handle */}
-      <G transform="translate(290, 138) rotate(35)">
-        {/* Carabiner clip */}
-        <Circle cx={4} cy={4} r={4.5} fill="none" stroke="#e2e8f0" strokeWidth={1.6} />
-        {/* Handle web strap */}
-        <Rect x={2} y={8} width={4} height={14} rx={1} fill="#0f172a" />
-        {/* Handle grip bar */}
-        <Rect x={-8} y={22} width={24} height={6} rx={3} fill="#475569" stroke="#94a3b8" strokeWidth={0.8} />
-      </G>
-
-      {/* Weight Stack Plates */}
+      {/* Pure Weight Stack Plates */}
       {stackPlates.map((w, idx) => {
         const y = STACK_START_Y + idx * (PLATE_H + PLATE_GAP);
         const isActive = idx === selectedIdx;
 
         return (
-          <G key={`c-stack-${w}`}>
+          <G key={`stack-plate-${w}`}>
             <Rect
               x={STACK_X}
               y={y}
@@ -134,46 +132,48 @@ const CableColumnSvg = React.memo(({ selectedKg, width: svgWidth }: CableColumnS
               rx={2}
               fill={isActive ? 'url(#cableActivePlate)' : 'url(#cablePlate)'}
               stroke={isActive ? '#38bdf8' : '#334155'}
-              strokeWidth={isActive ? 1.2 : 0.7}
+              strokeWidth={isActive ? 1.3 : 0.7}
             />
 
             {/* Guide Rod cutouts */}
-            <Circle cx={STACK_X + 18} cy={y + PLATE_H / 2} r={3} fill="#0f172a" />
-            <Circle cx={STACK_X + STACK_W - 18} cy={y + PLATE_H / 2} r={3} fill="#0f172a" />
+            <Circle cx={ROD_L_X} cy={y + PLATE_H / 2} r={3} fill="#090d16" />
+            <Circle cx={ROD_R_X} cy={y + PLATE_H / 2} r={3} fill="#090d16" />
 
             {/* Center Pin Hole */}
-            <Circle cx={STACK_X + STACK_W / 2} cy={y + PLATE_H / 2} r={2.5} fill="#090d13" />
+            <Circle cx={160} cy={y + PLATE_H / 2} r={2.5} fill="#05080e" />
 
-            {/* Plate Label */}
+            {/* Plate Weight Label */}
             <SvgText
-              x={STACK_X + 8}
+              x={STACK_X + 10}
               y={y + PLATE_H - 2}
               fontFamily="sans-serif"
-              fontSize={7}
+              fontSize={7.5}
               fontWeight="bold"
               fill={isActive ? '#ffffff' : '#94a3b8'}
             >
               {w}
             </SvgText>
 
-            {/* Selector Pin */}
+            {/* Magnetic Selector Pin */}
             {isActive && (
               <G>
+                {/* Silver pin shaft sliding into center selector hole */}
                 <Line
-                  x1={STACK_X + STACK_W / 2}
+                  x1={160}
                   y1={y + PLATE_H / 2}
-                  x2={STACK_X + STACK_W + 10}
+                  x2={STACK_X + STACK_W + 12}
                   y2={y + PLATE_H / 2}
                   stroke="#e2e8f0"
                   strokeWidth={2.8}
                   strokeLinecap="round"
                 />
+                {/* Gold Magnetic Selector Knob */}
                 <Circle
-                  cx={STACK_X + STACK_W + 11}
+                  cx={STACK_X + STACK_W + 13}
                   cy={y + PLATE_H / 2}
                   r={5}
                   fill="url(#cablePin)"
-                  stroke="#854d0e"
+                  stroke="#ca8a04"
                   strokeWidth={0.8}
                 />
               </G>
@@ -186,6 +186,88 @@ const CableColumnSvg = React.memo(({ selectedKg, width: svgWidth }: CableColumnS
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Cable Stack Pin Chip Component
+// Represents an individual cast-iron stack plate with an authentic magnetic pin hole
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface CableStackChipProps {
+  weightVal: number;
+  weightKg: number;
+  isSelected: boolean;
+  onSelect: () => void;
+  unit: string;
+  isDark: boolean;
+  plateIndex: number;
+}
+
+const CableStackChip = React.memo(({
+  weightVal,
+  isSelected,
+  onSelect,
+  unit,
+  isDark,
+  plateIndex,
+}: CableStackChipProps) => {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.75}
+      onPress={onSelect}
+      style={[
+        styles.stackChip,
+        {
+          backgroundColor: isSelected
+            ? (isDark ? '#0c2840' : '#E0F2FE')
+            : (isDark ? '#14171a' : '#F1F5F9'),
+          borderColor: isSelected
+            ? '#0284c7'
+            : (isDark ? '#23282d' : '#CBD5E1'),
+        },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`Select plate ${plateIndex + 1}, ${weightVal} ${unit}`}
+    >
+      {/* Top row: plate index and pin indicator */}
+      <View style={styles.stackChipHeader}>
+        <Text style={[styles.plateIndexText, { color: isSelected ? '#0284c7' : (isDark ? '#626b75' : '#94A3B8') }]}>
+          #{plateIndex + 1}
+        </Text>
+
+        {/* Magnetic Selector Pin Visual */}
+        <View
+          style={[
+            styles.pinSlot,
+            {
+              backgroundColor: isSelected ? '#FACC15' : (isDark ? '#090b0d' : '#94A3B8'),
+              borderColor: isSelected ? '#CA8A04' : (isDark ? '#22262a' : '#E2E8F0'),
+            },
+          ]}
+        >
+          {isSelected && <View style={styles.pinGlow} />}
+        </View>
+      </View>
+
+      {/* Main weight label */}
+      <View style={styles.stackChipBody}>
+        <Text
+          style={[
+            styles.stackChipNum,
+            {
+              color: isSelected ? '#0284c7' : (isDark ? '#F8FAFC' : '#0F172A'),
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {weightVal}
+        </Text>
+        <Text style={[styles.stackChipUnit, { color: isSelected ? '#0284c7' : (isDark ? '#8d979f' : '#64748B') }]}>
+          {unit}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // CableBuilder Component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -194,14 +276,28 @@ interface CableBuilderProps {
   onWeightChange: (weightKg: number) => void;
 }
 
-const CableBuilder = React.memo(({ initialConfig, onWeightChange }: CableBuilderProps) => {
-  const { colors, isDark } = useTheme();
+const CableBuilder = React.memo(({
+  initialConfig,
+  onWeightChange,
+}: CableBuilderProps) => {
+  const { isDark } = useTheme();
   const { unitSystem } = useUnits();
   const { width: windowWidth } = useWindowDimensions();
   const isImperial = unitSystem === 'imperial';
   const unit = weightUnit(unitSystem);
 
   const [selectedKg, setSelectedKg] = useState<number>(initialConfig.selectedWeightKg || 20);
+
+  const prevInitWeightRef = useRef(initialConfig.selectedWeightKg);
+  useEffect(() => {
+    if (
+      initialConfig.selectedWeightKg !== undefined &&
+      initialConfig.selectedWeightKg !== prevInitWeightRef.current
+    ) {
+      prevInitWeightRef.current = initialConfig.selectedWeightKg;
+      setSelectedKg(initialConfig.selectedWeightKg);
+    }
+  }, [initialConfig.selectedWeightKg]);
 
   const svgWidth = useMemo(() => {
     const maxW = Platform.OS === 'web'
@@ -210,36 +306,36 @@ const CableBuilder = React.memo(({ initialConfig, onWeightChange }: CableBuilder
     return Math.max(280, maxW);
   }, [windowWidth]);
 
-  const availablePlates = useMemo(() => getPlateOptions(isImperial), [isImperial]);
-
-  const plateCounts = useMemo(() => {
-    return plateConfigFromSideWeight(selectedKg, availablePlates);
-  }, [selectedKg, availablePlates]);
+  // Realistic selectorized stack weights
+  const stackOptions = useMemo(() => {
+    if (isImperial) {
+      return CABLE_STACK_WEIGHTS_LBS.map(lbs => ({
+        val: lbs,
+        kg: Math.round(lbs * LB_TO_KG * 10) / 10,
+      }));
+    }
+    return CABLE_STACK_WEIGHTS_KG.map(kg => ({
+      val: kg,
+      kg,
+    }));
+  }, [isImperial]);
 
   const handleSelectWeight = useCallback((kg: number) => {
     setSelectedKg(kg);
     onWeightChange(kg);
   }, [onWeightChange]);
 
-  const handleAddPlate = useCallback((plateWeightKg: number) => {
-    setSelectedKg(prev => {
-      const next = Math.min(180, Math.round((prev + plateWeightKg) * 10) / 10);
-      onWeightChange(next);
-      return next;
-    });
-  }, [onWeightChange]);
-
-  const handleRemovePlate = useCallback((plateWeightKg: number) => {
-    setSelectedKg(prev => {
-      const next = Math.max(0, Math.round((prev - plateWeightKg) * 10) / 10);
-      onWeightChange(next);
-      return next;
-    });
-  }, [onWeightChange]);
-
   const handleStep = useCallback((deltaKg: number) => {
     setSelectedKg(prev => {
       const next = Math.max(0, Math.min(180, Math.round((prev + deltaKg) * 10) / 10));
+      onWeightChange(next);
+      return next;
+    });
+  }, [onWeightChange]);
+
+  const handleAddFractional = useCallback((addKg: number) => {
+    setSelectedKg(prev => {
+      const next = Math.max(0, Math.min(180, Math.round((prev + addKg) * 10) / 10));
       onWeightChange(next);
       return next;
     });
@@ -251,35 +347,32 @@ const CableBuilder = React.memo(({ initialConfig, onWeightChange }: CableBuilder
     <View style={styles.container}>
       {/* Hero Visual Card */}
       <View style={[styles.heroCard, { backgroundColor: isDark ? '#111416' : '#F8FAFC', borderColor: isDark ? '#22262a' : '#E2E8F0' }]}>
-        <View style={styles.badge}>
-          <Text style={[styles.badgeText, { backgroundColor: isDark ? '#070809' : '#EDE9FE', color: isDark ? '#929ba5' : '#6D28D9', borderColor: isDark ? '#22262a' : '#DDD6FE' }]}>
-            {displayVal} {unit.toUpperCase()} · RATIO 1:1
-          </Text>
-        </View>
+        
 
-        <CableColumnSvg
+        <WeightStackSvg
           selectedKg={selectedKg}
+          isImperial={isImperial}
           width={svgWidth}
         />
       </View>
 
-      {/* Weight Selector Card - Plate Chips like Barbell */}
+      {/* Weight Selector Card - Selectorized Pin Stack */}
       <View style={[styles.selectorCard, { backgroundColor: isDark ? '#111416' : '#FFFFFF', borderColor: isDark ? '#22262a' : '#E2E8F0' }]}>
         <View style={styles.secHead}>
           <View>
             <Text style={[styles.secTitle, { color: isDark ? '#f5f7f8' : '#0F172A' }]}>
-              Insert weight plates
+              Weight Stack Pin
             </Text>
             <Text style={[styles.secNote, { color: isDark ? '#626b75' : '#94A3B8' }]}>
-              {displayVal} {unit} cable load
+              {displayVal} {unit} cable resistance
             </Text>
           </View>
 
-          {/* Stepper */}
+          {/* Micro stepper for fractional weights */}
           <View style={[styles.miniStepper, { backgroundColor: isDark ? '#171a1d' : '#F1F5F9', borderColor: isDark ? '#22262a' : '#E2E8F0' }]}>
             <TouchableOpacity
               style={styles.miniStepBtn}
-              onPress={() => handleStep(isImperial ? -0.5 * 0.453592 : -0.5)}
+              onPress={() => handleStep(isImperial ? -0.5 * LB_TO_KG : -0.5)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
               accessibilityLabel="Decrease weight"
@@ -289,80 +382,36 @@ const CableBuilder = React.memo(({ initialConfig, onWeightChange }: CableBuilder
             <Text style={[styles.miniStepVal, { color: isDark ? '#f5f7f8' : '#0F172A' }]}>{displayVal}</Text>
             <TouchableOpacity
               style={styles.miniStepBtn}
-              onPress={() => handleStep(isImperial ? 0.5 * 0.453592 : 0.5)}
+              onPress={() => handleStep(isImperial ? 0.5 * LB_TO_KG : 0.5)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
               accessibilityLabel="Increase weight"
             >
-              <Text style={[styles.miniStepBtnText, { color: '#16a9ff' }]}>+</Text>
+              <Text style={[styles.miniStepBtnText, { color: '#0284c7' }]}>+</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Plate Chips Scroller with Steppers (+ / −) like Barbell */}
+        {/* Stack Pin Plate Chips Scroller */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsScroll}
           keyboardShouldPersistTaps="handled"
         >
-          {availablePlates.map(p => (
-            <PlateChip
-              key={p.weightKg}
-              plate={p}
-              quantity={plateCounts[p.weightKg] ?? 0}
-              onAdd={() => handleAddPlate(p.weightKg)}
-              onRemove={() => handleRemovePlate(p.weightKg)}
-              isImperial={isImperial}
-            />
-          ))}
-        </ScrollView>
-
-        {/* Quick presets */}
-        <View style={styles.quickPresetHead}>
-          <Text style={[styles.quickPresetTitle, { color: isDark ? '#929ba5' : '#64748B' }]}>
-            Quick presets
-          </Text>
-          {selectedKg > 0 && (
-            <TouchableOpacity onPress={() => handleSelectWeight(0)}>
-              <Text style={styles.clearBtnText}>Reset to 0</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.presetsScroll}
-          keyboardShouldPersistTaps="handled"
-        >
-          {CABLE_WEIGHTS_KG.slice(0, 16).map(kg => {
-            const isSelected = Math.abs(kg - selectedKg) < 0.2;
-            const chipDisplay = formatWeightValue(kg, unitSystem);
+          {stackOptions.map((opt, idx) => {
+            const isSelected = Math.abs(opt.kg - selectedKg) < 0.25;
             return (
-              <TouchableOpacity
-                key={kg}
-                style={[
-                  styles.presetChip,
-                  {
-                    backgroundColor: isSelected
-                      ? 'rgba(22, 169, 255, 0.12)'
-                      : isDark ? '#171a1d' : '#F1F5F9',
-                    borderColor: isSelected
-                      ? '#16a9ff'
-                      : isDark ? '#22262a' : '#E2E8F0',
-                  },
-                ]}
-                onPress={() => handleSelectWeight(kg)}
-                accessibilityRole="button"
-                accessibilityLabel={`Select ${chipDisplay} ${unit} preset`}
-              >
-                <Text style={[styles.presetChipNum, { color: isSelected ? '#16a9ff' : (isDark ? '#f5f7f8' : '#0F172A') }]}>
-                  {chipDisplay}
-                </Text>
-                <Text style={[styles.presetChipUnit, { color: isDark ? '#626b75' : '#94A3B8' }]}>
-                  {unit}
-                </Text>
-              </TouchableOpacity>
+              <CableStackChip
+                key={`cable-opt-${opt.val}`}
+                plateIndex={idx}
+                weightVal={opt.val}
+                weightKg={opt.kg}
+                isSelected={isSelected}
+                onSelect={() => handleSelectWeight(opt.kg)}
+                unit={unit}
+                isDark={isDark}
+              />
             );
           })}
         </ScrollView>
@@ -450,7 +499,80 @@ const styles = StyleSheet.create({
   },
   chipsScroll: {
     gap: 8,
-    paddingVertical: 2,
+    paddingVertical: 4,
+  },
+  stackChip: {
+    width: 78,
+    height: 60,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    justifyContent: 'space-between',
+  },
+  stackChipHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  plateIndexText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 9.5,
+  },
+  pinSlot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1.2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinGlow: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ffffff',
+  },
+  stackChipBody: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 3,
+  },
+  stackChipNum: {
+    fontFamily: FONTS.heading,
+    fontSize: 17,
+    letterSpacing: -0.4,
+  },
+  stackChipUnit: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+  },
+  addonSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  addonLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 11.5,
+  },
+  addonRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  addonChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  addonChipText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
   },
   quickPresetHead: {
     flexDirection: 'row',
@@ -475,7 +597,7 @@ const styles = StyleSheet.create({
   },
   presetChip: {
     paddingHorizontal: 12,
-    height: 38,
+    height: 36,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
@@ -491,23 +613,5 @@ const styles = StyleSheet.create({
   presetChipUnit: {
     fontFamily: FONTS.bodyBold,
     fontSize: 9.5,
-  },
-  weightChip: {
-    width: 62,
-    height: 60,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 1,
-  },
-  weightChipNum: {
-    fontFamily: FONTS.heading,
-    fontSize: 16,
-    letterSpacing: -0.3,
-  },
-  weightChipUnit: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 10,
   },
 });

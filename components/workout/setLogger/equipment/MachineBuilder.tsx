@@ -1,16 +1,19 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Platform,
 } from 'react-native';
 import Svg, {
-  Defs, LinearGradient, Stop, Rect, Circle, Line, G, Text as SvgText, Path,
+  Defs, LinearGradient, Stop, Rect, Circle, Line, G, Text as SvgText,
 } from 'react-native-svg';
 import { useTheme } from '../../../../contexts/ThemeContext';
 import { useUnits } from '../../../../contexts/UnitContext';
 import { FONTS } from '../../../../constants/theme';
 import { MachineConfig } from '../types';
-import { MACHINE_WEIGHTS_KG, getPlateOptions, plateConfigFromSideWeight } from '../equipmentUtils';
-import { PlateChip } from './PlateChip';
+import {
+  MACHINE_STACK_WEIGHTS_KG,
+  MACHINE_STACK_WEIGHTS_LBS,
+  LB_TO_KG,
+} from '../equipmentUtils';
 import { formatWeightValue, weightUnit } from '../../../../utils/units';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,7 +32,7 @@ const MachineStackSvg = React.memo(({
   const viewBoxWidth = 360;
   const viewBoxHeight = 220;
 
-  // We display 12 stack plates centered in the tower
+  // 12 stack plates centered in the tower
   const stackPlates = useMemo(() => {
     return [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 115, 130];
   }, []);
@@ -64,7 +67,6 @@ const MachineStackSvg = React.memo(({
       style={{ alignSelf: 'center' }}
     >
       <Defs>
-        {/* Chrome Guide Rod Gradient */}
         <LinearGradient id="chromeRod" x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0" stopColor="#4b5563" />
           <Stop offset="0.3" stopColor="#d1d5db" />
@@ -72,111 +74,94 @@ const MachineStackSvg = React.memo(({
           <Stop offset="0.85" stopColor="#9ca3af" />
           <Stop offset="1" stopColor="#374151" />
         </LinearGradient>
-        {/* Cast Iron Stack Plate Gradient */}
         <LinearGradient id="stackPlate" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#374151" />
           <Stop offset="0.3" stopColor="#1f2937" />
           <Stop offset="0.75" stopColor="#18202b" />
           <Stop offset="1" stopColor="#0f172a" />
         </LinearGradient>
-        {/* Active Plate Gradient */}
         <LinearGradient id="activeStackPlate" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#1d4ed8" />
           <Stop offset="0.4" stopColor="#0284c7" />
           <Stop offset="1" stopColor="#0369a1" />
         </LinearGradient>
-        {/* Steel Cable Gradient */}
         <LinearGradient id="cableGrad" x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0" stopColor="#64748b" />
           <Stop offset="0.5" stopColor="#e2e8f0" />
           <Stop offset="1" stopColor="#475569" />
         </LinearGradient>
-        {/* Pulley Wheel */}
         <LinearGradient id="pulleyWheel" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#334155" />
           <Stop offset="0.5" stopColor="#0f172a" />
           <Stop offset="1" stopColor="#1e293b" />
         </LinearGradient>
-        {/* Pin Knob (Bright Yellow / Neon) */}
         <LinearGradient id="pinKnob" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#fde047" />
-          <Stop offset="0.7" stopColor="#eab308" />
-          <Stop offset="1" stopColor="#a16207" />
+          <Stop offset="0.5" stopColor="#eab308" />
+          <Stop offset="1" stopColor="#ca8a04" />
+        </LinearGradient>
+        <LinearGradient id="towerFrame" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#0f172a" />
+          <Stop offset="0.5" stopColor="#1e293b" />
+          <Stop offset="1" stopColor="#0a0f1d" />
         </LinearGradient>
       </Defs>
 
-      {/* Frame Uprights (Tower structure) */}
-      <Rect x={80} y={16} width={8} height={196} rx={3} fill="#1e293b" stroke="#0f172a" strokeWidth={1} />
-      <Rect x={272} y={16} width={8} height={196} rx={3} fill="#1e293b" stroke="#0f172a" strokeWidth={1} />
-      {/* Top Crossbar */}
-      <Rect x={76} y={14} width={208} height={12} rx={3} fill="#1e293b" stroke="#0f172a" strokeWidth={1} />
-      {/* Bottom Base */}
-      <Rect x={72} y={204} width={216} height={12} rx={3} fill="#0f172a" />
+      {/* Outer Cage Frame */}
+      <Rect x={88} y={10} width={184} height={204} rx={14} fill="none" stroke="url(#towerFrame)" strokeWidth={7} />
+      <Rect x={76} y={208} width={208} height={10} rx={4} fill="#090d16" />
+      <Rect x={86} y={12} width={188} height={10} rx={3} fill="#0f172a" />
 
-      {/* Top Pulley Wheel & Bracket */}
-      <Rect x={170} y={12} width={20} height={14} fill="#0f172a" rx={2} />
-      <Circle cx={180} cy={26} r={14} fill="url(#pulleyWheel)" stroke="#475569" strokeWidth={1.5} />
-      <Circle cx={180} cy={26} r={5} fill="#94a3b8" />
+      {/* Chrome Guide Rods */}
+      <Rect x={ROD_L_X - 2.5} y={22} width={5} height={186} rx={2.5} fill="url(#chromeRod)" />
+      <Rect x={ROD_R_X - 2.5} y={22} width={5} height={186} rx={2.5} fill="url(#chromeRod)" />
 
-      {/* Chrome Dual Guide Rods */}
-      <Rect x={ROD_L_X - 3} y={26} width={6} height={178} rx={2} fill="url(#chromeRod)" />
-      <Rect x={ROD_R_X - 3} y={26} width={6} height={178} rx={2} fill="url(#chromeRod)" />
+      {/* Center Selector Stem */}
+      <Rect x={178.5} y={22} width={3} height={186} rx={1.5} fill="url(#chromeRod)" />
 
-      {/* Steel Cable running down from pulley into center selector stem */}
-      <Line x1={180} y1={26} x2={180} y2={STACK_START_Y + selectedIdx * (PLATE_H + PLATE_GAP)} stroke="url(#cableGrad)" strokeWidth={2.5} />
-
-      {/* Stack Plates */}
+      {/* Weight Stack Plates */}
       {stackPlates.map((w, idx) => {
         const y = STACK_START_Y + idx * (PLATE_H + PLATE_GAP);
         const isActive = idx === selectedIdx;
-        const isAboveActive = idx < selectedIdx;
+        const displayW = isImperial ? Math.round(w / LB_TO_KG) : w;
 
         return (
-          <G key={`stack-${w}`}>
-            {/* Plate Body */}
+          <G key={`m-stack-${w}`}>
             <Rect
               x={STACK_X}
               y={y}
               width={STACK_W}
               height={PLATE_H}
-              rx={2.5}
+              rx={2}
               fill={isActive ? 'url(#activeStackPlate)' : 'url(#stackPlate)'}
-              stroke={isActive ? '#38bdf8' : '#293548'}
-              strokeWidth={isActive ? 1.2 : 0.8}
+              stroke={isActive ? '#38bdf8' : '#334155'}
+              strokeWidth={isActive ? 1.4 : 0.8}
             />
 
             {/* Guide Rod cutouts */}
-            <Circle cx={ROD_L_X} cy={y + PLATE_H / 2} r={3.6} fill="#0f172a" />
-            <Circle cx={ROD_R_X} cy={y + PLATE_H / 2} r={3.6} fill="#0f172a" />
+            <Circle cx={ROD_L_X} cy={y + PLATE_H / 2} r={3.2} fill="#0f172a" />
+            <Circle cx={ROD_R_X} cy={y + PLATE_H / 2} r={3.2} fill="#0f172a" />
 
-            {/* Center Selector Pin Hole */}
-            <Circle
-              cx={STACK_X + STACK_W / 2}
-              cy={y + PLATE_H / 2}
-              r={3}
-              fill={isActive ? '#0284c7' : '#090d13'}
-              stroke="#475569"
-              strokeWidth={0.5}
-            />
+            {/* Center Pin Hole */}
+            <Circle cx={180} cy={y + PLATE_H / 2} r={2.5} fill="#090d16" />
 
-            {/* Weight Stamp Label */}
+            {/* Weight label on plate */}
             <SvgText
-              x={STACK_X + 10}
-              y={y + PLATE_H - 2.5}
+              x={STACK_X + 12}
+              y={y + PLATE_H - 2}
               fontFamily="sans-serif"
               fontSize={7.5}
               fontWeight="bold"
               fill={isActive ? '#ffffff' : '#94a3b8'}
             >
-              {w}
+              {displayW}
             </SvgText>
 
-            {/* Magnetic Selector Pin at Active Index */}
+            {/* Selector Pin */}
             {isActive && (
               <G>
-                {/* Pin Shaft entering center hole from right */}
                 <Line
-                  x1={STACK_X + STACK_W / 2}
+                  x1={180}
                   y1={y + PLATE_H / 2}
                   x2={STACK_X + STACK_W + 12}
                   y2={y + PLATE_H / 2}
@@ -184,21 +169,13 @@ const MachineStackSvg = React.memo(({
                   strokeWidth={3}
                   strokeLinecap="round"
                 />
-                {/* High-visibility Yellow Knob */}
                 <Circle
-                  cx={STACK_X + STACK_W + 14}
+                  cx={STACK_X + STACK_W + 13}
                   cy={y + PLATE_H / 2}
-                  r={6}
+                  r={5.5}
                   fill="url(#pinKnob)"
-                  stroke="#78350f"
-                  strokeWidth={1}
-                />
-                {/* Lanyard coil */}
-                <Path
-                  d={`M ${STACK_X + STACK_W + 14} ${y + PLATE_H / 2 + 6} Q ${STACK_X + STACK_W + 22} ${y + PLATE_H / 2 + 18} ${STACK_X + STACK_W + 10} ${y + PLATE_H / 2 + 24}`}
-                  stroke="#eab308"
-                  strokeWidth={1.2}
-                  fill="none"
+                  stroke="#854d0e"
+                  strokeWidth={0.8}
                 />
               </G>
             )}
@@ -206,6 +183,83 @@ const MachineStackSvg = React.memo(({
         );
       })}
     </Svg>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Machine Stack Pin Chip Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface MachineStackChipProps {
+  weightVal: number;
+  weightKg: number;
+  isSelected: boolean;
+  onSelect: () => void;
+  unit: string;
+  isDark: boolean;
+  plateIndex: number;
+}
+
+const MachineStackChip = React.memo(({
+  weightVal,
+  isSelected,
+  onSelect,
+  unit,
+  isDark,
+  plateIndex,
+}: MachineStackChipProps) => {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.75}
+      onPress={onSelect}
+      style={[
+        styles.stackChip,
+        {
+          backgroundColor: isSelected
+            ? (isDark ? '#0c2840' : '#E0F2FE')
+            : (isDark ? '#14171a' : '#F1F5F9'),
+          borderColor: isSelected
+            ? '#0284c7'
+            : (isDark ? '#23282d' : '#CBD5E1'),
+        },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`Select machine plate ${plateIndex + 1}, ${weightVal} ${unit}`}
+    >
+      <View style={styles.stackChipHeader}>
+        <Text style={[styles.plateIndexText, { color: isSelected ? '#0284c7' : (isDark ? '#626b75' : '#94A3B8') }]}>
+          #{plateIndex + 1}
+        </Text>
+        <View
+          style={[
+            styles.pinSlot,
+            {
+              backgroundColor: isSelected ? '#FACC15' : (isDark ? '#090b0d' : '#94A3B8'),
+              borderColor: isSelected ? '#CA8A04' : (isDark ? '#22262a' : '#E2E8F0'),
+            },
+          ]}
+        >
+          {isSelected && <View style={styles.pinGlow} />}
+        </View>
+      </View>
+
+      <View style={styles.stackChipBody}>
+        <Text
+          style={[
+            styles.stackChipNum,
+            {
+              color: isSelected ? '#0284c7' : (isDark ? '#F8FAFC' : '#0F172A'),
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {weightVal}
+        </Text>
+        <Text style={[styles.stackChipUnit, { color: isSelected ? '#0284c7' : (isDark ? '#8d979f' : '#64748B') }]}>
+          {unit}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 });
 
@@ -218,14 +272,28 @@ interface MachineBuilderProps {
   onWeightChange: (weightKg: number) => void;
 }
 
-const MachineBuilder = React.memo(({ initialConfig, onWeightChange }: MachineBuilderProps) => {
-  const { colors, isDark } = useTheme();
+const MachineBuilder = React.memo(({
+  initialConfig,
+  onWeightChange,
+}: MachineBuilderProps) => {
+  const { isDark } = useTheme();
   const { unitSystem } = useUnits();
   const { width: windowWidth } = useWindowDimensions();
   const isImperial = unitSystem === 'imperial';
   const unit = weightUnit(unitSystem);
 
   const [selectedKg, setSelectedKg] = useState<number>(initialConfig.selectedWeightKg || 40);
+
+  const prevInitWeightRef = useRef(initialConfig.selectedWeightKg);
+  useEffect(() => {
+    if (
+      initialConfig.selectedWeightKg !== undefined &&
+      initialConfig.selectedWeightKg !== prevInitWeightRef.current
+    ) {
+      prevInitWeightRef.current = initialConfig.selectedWeightKg;
+      setSelectedKg(initialConfig.selectedWeightKg);
+    }
+  }, [initialConfig.selectedWeightKg]);
 
   const svgWidth = useMemo(() => {
     const maxW = Platform.OS === 'web'
@@ -234,36 +302,36 @@ const MachineBuilder = React.memo(({ initialConfig, onWeightChange }: MachineBui
     return Math.max(280, maxW);
   }, [windowWidth]);
 
-  const availablePlates = useMemo(() => getPlateOptions(isImperial), [isImperial]);
-
-  const plateCounts = useMemo(() => {
-    return plateConfigFromSideWeight(selectedKg, availablePlates);
-  }, [selectedKg, availablePlates]);
+  // Realistic selectorized machine stack weights
+  const stackOptions = useMemo(() => {
+    if (isImperial) {
+      return MACHINE_STACK_WEIGHTS_LBS.map(lbs => ({
+        val: lbs,
+        kg: Math.round(lbs * LB_TO_KG * 10) / 10,
+      }));
+    }
+    return MACHINE_STACK_WEIGHTS_KG.map(kg => ({
+      val: kg,
+      kg,
+    }));
+  }, [isImperial]);
 
   const handleSelectWeight = useCallback((kg: number) => {
     setSelectedKg(kg);
     onWeightChange(kg);
   }, [onWeightChange]);
 
-  const handleAddPlate = useCallback((plateWeightKg: number) => {
-    setSelectedKg(prev => {
-      const next = Math.min(250, Math.round((prev + plateWeightKg) * 10) / 10);
-      onWeightChange(next);
-      return next;
-    });
-  }, [onWeightChange]);
-
-  const handleRemovePlate = useCallback((plateWeightKg: number) => {
-    setSelectedKg(prev => {
-      const next = Math.max(0, Math.round((prev - plateWeightKg) * 10) / 10);
-      onWeightChange(next);
-      return next;
-    });
-  }, [onWeightChange]);
-
   const handleStep = useCallback((deltaKg: number) => {
     setSelectedKg(prev => {
       const next = Math.max(0, Math.min(250, Math.round((prev + deltaKg) * 10) / 10));
+      onWeightChange(next);
+      return next;
+    });
+  }, [onWeightChange]);
+
+  const handleAddFractional = useCallback((addKg: number) => {
+    setSelectedKg(prev => {
+      const next = Math.max(0, Math.min(250, Math.round((prev + addKg) * 10) / 10));
       onWeightChange(next);
       return next;
     });
@@ -277,7 +345,7 @@ const MachineBuilder = React.memo(({ initialConfig, onWeightChange }: MachineBui
       <View style={[styles.heroCard, { backgroundColor: isDark ? '#111416' : '#F8FAFC', borderColor: isDark ? '#22262a' : '#E2E8F0' }]}>
         <View style={styles.badge}>
           <Text style={[styles.badgeText, { backgroundColor: isDark ? '#070809' : '#EDE9FE', color: isDark ? '#929ba5' : '#6D28D9', borderColor: isDark ? '#22262a' : '#DDD6FE' }]}>
-            {displayVal} {unit.toUpperCase()} · PIN SELECTOR
+            {displayVal} {unit.toUpperCase()} · PIN SELECTOR STACK
           </Text>
         </View>
 
@@ -288,15 +356,15 @@ const MachineBuilder = React.memo(({ initialConfig, onWeightChange }: MachineBui
         />
       </View>
 
-      {/* Weight Selector Card - Plate Chips like for Barbell */}
+      {/* Weight Selector Card - Selectorized Pin Stack */}
       <View style={[styles.selectorCard, { backgroundColor: isDark ? '#111416' : '#FFFFFF', borderColor: isDark ? '#22262a' : '#E2E8F0' }]}>
         <View style={styles.secHead}>
           <View>
             <Text style={[styles.secTitle, { color: isDark ? '#f5f7f8' : '#0F172A' }]}>
-              Insert weight plates
+              Machine Weight Stack Pin
             </Text>
             <Text style={[styles.secNote, { color: isDark ? '#626b75' : '#94A3B8' }]}>
-              {displayVal} {unit} loaded on machine
+              {displayVal} {unit} selectorized stack
             </Text>
           </View>
 
@@ -304,7 +372,7 @@ const MachineBuilder = React.memo(({ initialConfig, onWeightChange }: MachineBui
           <View style={[styles.miniStepper, { backgroundColor: isDark ? '#171a1d' : '#F1F5F9', borderColor: isDark ? '#22262a' : '#E2E8F0' }]}>
             <TouchableOpacity
               style={styles.miniStepBtn}
-              onPress={() => handleStep(isImperial ? -0.5 * 0.453592 : -0.5)}
+              onPress={() => handleStep(isImperial ? -0.5 * LB_TO_KG : -0.5)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
               accessibilityLabel="Decrease weight"
@@ -314,80 +382,36 @@ const MachineBuilder = React.memo(({ initialConfig, onWeightChange }: MachineBui
             <Text style={[styles.miniStepVal, { color: isDark ? '#f5f7f8' : '#0F172A' }]}>{displayVal}</Text>
             <TouchableOpacity
               style={styles.miniStepBtn}
-              onPress={() => handleStep(isImperial ? 0.5 * 0.453592 : 0.5)}
+              onPress={() => handleStep(isImperial ? 0.5 * LB_TO_KG : 0.5)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityRole="button"
               accessibilityLabel="Increase weight"
             >
-              <Text style={[styles.miniStepBtnText, { color: '#16a9ff' }]}>+</Text>
+              <Text style={[styles.miniStepBtnText, { color: '#0284c7' }]}>+</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Plate Chips Scroller with Steppers (+ / −) like Barbell */}
+        {/* Stack Pin Plate Chips Scroller */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsScroll}
           keyboardShouldPersistTaps="handled"
         >
-          {availablePlates.map(p => (
-            <PlateChip
-              key={p.weightKg}
-              plate={p}
-              quantity={plateCounts[p.weightKg] ?? 0}
-              onAdd={() => handleAddPlate(p.weightKg)}
-              onRemove={() => handleRemovePlate(p.weightKg)}
-              isImperial={isImperial}
-            />
-          ))}
-        </ScrollView>
-
-        {/* Quick Stack Presets */}
-        <View style={styles.quickPresetHead}>
-          <Text style={[styles.quickPresetTitle, { color: isDark ? '#929ba5' : '#64748B' }]}>
-            Quick stack presets
-          </Text>
-          {selectedKg > 0 && (
-            <TouchableOpacity onPress={() => handleSelectWeight(0)}>
-              <Text style={styles.clearBtnText}>Reset to 0</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.presetsScroll}
-          keyboardShouldPersistTaps="handled"
-        >
-          {MACHINE_WEIGHTS_KG.slice(0, 16).map(kg => {
-            const isSelected = Math.abs(kg - selectedKg) < 0.2;
-            const chipDisplay = formatWeightValue(kg, unitSystem);
+          {stackOptions.map((opt, idx) => {
+            const isSelected = Math.abs(opt.kg - selectedKg) < 0.25;
             return (
-              <TouchableOpacity
-                key={kg}
-                style={[
-                  styles.presetChip,
-                  {
-                    backgroundColor: isSelected
-                      ? 'rgba(22, 169, 255, 0.12)'
-                      : isDark ? '#171a1d' : '#F1F5F9',
-                    borderColor: isSelected
-                      ? '#16a9ff'
-                      : isDark ? '#22262a' : '#E2E8F0',
-                  },
-                ]}
-                onPress={() => handleSelectWeight(kg)}
-                accessibilityRole="button"
-                accessibilityLabel={`Select ${chipDisplay} ${unit} preset`}
-              >
-                <Text style={[styles.presetChipNum, { color: isSelected ? '#16a9ff' : (isDark ? '#f5f7f8' : '#0F172A') }]}>
-                  {chipDisplay}
-                </Text>
-                <Text style={[styles.presetChipUnit, { color: isDark ? '#626b75' : '#94A3B8' }]}>
-                  {unit}
-                </Text>
-              </TouchableOpacity>
+              <MachineStackChip
+                key={`machine-opt-${opt.val}`}
+                plateIndex={idx}
+                weightVal={opt.val}
+                weightKg={opt.kg}
+                isSelected={isSelected}
+                onSelect={() => handleSelectWeight(opt.kg)}
+                unit={unit}
+                isDark={isDark}
+              />
             );
           })}
         </ScrollView>
@@ -475,7 +499,80 @@ const styles = StyleSheet.create({
   },
   chipsScroll: {
     gap: 8,
-    paddingVertical: 2,
+    paddingVertical: 4,
+  },
+  stackChip: {
+    width: 78,
+    height: 60,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    justifyContent: 'space-between',
+  },
+  stackChipHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  plateIndexText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 9.5,
+  },
+  pinSlot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1.2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinGlow: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ffffff',
+  },
+  stackChipBody: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 3,
+  },
+  stackChipNum: {
+    fontFamily: FONTS.heading,
+    fontSize: 17,
+    letterSpacing: -0.4,
+  },
+  stackChipUnit: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+  },
+  addonSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  addonLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 11.5,
+  },
+  addonRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  addonChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  addonChipText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
   },
   quickPresetHead: {
     flexDirection: 'row',
@@ -500,7 +597,7 @@ const styles = StyleSheet.create({
   },
   presetChip: {
     paddingHorizontal: 12,
-    height: 38,
+    height: 36,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
@@ -516,23 +613,5 @@ const styles = StyleSheet.create({
   presetChipUnit: {
     fontFamily: FONTS.bodyBold,
     fontSize: 9.5,
-  },
-  weightChip: {
-    width: 62,
-    height: 60,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 1,
-  },
-  weightChipNum: {
-    fontFamily: FONTS.heading,
-    fontSize: 16,
-    letterSpacing: -0.3,
-  },
-  weightChipUnit: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 10,
   },
 });

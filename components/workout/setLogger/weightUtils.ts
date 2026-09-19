@@ -22,7 +22,8 @@ export function calculateEquipmentWeight(
     case 'barbell':
     case 'ez_barbell':
     case 'olympic_barbell':
-    case 'trap_bar': {
+    case 'trap_bar':
+    case 'smith_machine': {
       const platesTotal = calcPlatesTotal(config.plateQuantities);
       const total = Math.round((config.barWeightKg + platesTotal) * 100) / 100;
       const perSide = Math.round((platesTotal / 2) * 100) / 100;
@@ -35,7 +36,27 @@ export function calculateEquipmentWeight(
         totalWeightKg: total,
         displayWeight: `${displayTotal} ${unit}`,
         perSideKg: perSide,
-        details: `${barDisplay}${unit} bar · ${sideDisplay}${unit}/side`,
+        details: config.type === 'smith_machine'
+          ? `${barDisplay}${unit} smith bar · ${sideDisplay}${unit}/side`
+          : `${barDisplay}${unit} bar · ${sideDisplay}${unit}/side`,
+      };
+    }
+
+    case 'plate_loaded_machine': {
+      const platesTotal = calcPlatesTotal(config.plateQuantities);
+      const base = config.startingResistanceKg || 0;
+      const total = Math.round((base + platesTotal) * 100) / 100;
+      const perSide = Math.round((platesTotal / 2) * 100) / 100;
+      const displayTotal = formatWeightValue(total, unitSystem);
+      const sideDisplay = formatWeightValue(perSide, unitSystem);
+
+      return {
+        totalWeightKg: total,
+        displayWeight: `${displayTotal} ${unit}`,
+        perSideKg: perSide,
+        details: base > 0
+          ? `${formatWeightValue(base, unitSystem)}${unit} sled · ${sideDisplay}${unit}/peg`
+          : `plate-loaded · ${sideDisplay}${unit}/peg`,
       };
     }
 

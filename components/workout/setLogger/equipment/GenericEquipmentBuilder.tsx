@@ -1,11 +1,10 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Platform,
 } from 'react-native';
 import Svg, {
   Defs, LinearGradient, Stop, Rect, Circle, Ellipse, Line, G, Text as SvgText,
 } from 'react-native-svg';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../../contexts/ThemeContext';
 import { useUnits } from '../../../../contexts/UnitContext';
 import { FONTS } from '../../../../constants/theme';
@@ -373,6 +372,17 @@ const GenericEquipmentBuilder = React.memo(({
   const svgWidth = Math.min(360, Math.max(280, screenWidth - 48));
 
   const [weightKg, setWeightKg] = useState(initialConfig.selectedWeightKg || 20);
+
+  const prevInitWeightRef = useRef(initialConfig.selectedWeightKg);
+  useEffect(() => {
+    if (
+      initialConfig.selectedWeightKg !== undefined &&
+      initialConfig.selectedWeightKg !== prevInitWeightRef.current
+    ) {
+      prevInitWeightRef.current = initialConfig.selectedWeightKg;
+      setWeightKg(initialConfig.selectedWeightKg);
+    }
+  }, [initialConfig.selectedWeightKg]);
 
   const availablePlates = useMemo(() => getPlateOptions(isImperial), [isImperial]);
 

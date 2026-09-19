@@ -323,7 +323,7 @@ const BarbellSvg = React.memo(({ config, availablePlates, isImperial, width: svg
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface BarbellBuilderProps {
-  equipmentType: 'barbell' | 'ez_barbell' | 'olympic_barbell' | 'trap_bar';
+  equipmentType: 'barbell' | 'ez_barbell' | 'olympic_barbell' | 'trap_bar' | 'smith_machine';
   initialConfig: BarbellConfig;
   isApproximate?: boolean;
   onWeightChange: (weightKg: number) => void;
@@ -339,6 +339,14 @@ const BarbellBuilder = React.memo(({
 
   const [config, setConfig] = useState<BarbellConfig>(initialConfig);
   const configRef = useRef(config);
+
+  const prevInitialConfigRef = useRef(initialConfig);
+  useEffect(() => {
+    if (initialConfig && initialConfig !== prevInitialConfigRef.current) {
+      prevInitialConfigRef.current = initialConfig;
+      setConfig(initialConfig);
+    }
+  }, [initialConfig]);
 
   const availablePlates = useMemo(() => getPlateOptions(isImperial), [isImperial]);
 
@@ -405,7 +413,8 @@ const BarbellBuilder = React.memo(({
 
   const barLabel = equipmentType === 'ez_barbell' ? 'EZ Bar' :
     equipmentType === 'trap_bar' ? 'Trap Bar' :
-    equipmentType === 'olympic_barbell' ? 'Olympic Bar' : 'Barbell';
+    equipmentType === 'olympic_barbell' ? 'Olympic Bar' :
+    equipmentType === 'smith_machine' ? 'Smith Machine Bar' : 'Barbell';
 
   return (
     <View style={styles.container}>

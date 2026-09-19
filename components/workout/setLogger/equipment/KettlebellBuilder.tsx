@@ -231,7 +231,7 @@ const KettlebellBuilder = React.memo(({ initialConfig, onWeightChange }: Kettleb
           contentContainerStyle={styles.chipsScroll}
           keyboardShouldPersistTaps="handled"
         >
-          {KETTLEBELL_WEIGHTS_KG.map(kg => {
+          {KETTLEBELL_WEIGHTS_KG.map((kg: number) => {
             const isSelected = Math.abs(kg - selectedKg) < 0.2;
             const chipDisplay = formatWeightValue(kg, unitSystem);
             return (

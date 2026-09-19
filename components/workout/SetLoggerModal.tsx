@@ -59,13 +59,13 @@ const SetLoggerModal = React.memo(({
   const isWeb = Platform.OS === 'web';
   const isDesktopWeb = isWeb && windowWidth >= 768;
 
-  const isCardio = activeExercise?.category?.toLowerCase() === 'cardio';
-  const isBodyweight = activeExercise?.equipment?.toLowerCase() === 'body weight';
-  const isEditing = !!editingSet;
   const equipmentType = useMemo(
     () => normalizeEquipment(activeExercise?.equipment),
     [activeExercise?.equipment],
   );
+  const isCardio = activeExercise?.category?.toLowerCase() === 'cardio' || equipmentType === 'cardio';
+  const isBodyweight = equipmentType === 'body_weight';
+  const isEditing = !!editingSet;
 
   // ── Internal weight state (kg) managed by equipment builders ────────────────
   const [internalWeightKg, setInternalWeightKg] = useState<number>(
@@ -125,9 +125,18 @@ const SetLoggerModal = React.memo(({
   const panelMaxWidth = isDesktopWeb ? Math.min(windowWidth - 48, 540) : windowWidth;
   const bottomPad = Math.max(insets.bottom, 16) + (isDesktopWeb ? 16 : keyboardHeight > 0 ? keyboardHeight : 16);
 
+  // Explicit responsive sheet height for mobile to prevent React Native Yoga flex collapse
+  const sheetHeight = isDesktopWeb
+    ? undefined
+    : isCardio
+      ? Math.round(windowHeight * 0.52)
+      : isBodyweight
+        ? Math.round(windowHeight * 0.58)
+        : Math.min(Math.round(windowHeight * 0.88), 780);
+
   const translateY = setModalSlideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [700, 0],
+    outputRange: [windowHeight, 0],
   });
 
   // ─── Content ─────────────────────────────────────────────────────────────
@@ -141,7 +150,8 @@ const SetLoggerModal = React.memo(({
           paddingBottom: bottomPad,
           maxWidth: panelMaxWidth,
           width: isDesktopWeb ? panelMaxWidth : '100%',
-          maxHeight: isDesktopWeb ? ('88vh' as any) : Math.round(windowHeight * 0.90),
+          height: sheetHeight,
+          maxHeight: isDesktopWeb ? ('88vh' as any) : sheetHeight,
           borderTopLeftRadius: isDesktopWeb ? 24 : 26,
           borderTopRightRadius: isDesktopWeb ? 24 : 26,
           borderBottomLeftRadius: isDesktopWeb ? 24 : 0,
@@ -174,6 +184,7 @@ const SetLoggerModal = React.memo(({
         style={{ flex: 1, width: '100%' }}
         showsVerticalScrollIndicator={true}
         keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled={true}
         contentContainerStyle={[
           styles.scrollContent,
           isDesktopWeb && styles.scrollContentDesktop,
@@ -190,7 +201,7 @@ const SetLoggerModal = React.memo(({
         {/* Equipment Hero Visual + Controls */}
         {!isCardio && (
           <EquipmentRenderer
-            key={`equip-${internalWeightKg}-${equipmentType}`}
+            key={`equip-${equipmentType}`}
             rawEquipment={activeExercise?.equipment}
             storedWeightKg={internalWeightKg}
             isEditing={isEditing || internalWeightKg > 0}
@@ -323,6 +334,7 @@ const styles = StyleSheet.create({
   mobileSheet: {
     width: '100%',
     alignSelf: 'stretch',
+    overflow: 'hidden',
   },
   webScrollContainer: {
     width: '100%',

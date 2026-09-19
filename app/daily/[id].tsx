@@ -422,10 +422,10 @@ export default function ActiveWorkoutScreen() {
     setSetModalVisible(true);
     Animated.parallel([
       Animated.spring(setModalSlideAnim, {
-        toValue: 1, useNativeDriver: true, tension: 60, friction: 10,
+        toValue: 1, useNativeDriver: true, tension: 90, friction: 11,
       }),
       Animated.timing(setModalFadeAnim, {
-        toValue: 1, duration: 200, useNativeDriver: true,
+        toValue: 1, duration: 160, useNativeDriver: true,
       }),
     ]).start();
   }, []);

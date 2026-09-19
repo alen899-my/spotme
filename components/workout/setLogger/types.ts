@@ -8,6 +8,8 @@ export type EquipmentType =
   | 'ez_barbell'
   | 'olympic_barbell'
   | 'trap_bar'
+  | 'smith_machine'
+  | 'plate_loaded_machine'
   | 'dumbbell'
   | 'cable'
   | 'machine'
@@ -61,8 +63,14 @@ export type PlateQuantityMap = Record<number, number>;
 // ─── Equipment Configuration ──────────────────────────────────────────────────
 
 export interface BarbellConfig {
-  type: 'barbell' | 'ez_barbell' | 'olympic_barbell' | 'trap_bar';
+  type: 'barbell' | 'ez_barbell' | 'olympic_barbell' | 'trap_bar' | 'smith_machine';
   barWeightKg: number;
+  plateQuantities: PlateQuantityMap;
+}
+
+export interface PlateLoadedMachineConfig {
+  type: 'plate_loaded_machine';
+  startingResistanceKg: number;
   plateQuantities: PlateQuantityMap;
 }
 
@@ -104,6 +112,7 @@ export interface GenericConfig {
 
 export type EquipmentConfiguration =
   | BarbellConfig
+  | PlateLoadedMachineConfig
   | DumbbellConfig
   | KettlebellConfig
   | CableConfig

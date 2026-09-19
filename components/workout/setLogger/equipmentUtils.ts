@@ -10,6 +10,7 @@ import {
   PlateSwatch,
   EquipmentPreset,
   BarbellConfig,
+  PlateLoadedMachineConfig,
   DumbbellConfig,
   KettlebellConfig,
   CableConfig,
@@ -23,28 +24,76 @@ import {
 // ─── Normalization ────────────────────────────────────────────────────────────
 
 const EQUIPMENT_MAP: Record<string, EquipmentType> = {
-  'barbell':          'barbell',
-  'olympic barbell':  'olympic_barbell',
-  'olympic_barbell':  'olympic_barbell',
-  'ez barbell':       'ez_barbell',
-  'ez_barbell':       'ez_barbell',
-  'ez bar':           'ez_barbell',
-  'trap bar':         'trap_bar',
-  'trap_bar':         'trap_bar',
-  'dumbbell':         'dumbbell',
-  'dumbbells':        'dumbbell',
-  'cable':            'cable',
-  'machine':          'machine',
-  'leverage machine': 'machine',
-  'smith machine':    'machine',
-  'kettlebell':       'kettlebell',
-  'band':             'band',
-  'resistance band':  'band',
-  'assisted':         'band',
-  'body weight':      'body_weight',
-  'bodyweight':       'body_weight',
-  'body_weight':      'body_weight',
-  'cardio':           'cardio',
+  // Free weights & Barbells
+  'barbell':              'barbell',
+  'olympic barbell':      'olympic_barbell',
+  'olympic_barbell':      'olympic_barbell',
+  'ez barbell':           'ez_barbell',
+  'ez_barbell':           'ez_barbell',
+  'ez bar':               'ez_barbell',
+  'ez-bar':               'ez_barbell',
+  'trap bar':             'trap_bar',
+  'trap_bar':             'trap_bar',
+  'hex bar':              'trap_bar',
+  'smith machine':        'smith_machine',
+  'smith_machine':        'smith_machine',
+  'smith':                'smith_machine',
+
+  // Dumbbells
+  'dumbbell':             'dumbbell',
+  'dumbbells':            'dumbbell',
+
+  // Kettlebell
+  'kettlebell':           'kettlebell',
+  'kettlebells':          'kettlebell',
+
+  // Cables
+  'cable':                'cable',
+  'cables':               'cable',
+  'cable machine':        'cable',
+
+  // Selectorized Pin Stack Machines
+  'machine':              'machine',
+  'pin machine':          'machine',
+  'selectorized':         'machine',
+
+  // Plate-Loaded Machines
+  'leverage machine':     'plate_loaded_machine',
+  'sled machine':         'plate_loaded_machine',
+  'plate loaded':         'plate_loaded_machine',
+  'plate loaded machine': 'plate_loaded_machine',
+  'plate_loaded':         'plate_loaded_machine',
+
+  // Bands & Assisted
+  'band':                 'band',
+  'resistance band':      'band',
+  'bands':                'band',
+  'assisted':             'band',
+
+  // Bodyweight & Mobility (Timer + Reps only, no weight plate UI)
+  'body weight':          'body_weight',
+  'bodyweight':           'body_weight',
+  'body_weight':          'body_weight',
+  'calisthenics':         'body_weight',
+  'wheel roller':         'body_weight',
+  'roller':               'body_weight',
+  'bosu ball':            'body_weight',
+  'stability ball':       'body_weight',
+
+  // Cardio (Duration timer only)
+  'cardio':               'cardio',
+  'elliptical machine':   'cardio',
+  'stationary bike':      'cardio',
+  'stepmill machine':     'cardio',
+  'skierg machine':       'cardio',
+  'upper body ergometer': 'cardio',
+  'rope':                 'cardio',
+
+  // Generic / Weighted / Functional
+  'weighted':             'generic',
+  'medicine ball':        'generic',
+  'hammer':               'generic',
+  'tire':                 'generic',
 };
 
 export function normalizeEquipment(raw: string | null | undefined): EquipmentType {
@@ -56,10 +105,12 @@ export function normalizeEquipment(raw: string | null | undefined): EquipmentTyp
 // ─── Bar weights (kg) ─────────────────────────────────────────────────────────
 
 export const BAR_WEIGHTS: Record<string, number> = {
-  barbell:         20,
-  olympic_barbell: 20,
-  ez_barbell:      10,
-  trap_bar:        25,
+  barbell:              20,
+  olympic_barbell:      20,
+  ez_barbell:           10,
+  trap_bar:             25,
+  smith_machine:        15, // Standard counterbalanced smith bar tare
+  plate_loaded_machine: 0,
 };
 
 export function getBarWeightKg(type: EquipmentType): number {
@@ -149,9 +200,25 @@ export const DUMBBELL_WEIGHTS_KG = STANDARD_WEIGHT_CHIPS_KG;
 
 export const KETTLEBELL_WEIGHTS_KG = STANDARD_WEIGHT_CHIPS_KG;
 
-export const CABLE_WEIGHTS_KG = STANDARD_WEIGHT_CHIPS_KG;
+export const CABLE_STACK_WEIGHTS_KG: number[] = [
+  2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 100,
+];
 
-export const MACHINE_WEIGHTS_KG = STANDARD_WEIGHT_CHIPS_KG;
+export const CABLE_STACK_WEIGHTS_LBS: number[] = [
+  5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 180, 200,
+];
+
+export const MACHINE_STACK_WEIGHTS_KG: number[] = [
+  5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 110, 120, 130, 140, 150,
+];
+
+export const MACHINE_STACK_WEIGHTS_LBS: number[] = [
+  10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 175, 190, 205, 220, 250, 275, 300,
+];
+
+export const CABLE_WEIGHTS_KG = CABLE_STACK_WEIGHTS_KG;
+
+export const MACHINE_WEIGHTS_KG = MACHINE_STACK_WEIGHTS_KG;
 
 // ─── Plate decomposition ──────────────────────────────────────────────────────
 
@@ -205,11 +272,18 @@ export function getDefaultConfig(type: EquipmentType): EquipmentConfiguration {
     case 'olympic_barbell':
     case 'ez_barbell':
     case 'trap_bar':
+    case 'smith_machine':
       return {
         type,
         barWeightKg: getBarWeightKg(type),
         plateQuantities: {},
       } as BarbellConfig;
+    case 'plate_loaded_machine':
+      return {
+        type: 'plate_loaded_machine',
+        startingResistanceKg: 0,
+        plateQuantities: {},
+      } as PlateLoadedMachineConfig;
     case 'dumbbell':
       return { type: 'dumbbell', weightPerDumbbell: 10 } as DumbbellConfig;
     case 'kettlebell':
@@ -241,13 +315,25 @@ export function resolveVisualConfigFromWeight(
     case 'barbell':
     case 'olympic_barbell':
     case 'ez_barbell':
-    case 'trap_bar': {
+    case 'trap_bar':
+    case 'smith_machine': {
       const barWeight = getBarWeightKg(equipment);
       const sideWeight = (storedWeightKg - barWeight) / 2;
       const plateQuantities = sideWeight > 0
         ? plateConfigFromSideWeight(sideWeight, plates)
         : {};
       return { type: equipment, barWeightKg: barWeight, plateQuantities } as BarbellConfig;
+    }
+    case 'plate_loaded_machine': {
+      const sideWeight = storedWeightKg / 2;
+      const plateQuantities = sideWeight > 0
+        ? plateConfigFromSideWeight(sideWeight, plates)
+        : {};
+      return {
+        type: 'plate_loaded_machine',
+        startingResistanceKg: 0,
+        plateQuantities,
+      } as PlateLoadedMachineConfig;
     }
     case 'dumbbell':
       return { type: 'dumbbell', weightPerDumbbell: storedWeightKg / 2 || storedWeightKg } as DumbbellConfig;
@@ -282,7 +368,8 @@ export function getPlateSwatchesForWeight(
     equipment === 'barbell' ||
     equipment === 'olympic_barbell' ||
     equipment === 'ez_barbell' ||
-    equipment === 'trap_bar'
+    equipment === 'trap_bar' ||
+    equipment === 'smith_machine'
   ) {
     const barWeight = getBarWeightKg(equipment);
     const sideWeight = (totalWeightKg - barWeight) / 2;
@@ -292,6 +379,32 @@ export function getPlateSwatchesForWeight(
     const swatches: PlateSwatch[] = [];
 
     // Sort descending
+    const sortedWeights = Object.keys(quantities || {})
+      .map(Number)
+      .sort((a, b) => b - a);
+
+    for (const w of sortedWeights) {
+      const count = quantities[w];
+      const opt = plates.find(p => Math.abs(p.weightKg - w) < 0.05);
+      const label = opt ? opt.label : String(w);
+      const spec = specMap[parseFloat(label)] ?? { face: opt?.color ?? '#2b2f34' };
+      for (let i = 0; i < count; i++) {
+        swatches.push({
+          color: spec.face,
+          label,
+          weightKg: w,
+        });
+      }
+    }
+    return swatches;
+  }
+
+  if (equipment === 'plate_loaded_machine') {
+    const sideWeight = totalWeightKg / 2;
+    if (sideWeight <= 0) return [];
+
+    const quantities = plateConfigFromSideWeight(sideWeight, plates);
+    const swatches: PlateSwatch[] = [];
     const sortedWeights = Object.keys(quantities || {})
       .map(Number)
       .sort((a, b) => b - a);
@@ -353,9 +466,13 @@ export function getDefaultPresets(
           equipment === 'barbell' ||
           equipment === 'olympic_barbell' ||
           equipment === 'ez_barbell' ||
-          equipment === 'trap_bar'
+          equipment === 'trap_bar' ||
+          equipment === 'smith_machine'
         ) {
           const sideW = Math.max(0, (wKg - barWeightKg) / 2);
+          plateMap = plateConfigFromSideWeight(sideW, plates);
+        } else if (equipment === 'plate_loaded_machine') {
+          const sideW = Math.max(0, wKg / 2);
           plateMap = plateConfigFromSideWeight(sideW, plates);
         }
 
@@ -381,7 +498,8 @@ export function getDefaultPresets(
     equipment === 'barbell' ||
     equipment === 'olympic_barbell' ||
     equipment === 'ez_barbell' ||
-    equipment === 'trap_bar'
+    equipment === 'trap_bar' ||
+    equipment === 'smith_machine'
   ) {
     if (isImperial) {
       // e.g. 135 lb (45s), 185 lb (45 + 25), 225 lb (45 + 45)
@@ -454,11 +572,83 @@ export function getDefaultPresets(
     }
   }
 
+  if (equipment === 'plate_loaded_machine') {
+    if (isImperial) {
+      const p45 = 45 * LB_TO_KG;
+      const p25 = 25 * LB_TO_KG;
+      return [
+        {
+          id: 'pre-plm-1',
+          plates: { [p45]: 2 },
+          reps: 8,
+          totalWeightKg: p45 * 4,
+          label: '90 lb/peg',
+          swatches: [
+            { color: SPEC_LBS[45].face, label: '45', weightKg: p45 },
+            { color: SPEC_LBS[45].face, label: '45', weightKg: p45 },
+          ],
+        },
+        {
+          id: 'pre-plm-2',
+          plates: { [p45]: 1, [p25]: 1 },
+          reps: 10,
+          totalWeightKg: (p45 + p25) * 2,
+          label: '70 lb/peg',
+          swatches: [
+            { color: SPEC_LBS[45].face, label: '45', weightKg: p45 },
+            { color: SPEC_LBS[25].face, label: '25', weightKg: p25 },
+          ],
+        },
+        {
+          id: 'pre-plm-3',
+          plates: { [p45]: 1 },
+          reps: 12,
+          totalWeightKg: p45 * 2,
+          label: '45 lb/peg',
+          swatches: [{ color: SPEC_LBS[45].face, label: '45', weightKg: p45 }],
+        },
+      ];
+    } else {
+      return [
+        {
+          id: 'pre-plm-1',
+          plates: { 20: 2 },
+          reps: 8,
+          totalWeightKg: 80,
+          label: '40 kg/peg',
+          swatches: [
+            { color: SPEC_KG[20].face, label: '20', weightKg: 20 },
+            { color: SPEC_KG[20].face, label: '20', weightKg: 20 },
+          ],
+        },
+        {
+          id: 'pre-plm-2',
+          plates: { 20: 1, 10: 1 },
+          reps: 10,
+          totalWeightKg: 60,
+          label: '30 kg/peg',
+          swatches: [
+            { color: SPEC_KG[20].face, label: '20', weightKg: 20 },
+            { color: SPEC_KG[10].face, label: '10', weightKg: 10 },
+          ],
+        },
+        {
+          id: 'pre-plm-3',
+          plates: { 20: 1 },
+          reps: 12,
+          totalWeightKg: 40,
+          label: '20 kg/peg',
+          swatches: [{ color: SPEC_KG[20].face, label: '20', weightKg: 20 }],
+        },
+      ];
+    }
+  }
+
   if (equipment === 'dumbbell') {
     return [
-      { id: 'pre-1', weightKg: 24, reps: 8, totalWeightKg: 24 * 2, label: '24 kg each', swatches: [{ color: '#16a9ff', label: '24', weightKg: 24 }] },
-      { id: 'pre-2', weightKg: 20, reps: 10, totalWeightKg: 20 * 2, label: '20 kg each', swatches: [{ color: '#16a9ff', label: '20', weightKg: 20 }] },
-      { id: 'pre-3', weightKg: 16, reps: 12, totalWeightKg: 16 * 2, label: '16 kg each', swatches: [{ color: '#16a9ff', label: '16', weightKg: 16 }] },
+      { id: 'pre-1', weightKg: 24, reps: 8, totalWeightKg: 24 * 2, label: '24 kg each', swatches: [{ color: getDumbbellStyle(24).color, label: '24', weightKg: 24 }] },
+      { id: 'pre-2', weightKg: 20, reps: 10, totalWeightKg: 20 * 2, label: '20 kg each', swatches: [{ color: getDumbbellStyle(20).color, label: '20', weightKg: 20 }] },
+      { id: 'pre-3', weightKg: 16, reps: 12, totalWeightKg: 16 * 2, label: '16 kg each', swatches: [{ color: getDumbbellStyle(16).color, label: '16', weightKg: 16 }] },
     ];
   }
 
@@ -492,103 +682,102 @@ export interface DumbbellStyleSpec {
   cornerRadius: number;
 }
 
-export function getDumbbellStyle(weightKg: number): DumbbellStyleSpec {
-  if (weightKg <= 2.5) {
-    return {
-      color: '#06B6D4',
-      accent: '#67E8F9',
-      darkColor: '#0E7490',
-      headHeight: 28,
-      headWidth: 14,
-      cornerRadius: 6,
-    };
+/**
+ * Curated distinct colors for every dumbbell weight.
+ * Every single standard weight and common increment has a completely unique color.
+ */
+const DUMBBELL_EXACT_COLORS: Record<number, { color: string; accent: string; darkColor: string }> = {
+  0.5:  { color: '#64748B', accent: '#94A3B8', darkColor: '#334155' }, // Slate Pearl
+  1:    { color: '#06B6D4', accent: '#67E8F9', darkColor: '#0E7490' }, // Arctic Cyan
+  1.5:  { color: '#38BDF8', accent: '#7DD3FC', darkColor: '#0284C7' }, // Sky Frost
+  2:    { color: '#0EA5E9', accent: '#38BDF8', darkColor: '#0369A1' }, // Pacific Aqua
+  2.5:  { color: '#14B8A6', accent: '#5EEAD4', darkColor: '#0F766E' }, // Mint Teal
+  3:    { color: '#2DD4BF', accent: '#99F6E4', darkColor: '#115E59' }, // Seafoam
+  4:    { color: '#10B981', accent: '#6EE7B7', darkColor: '#047857' }, // Jade Green
+  5:    { color: '#059669', accent: '#34D399', darkColor: '#064E3B' }, // Vibrant Emerald
+  6:    { color: '#84CC16', accent: '#BEF264', darkColor: '#4D7C0F' }, // Lime Apple
+  7:    { color: '#65A30D', accent: '#A3E635', darkColor: '#3F6212' }, // Citron
+  7.5:  { color: '#EAB308', accent: '#FDE047', darkColor: '#A16207' }, // Solar Yellow
+  8:    { color: '#F59E0B', accent: '#FCD34D', darkColor: '#B45309' }, // Amber Gold
+  9:    { color: '#D97706', accent: '#FBBF24', darkColor: '#92400E' }, // Ochre
+  10:   { color: '#F97316', accent: '#FDBA74', darkColor: '#C2410C' }, // Blaze Orange
+  11:   { color: '#EA580C', accent: '#FB923C', darkColor: '#9A3412' }, // Rust Copper
+  12:   { color: '#FB7185', accent: '#FDA4AF', darkColor: '#E11D48' }, // Coral Punch
+  12.5: { color: '#F43F5E', accent: '#FECDD3', darkColor: '#BE123C' }, // Flamingo Rose
+  13:   { color: '#E11D48', accent: '#FB7185', darkColor: '#9F1239' }, // Crimson Flame
+  14:   { color: '#DC2626', accent: '#F87171', darkColor: '#991B1B' }, // Ruby Red
+  15:   { color: '#EF4444', accent: '#FCA5A5', darkColor: '#B91C1C' }, // Olympic Scarlet
+  16:   { color: '#BE185D', accent: '#F472B6', darkColor: '#831843' }, // Rose Wine
+  17:   { color: '#C026D3', accent: '#E879F9', darkColor: '#86198F' }, // Fuchsia Berry
+  17.5: { color: '#D946EF', accent: '#F0ABFC', darkColor: '#A21CAF' }, // Neon Orchid
+  18:   { color: '#A855F7', accent: '#D8B4FE', darkColor: '#7E22CE' }, // Electric Violet
+  20:   { color: '#9333EA', accent: '#C084FC', darkColor: '#6B21A8' }, // Royal Purple
+  22:   { color: '#8B5CF6', accent: '#C4B5FD', darkColor: '#6D28D9' }, // Deep Iris
+  22.5: { color: '#6366F1', accent: '#A5B4FC', darkColor: '#4338CA' }, // Imperial Indigo
+  24:   { color: '#4F46E5', accent: '#818CF8', darkColor: '#3730A3' }, // Royal Blue
+  25:   { color: '#3B82F6', accent: '#93C5FD', darkColor: '#1D4ED8' }, // Cobalt Blue
+  26:   { color: '#2563EB', accent: '#60A5FA', darkColor: '#1E40AF' }, // Electric Azure
+  27.5: { color: '#0284C7', accent: '#38BDF8', darkColor: '#075985' }, // Cerulean
+  28:   { color: '#0891B2', accent: '#22D3EE', darkColor: '#155E75' }, // Deep Cyan
+  30:   { color: '#0D9488', accent: '#2DD4BF', darkColor: '#115E59' }, // Persian Teal
+  32:   { color: '#047857', accent: '#34D399', darkColor: '#064E3B' }, // Deep Pine
+  32.5: { color: '#15803D', accent: '#4ADE80', darkColor: '#14532D' }, // Rainforest Green
+  34:   { color: '#166534', accent: '#22C55E', darkColor: '#052E16' }, // Forest Hunter
+  35:   { color: '#4D7C0F', accent: '#84CC16', darkColor: '#365314' }, // Olive Moss
+  36:   { color: '#A16207', accent: '#EAB308', darkColor: '#713F12' }, // Mustard Gold
+  37.5: { color: '#CA8A04', accent: '#FACC15', darkColor: '#854D0E' }, // Amber Bronze
+  38:   { color: '#C2410C', accent: '#FB923C', darkColor: '#7C2D12' }, // Burnt Orange
+  40:   { color: '#B91C1C', accent: '#EF4444', darkColor: '#7F1D1D' }, // Lava Red
+  42.5: { color: '#9F1239', accent: '#FB7185', darkColor: '#4C0519' }, // Claret Ruby
+  45:   { color: '#7E22CE', accent: '#C084FC', darkColor: '#581C87' }, // Plum Purple
+  47.5: { color: '#7C3AED', accent: '#A78BFA', darkColor: '#4C1D95' }, // Velvet Purple
+  50:   { color: '#4338CA', accent: '#818CF8', darkColor: '#312E81' }, // Midnight Indigo
+  52.5: { color: '#1D4ED8', accent: '#60A5FA', darkColor: '#172554' }, // Atlantic Blue
+  55:   { color: '#1E40AF', accent: '#3B82F6', darkColor: '#1E3A8A' }, // Deep Navy
+  57.5: { color: '#0F766E', accent: '#2DD4BF', darkColor: '#134E4A' }, // Caribbean Teal
+  60:   { color: '#14532D', accent: '#16A34A', darkColor: '#052E16' }, // Alpine Pine
+  62.5: { color: '#92400E', accent: '#F59E0B', darkColor: '#451A03' }, // Desert Ochre
+  65:   { color: '#9A3412', accent: '#F97316', darkColor: '#431407' }, // Terracotta
+  67.5: { color: '#991B1B', accent: '#F87171', darkColor: '#450A0A' }, // Cardinal Scarlet
+  70:   { color: '#831843', accent: '#F472B6', darkColor: '#500724' }, // Black Cherry
+  72.5: { color: '#6B21A8', accent: '#A855F7', darkColor: '#3B0764' }, // Royal Blackberry
+  75:   { color: '#3730A3', accent: '#6366F1', darkColor: '#1E1B4B' }, // Deep Abyss
+  77.5: { color: '#1E3A8A', accent: '#38BDF8', darkColor: '#0F172A' }, // Twilight Cobalt
+  80:   { color: '#064E3B', accent: '#10B981', darkColor: '#022C22' }, // Dark Emerald
+  82.5: { color: '#78350F', accent: '#D97706', darkColor: '#451A03' }, // Molten Bronze
+  85:   { color: '#7F1D1D', accent: '#DC2626', darkColor: '#450A0A' }, // Crimson Forge
+  87.5: { color: '#581C87', accent: '#9333EA', darkColor: '#3B0764' }, // Tyrian Purple
+  90:   { color: '#334155', accent: '#94A3B8', darkColor: '#0F172A' }, // Titanium Grey
+  92.5: { color: '#0F172A', accent: '#38BDF8', darkColor: '#020617' }, // Deep Space
+  95:   { color: '#18181B', accent: '#A1A1AA', darkColor: '#09090B' }, // Cast Charcoal
+  97.5: { color: '#1C1917', accent: '#F59E0B', darkColor: '#0C0A09' }, // Onyx Bronze
+  100:  { color: '#0F172A', accent: '#FBBF24', darkColor: '#020617' }, // Champion Gold
+};
+
+function getDumbbellColor(weightKg: number): { color: string; accent: string; darkColor: string } {
+  const roundedKey = Math.round(weightKg * 10) / 10;
+  if (DUMBBELL_EXACT_COLORS[roundedKey]) {
+    return DUMBBELL_EXACT_COLORS[roundedKey];
   }
-  if (weightKg <= 5) {
-    return {
-      color: '#64748B',
-      accent: '#94A3B8',
-      darkColor: '#334155',
-      headHeight: 32,
-      headWidth: 16,
-      cornerRadius: 7,
-    };
-  }
-  if (weightKg <= 10) {
-    return {
-      color: '#10B981',
-      accent: '#34D399',
-      darkColor: '#047857',
-      headHeight: 38,
-      headWidth: 18,
-      cornerRadius: 8,
-    };
-  }
-  if (weightKg <= 15) {
-    return {
-      color: '#F59E0B',
-      accent: '#FCD34D',
-      darkColor: '#B45309',
-      headHeight: 42,
-      headWidth: 20,
-      cornerRadius: 9,
-    };
-  }
-  if (weightKg <= 20) {
-    return {
-      color: '#3B82F6',
-      accent: '#60A5FA',
-      darkColor: '#1D4ED8',
-      headHeight: 46,
-      headWidth: 22,
-      cornerRadius: 9,
-    };
-  }
-  if (weightKg <= 25) {
-    return {
-      color: '#EF4444',
-      accent: '#F87171',
-      darkColor: '#B91C1C',
-      headHeight: 50,
-      headWidth: 24,
-      cornerRadius: 10,
-    };
-  }
-  if (weightKg <= 30) {
-    return {
-      color: '#8B5CF6',
-      accent: '#A78BFA',
-      darkColor: '#6D28D9',
-      headHeight: 53,
-      headWidth: 25,
-      cornerRadius: 10,
-    };
-  }
-  if (weightKg <= 40) {
-    return {
-      color: '#F97316',
-      accent: '#FB923C',
-      darkColor: '#C2410C',
-      headHeight: 56,
-      headWidth: 26,
-      cornerRadius: 11,
-    };
-  }
-  if (weightKg <= 50) {
-    return {
-      color: '#84CC16',
-      accent: '#A3E635',
-      darkColor: '#4D7C0F',
-      headHeight: 59,
-      headWidth: 27,
-      cornerRadius: 11,
-    };
-  }
+  // Deterministic golden-ratio hue fallback for custom fractional weights
+  const hue = Math.round((Math.abs(weightKg) * 137.508) % 360);
   return {
-    color: '#0EA5E9',
-    accent: '#7DD3FC',
-    darkColor: '#0369A1',
-    headHeight: 62,
-    headWidth: 28,
-    cornerRadius: 12,
+    color: `hsl(${hue}, 76%, 50%)`,
+    accent: `hsl(${hue}, 88%, 68%)`,
+    darkColor: `hsl(${hue}, 80%, 34%)`,
+  };
+}
+
+export function getDumbbellStyle(weightKg: number): DumbbellStyleSpec {
+  const colors = getDumbbellColor(weightKg);
+  const safeKg = Math.max(0.5, weightKg);
+
+  return {
+    color: colors.color,
+    accent: colors.accent,
+    darkColor: colors.darkColor,
+    headHeight: 28 + Math.min(34, Math.sqrt(safeKg) * 3.4),
+    headWidth: 14 + Math.min(14, Math.sqrt(safeKg) * 1.4),
+    cornerRadius: Math.min(12, 6 + Math.round(Math.sqrt(safeKg) * 0.6)),
   };
 }

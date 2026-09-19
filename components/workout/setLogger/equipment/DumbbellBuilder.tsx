@@ -247,14 +247,14 @@ const DumbbellFrontViewChip = React.memo(({
         styles.dbFrontChip,
         {
           backgroundColor: isSelected
-            ? (isDark ? 'rgba(22, 169, 255, 0.14)' : '#EFF6FF')
+            ? (isDark ? 'rgba(255, 255, 255, 0.05)' : '#F8FAFC')
             : (isDark ? '#0d1012' : '#FFFFFF'),
           borderColor: isSelected
-            ? '#16a9ff'
+            ? styleSpec.color
             : (isDark ? '#22262a' : '#E2E8F0'),
-          shadowColor: isSelected ? '#16a9ff' : '#000',
-          shadowOpacity: isSelected ? 0.35 : 0.08,
-          shadowRadius: isSelected ? 6 : 3,
+          shadowColor: isSelected ? styleSpec.color : '#000',
+          shadowOpacity: isSelected ? 0.45 : 0.08,
+          shadowRadius: isSelected ? 8 : 3,
           elevation: isSelected ? 4 : 1,
         },
       ]}
@@ -263,17 +263,8 @@ const DumbbellFrontViewChip = React.memo(({
       accessibilityRole="button"
       accessibilityLabel={`Select ${chipDisplay} ${unit} dumbbell`}
     >
-      {/* Front View of Dumbbell Head (Face-On Disc) */}
+      {/* Front View of Dumbbell Head (Solid Colored Face-On Disc) */}
       <Svg width={56} height={56} viewBox="0 0 56 56">
-        <Defs>
-          <LinearGradient id={`frontBevel_${kg}`} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={styleSpec.accent} stopOpacity={0.95} />
-            <Stop offset="0.25" stopColor={styleSpec.color} />
-            <Stop offset="0.8" stopColor={styleSpec.color} />
-            <Stop offset="1" stopColor={styleSpec.darkColor} />
-          </LinearGradient>
-        </Defs>
-
         {/* Ambient Floor Shadow */}
         <Ellipse
           cx={center}
@@ -284,55 +275,45 @@ const DumbbellFrontViewChip = React.memo(({
           opacity={isDark ? 0.45 : 0.2}
         />
 
-        {/* Outer Molded Urethane/Rubber Tire Rim */}
+        {/* Solid Molded Urethane Dumbbell Head */}
         <Circle
           cx={center}
           cy={center}
           r={r}
-          fill={`url(#frontBevel_${kg})`}
+          fill={styleSpec.color}
           stroke={styleSpec.accent}
-          strokeWidth={1.2}
+          strokeWidth={1.3}
         />
 
-        {/* Specular Highlight Ring */}
+        {/* Outer Highlight Bevel */}
         <Circle
           cx={center}
           cy={center}
           r={r * 0.88}
           fill="none"
           stroke="#ffffff"
-          strokeOpacity={0.25}
+          strokeOpacity={0.22}
           strokeWidth={1}
         />
 
-        {/* Recessed Center Face Plate */}
+        {/* Molded Inner Groove on Solid Face */}
         <Circle
           cx={center}
           cy={center}
-          r={r * 0.76}
-          fill={isDark ? '#0c0f12' : '#1e242a'}
+          r={r * 0.78}
+          fill="none"
           stroke="#000000"
-          strokeOpacity={0.4}
+          strokeOpacity={0.2}
           strokeWidth={1}
         />
 
-        {/* Center Bolt / Hub Cap */}
-        <Circle
-          cx={center}
-          cy={center}
-          r={Math.max(3.5, r * 0.22)}
-          fill="#334155"
-          stroke="#64748b"
-          strokeWidth={0.8}
-        />
-
-        {/* BIG STAMPED WEIGHT NUMBER (Front View Face) */}
+        {/* BIG STAMPED WEIGHT NUMBER (Directly on Solid Colored Face) */}
         <SvgText
           x={center}
-          y={center - (chipDisplay.length > 3 ? 2 : 3)}
+          y={center - (chipDisplay.length > 3 ? 1.5 : 2.5)}
           textAnchor="middle"
           fontFamily="sans-serif"
-          fontSize={chipDisplay.length > 3 ? 10.5 : 12.5}
+          fontSize={chipDisplay.length > 3 ? 11 : 13}
           fontWeight="900"
           fill="#ffffff"
           letterSpacing={-0.3}
@@ -343,13 +324,13 @@ const DumbbellFrontViewChip = React.memo(({
         {/* STAMPED UNIT */}
         <SvgText
           x={center}
-          y={center + 8}
+          y={center + 8.5}
           textAnchor="middle"
           fontFamily="sans-serif"
-          fontSize={6.5}
-          fontWeight="bold"
-          fill={styleSpec.accent}
-          letterSpacing={0.6}
+          fontSize={6.8}
+          fontWeight="800"
+          fill="rgba(255, 255, 255, 0.9)"
+          letterSpacing={0.8}
         >
           {unit.toUpperCase()}
         </SvgText>
@@ -361,7 +342,7 @@ const DumbbellFrontViewChip = React.memo(({
           style={[
             styles.dbChipNum,
             {
-              color: isSelected ? '#16a9ff' : (isDark ? '#f5f7f8' : '#0F172A'),
+              color: isSelected ? styleSpec.color : (isDark ? '#f5f7f8' : '#0F172A'),
               fontWeight: isSelected ? 'bold' : '600',
             },
           ]}
@@ -396,6 +377,18 @@ const DumbbellBuilder = React.memo(({ initialConfig, onWeightChange }: DumbbellB
     initialConfig.weightPerDumbbell || 10,
   );
 
+  // Synchronize when initialConfig updates from preset or set change without remounting
+  const prevConfigWeightRef = useRef(initialConfig.weightPerDumbbell);
+  useEffect(() => {
+    if (
+      initialConfig.weightPerDumbbell !== undefined &&
+      initialConfig.weightPerDumbbell !== prevConfigWeightRef.current
+    ) {
+      prevConfigWeightRef.current = initialConfig.weightPerDumbbell;
+      setWeightPerDbKg(initialConfig.weightPerDumbbell);
+    }
+  }, [initialConfig.weightPerDumbbell]);
+
   const svgWidth = useMemo(() => {
     const maxW = Platform.OS === 'web'
       ? Math.min(windowWidth - 48, 520)
@@ -419,15 +412,25 @@ const DumbbellBuilder = React.memo(({ initialConfig, onWeightChange }: DumbbellB
 
   const displayVal = formatWeightValue(weightPerDbKg, unitSystem);
   const totalVal = formatWeightValue(weightPerDbKg * 2, unitSystem);
+  const currentStyleSpec = useMemo(() => getDumbbellStyle(weightPerDbKg), [weightPerDbKg]);
 
   return (
     <View style={styles.container}>
       {/* Hero Visual Card - Neat Side View of Pair */}
       <View style={[styles.heroCard, { backgroundColor: isDark ? '#111416' : '#F8FAFC', borderColor: isDark ? '#22262a' : '#E2E8F0' }]}>
         <View style={styles.badge}>
-          <Text style={[styles.badgeText, { backgroundColor: isDark ? '#070809' : '#EDE9FE', color: isDark ? '#929ba5' : '#6D28D9', borderColor: isDark ? '#22262a' : '#DDD6FE' }]}>
-            {displayVal} {unit.toUpperCase()} EACH · PAIR
-          </Text>
+          <View style={[
+            styles.badgePill,
+            {
+              backgroundColor: isDark ? '#070809' : '#EDE9FE',
+              borderColor: isDark ? '#22262a' : '#DDD6FE',
+            }
+          ]}>
+            <View style={[styles.badgeDot, { backgroundColor: currentStyleSpec.color }]} />
+            <Text style={[styles.badgeText, { color: isDark ? '#f5f7f8' : '#6D28D9' }]}>
+              {displayVal} {unit.toUpperCase()} EACH · PAIR
+            </Text>
+          </View>
         </View>
 
         <DualDumbbellsSideViewSvg
@@ -516,17 +519,26 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
+  },
+  badgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  badgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   badgeText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 10.5,
     letterSpacing: 1.2,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    overflow: 'hidden',
   },
   selectorCard: {
     marginHorizontal: 16,
