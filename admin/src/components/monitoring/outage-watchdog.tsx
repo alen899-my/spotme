@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { AlertTriangle, RefreshCw, ServerOff, WifiOff } from "lucide-react"
+import { AlertCircle, RefreshCw, WifiOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface OutageWatchdogProps {
@@ -43,30 +43,21 @@ export function OutageWatchdog({
   }
 
   return (
-    <div className="relative mb-6 overflow-hidden rounded-xl border border-rose-500/40 bg-gradient-to-r from-rose-950/80 via-rose-900/60 to-black/80 p-4 shadow-xl backdrop-blur-md transition-all">
-      {/* Red pulse background glow */}
-      <div className="absolute -left-10 -top-10 h-32 w-32 rounded-full bg-rose-500/20 blur-3xl animate-pulse pointer-events-none" />
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-4 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-500/20 text-rose-400 ring-1 ring-rose-500/40">
-            {lastError?.toLowerCase().includes("network") ? (
-              <WifiOff className="h-5 w-5 animate-bounce" />
-            ) : (
-              <ServerOff className="h-5 w-5 animate-bounce" />
-            )}
-          </div>
+          <WifiOff className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-bold text-rose-200">
-                CRITICAL: Backend Offline or Unreachable
+              <h3 className="text-sm font-semibold text-rose-950 dark:text-rose-100">
+                Service Telemetry Connection Interrupted
               </h3>
-              <span className="rounded-full bg-rose-500/30 px-2.5 py-0.5 text-xs font-semibold text-rose-300 ring-1 ring-rose-500/40">
+              <span className="rounded-full border border-rose-300/80 bg-rose-100 px-2 py-0.5 text-[11px] font-mono font-medium text-rose-800 dark:border-rose-800/60 dark:bg-rose-900/40 dark:text-rose-300">
                 Downtime: {formatDowntime(downtimeSeconds)}
               </span>
             </div>
-            <p className="mt-1 text-xs text-rose-300/80 sm:text-sm">
-              {lastError || "The backend server at spotme-api.duckdns.org is not responding to HTTP heartbeat probes."}
+            <p className="mt-1 text-xs text-rose-800/80 dark:text-rose-300/80">
+              {lastError || "The backend server is not responding to heartbeat telemetry probes."}
             </p>
           </div>
         </div>
@@ -74,13 +65,13 @@ export function OutageWatchdog({
         <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
           <Button
             size="sm"
-            variant="destructive"
+            variant="outline"
             onClick={onRetry}
             disabled={isRetrying}
-            className="h-9 gap-2 bg-rose-600 text-xs font-semibold shadow-lg hover:bg-rose-500 active:scale-95"
+            className="h-8 gap-1.5 text-xs font-medium border-rose-300 text-rose-900 hover:bg-rose-100 dark:border-rose-800 dark:text-rose-200 dark:hover:bg-rose-900/50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isRetrying ? "animate-spin" : ""}`} />
-            {isRetrying ? "Checking..." : "Reconnect"}
+            {isRetrying ? "Reconnecting..." : "Retry Connection"}
           </Button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 'use strict';
 
 const os = require('os');
+const v8 = require('v8');
 const { pool } = require('../../db');
 
 // In-Memory Ring Buffer for recent requests
@@ -9,17 +10,17 @@ const recentRequests = [];
 
 // Rolling 60-Second Buckets (1 bucket per second)
 const SECONDS_WINDOW = 60;
-const secondBuckets = new Map(); // timestampSec -> { count, errors, durations: [] }
+const secondBuckets = new Map(); // timestampSec -> { count, errors, durations: [], bytes: 0, statusCodes: { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 } }
 
 // Rolling 24-Hour Buckets (5-minute intervals = 288 buckets)
 const BUCKET_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_HISTORICAL_BUCKETS = 288;
-const historyBuckets = new Map(); // bucketKey -> { timestamp, requests, errors, totalDuration, avgLatency }
+const historyBuckets = new Map(); // bucketKey -> { timestamp, requests, errors, totalDuration, avgLatency, bytes }
 
 // Route Aggregation Stats
 const routeStats = new Map(); // routeKey -> { path, method, count, errors, totalDuration, minDuration, maxDuration }
 
-// Peak Pulse Records
+// Peak Pulse Records & Global Counters
 const peakMetrics = {
   peakRps: 0,
   peakRpsTimestamp: null,
@@ -27,6 +28,9 @@ const peakMetrics = {
   peakLatencyRoute: null,
   allTimeRequests: 0,
   allTimeErrors: 0,
+  allTimeBytes: 0,
+  statusCodes: { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 },
+  clientPlatforms: { mobile: 0, web: 0, api: 0 },
   serverStartTime: new Date(),
 };
 
@@ -76,6 +80,27 @@ function telemetryMiddleware(req, res, next) {
       // Ignore static assets or favicon if any
       if (cleanPath.startsWith('/favicon.ico')) return;
 
+      // Classify status code group
+      let codeGroup = '2xx';
+      if (statusCode >= 300 && statusCode < 400) codeGroup = '3xx';
+      else if (statusCode >= 400 && statusCode < 500) codeGroup = '4xx';
+      else if (statusCode >= 500) codeGroup = '5xx';
+
+      // Estimate bytes transferred
+      const contentLen = Number(res.getHeader('content-length')) || 256;
+      peakMetrics.allTimeBytes += contentLen;
+      peakMetrics.statusCodes[codeGroup] = (peakMetrics.statusCodes[codeGroup] || 0) + 1;
+
+      // Classify client platform
+      const userAgent = req.headers['user-agent'] || '';
+      let clientPlatform = 'api';
+      if (/SpotMe|okhttp|CFNetwork|Expo/i.test(userAgent)) {
+        clientPlatform = 'mobile';
+      } else if (/Mozilla|Chrome|Safari|Firefox|Edge/i.test(userAgent)) {
+        clientPlatform = 'web';
+      }
+      peakMetrics.clientPlatforms[clientPlatform] = (peakMetrics.clientPlatforms[clientPlatform] || 0) + 1;
+
       peakMetrics.allTimeRequests += 1;
       if (isError) peakMetrics.allTimeErrors += 1;
 
@@ -89,6 +114,8 @@ function telemetryMiddleware(req, res, next) {
         status: statusCode,
         durationMs: roundedDuration,
         clientIp,
+        clientPlatform,
+        bytes: contentLen,
         isError,
         is5xx,
       };
@@ -102,12 +129,20 @@ function telemetryMiddleware(req, res, next) {
       const currentSec = Math.floor(Date.now() / 1000);
       let secData = secondBuckets.get(currentSec);
       if (!secData) {
-        secData = { count: 0, errors: 0, durations: [] };
+        secData = {
+          count: 0,
+          errors: 0,
+          durations: [],
+          bytes: 0,
+          statusCodes: { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 },
+        };
         secondBuckets.set(currentSec, secData);
       }
       secData.count += 1;
       if (isError) secData.errors += 1;
       secData.durations.push(roundedDuration);
+      secData.bytes = (secData.bytes || 0) + contentLen;
+      secData.statusCodes[codeGroup] = (secData.statusCodes[codeGroup] || 0) + 1;
 
       // Check Peak RPS
       if (secData.count > peakMetrics.peakRps) {
@@ -131,6 +166,7 @@ function telemetryMiddleware(req, res, next) {
           errors: 0,
           totalDuration: 0,
           avgLatency: 0,
+          bytes: 0,
         };
         historyBuckets.set(bucketTimestamp, histData);
 
@@ -144,6 +180,7 @@ function telemetryMiddleware(req, res, next) {
       if (isError) histData.errors += 1;
       histData.totalDuration += roundedDuration;
       histData.avgLatency = Math.round((histData.totalDuration / histData.requests) * 10) / 10;
+      histData.bytes = (histData.bytes || 0) + contentLen;
 
       // 4. Update Route Aggregation
       const routeKey = `${method} ${cleanPath}`;
@@ -180,11 +217,13 @@ function telemetryMiddleware(req, res, next) {
  */
 function calculatePercentiles(values) {
   if (!values || values.length === 0) {
-    return { p50: 0, p95: 0, p99: 0, avg: 0, min: 0, max: 0 };
+    return { p50: 0, p75: 0, p90: 0, p95: 0, p99: 0, avg: 0, min: 0, max: 0 };
   }
   const sorted = [...values].sort((a, b) => a - b);
   const len = sorted.length;
   const p50 = sorted[Math.floor(len * 0.5)] || 0;
+  const p75 = sorted[Math.floor(len * 0.75)] || 0;
+  const p90 = sorted[Math.floor(len * 0.90)] || 0;
   const p95 = sorted[Math.floor(len * 0.95)] || 0;
   const p99 = sorted[Math.floor(len * 0.99)] || 0;
   const sum = sorted.reduce((acc, v) => acc + v, 0);
@@ -192,6 +231,8 @@ function calculatePercentiles(values) {
 
   return {
     p50: Math.round(p50 * 10) / 10,
+    p75: Math.round(p75 * 10) / 10,
+    p90: Math.round(p90 * 10) / 10,
     p95: Math.round(p95 * 10) / 10,
     p99: Math.round(p99 * 10) / 10,
     avg,
@@ -246,12 +287,15 @@ async function getRealtimeSnapshot() {
   const allRecentDurations = [];
   let currentWindowRequests = 0;
   let currentWindowErrors = 0;
+  let currentWindowBytes = 0;
+  const currentWindowStatusCodes = { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 };
 
   for (let i = SECONDS_WINDOW - 1; i >= 0; i--) {
     const secKey = currentSec - i;
     const bucket = secondBuckets.get(secKey);
     const count = bucket ? bucket.count : 0;
     const errors = bucket ? bucket.errors : 0;
+    const bytes = bucket ? bucket.bytes || 0 : 0;
     const avgLatency = bucket && bucket.durations.length > 0
       ? Math.round((bucket.durations.reduce((a, b) => a + b, 0) / bucket.durations.length) * 10) / 10
       : 0;
@@ -262,24 +306,34 @@ async function getRealtimeSnapshot() {
       rps: count,
       errors,
       avgLatency,
+      bytes,
     });
 
     if (bucket) {
       currentWindowRequests += count;
       currentWindowErrors += errors;
+      currentWindowBytes += bytes;
+      if (bucket.statusCodes) {
+        currentWindowStatusCodes['2xx'] += bucket.statusCodes['2xx'] || 0;
+        currentWindowStatusCodes['3xx'] += bucket.statusCodes['3xx'] || 0;
+        currentWindowStatusCodes['4xx'] += bucket.statusCodes['4xx'] || 0;
+        currentWindowStatusCodes['5xx'] += bucket.statusCodes['5xx'] || 0;
+      }
       allRecentDurations.push(...bucket.durations);
     }
   }
 
-  // Calculate current active RPS (average over last 5 seconds)
+  // Calculate current active RPS & KB/s (average over last 5 seconds)
   const last5Secs = last60Seconds.slice(-5);
   const activeRps = Math.round((last5Secs.reduce((acc, s) => acc + s.rps, 0) / 5) * 10) / 10;
+  const currentKbps = Math.round(((last5Secs.reduce((acc, s) => acc + s.bytes, 0) / 5) / 1024) * 10) / 10;
 
   // 2. Latency percentiles
   const latencyPercentiles = calculatePercentiles(allRecentDurations.slice(-200));
 
   // 3. System Resources
   const memUsage = process.memoryUsage();
+  const v8Stats = v8.getHeapStatistics ? v8.getHeapStatistics() : {};
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
   const usedMem = totalMem - freeMem;
@@ -304,6 +358,9 @@ async function getRealtimeSnapshot() {
       systemTotalMb: Math.round(totalMem / 1024 / 1024),
       systemFreeMb: Math.round(freeMem / 1024 / 1024),
       systemUsedPercent: Math.round((usedMem / totalMem) * 100),
+      heapLimitMb: v8Stats.heap_size_limit ? Math.round(v8Stats.heap_size_limit / 1024 / 1024) : 0,
+      physicalMb: v8Stats.total_physical_size ? Math.round(v8Stats.total_physical_size / 1024 / 1024) : 0,
+      mallocedMb: v8Stats.malloced_memory ? Math.round(v8Stats.malloced_memory / 1024 / 1024) : 0,
     },
     eventLoop: {
       lagMs: eventLoopLagMs,
@@ -341,6 +398,9 @@ async function getRealtimeSnapshot() {
     overallStatus = 'down';
   }
 
+  // 7. Recent Errors Ring Buffer
+  const recentErrors = recentRequests.filter(r => r.isError).slice(-20).reverse();
+
   return {
     status: overallStatus,
     timestamp: new Date().toISOString(),
@@ -361,10 +421,22 @@ async function getRealtimeSnapshot() {
       peakLatencyMs: peakMetrics.peakLatencyMs,
       peakLatencyRoute: peakMetrics.peakLatencyRoute,
     },
+    statusCodes: {
+      window: currentWindowStatusCodes,
+      allTime: { ...peakMetrics.statusCodes },
+    },
+    bandwidth: {
+      currentKbps,
+      windowBytes: currentWindowBytes,
+      allTimeBytes: peakMetrics.allTimeBytes,
+    },
+    clients: { ...peakMetrics.clientPlatforms },
     system: systemMetrics,
     database: dbHealth,
     rolling60Seconds: last60Seconds,
+    history: Array.from(historyBuckets.values()).slice(-288),
     recentRequests: [...recentRequests].reverse().slice(0, 50),
+    recentErrors,
     topRoutes: sortedRoutes,
     slowestRoutes,
   };

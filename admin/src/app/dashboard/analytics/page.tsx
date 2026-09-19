@@ -7,6 +7,9 @@ import { OutageWatchdog } from "@/components/monitoring/outage-watchdog"
 import { LivePulseHero } from "@/components/monitoring/live-pulse-hero"
 import { KpiGrid } from "@/components/monitoring/kpi-grid"
 import { TelemetryCharts } from "@/components/monitoring/telemetry-charts"
+import { LatencySpectrum } from "@/components/monitoring/latency-spectrum"
+import { StatusDistribution } from "@/components/monitoring/status-distribution"
+import { ErrorLogsCard } from "@/components/monitoring/error-logs-card"
 import { SlowRoutesCard } from "@/components/monitoring/slow-routes-card"
 import { RequestWaterfall } from "@/components/monitoring/request-waterfall"
 import { DiagnosticsToolbar } from "@/components/monitoring/diagnostics-toolbar"
@@ -30,10 +33,13 @@ export default function AnalyticsMonitoringPage() {
       consecutiveFailures.current = 0
     } catch (err: any) {
       consecutiveFailures.current += 1
-      const errMsg = err.response?.data?.message || err.message || "Failed to connect to backend telemetry."
+      const errMsg =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to connect to backend telemetry."
       setLastError(errMsg)
 
-      // If 2 consecutive failures occur, flag server as DOWN
+      // Flag offline after 2 consecutive failures
       if (consecutiveFailures.current >= 2) {
         setIsOnline(false)
       }
@@ -44,7 +50,6 @@ export default function AnalyticsMonitoringPage() {
 
   // Polling loop based on refreshInterval
   useEffect(() => {
-    // Initial fetch
     fetchTelemetry()
 
     if (refreshInterval === 0) return
@@ -57,8 +62,8 @@ export default function AnalyticsMonitoringPage() {
   }, [refreshInterval])
 
   return (
-    <div className="min-h-screen p-2 sm:p-4 lg:p-6">
-      {/* 1. Downtime & Outage Watchdog (Appears only if server fails) */}
+    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+      {/* 1. Outage Incident Watchdog Banner (Appears only if server fails) */}
       <OutageWatchdog
         isDown={!isOnline}
         lastError={lastError}
@@ -66,7 +71,7 @@ export default function AnalyticsMonitoringPage() {
         isRetrying={isRefreshing}
       />
 
-      {/* 2. Status & Live Pulse Hero Header */}
+      {/* 2. Status & Header (Cadence selector & Sync action) */}
       <LivePulseHero
         snapshot={snapshot}
         isOnline={isOnline}
@@ -76,28 +81,38 @@ export default function AnalyticsMonitoringPage() {
         onManualRefresh={() => fetchTelemetry(true)}
       />
 
-      {/* 3. Core KPI Telemetry Grid (Throughput, Latency, Errors, Database) */}
+      {/* 3. Core KPI Telemetry Grid (Throughput, Latency, SLO Availability, DB Ping) */}
       <KpiGrid snapshot={snapshot} />
 
-      {/* 4. Real-Time Charts & Saturation Gauges */}
+      {/* 4. Live Pulse Chart (Smooth Area curve, 24h trend toggle) & Host Saturation */}
       <TelemetryCharts
         rollingData={snapshot?.rolling60Seconds || []}
+        historyData={snapshot?.history || []}
         system={snapshot?.system || null}
       />
 
-      {/* 5. Diagnostics Toolbar (Instant Latency Benchmark & JSON Export) */}
+      {/* 5. Latency Percentile Spectrum (p50..p99), Transfer Bandwidth & V8 Memory */}
+      <LatencySpectrum snapshot={snapshot} />
+
+      {/* 6. HTTP Status Distribution (2xx-5xx), Client Platforms, Neon DB Pool */}
+      <StatusDistribution snapshot={snapshot} />
+
+      {/* 7. Incident & Error Stream Log with Copyable JSON & SLO Tracker */}
+      <ErrorLogsCard snapshot={snapshot} />
+
+      {/* 8. Diagnostics Action Bar (Ping Roundtrip, Copy/Download JSON, Reset Peaks) */}
       <DiagnosticsToolbar
         snapshot={snapshot}
         onResetPeaks={() => fetchTelemetry(true)}
       />
 
-      {/* 6. Endpoint Performance & Slowest Routes */}
+      {/* 9. Endpoint Performance Matrix & Route Bottlenecks */}
       <SlowRoutesCard
         topRoutes={snapshot?.topRoutes || []}
         slowestRoutes={snapshot?.slowestRoutes || []}
       />
 
-      {/* 7. Live Request Waterfall Stream */}
+      {/* 10. Live Request Ring-Buffer Stream & Route Filter */}
       <RequestWaterfall requests={snapshot?.recentRequests || []} />
     </div>
   )

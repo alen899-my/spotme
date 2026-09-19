@@ -1,15 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import {
-  Activity,
-  AlertTriangle,
-  ArrowDownUp,
-  Clock,
-  Filter,
-  Layers,
-  Search,
-} from "lucide-react"
+import { Activity, Search, Smartphone, Globe, Terminal } from "lucide-react"
 import { RequestRecord } from "./types"
 
 interface RequestWaterfallProps {
@@ -18,77 +10,67 @@ interface RequestWaterfallProps {
 
 export function RequestWaterfall({ requests }: RequestWaterfallProps) {
   const [search, setSearch] = useState("")
-  const [filter, setFilter] = useState<"all" | "errors" | "slow">("all")
+  const [filter, setFilter] = useState<"all" | "errors" | "slow" | "mobile">("all")
 
-  // Filter requests
   const filtered = requests.filter((req) => {
-    const matchesSearch = req.path.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch =
+      req.path.toLowerCase().includes(search.toLowerCase()) ||
+      req.method.toLowerCase().includes(search.toLowerCase()) ||
+      req.clientIp.includes(search)
     if (!matchesSearch) return false
 
     if (filter === "errors") return req.isError
     if (filter === "slow") return req.durationMs > 150
+    if (filter === "mobile") return req.clientPlatform === "mobile"
     return true
   })
 
   const getStatusBadge = (status: number) => {
     if (status >= 200 && status < 300) {
-      return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
     }
     if (status >= 300 && status < 400) {
-      return "bg-sky-500/15 text-sky-400 border-sky-500/30"
+      return "border-sky-500/30 bg-sky-500/10 text-sky-500"
     }
     if (status >= 400 && status < 500) {
-      return "bg-amber-500/15 text-amber-400 border-amber-500/30"
+      return "border-amber-500/30 bg-amber-500/10 text-amber-500"
     }
-    return "bg-rose-500/15 text-rose-400 border-rose-500/30"
-  }
-
-  const getMethodBadge = (method: string) => {
-    switch (method.toUpperCase()) {
-      case "GET":
-        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-      case "POST":
-        return "bg-sky-500/10 text-sky-400 border-sky-500/30"
-      case "PUT":
-      case "PATCH":
-        return "bg-amber-500/10 text-amber-400 border-amber-500/30"
-      case "DELETE":
-        return "bg-rose-500/10 text-rose-400 border-rose-500/30"
-      default:
-        return "bg-secondary text-muted-foreground border-border"
-    }
+    return "border-rose-500/30 bg-rose-500/10 text-rose-500"
   }
 
   return (
-    <div className="rounded-xl border bg-card/80 p-4 shadow-sm backdrop-blur-sm">
+    <div className="rounded-xl border border-border bg-card p-4">
       {/* Header & Controls */}
       <div className="flex flex-col gap-3 pb-3 border-b border-border/40 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-            <Activity className="h-4 w-4 text-sky-400 animate-pulse" />
-            Live Request Stream (Recent Traffic)
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            Streaming ring-buffer of incoming HTTP requests
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-sky-500" />
+            <h2 className="text-sm font-semibold text-foreground">
+              Live Request Stream (Ring Buffer)
+            </h2>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Streaming in-memory ring-buffer of recent incoming HTTP requests
           </p>
         </div>
 
         {/* Filters & Search */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Quick Filter Tabs */}
-          <div className="flex rounded-lg border bg-secondary/40 p-1">
+          <div className="flex rounded-lg border bg-secondary/40 p-0.5">
             {[
               { id: "all" as const, label: "All" },
               { id: "errors" as const, label: "Errors" },
               { id: "slow" as const, label: "Slow (>150ms)" },
+              { id: "mobile" as const, label: "Mobile" },
             ].map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setFilter(tab.id)}
-                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
                   filter === tab.id
-                    ? "bg-foreground text-background shadow-sm"
+                    ? "bg-background text-foreground shadow-xs font-semibold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -98,29 +80,29 @@ export function RequestWaterfall({ requests }: RequestWaterfallProps) {
           </div>
 
           {/* Search Input */}
-          <div className="relative min-w-[140px] flex-1 sm:flex-initial">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+          <div className="relative min-w-[150px] flex-1 sm:flex-initial">
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Filter route..."
+              placeholder="Search route or IP..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-full rounded-lg border bg-secondary/40 pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-sky-500"
+              className="h-7 w-full rounded-md border border-border bg-secondary/50 pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
         </div>
       </div>
 
-      {/* Stream List / Table */}
+      {/* Stream List */}
       <div className="mt-3">
         {filtered.length === 0 ? (
           <div className="py-12 text-center text-xs text-muted-foreground">
             {requests.length === 0
               ? "Waiting for incoming requests... Real-time stream will appear here."
-              : "No requests matching your current filter criteria."}
+              : "No requests match the current search or filter."}
           </div>
         ) : (
-          <div className="space-y-2 max-h-[440px] overflow-y-auto pr-1">
+          <div className="space-y-1.5 max-h-[380px] overflow-y-auto pr-1">
             {filtered.map((req) => {
               const timeFormatted = new Date(req.timestamp).toLocaleTimeString([], {
                 hour: "2-digit",
@@ -131,15 +113,11 @@ export function RequestWaterfall({ requests }: RequestWaterfallProps) {
               return (
                 <div
                   key={req.id}
-                  className="flex flex-col gap-2 rounded-lg border border-border/40 bg-secondary/20 p-2.5 transition-colors hover:bg-secondary/40 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-2 rounded-lg border border-border/50 bg-secondary/15 p-2 transition-colors hover:bg-secondary/40 sm:flex-row sm:items-center sm:justify-between text-xs"
                 >
                   {/* Method, Status & Path */}
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span
-                      className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-mono font-black ${getMethodBadge(
-                        req.method
-                      )}`}
-                    >
+                    <span className="shrink-0 rounded border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-mono font-bold text-foreground">
                       {req.method}
                     </span>
 
@@ -151,34 +129,41 @@ export function RequestWaterfall({ requests }: RequestWaterfallProps) {
                       {req.status}
                     </span>
 
-                    <span className="truncate text-xs font-mono font-medium text-foreground">
+                    <span className="truncate font-mono font-medium text-foreground text-xs">
                       {req.path}
                     </span>
                   </div>
 
-                  {/* Latency & Timestamp */}
-                  <div className="flex items-center gap-3 self-end sm:self-auto shrink-0 text-xs">
+                  {/* Client, Latency & Timestamp */}
+                  <div className="flex items-center gap-3 self-end sm:self-auto shrink-0 font-mono text-[11px] text-muted-foreground">
+                    <span className="hidden md:inline text-[10px] text-muted-foreground">
+                      {req.clientIp}
+                    </span>
+
                     <span
-                      className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] ${
+                      className={`font-semibold px-2 py-0.5 rounded text-[11px] ${
                         req.durationMs > 250
-                          ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                          ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
                           : req.durationMs > 100
-                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                          : "bg-secondary text-foreground border border-border"
                       }`}
                     >
                       {req.durationMs} ms
                     </span>
 
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      {timeFormatted}
-                    </span>
+                    <span>{timeFormatted}</span>
                   </div>
                 </div>
               )
             })}
           </div>
         )}
+      </div>
+
+      <div className="mt-3 border-t border-border/40 pt-2 flex items-center justify-between text-[11px] font-mono text-muted-foreground">
+        <span>Showing {filtered.length} of {requests.length} requests</span>
+        <span>Auto-streams live updates</span>
       </div>
     </div>
   )

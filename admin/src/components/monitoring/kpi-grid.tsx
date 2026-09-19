@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Activity, Clock, ShieldCheck, Database } from "lucide-react"
+import { Activity, Clock, ShieldCheck, Database, ArrowUpRight, CheckCircle2 } from "lucide-react"
 import { TelemetrySnapshot } from "./types"
 
 interface KpiGridProps {
@@ -22,72 +22,60 @@ export function KpiGrid({ snapshot }: KpiGridProps) {
       title: "Throughput",
       value: throughput ? throughput.currentRps.toFixed(1) : "0.0",
       unit: "req/s",
-      subtext: `Peak: ${throughput?.peakRps ?? 0} req/s`,
+      subtext: `Peak: ${throughput?.peakRps ?? 0} req/s · ${throughput?.windowRequests ?? 0} in window`,
       icon: Activity,
-      iconColor: "text-sky-500",
-      iconBg: "bg-sky-500/10",
+      status: "normal",
     },
     {
       title: "Median Latency (p50)",
       value: latency ? `${latency.p50}` : "0",
       unit: "ms",
-      subtext: `p95: ${latency?.p95 ?? 0}ms · p99: ${latency?.p99 ?? 0}ms`,
+      subtext: `p90: ${latency?.p90 ?? latency?.p95 ?? 0}ms · p99: ${latency?.p99 ?? 0}ms`,
       icon: Clock,
-      iconColor: "text-emerald-500",
-      iconBg: "bg-emerald-500/10",
+      status: latency && latency.p50 > 200 ? "warning" : "normal",
     },
     {
-      title: "Success Rate",
+      title: "Availability (SLO)",
       value: `${successRate}`,
       unit: "%",
-      subtext: `${throughput?.windowErrors ?? 0} errors (${throughput?.errorRatePercent ?? 0}%)`,
+      subtext: `${throughput?.windowErrors ?? 0} errors · 99.9% target`,
       icon: ShieldCheck,
-      iconColor:
-        throughput && throughput.errorRatePercent > 0
-          ? "text-rose-500"
-          : "text-violet-500",
-      iconBg:
-        throughput && throughput.errorRatePercent > 0
-          ? "bg-rose-500/10"
-          : "bg-violet-500/10",
+      status: throughput && throughput.errorRatePercent > 1 ? "warning" : "normal",
     },
     {
       title: "Database Latency",
       value: database && database.latencyMs >= 0 ? `${database.latencyMs}` : "—",
       unit: "ms",
-      subtext: `Pool: ${database?.pool?.idle ?? 0} idle · ${database?.pool?.total ?? 0} total`,
+      subtext: `Neon Pool: ${database?.pool?.idle ?? 0} idle / ${database?.pool?.total ?? 0} conn`,
       icon: Database,
-      iconColor: "text-amber-500",
-      iconBg: "bg-amber-500/10",
+      status: database?.status === "healthy" ? "normal" : "warning",
     },
   ]
 
   return (
-    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => {
         const Icon = card.icon
         return (
           <div
             key={card.title}
-            className="rounded-lg border bg-card p-4 transition-colors hover:bg-secondary/40"
+            className="rounded-xl border border-border bg-card p-4 transition-all hover:border-border/80"
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
                 {card.title}
               </span>
-              <div className={`rounded-md p-1.5 ${card.iconBg}`}>
-                <Icon className={`h-4 w-4 ${card.iconColor}`} />
-              </div>
+              <Icon className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
 
-            <div className="mt-3 flex items-baseline gap-1.5">
-              <span className="text-2xl font-semibold tracking-tight font-mono tabular-nums">
+            <div className="mt-2.5 flex items-baseline gap-1">
+              <span className="text-2xl font-semibold tracking-tight font-mono tabular-nums text-foreground">
                 {card.value}
               </span>
-              <span className="text-xs text-muted-foreground">{card.unit}</span>
+              <span className="text-xs text-muted-foreground font-normal">{card.unit}</span>
             </div>
 
-            <p className="mt-2 text-xs text-muted-foreground font-mono">
+            <p className="mt-1.5 text-xs text-muted-foreground font-mono truncate">
               {card.subtext}
             </p>
           </div>

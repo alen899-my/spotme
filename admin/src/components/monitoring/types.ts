@@ -6,6 +6,8 @@ export interface RequestRecord {
   status: number
   durationMs: number
   clientIp: string
+  clientPlatform?: "mobile" | "web" | "api"
+  bytes?: number
   isError: boolean
   is5xx: boolean
 }
@@ -16,6 +18,22 @@ export interface RollingSecondBucket {
   rps: number
   errors: number
   avgLatency: number
+  bytes?: number
+  statusCodes?: {
+    "2xx": number
+    "3xx": number
+    "4xx": number
+    "5xx": number
+  }
+}
+
+export interface HistoricalBucket {
+  timestamp: string
+  requests: number
+  errors: number
+  totalDuration: number
+  avgLatency: number
+  bytes?: number
 }
 
 export interface RouteStat {
@@ -46,6 +64,9 @@ export interface SystemMetrics {
     systemTotalMb: number
     systemFreeMb: number
     systemUsedPercent: number
+    heapLimitMb?: number
+    physicalMb?: number
+    mallocedMb?: number
   }
   eventLoop: {
     lagMs: number
@@ -73,6 +94,33 @@ export interface DatabaseHealth {
   error?: string
 }
 
+export interface StatusCodeBreakdown {
+  window: {
+    "2xx": number
+    "3xx": number
+    "4xx": number
+    "5xx": number
+  }
+  allTime: {
+    "2xx": number
+    "3xx": number
+    "4xx": number
+    "5xx": number
+  }
+}
+
+export interface BandwidthMetrics {
+  currentKbps: number
+  windowBytes: number
+  allTimeBytes: number
+}
+
+export interface ClientPlatformBreakdown {
+  mobile: number
+  web: number
+  api: number
+}
+
 export interface TelemetrySnapshot {
   status: "optimal" | "degraded" | "down"
   timestamp: string
@@ -88,6 +136,8 @@ export interface TelemetrySnapshot {
   }
   latency: {
     p50: number
+    p75?: number
+    p90?: number
     p95: number
     p99: number
     avg: number
@@ -96,10 +146,15 @@ export interface TelemetrySnapshot {
     peakLatencyMs: number
     peakLatencyRoute: string | null
   }
+  statusCodes?: StatusCodeBreakdown
+  bandwidth?: BandwidthMetrics
+  clients?: ClientPlatformBreakdown
   system: SystemMetrics
   database: DatabaseHealth
   rolling60Seconds: RollingSecondBucket[]
+  history?: HistoricalBucket[]
   recentRequests: RequestRecord[]
+  recentErrors?: RequestRecord[]
   topRoutes: RouteStat[]
   slowestRoutes: RouteStat[]
 }
