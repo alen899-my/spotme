@@ -25,6 +25,8 @@ const feedbackRoutes = require('./features/feedback/feedback.routes');
 const fileReplacerRoutes = require('./features/file-replacer/file-replacer.routes');
 const aiRoutes = require('./features/ai/ai.routes');
 const updatesRoutes = require('./features/updates/updates.routes');
+const { telemetryMiddleware } = require('./features/monitoring/monitoring.collector');
+const monitoringRoutes = require('./features/monitoring/monitoring.routes');
 
 const app = express();
 
@@ -60,6 +62,7 @@ const corsOptions = {
 app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(telemetryMiddleware);
 
 // Status & Health Routes
 app.get('/', (req, res) => {
@@ -94,6 +97,7 @@ app.use('/api/weight', weightRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/physique', physiqueRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/monitoring', monitoringRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/updates', updatesRoutes);
 

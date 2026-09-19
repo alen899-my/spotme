@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import api from "@/lib/api"
 import {
@@ -82,10 +83,14 @@ export default function DashboardPage() {
             Overview of your platform
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-sm text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          All systems normal
-        </div>
+        <Link
+          href="/dashboard/analytics"
+          className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-emerald-500/40 hover:bg-secondary hover:text-foreground hover:shadow-sm"
+        >
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10B981]" />
+          System Telemetry & APM
+          <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
+        </Link>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
