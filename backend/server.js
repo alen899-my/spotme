@@ -4,6 +4,7 @@ const cors = require('cors');
 const { initDB } = require('./db');
 
 const isProduction = process.env.NODE_ENV === 'production';
+const DEPLOY_TARGET = (process.env.DEPLOY_TARGET || (process.env.VERCEL ? 'vercel' : (isProduction ? 'aws' : 'local'))).toLowerCase();
 
 // Feature Routes
 const authRoutes = require('./features/auth/auth.routes');
@@ -31,6 +32,12 @@ const allowedOrigins = [
   'https://spotme-gym.vercel.app',   // expo web
   'https://spotme-kdjd.vercel.app',  // admin panel
 ];
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+if (process.env.ADMIN_URL) {
+  allowedOrigins.push(process.env.ADMIN_URL);
+}
 if (!isProduction) {
   allowedOrigins.push('http://localhost:19006', 'http://localhost:8081','http://localhost:8082', 'http://localhost:5173', 'http://localhost:3000');
 }
@@ -54,9 +61,24 @@ app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Routes
+// Status & Health Routes
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'SpotMe API',
+    target: DEPLOY_TARGET,
+    time: new Date()
+  });
+});
+
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'SpotMe API is running smoothly!', time: new Date() })
+  res.json({
+    status: 'ok',
+    service: 'SpotMe API',
+    target: DEPLOY_TARGET,
+    message: 'SpotMe API is running smoothly!',
+    time: new Date()
+  });
 });
 
 app.use('/api/auth', authRoutes);
@@ -90,11 +112,22 @@ app.use((err, req, res, _next) => {
 
 const PORT = process.env.PORT || 5000;
 
-if (!isProduction) {
+// Determine whether the server should actively listen on a port:
+// - Standalone servers (AWS EC2 / PM2, local dev) MUST call app.listen()
+// - Serverless environments (Vercel) export the app directly
+const shouldListen = DEPLOY_TARGET === 'aws' || DEPLOY_TARGET === 'local' || (!process.env.VERCEL && DEPLOY_TARGET !== 'vercel');
+
+if (shouldListen) {
   app.listen(PORT, '0.0.0.0', async () => {
-    await initDB();
+    console.log(`🚀 [${DEPLOY_TARGET.toUpperCase()}] SpotMe backend running on port ${PORT}`);
+    try {
+      await initDB();
+    } catch (err) {
+      console.error("DB Init Error:", err);
+    }
   });
 } else {
+  // Vercel serverless mode
   initDB().catch(err => console.error("DB Init Error:", err));
 }
 
