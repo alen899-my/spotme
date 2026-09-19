@@ -1,19 +1,7 @@
 "use client"
 
 import React from "react"
-import {
-  Activity,
-  ArrowUpRight,
-  CheckCircle2,
-  Clock,
-  Database,
-  Flame,
-  Gauge,
-  Layers,
-  ShieldCheck,
-  TrendingUp,
-  Zap,
-} from "lucide-react"
+import { Activity, Clock, ShieldCheck, Database } from "lucide-react"
 import { TelemetrySnapshot } from "./types"
 
 interface KpiGridProps {
@@ -25,140 +13,86 @@ export function KpiGrid({ snapshot }: KpiGridProps) {
   const latency = snapshot?.latency
   const database = snapshot?.database
 
-  // Latency Speed Tier Color
-  const getLatencyColor = (ms: number) => {
-    if (ms < 50) return "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
-    if (ms < 150) return "text-sky-400 bg-sky-500/10 border-sky-500/30"
-    if (ms < 300) return "text-amber-400 bg-amber-500/10 border-amber-500/30"
-    return "text-rose-400 bg-rose-500/10 border-rose-500/30"
-  }
+  const successRate = throughput
+    ? Math.max(0, 100 - throughput.errorRatePercent).toFixed(2)
+    : "100.00"
+
+  const cards = [
+    {
+      title: "Throughput",
+      value: throughput ? throughput.currentRps.toFixed(1) : "0.0",
+      unit: "req/s",
+      subtext: `Peak: ${throughput?.peakRps ?? 0} req/s`,
+      icon: Activity,
+      iconColor: "text-sky-500",
+      iconBg: "bg-sky-500/10",
+    },
+    {
+      title: "Median Latency (p50)",
+      value: latency ? `${latency.p50}` : "0",
+      unit: "ms",
+      subtext: `p95: ${latency?.p95 ?? 0}ms · p99: ${latency?.p99 ?? 0}ms`,
+      icon: Clock,
+      iconColor: "text-emerald-500",
+      iconBg: "bg-emerald-500/10",
+    },
+    {
+      title: "Success Rate",
+      value: `${successRate}`,
+      unit: "%",
+      subtext: `${throughput?.windowErrors ?? 0} errors (${throughput?.errorRatePercent ?? 0}%)`,
+      icon: ShieldCheck,
+      iconColor:
+        throughput && throughput.errorRatePercent > 0
+          ? "text-rose-500"
+          : "text-violet-500",
+      iconBg:
+        throughput && throughput.errorRatePercent > 0
+          ? "bg-rose-500/10"
+          : "bg-violet-500/10",
+    },
+    {
+      title: "Database Latency",
+      value: database && database.latencyMs >= 0 ? `${database.latencyMs}` : "—",
+      unit: "ms",
+      subtext: `Pool: ${database?.pool?.idle ?? 0} idle · ${database?.pool?.total ?? 0} total`,
+      icon: Database,
+      iconColor: "text-amber-500",
+      iconBg: "bg-amber-500/10",
+    },
+  ]
 
   return (
-    <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {/* 1. Throughput & Peak Pulse */}
-      <div className="group relative overflow-hidden rounded-xl border bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all hover:border-sky-500/40 hover:shadow-md">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Throughput Pulse
-          </span>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/10 text-sky-400">
-            <Zap className="h-4 w-4" />
-          </div>
-        </div>
-
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-2xl font-black tracking-tight text-foreground font-mono">
-            {throughput ? throughput.currentRps : "0"}
-          </span>
-          <span className="text-xs text-muted-foreground">req/sec</span>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-1 border-t border-border/40 pt-2 text-xs">
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <Flame className="h-3 w-3 text-amber-400" />
-            <span>Peak Pulse:</span>
-          </div>
-          <span className="font-mono font-bold text-amber-400">
-            {throughput ? `${throughput.peakRps} req/s` : "0 req/s"}
-          </span>
-        </div>
-      </div>
-
-      {/* 2. Latency Percentile Spectrum */}
-      <div className="group relative overflow-hidden rounded-xl border bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all hover:border-emerald-500/40 hover:shadow-md">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Latency (P50 / P95)
-          </span>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
-            <Clock className="h-4 w-4" />
-          </div>
-        </div>
-
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-2xl font-black tracking-tight text-foreground font-mono">
-            {latency ? `${latency.p50}` : "0"}
-          </span>
-          <span className="text-xs text-muted-foreground">ms (median)</span>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-1 border-t border-border/40 pt-2 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">P95:</span>
-            <span className="font-mono font-semibold text-foreground">
-              {latency ? `${latency.p95}ms` : "-"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">P99:</span>
-            <span className="font-mono font-semibold text-foreground">
-              {latency ? `${latency.p99}ms` : "-"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Error Rate & Reliability */}
-      <div className="group relative overflow-hidden rounded-xl border bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all hover:border-violet-500/40 hover:shadow-md">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Reliability
-          </span>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">
-            <ShieldCheck className="h-4 w-4" />
-          </div>
-        </div>
-
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-2xl font-black tracking-tight text-foreground font-mono">
-            {throughput
-              ? `${Math.max(0, 100 - throughput.errorRatePercent).toFixed(2)}%`
-              : "100%"}
-          </span>
-          <span className="text-xs text-muted-foreground">uptime score</span>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-1 border-t border-border/40 pt-2 text-xs">
-          <span className="text-muted-foreground">Error Rate:</span>
-          <span
-            className={`font-mono font-bold ${
-              throughput && throughput.errorRatePercent > 0
-                ? "text-rose-400"
-                : "text-emerald-400"
-            }`}
+    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {cards.map((card) => {
+        const Icon = card.icon
+        return (
+          <div
+            key={card.title}
+            className="rounded-lg border bg-card p-4 transition-colors hover:bg-secondary/40"
           >
-            {throughput ? `${throughput.errorRatePercent}%` : "0%"}
-          </span>
-        </div>
-      </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">
+                {card.title}
+              </span>
+              <div className={`rounded-md p-1.5 ${card.iconBg}`}>
+                <Icon className={`h-4 w-4 ${card.iconColor}`} />
+              </div>
+            </div>
 
-      {/* 4. Neon Database Health */}
-      <div className="group relative overflow-hidden rounded-xl border bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all hover:border-cyan-500/40 hover:shadow-md">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Neon Database
-          </span>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400">
-            <Database className="h-4 w-4" />
+            <div className="mt-3 flex items-baseline gap-1.5">
+              <span className="text-2xl font-semibold tracking-tight font-mono tabular-nums">
+                {card.value}
+              </span>
+              <span className="text-xs text-muted-foreground">{card.unit}</span>
+            </div>
+
+            <p className="mt-2 text-xs text-muted-foreground font-mono">
+              {card.subtext}
+            </p>
           </div>
-        </div>
-
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-2xl font-black tracking-tight text-foreground font-mono">
-            {database && database.latencyMs >= 0 ? `${database.latencyMs}` : "-"}
-          </span>
-          <span className="text-xs text-muted-foreground">ms roundtrip</span>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-1 border-t border-border/40 pt-2 text-xs">
-          <span className="text-muted-foreground">Pool Status:</span>
-          <span className="font-mono font-semibold text-cyan-400">
-            {database
-              ? `${database.pool.total} total • ${database.pool.idle} idle`
-              : "Active"}
-          </span>
-        </div>
-      </div>
+        )
+      })}
     </div>
   )
 }
