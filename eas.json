@@ -18,7 +18,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://spotme-smoky.vercel.app/api"
+        "EXPO_PUBLIC_API_URL": "https://spotme-api.duckdns.org/api"
       }
     },
     "production": {
@@ -28,7 +28,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://spotme-smoky.vercel.app/api"
+        "EXPO_PUBLIC_API_URL": "https://spotme-api.duckdns.org/api"
       }
     },
     "production-apk": {
