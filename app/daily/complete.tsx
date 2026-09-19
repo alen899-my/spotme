@@ -5,11 +5,11 @@ import {
   TextInput, Dimensions, Animated, Easing,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import OptimizedImage from '../../components/ui/OptimizedImage';
 import { optimizeImage } from '../../utils/imageOptimizer';
+import XPBar, { getLeagueTier } from '../../components/ui/XPBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
@@ -41,7 +41,6 @@ const fs = (n: number) => Math.round((Math.min(SCREEN_WIDTH, 500) / BASE_W) * n)
 const PARTICLE_COLORS = ['#F7CB16', '#2596BE', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 function ConfettiParticle({ delay, color, startX }: { delay: number; color: string; startX: number }) {
   const fall = useRef(new Animated.Value(0)).current;
-  const sway = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -52,19 +51,13 @@ function ConfettiParticle({ delay, color, startX }: { delay: number; color: stri
           Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
           Animated.timing(opacity, { toValue: 0, duration: 2000, useNativeDriver: true }),
         ]),
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(sway, { toValue: 1, duration: 400 + Math.random() * 300, useNativeDriver: true }),
-            Animated.timing(sway, { toValue: -1, duration: 400 + Math.random() * 300, useNativeDriver: true }),
-          ])
-        ),
       ]).start();
     }, delay);
     return () => clearTimeout(timer);
   }, []);
 
+  // Straight top-to-bottom fall (no sideways sway).
   const translateY = fall.interpolate({ inputRange: [0, 1], outputRange: [-20, vs(180)] });
-  const translateX = sway.interpolate({ inputRange: [-1, 0, 1], outputRange: [-s(18), 0, s(18)] });
   const size = s(4 + Math.random() * 4);
 
   return (
@@ -78,7 +71,7 @@ function ConfettiParticle({ delay, color, startX }: { delay: number; color: stri
         borderRadius: size / 2,
         backgroundColor: color,
         opacity,
-        transform: [{ translateY }, { translateX }],
+        transform: [{ translateY }],
       }}
     />
   );
@@ -150,25 +143,35 @@ export default function WorkoutCompleteScreen() {
   const [newLevel, setNewLevel] = useState<number | null>(null);
   const [leveledUp, setLeveledUp] = useState(false);
   const [displayedXP, setDisplayedXP] = useState(0);
+  // XP increase animation bounds (xp-in-level). Same XPBar as Profile/Leaderboard.
+  const [xpStartInLevel, setXpStartInLevel] = useState(0);
+  const [xpEndInLevel, setXpEndInLevel] = useState(0);
+  const [xpLevelForBar, setXpLevelForBar] = useState(1);
+  const [leagueTier, setLeagueTier] = useState<string>('Bronze');
 
-  // ── Hero animations ──
-  const heroScale = useRef(new Animated.Value(0.5)).current;
+  // League icons — same set as Leaderboard tiers.
+  const LEAGUE_ICONS: Record<string, string> = {
+    Bronze: 'shield',
+    Silver: 'shield-half-full',
+    Gold: 'trophy',
+    Platinum: 'diamond-stone',
+    Diamond: 'diamond',
+    Master: 'crown',
+    Grandmaster: 'crown-outline',
+    Elite: 'sword-cross',
+    Champion: 'fire',
+    Legend: 'star-four-points',
+  };
+  const activeTier = getLeagueTier(leagueTier);
+  const activeTierIcon = LEAGUE_ICONS[activeTier.name] ?? 'shield';
+
+  // ── Hero animations (text fade only — trophy/muscle art removed) ──
   const heroOpacity = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
   const xpFadeAnim = useRef(new Animated.Value(0)).current;
+  const xpFloatAnim = useRef(new Animated.Value(0)).current; // 0=bottom 1=floated-up
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(heroScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
-      Animated.timing(heroOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-    ]).start();
-    // Glow pulse loop
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(glowAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ])
-    ).start();
+    Animated.timing(heroOpacity, { toValue: 1, duration: 600, useNativeDriver: true }).start();
   }, []);
 
   // ── XP counter animation ──
@@ -190,6 +193,62 @@ export default function WorkoutCompleteScreen() {
 
   useEffect(() => { fetchWorkout(); const t = setTimeout(fetchWorkout, 4000); return () => clearTimeout(t); }, []);
 
+  const animateXpCardIn = () => {
+    Animated.timing(xpFadeAnim, { toValue: 1, duration: 400, useNativeDriver: false }).start();
+    xpFloatAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(xpFloatAnim, { toValue: 1, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(xpFloatAnim, { toValue: 1.5, duration: 600, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const resolveXpFromProfile = async () => {
+    try {
+      const token = await getToken();
+      const headers = { Authorization: `Bearer ${token}` };
+      const [profileRes, xpLogRes] = await Promise.all([
+        axios.get(`${API_URL}/profile`, { headers }).catch(() => null),
+        axios.get(`${API_URL}/leaderboard/xp-log`, { headers }).catch(() => null),
+      ]);
+      const totalXp = Number(profileRes?.data?.total_xp) || 0;
+      const level = Number(profileRes?.data?.level) || 1;
+      const tierFromProfile = (profileRes?.data?.league_tier as string) || '';
+      if (tierFromProfile) setLeagueTier(tierFromProfile);
+      const latestTx = Array.isArray(xpLogRes?.data) ? xpLogRes.data[0] : null;
+      const txAmount = Number(latestTx?.amount) || 0;
+      const txAt = latestTx?.created_at ? new Date(latestTx.created_at).getTime() : 0;
+      const isRecentWorkoutTx =
+        latestTx?.reason === 'Completed workout' && txAmount > 0 && (Date.now() - txAt) < 15 * 60 * 1000;
+
+      if (isRecentWorkoutTx) {
+        const beforeTotal = Math.max(0, totalXp - txAmount);
+        // Handle level-up crossing: clamp start/end into current level window for the shared XPBar.
+        const xpForLevel = Math.max(1, level) * 2000;
+        const endInLevel = totalXp % xpForLevel;
+        const leveled = totalXp >= xpForLevel && beforeTotal < Math.floor(totalXp / xpForLevel) * xpForLevel;
+        const startInLevel = leveled ? 0 : Math.max(0, beforeTotal % xpForLevel);
+        setEarnedXP(txAmount);
+        setNewLevel(level);
+        setLeveledUp(leveled || (Number(profileRes?.data?.level) || 1) > 1 && endInLevel < startInLevel);
+        setXpLevelForBar(level);
+        setXpStartInLevel(startInLevel);
+        setXpEndInLevel(endInLevel);
+        animateXpCardIn();
+      } else if (totalXp > 0) {
+        // No fresh workout TX (e.g. background job still pending) — show current progress without increase.
+        const xpForLevel = Math.max(1, level) * 2000;
+        const inLevel = totalXp % xpForLevel;
+        setXpLevelForBar(level);
+        setNewLevel(level);
+        setXpStartInLevel(inLevel);
+        setXpEndInLevel(inLevel);
+        Animated.timing(xpFadeAnim, { toValue: 1, duration: 400, useNativeDriver: false }).start();
+      }
+    } catch {
+      // Silent — XP card simply stays hidden / shows current progress
+    }
+  };
+
   const fetchWorkout = async () => {
     try {
       const token = await getToken();
@@ -203,6 +262,7 @@ export default function WorkoutCompleteScreen() {
       if (streakVal >= 1) {
         setNewStreak(streakVal);
       }
+      resolveXpFromProfile();
     } catch (err) {
       console.error('Error fetching workout summary:', err);
     } finally {
@@ -295,23 +355,35 @@ export default function WorkoutCompleteScreen() {
       });
       setWorkout(completeRes.data);
 
-      // ─── XP counter animation ───
-      const xpAmount = completeRes.data.earned_xp || 0;
-      setEarnedXP(xpAmount);
-      setNewLevel(completeRes.data.new_level || null);
-      setLeveledUp(!!completeRes.data.leveled_up);
-
+      // ─── XP: prefer synchronous backend values when present, else re-resolve from profile/xp-log ───
+      const xpAmount = Number(completeRes.data.earned_xp) || 0;
+      if (completeRes.data.league_tier) setLeagueTier(completeRes.data.league_tier);
       if (xpAmount > 0) {
-        Animated.timing(xpFadeAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: false,
-        }).start();
+        const lvl = Number(completeRes.data.new_level) || xpLevelForBar;
+        const xpForLevel = Math.max(1, lvl) * 2000;
+        setEarnedXP(xpAmount);
+        setNewLevel(completeRes.data.new_level || lvl);
+        setLeveledUp(!!completeRes.data.leveled_up);
+        setXpLevelForBar(lvl);
+        if (completeRes.data.new_total_xp !== undefined) {
+          const newTotal = Number(completeRes.data.new_total_xp) || 0;
+          const beforeTotal = Math.max(0, newTotal - xpAmount);
+          setXpEndInLevel(newTotal % xpForLevel);
+          setXpStartInLevel(beforeTotal % xpForLevel);
+        } else {
+          // Fall back to full-bar sweep when backend doesn't supply before/after totals.
+          setXpStartInLevel(0);
+          setXpEndInLevel(xpForLevel > 0 ? xpForLevel : 0);
+        }
+        animateXpCardIn();
         AsyncStorage.setItem('pendingXPModal', JSON.stringify({
           earned_xp: xpAmount,
           new_level: completeRes.data.new_level,
           leveled_up: !!completeRes.data.leveled_up,
         })).catch(() => {});
+      } else {
+        // Second PATCH is idempotent (no new XP) — refresh increase animation from xp-log/profile.
+        resolveXpFromProfile();
       }
 
       const rawStreak = completeRes.data.new_streak;
@@ -325,7 +397,7 @@ export default function WorkoutCompleteScreen() {
         }
       }
 
-      showToast('Workout finalized! Great job! 🏆');
+      showToast('Workout finalized! Great job!');
 
       setTimeout(() => {
         router.replace('/(tabs)/daily');
@@ -345,23 +417,38 @@ export default function WorkoutCompleteScreen() {
   };
 
   // ── Computed stats ──
-  const displayDuration = workout?.total_duration_seconds || duration;
-  const displayVolume = workout?.total_volume || volume;
-  const displayRest = workout?.total_rest_seconds || rest;
-  const caloriesBurned = Number(workout?.calories_burned) || 0;
+  const displayDuration = Number(workout?.total_duration_seconds) || duration || 0;
+  const displayVolume   = Number(workout?.total_volume) || volume || 0;
+  const caloriesBurned  = Number(workout?.calories_burned) || 0;
+
   const totalSets = useMemo(() => {
     if (workout?.total_sets) return workout.total_sets;
     return workout?.exercises?.reduce((acc: number, ex: any) =>
       acc + (ex.sets?.filter((s: any) => !s.is_skipped).length || 0), 0) || 0;
   }, [workout]);
 
+  // Active time = sum of all per-set durations (non-skipped). Verified: ACTIVE = Σ set time.
+  // Rest time = total - active (computed, never stored). Verified: REST = TOTAL − ACTIVE.
   const displayActive = useMemo(() => {
-    if (!workout?.exercises) return Math.max(0, displayDuration - displayRest);
-    const setTime = workout.exercises.reduce((acc: number, ex: any) =>
-      acc + (ex.sets?.reduce((sum: number, s: any) => sum + (s.duration_seconds || 0), 0) || 0), 0);
-    // Fall back to duration - rest if no per-set durations were recorded
-    return setTime > 0 ? setTime : Math.max(0, displayDuration - displayRest);
-  }, [workout, displayDuration, displayRest]);
+    if (!workout?.exercises?.length) {
+      return Math.max(0, displayDuration - (workout?.total_rest_seconds || rest || 0));
+    }
+    const setTime = workout.exercises.reduce((acc: number, ex: any) => {
+      if (ex?.is_skipped) return acc;
+      const exTime = (ex.sets || [])
+        .filter((s: any) => !s?.is_skipped)
+        .reduce((sum: number, s: any) => sum + (Number(s?.duration_seconds) || 0), 0);
+      return acc + exTime;
+    }, 0);
+    // Clamp so ACTIVE + REST always equals TOTAL, even with clock drift.
+    return Math.min(Math.max(0, Math.round(setTime)), Math.max(0, displayDuration));
+  }, [workout, displayDuration, rest]);
+
+  // Rest time = total duration - active time (computed, not stored field)
+  const displayRest = useMemo(
+    () => Math.max(0, Math.round(displayDuration) - displayActive),
+    [displayDuration, displayActive]
+  );
 
   const exerciseStats = useMemo(() => {
     if (!workout?.exercises) return { total: 0, completed: 0, skipped: 0 };
@@ -415,8 +502,6 @@ export default function WorkoutCompleteScreen() {
     []
   );
 
-  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] });
-
   if (loading) return <CompleteSkeleton />;
 
   return (
@@ -425,101 +510,108 @@ export default function WorkoutCompleteScreen() {
         contentContainerStyle={[st.scrollContent, { paddingBottom: vs(150) + Math.max(insets.bottom, 12) }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ═══ HERO SECTION ═══ */}
+        {/* ═══ HERO SECTION (trophy removed, person art kept right) ═══ */}
         <View style={[st.heroWrap, { height: vs(260) + insets.top }]}>
           <LinearGradient colors={['#065F46', '#059669']} style={StyleSheet.absoluteFill} />
 
-            <Image
-              source={require('../../assets/coach/fit-cartoon-character-training.png')}
-              style={[st.heroImage, { width: s(200), height: vs(280), bottom: vs(-30) }]}
-              resizeMode="contain"
-            />
+          <Image
+            source={require('../../assets/coach/fit-cartoon-character-training.png')}
+            style={[st.heroImage, { width: s(200), height: vs(280), bottom: vs(-30) }]}
+            resizeMode="contain"
+          />
 
           {/* Confetti */}
           {confettiParticles.map(p => (
             <ConfettiParticle key={p.id} delay={p.delay} color={p.color} startX={p.startX} />
           ))}
 
-          {/* Glow ring */}
-          <Animated.View
-            style={[
-              st.glowRing,
-              {
-                opacity: glowOpacity,
-                width: s(140),
-                height: s(140),
-                borderRadius: s(70),
-                borderColor: 'rgba(255,255,255,0.3)',
-              },
-            ]}
-          />
-
-          {/* Left content */}
-          <View style={[st.heroContent, { paddingTop: insets.top + vs(20) }]}>
-            <Animated.View style={{ transform: [{ scale: heroScale }], opacity: heroOpacity }}>
-              <View style={[st.trophyCircle]}>
-                <Ionicons name="trophy" size={fs(48)} color="#FBBF24" />
-              </View>
+          <View style={[st.heroContent, { paddingTop: insets.top + vs(16) }]}>
+            <Animated.View style={{ opacity: heroOpacity }}>
+              <Text style={[st.heroTitle, { fontSize: fs(30), color: '#FFF' }]}>
+                Workout Complete!
+              </Text>
+              <Text style={[st.heroSub, { fontSize: fs(14), color: 'rgba(255,255,255,0.85)' }]}>
+                Keep pushing, every rep counts.
+              </Text>
+              {workout?.title && (
+                <View style={[st.heroPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                  <Text style={[st.heroPillText, { fontSize: fs(11), color: 'rgba(255,255,255,0.9)' }]}>
+                    {workout.title}
+                  </Text>
+                </View>
+              )}
             </Animated.View>
-
-            <Text style={[st.heroTitle, { fontSize: fs(30), color: '#FFF' }]}>
-              Workout Complete!
-            </Text>
-            <Text style={[st.heroSub, { fontSize: fs(14), color: 'rgba(255,255,255,0.85)' }]}>
-              You crushed it today 💪
-            </Text>
-            {workout?.title && (
-              <View style={[st.heroPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <Text style={[st.heroPillText, { fontSize: fs(11), color: 'rgba(255,255,255,0.9)' }]}>
-                  {workout.title}
-                </Text>
-              </View>
-            )}
           </View>
         </View>
 
-        {/* ═══ XP COUNTER ═══ */}
-        {earnedXP > 0 && (
-          <Animated.View style={[st.xpContainer, { opacity: xpFadeAnim, transform: [{ scale: xpFadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }] }]}>
-            <LinearGradient colors={['#047857', '#059669']} style={st.xpGradient}>
+        {/* ═══ XP CARD — same XPBar as Profile / Leaderboard, with increase animation ═══ */}
+        {(earnedXP > 0 || xpEndInLevel > 0 || xpLevelForBar > 1) && (
+          <Animated.View style={[
+            st.xpContainer,
+            { opacity: xpFadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }), transform: [{ scale: xpFadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] },
+          ]}>
+            <View style={[st.xpCard, { backgroundColor: isDark ? '#0D0D0D' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)' }]}>
               <View style={st.xpRow}>
-                <View style={st.xpIconBox}>
-                  <Ionicons name="flash" size={fs(22)} color="#FBBF24" />
-                </View>
+                <LinearGradient
+                  colors={activeTier.gradient}
+                  style={[st.xpIconBox, { padding: 0, overflow: 'hidden' }]}
+                >
+                  <MaterialCommunityIcons
+                    name={activeTierIcon as any}
+                    size={fs(22)}
+                    color={activeTier.textDark ? '#021518' : '#FFF'}
+                  />
+                </LinearGradient>
                 <View style={{ flex: 1 }}>
-                  <Text style={st.xpLabel}>XP EARNED</Text>
-                  <Text style={st.xpValue}>+{displayedXP.toLocaleString()}</Text>
+                  <Text style={[st.xpLabel, { color: isDark ? 'rgba(241,245,249,0.45)' : '#94A3B8' }]}>
+                    {activeTier.name.toUpperCase()} LEAGUE • XP EARNED
+                  </Text>
+                  <Text style={[st.xpValue, { color: activeTier.color }]}>+{displayedXP.toLocaleString()}</Text>
                 </View>
-                {leveledUp && (
-                  <View style={st.levelUpBadge}>
-                    <Text style={st.levelUpText}>LV.{newLevel} ↑</Text>
-                  </View>
-                )}
               </View>
-              <View style={st.xpBarBg}>
-                <Animated.View
-                  style={[
-                    st.xpBarFill,
-                    {
-                      width: xpFadeAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%'],
-                      }),
-                    },
-                  ]}
-                />
-              </View>
-            </LinearGradient>
+              {/* Shared XP progress bar — league colors, animates start → end to show the increase */}
+              <XPBar
+                level={xpLevelForBar}
+                currentXp={xpEndInLevel}
+                startXp={xpStartInLevel}
+                animationDuration={1500}
+                leagueTier={activeTier.name}
+              />
+              {/* Streak bonus row */}
+              {newStreak !== null && newStreak >= 1 && (
+                <View style={st.xpStreakRow}>
+                  <Ionicons name="flame" size={fs(13)} color="#FF9F43" />
+                  <Text style={[st.xpStreakText, { color: isDark ? 'rgba(241,245,249,0.55)' : '#94A3B8', fontSize: fs(12) }]}>
+                    {newStreak}-day streak active  •  +{newStreak * 3} XP bonus
+                  </Text>
+                </View>
+              )}
+            </View>
           </Animated.View>
         )}
 
         {/* ═══ BENTO GRID ═══ */}
         <View style={[st.bentoContainer, { paddingHorizontal: s(16) }]}>
+          {/* Floating +XP chip above session summary */}
+          {earnedXP > 0 && (
+            <Animated.View
+              style={[
+                st.xpFloatChip,
+                {
+                  opacity: xpFloatAnim.interpolate({ inputRange: [0, 0.3, 1, 1.5], outputRange: [0, 1, 1, 0] }),
+                  transform: [{ translateY: xpFloatAnim.interpolate({ inputRange: [0, 1, 1.5], outputRange: [0, -28, -52] }) }],
+                },
+              ]}
+            >
+              <MaterialCommunityIcons name={activeTierIcon as any} size={fs(13)} color={activeTier.color} />
+              <Text style={[st.xpFloatText, { color: activeTier.color, fontSize: fs(13) }]}>+{earnedXP.toLocaleString()} XP</Text>
+            </Animated.View>
+          )}
           <Text style={[st.sectionLabel, { color: colors.text, fontSize: fs(18) }]}>Session Summary</Text>
           <View style={st.bentoGrid}>
           <BentoTile icon="time-outline" iconColor="#2596BE" label="DURATION" value={formatDuration(displayDuration)} sub="Total session" colors={colors} isDark={isDark} />
-            <BentoTile icon="stopwatch-outline" iconColor="#00C9C8" label="Active time" value={formatDuration(displayActive)} sub="Active exercising" colors={colors} isDark={isDark} />
-            <BentoTile icon="hourglass-outline" iconColor="#F59E0B" label="REST TIME" value={formatDuration(displayRest)} sub="Recovery" colors={colors} isDark={isDark} />
+            <BentoTile icon="stopwatch-outline" iconColor="#00C9C8" label="ACTIVE TIME" value={formatDuration(displayActive)} sub="Set workout time" colors={colors} isDark={isDark} />
+            <BentoTile icon="hourglass-outline" iconColor="#F59E0B" label="REST TIME" value={formatDuration(displayRest)} sub="Duration − active" colors={colors} isDark={isDark} />
             <BentoTile icon="flame-outline" iconColor="#EF4444" label="CALORIES" value={`${caloriesBurned}`} sub="Est. kcal burn" colors={colors} isDark={isDark} />
             {/* volume already stored in user's unit — no formatWeightValue conversion */}
             <BentoTile icon="barbell-outline" iconColor="#10B981" label="TOTAL VOLUME" value={`${Math.round(displayVolume)} ${weightUnit(unitSystem)}`} sub="Weight lifted" colors={colors} isDark={isDark} />
@@ -684,9 +776,12 @@ export default function WorkoutCompleteScreen() {
 const st = StyleSheet.create({
   scrollContent: { flexGrow: 1 },
 
-  // ── Hero ──
+  // ── Hero (trophy removed, person art kept on the right) ──
   heroWrap: {
     position: 'relative',
+    borderBottomLeftRadius: s(24),
+    borderBottomRightRadius: s(24),
+    overflow: 'hidden',
   },
   heroImage: {
     position: 'absolute',
@@ -702,18 +797,8 @@ const st = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     paddingLeft: s(20),
+    paddingRight: s(20),
     zIndex: 3,
-  },
-  glowRing: {
-    position: 'absolute',
-    borderWidth: 2,
-    zIndex: 2,
-  },
-  trophyCircle: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: vs(12),
-    alignSelf: 'flex-start',
   },
   heroTitle: {
     fontFamily: FONTS.heading,
@@ -734,15 +819,16 @@ const st = StyleSheet.create({
     fontFamily: FONTS.bodySemiBold,
   },
 
-  // ── XP Counter ──
+  // ── XP card (unified with Profile / Leaderboard XPBar) ──
   xpContainer: {
     paddingHorizontal: s(16),
     marginTop: vs(16),
     marginBottom: vs(4),
   },
-  xpGradient: {
+  xpCard: {
     borderRadius: s(18),
     padding: s(16),
+    borderWidth: 1,
     overflow: 'hidden',
   },
   xpRow: {
@@ -761,14 +847,12 @@ const st = StyleSheet.create({
   xpLabel: {
     fontFamily: FONTS.bodyBold,
     fontSize: fs(10),
-    color: 'rgba(255,255,255,0.7)',
     letterSpacing: 1.2,
     marginBottom: vs(2),
   },
   xpValue: {
     fontFamily: FONTS.heading,
     fontSize: fs(28),
-    color: '#FBBF24',
   },
   levelUpBadge: {
     backgroundColor: 'rgba(251,191,36,0.2)',
@@ -783,17 +867,31 @@ const st = StyleSheet.create({
     fontSize: fs(12),
     color: '#FBBF24',
   },
-  xpBarBg: {
-    height: vs(4),
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: s(2),
-    marginTop: vs(12),
-    overflow: 'hidden',
+  xpStreakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(6),
+    marginTop: vs(10),
   },
-  xpBarFill: {
-    height: '100%',
-    backgroundColor: '#FBBF24',
-    borderRadius: s(2),
+  xpStreakText: {
+    fontFamily: FONTS.body,
+  },
+  xpFloatChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: s(6),
+    backgroundColor: 'rgba(251,191,36,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.35)',
+    paddingHorizontal: s(12),
+    paddingVertical: vs(6),
+    borderRadius: s(20),
+    marginBottom: vs(8),
+  },
+  xpFloatText: {
+    fontFamily: FONTS.bodyBold,
+    color: '#B45309',
   },
 
   // ── Bento ──

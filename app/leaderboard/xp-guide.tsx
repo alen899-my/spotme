@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import OptimizedImage from '../../components/ui/OptimizedImage';
+import XPBar from '../../components/ui/XPBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { FONTS } from '../../constants/theme';
@@ -92,19 +93,18 @@ export default function XPGuideScreen() {
     }
   };
 
+  // Unified with Profile + Complete: level thresholds are level * 2000 (see backend/utils/xp.js).
+  const xpForNextLevel = Math.max(1, user?.level || 1) * 2000;
+  const xpInLevel = (user?.total_xp || 0) % xpForNextLevel;
+
   const getProgressPercent = () => {
     if (!user) return 0;
-    const level = user.level || 1;
-    const currentXp = user.total_xp || 0;
-    const xpInCurrentLevel = currentXp % 2000;
-    return Math.min(Math.round((xpInCurrentLevel / 2000) * 100), 100);
+    return Math.min(Math.round((xpInLevel / xpForNextLevel) * 100), 100);
   };
 
   const xpToNextLevel = () => {
     if (!user) return 0;
-    const currentXp = user.total_xp || 0;
-    const nextLevelXp = (user.level || 1) * 2000;
-    return Math.max(nextLevelXp - currentXp, 0);
+    return Math.max(xpForNextLevel - xpInLevel, 0);
   };
 
   return (
@@ -182,9 +182,8 @@ export default function XPGuideScreen() {
                 </Text>
                 <Text style={[styles.progressLabelPercent, { color: colors.primary }]}>{getProgressPercent()}%</Text>
               </View>
-              <View style={[styles.progressBarTrack, { backgroundColor: colors.inputBg }]}>
-                <View style={[styles.progressBarFill, { width: `${getProgressPercent()}%`, backgroundColor: colors.primary }]} />
-              </View>
+              {/* Same XPBar as My Profile + Workout Complete — league colors, animates the increase */}
+              <XPBar level={user.level || 1} currentXp={xpInLevel} leagueTier={user.league_tier} />
             </View>
 
             {user.current_streak > 0 && (
