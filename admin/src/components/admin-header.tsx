@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Search, Menu, Sun, Moon } from "lucide-react"
+import { Search, Menu } from "lucide-react"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 interface HeaderProps {
   onMenuClick: () => void
@@ -9,23 +9,6 @@ interface HeaderProps {
 }
 
 export function AdminHeader({ onMenuClick, title }: HeaderProps) {
-  const [dark, setDark] = useState(true)
-
-  useEffect(() => {
-    const stored = localStorage.getItem("theme")
-    const prefersDark = !stored
-      ? window.matchMedia("(prefers-color-scheme: dark)").matches
-      : stored === "dark"
-    setDark(prefersDark)
-    document.documentElement.classList.toggle("dark", prefersDark)
-  }, [])
-
-  const toggleTheme = () => {
-    const next = !dark
-    setDark(next)
-    document.documentElement.classList.toggle("dark", next)
-    localStorage.setItem("theme", next ? "dark" : "light")
-  }
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4 lg:px-6">
@@ -49,12 +32,7 @@ export function AdminHeader({ onMenuClick, title }: HeaderProps) {
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-3">
-        <button
-          onClick={toggleTheme}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary"
-        >
-          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
+        <ThemeToggle size="sm" />
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground ring-2 ring-background">
           A
         </div>

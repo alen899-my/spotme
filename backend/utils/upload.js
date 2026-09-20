@@ -35,8 +35,9 @@ const upload = multer({
                    : req.originalUrl.includes('/equipment') ? 'equipment'
                    : req.originalUrl.includes('/targets') ? 'targets'
                    : req.originalUrl.includes('/muscle_groups') ? 'muscle_groups'
-                   : req.originalUrl.includes('/secondary_muscles') ? 'secondary_muscles'
-                   : 'onboarding';
+                    : req.originalUrl.includes('/secondary_muscles') ? 'secondary_muscles'
+                    : req.originalUrl.includes('/site-images') ? 'site-images'
+                    : 'onboarding';
       cb(null, `spotme/${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`);
     }
   })

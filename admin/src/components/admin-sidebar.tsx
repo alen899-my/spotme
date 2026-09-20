@@ -18,6 +18,7 @@ import {
   GitBranch,
   ListTree,
   Image as ImageIcon,
+  LayoutGrid,
   RefreshCw,
   Smartphone,
   Utensils,
@@ -49,6 +50,7 @@ const navItems = [
   { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare },
   { href: "/dashboard/workout-splits", label: "Workout Splits", icon: Activity },
   { href: "/dashboard/images", label: "Image Vault", icon: ImageIcon },
+  { href: "/dashboard/site-images", label: "Site Images", icon: LayoutGrid },
   { href: "/dashboard/file-replacer", label: "File Replacer", icon: RefreshCw },
   { href: "/dashboard/builds", label: "App Builds", icon: Smartphone },
 ]

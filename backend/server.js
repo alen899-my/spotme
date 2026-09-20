@@ -21,6 +21,7 @@ const notificationRoutes = require('./features/notifications/notifications.route
 const physiqueRoutes = require('./features/physique/physique.routes');
 const adminRoutes = require('./features/admin/admin.routes');
 const imagesRoutes = require('./features/images/images.routes');
+const siteImagesRoutes = require('./features/site-images/site-images.routes');
 const feedbackRoutes = require('./features/feedback/feedback.routes');
 const fileReplacerRoutes = require('./features/file-replacer/file-replacer.routes');
 const aiRoutes = require('./features/ai/ai.routes');
@@ -103,6 +104,8 @@ app.use('/api/updates', updatesRoutes);
 
 const authenticateAdmin = require('./middleware/adminAuth');
 app.use('/api/images', authenticateAdmin, imagesRoutes);
+app.use('/api/site-images', siteImagesRoutes.publicRouter);
+app.use('/api/admin/site-images', siteImagesRoutes.adminRouter);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/admin/file-replacer', fileReplacerRoutes);
 

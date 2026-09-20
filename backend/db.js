@@ -722,6 +722,21 @@ const initDB = async () => {
       WHERE u.id = sub.user_id AND u.last_active_at IS NULL
     `);
 
+    // ── Site Images (landing `/` slots managed from admin panel) ─────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS site_images (
+        slug TEXT PRIMARY KEY,
+        section TEXT NOT NULL,
+        title TEXT NOT NULL,
+        local_fallback TEXT NOT NULL,
+        r2_key TEXT,
+        r2_url TEXT,
+        alt TEXT,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_site_images_section ON site_images(section);`);
+
     const adminHash = await bcrypt.hash('alenadmin123', 10);
     await pool.query(`
       INSERT INTO admins (email, password, name)

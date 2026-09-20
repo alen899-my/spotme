@@ -1,7 +1,7 @@
 const feedbackService = require('./feedback.service');
 
 /**
- * Handles feedback submission request.
+ * Handles feedback submission request for authenticated users.
  */
 async function submitFeedback(req, res) {
   try {
@@ -29,6 +29,47 @@ async function submitFeedback(req, res) {
   }
 }
 
+/**
+ * Handles public contact form submissions from the landing page.
+ */
+async function handleContactSubmission(req, res) {
+  try {
+    const { name, email, msg } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Please enter your name.' });
+    }
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Please enter your email address.' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({ message: 'Please enter a valid email address.' });
+    }
+
+    if (!msg || !msg.trim()) {
+      return res.status(400).json({ message: 'Please enter a message.' });
+    }
+
+    const feedback = await feedbackService.submitContactFeedback({
+      name: name.trim(),
+      email: email.trim(),
+      msg: msg.trim(),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Thank you! Your message has been sent to the team.',
+      feedbackId: feedback.id,
+    });
+  } catch (err) {
+    console.error('Contact submission error:', err);
+    return res.status(500).json({ error: 'Failed to send message. Please try again later.' });
+  }
+}
+
 module.exports = {
   submitFeedback,
+  handleContactSubmission,
 };
