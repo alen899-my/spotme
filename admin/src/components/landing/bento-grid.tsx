@@ -5,9 +5,8 @@ import { motion } from "framer-motion"
 import { SITE_IMAGE_FALLBACKS } from "@/lib/site-images"
 
 export function BentoGrid({ srcMap }: { srcMap?: Record<string, string> }) {
-  // Local public/ files were removed — fall back to seeded R2 URLs.
-  const src = (slug: string, _legacyFallback: string) =>
-    srcMap?.[slug] || SITE_IMAGE_FALLBACKS[slug] || _legacyFallback;
+  // All images resolve to Cloudflare R2 (live map → seeded fallback). No local files.
+  const src = (slug: string) => srcMap?.[slug] || SITE_IMAGE_FALLBACKS[slug] || "";
   return (
     <section
       id="features"
@@ -101,7 +100,7 @@ export function BentoGrid({ srcMap }: { srcMap?: Record<string, string> }) {
               <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-white/10 dark:bg-black/40 p-2.5 sm:p-3.5 shadow-md flex items-center justify-center backdrop-blur-xs">
                 <div className="relative h-full w-full">
                   <Image
-                    src={src("bento-exercises", "/images/app-assets/exercises.png")}
+                    src={src("bento-exercises")}
                     alt="SpotMe Exercise Library and Muscle Map"
                     fill
                     className="object-contain rounded-xl transition-transform duration-500 ease-out group-hover:scale-[1.02]"
@@ -158,7 +157,7 @@ export function BentoGrid({ srcMap }: { srcMap?: Record<string, string> }) {
             <div className="relative aspect-[3/2] w-full overflow-hidden rounded-2xl bg-white/10 dark:bg-black/40 p-2 sm:p-3 shadow-md flex items-center justify-center backdrop-blur-xs">
               <div className="relative h-full w-full">
                 <Image
-                  src={src("bento-splits", "/images/app-assets/splits.png")}
+                  src={src("bento-splits")}
                   alt="SpotMe Workout Splits"
                   fill
                   className="object-contain rounded-xl transition-transform duration-500 ease-out group-hover:scale-[1.02]"
@@ -213,7 +212,7 @@ export function BentoGrid({ srcMap }: { srcMap?: Record<string, string> }) {
             <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black p-2 sm:p-3 flex items-center justify-center shadow-md">
               <div className="relative h-full w-full">
                 <Image
-                  src={src("bento-workoutlog", "/images/app-assets/workoutlog.jpg")}
+                  src={src("bento-workoutlog")}
                   alt="SpotMe In-Gym Workout Logger"
                   fill
                   className="object-contain rounded-xl transition-transform duration-500 ease-out group-hover:scale-[1.02]"
@@ -273,7 +272,7 @@ export function BentoGrid({ srcMap }: { srcMap?: Record<string, string> }) {
             <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-white/10 dark:bg-black/40 p-2 sm:p-3 shadow-md flex items-center justify-center backdrop-blur-xs">
               <div className="relative h-full w-full">
                 <Image
-                  src={src("bento-foodlog", "/images/app-assets/foodlog.jpg")}
+                  src={src("bento-foodlog")}
                   alt="SpotMe Meal and Food Tracker"
                   fill
                   className="object-contain rounded-xl transition-transform duration-500 ease-out group-hover:scale-[1.02]"
@@ -328,7 +327,7 @@ export function BentoGrid({ srcMap }: { srcMap?: Record<string, string> }) {
             <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-white/10 dark:bg-black/40 p-2 sm:p-3 shadow-md flex items-center justify-center backdrop-blur-xs">
               <div className="relative h-full w-full">
                 <Image
-                  src={src("bento-weight", "/images/app-assets/weight.png")}
+                  src={src("bento-weight")}
                   alt="SpotMe Body Weight Progress Tracker"
                   fill
                   className="object-contain rounded-xl transition-transform duration-500 ease-out group-hover:scale-[1.02]"
@@ -386,7 +385,7 @@ export function BentoGrid({ srcMap }: { srcMap?: Record<string, string> }) {
               <div className="relative aspect-[3/4] w-full max-h-[380px] overflow-hidden rounded-2xl bg-white/10 dark:bg-black/40 p-2 sm:p-3 shadow-md flex items-center justify-center backdrop-blur-xs">
                 <div className="relative h-full w-full">
                   <Image
-                    src={src("bento-reports", "/images/app-assets/reports.png")}
+                    src={src("bento-reports")}
                     alt="SpotMe Training Reports"
                     fill
                     className="object-contain rounded-xl transition-transform duration-500 ease-out group-hover:scale-[1.02]"
@@ -445,7 +444,7 @@ export function BentoGrid({ srcMap }: { srcMap?: Record<string, string> }) {
               <div className="relative aspect-square w-full max-h-[380px] overflow-hidden rounded-2xl bg-white/10 dark:bg-black/40 p-2 sm:p-3 shadow-md flex items-center justify-center backdrop-blur-xs">
                 <div className="relative h-full w-full">
                   <Image
-                    src={src("bento-calendar", "/images/app-assets/calendar.png")}
+                    src={src("bento-calendar")}
                     alt="SpotMe Calendar Heatmap"
                     fill
                     className="object-contain rounded-xl transition-transform duration-500 ease-out group-hover:scale-[1.02]"
@@ -523,7 +522,7 @@ export function BentoGrid({ srcMap }: { srcMap?: Record<string, string> }) {
               <div className="relative aspect-[1402/1122] w-full overflow-hidden rounded-2xl bg-white/10 dark:bg-black/40 p-2 sm:p-3.5 shadow-md flex items-center justify-center backdrop-blur-xs">
                 <div className="relative h-full w-full">
                   <Image
-                    src={src("bento-following", "/images/app-assets/following.png")}
+                    src={src("bento-following")}
                     alt="SpotMe Athlete Following Feed"
                     fill
                     className="object-contain rounded-xl transition-transform duration-500 ease-out group-hover:scale-[1.02]"
