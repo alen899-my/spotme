@@ -85,7 +85,7 @@ const FRAME_DEFAULTS = [
   `${R2_SEED_BASE}/seed-hero-frame-5.webp`,
 ];
 
-const AUTOPLAY_MS = 3200
+const AUTOPLAY_MS = 10000
 const RESUME_MS = 5000
 
 export function HeroFramesMockup({ srcMap }: { srcMap?: Record<string, string> }) {
@@ -118,13 +118,15 @@ export function HeroFramesMockup({ srcMap }: { srcMap?: Record<string, string> }
   const [index, setIndex] = useState(2) // start on dashboard frame (LCP visual)
   const [autoplayPaused, setAutoplayPaused] = useState(false)
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const reduceMotion = useReducedMotion()
 
   const go = useCallback(
-    (dir: number) => {
-      setIndex((prev) => (prev + dir + frames.length) % frames.length)
+    (delta: number) => {
+      const n = FRAMES.length
+      setIndex((prev) => (((prev + delta) % n) + n) % n)
     },
-    [frames.length]
+    []
   )
 
   const pauseAutoplay = useCallback(() => {
@@ -168,7 +170,7 @@ export function HeroFramesMockup({ srcMap }: { srcMap?: Record<string, string> }
         aria-roledescription="carousel"
         aria-label="SpotMe app screenshots"
       >
-        <div className="overflow-hidden">
+        <div ref={viewportRef} className="cursor-grab overflow-hidden active:cursor-grabbing">
           <motion.div
             className="flex"
             initial={false}
@@ -181,9 +183,15 @@ export function HeroFramesMockup({ srcMap }: { srcMap?: Record<string, string> }
             dragMomentum={false}
             onDragStart={pauseAutoplay}
             onDragEnd={(_, info) => {
+              const width = viewportRef.current?.offsetWidth || 1
               const { offset, velocity } = info
-              if (offset.x < -80 || velocity.x < -500) go(1)
-              else if (offset.x > 80 || velocity.x > 500) go(-1)
+              // Dead zone: tiny accidental touches snap back to the current frame.
+              if (Math.abs(offset.x) < 24 && Math.abs(velocity.x) < 500) return
+              // Dragged distance maps to whole frames (long drags can skip
+              // multiple frames); a fast flick always moves at least one.
+              let delta = Math.round(-offset.x / width)
+              if (delta === 0) delta = velocity.x < 0 ? 1 : -1
+              go(delta)
             }}
           >
             {frames.map((frame, i) => (
