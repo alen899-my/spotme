@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Plus, Download, Star, Copy, Check } from "lucide-react"
+import { Plus, Download, Star, Copy, Check, Upload } from "lucide-react"
 import { DataTable } from "@/components/data-table"
 import { DetailModal, type DetailField } from "@/components/detail-modal"
 import { Button } from "@/components/ui/button"
@@ -150,15 +150,15 @@ export function BuildsList() {
 
   return (
     <div className="min-w-0 max-w-full space-y-4">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold">App Builds</h1>
           <p className="text-sm text-muted-foreground">Upload production, preview and development builds</p>
         </div>
-        <Link href="/dashboard/builds/new">
-          <Button>
-            <Plus className="mr-1.5 h-4 w-4" />
-            New Build
+        <Link href="/dashboard/builds/new" className="w-full sm:w-auto shrink-0">
+          <Button className="w-full sm:w-auto flex items-center justify-center gap-1.5 shadow-sm">
+            <Upload className="h-4 w-4" />
+            Upload Build
           </Button>
         </Link>
       </div>
@@ -252,6 +252,16 @@ export function BuildsList() {
         data={viewTarget}
         fields={viewFields}
       />
+
+      {/* Mobile Floating Upload Button */}
+      <div className="sm:hidden fixed bottom-6 right-6 z-40">
+        <Link href="/dashboard/builds/new">
+          <Button size="lg" className="rounded-full shadow-2xl flex items-center gap-2 px-4 py-3 h-auto bg-primary text-primary-foreground font-semibold border border-primary/20">
+            <Upload className="h-4 w-4" />
+            <span>Upload Build</span>
+          </Button>
+        </Link>
+      </div>
     </div>
   )
 }

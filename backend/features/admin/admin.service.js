@@ -729,17 +729,50 @@ async function getBuildById(id) {
   return result.rows[0] || null;
 }
 
-async function createBuild({ title, description, build_channel, version, version_code, force_update, file }) {
-  const ext = (file.originalname.split('.').pop() || '').toLowerCase();
-  if (!['apk', 'aab'].includes(ext)) {
-    await deleteBuildFile(file.key);
-    const err = new Error('Only .apk and .aab files are allowed');
+async function createBuild({
+  title,
+  description,
+  build_channel,
+  version,
+  version_code,
+  force_update,
+  file,
+  file_key,
+  file_url,
+  file_size,
+  file_type,
+}) {
+  let fileKey = file_key;
+  let fileUrl = file_url;
+  let fileSize = file_size ? parseInt(file_size) : null;
+  let ext = file_type;
+
+  if (file) {
+    ext = (file.originalname.split('.').pop() || '').toLowerCase();
+    if (!['apk', 'aab'].includes(ext)) {
+      await deleteBuildFile(file.key);
+      const err = new Error('Only .apk and .aab files are allowed');
+      err.statusCode = 400;
+      throw err;
+    }
+    fileKey = file.key;
+    fileUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${fileKey}`;
+    fileSize = file.size || null;
+  } else if (fileKey) {
+    ext = (file_type || fileKey.split('.').pop() || '').toLowerCase();
+    if (!['apk', 'aab'].includes(ext)) {
+      const err = new Error('Only .apk and .aab files are allowed');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!fileUrl) {
+      fileUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${fileKey}`;
+    }
+  } else {
+    const err = new Error('Build file is required');
     err.statusCode = 400;
     throw err;
   }
-
-  const fileKey = file.key;
-  const fileUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${fileKey}`;
 
   await pool.query('UPDATE app_builds SET is_latest = FALSE WHERE build_channel = $1', [build_channel]);
   const forceUpdate = parseBuildFlag(force_update) === true;
@@ -758,14 +791,26 @@ async function createBuild({ title, description, build_channel, version, version
       version_code ? parseInt(version_code) : null,
       fileKey,
       fileUrl,
-      file.size || null,
+      fileSize,
       forceUpdate,
     ]
   );
   return result.rows[0];
 }
 
-async function updateBuild(id, { title, description, build_channel, version, version_code, force_update, file }) {
+async function updateBuild(id, {
+  title,
+  description,
+  build_channel,
+  version,
+  version_code,
+  force_update,
+  file,
+  file_key,
+  file_url,
+  file_size,
+  file_type,
+}) {
   const existing = await pool.query('SELECT * FROM app_builds WHERE id = $1', [id]);
   if (existing.rows.length === 0) {
     if (file) await deleteBuildFile(file.key);
@@ -801,6 +846,18 @@ async function updateBuild(id, { title, description, build_channel, version, ver
     fileKey = file.key;
     fileUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${fileKey}`;
     fileSize = file.size || null;
+    fileType = ext;
+  } else if (file_key && file_key !== current.file_key) {
+    const ext = (file_type || file_key.split('.').pop() || '').toLowerCase();
+    if (!['apk', 'aab'].includes(ext)) {
+      const err = new Error('Only .apk and .aab files are allowed');
+      err.statusCode = 400;
+      throw err;
+    }
+    await deleteBuildFile(current.file_key);
+    fileKey = file_key;
+    fileUrl = file_url || `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${fileKey}`;
+    fileSize = file_size ? parseInt(file_size) : null;
     fileType = ext;
   }
 

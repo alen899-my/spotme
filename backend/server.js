@@ -122,7 +122,7 @@ const PORT = process.env.PORT || 5000;
 const shouldListen = DEPLOY_TARGET === 'aws' || DEPLOY_TARGET === 'local' || (!process.env.VERCEL && DEPLOY_TARGET !== 'vercel');
 
 if (shouldListen) {
-  app.listen(PORT, '0.0.0.0', async () => {
+  const server = app.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 [${DEPLOY_TARGET.toUpperCase()}] SpotMe backend running on port ${PORT}`);
     try {
       await initDB();
@@ -130,6 +130,10 @@ if (shouldListen) {
       console.error("DB Init Error:", err);
     }
   });
+  // Increase server timeouts for large file uploads (up to 15 minutes)
+  server.timeout = 15 * 60 * 1000;
+  server.keepAliveTimeout = 120 * 1000;
+  server.headersTimeout = 125 * 1000;
 } else {
   // Vercel serverless mode
   initDB().catch(err => console.error("DB Init Error:", err));

@@ -13,6 +13,10 @@ const s3 = new S3Client({
 });
 
 const upload = multer({
+  limits: {
+    fileSize: 600 * 1024 * 1024, // 600 MB
+    fieldSize: 50 * 1024 * 1024,
+  },
   storage: multerS3({
     s3: s3,
     bucket: process.env.CLOUDFLARE_R2_BUCKET,

@@ -249,14 +249,74 @@ async function getBuild(req, res) {
   }
 }
 
+async function getBuildPresignedUrl(req, res) {
+  try {
+    const { filename, fileType, fileSize } = req.body;
+    if (!filename) {
+      return res.status(400).json({ message: 'Filename is required' });
+    }
+
+    const ext = (filename.split('.').pop() || '').toLowerCase();
+    if (!['apk', 'aab'].includes(ext)) {
+      return res.status(400).json({ message: 'Only .apk and .aab files are allowed' });
+    }
+
+    if (fileSize && fileSize > 1024 * 1024 * 1024) { // 1GB
+      return res.status(400).json({ message: 'File exceeds 1 GB limit' });
+    }
+
+    const { s3 } = require('../../utils/upload');
+    const { PutObjectCommand } = require('@aws-sdk/client-s3');
+    const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
+    const key = `spotme/builds/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+    const contentType = fileType || (ext === 'apk'
+      ? 'application/vnd.android.package-archive'
+      : 'application/octet-stream');
+
+    const command = new PutObjectCommand({
+      Bucket: process.env.CLOUDFLARE_R2_BUCKET,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 7200 }); // 2 hours
+    const fileUrl = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`;
+
+    res.json({
+      uploadUrl,
+      fileKey: key,
+      fileUrl,
+      fileType: ext,
+    });
+  } catch (error) {
+    console.error('Admin getBuildPresignedUrl error:', error);
+    res.status(500).json({ message: 'Failed to generate upload URL' });
+  }
+}
+
 async function createBuild(req, res) {
   try {
-    const { title, description, build_channel, version, version_code, force_update } = req.body;
+    const {
+      title,
+      description,
+      build_channel,
+      version,
+      version_code,
+      force_update,
+      file_key,
+      file_url,
+      file_size,
+      file_type,
+    } = req.body;
+
     if (!title) return res.status(400).json({ message: 'Title is required' });
     if (!adminService.BUILD_CHANNELS.includes(build_channel)) {
       return res.status(400).json({ message: 'build_channel must be production, preview or development' });
     }
-    if (!req.file) return res.status(400).json({ message: 'Build file (.apk or .aab) is required' });
+    if (!req.file && !file_key) {
+      return res.status(400).json({ message: 'Build file (.apk or .aab) is required' });
+    }
 
     const build = await adminService.createBuild({
       title,
@@ -266,6 +326,10 @@ async function createBuild(req, res) {
       version_code,
       force_update,
       file: req.file,
+      file_key,
+      file_url,
+      file_size,
+      file_type,
     });
     res.status(201).json({ success: true, build });
   } catch (error) {
@@ -273,14 +337,25 @@ async function createBuild(req, res) {
       return res.status(error.statusCode).json({ message: error.message });
     }
     console.error('Admin create build error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 }
 
 async function updateBuild(req, res) {
   try {
     const { id } = req.params;
-    const { title, description, build_channel, version, version_code, force_update } = req.body;
+    const {
+      title,
+      description,
+      build_channel,
+      version,
+      version_code,
+      force_update,
+      file_key,
+      file_url,
+      file_size,
+      file_type,
+    } = req.body;
 
     const build = await adminService.updateBuild(id, {
       title,
@@ -290,6 +365,10 @@ async function updateBuild(req, res) {
       version_code,
       force_update,
       file: req.file,
+      file_key,
+      file_url,
+      file_size,
+      file_type,
     });
     if (!build) {
       return res.status(404).json({ message: 'Build not found' });
@@ -300,7 +379,7 @@ async function updateBuild(req, res) {
       return res.status(error.statusCode).json({ message: error.message });
     }
     console.error('Admin update build error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 }
 
@@ -641,6 +720,7 @@ module.exports = {
   deleteSplit,
   listBuilds,
   getBuild,
+  getBuildPresignedUrl,
   createBuild,
   updateBuild,
   deleteBuild,

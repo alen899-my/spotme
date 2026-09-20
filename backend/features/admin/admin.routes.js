@@ -76,6 +76,7 @@ for (const [table, entityName] of Object.entries(entityNameMap)) {
 // ─── App Builds ───────────────────────────────────────────────────────────────
 router.get('/builds', authenticateAdmin, adminController.listBuilds);
 router.get('/builds/:id', authenticateAdmin, adminController.getBuild);
+router.post('/builds/presigned-url', authenticateAdmin, adminController.getBuildPresignedUrl);
 router.post('/builds', authenticateAdmin, upload.single('build_file'), adminController.createBuild);
 router.put('/builds/:id', authenticateAdmin, upload.single('build_file'), adminController.updateBuild);
 router.delete('/builds/:id', authenticateAdmin, adminController.deleteBuild);
