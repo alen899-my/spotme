@@ -196,7 +196,7 @@ export function HeroFramesMockup({ srcMap }: { srcMap?: Record<string, string> }
               >
                 {/* Scales with screen width AND caps to viewport height
                     so the full frame is always visible on small phones. */}
-                <div className="mx-auto aspect-[2/3] w-[72vw] max-w-[300px] max-h-[58svh] rounded-3xl bg-neutral-100 dark:bg-neutral-900">
+                <div className="mx-auto aspect-[2/3] w-[72vw] max-w-[300px] max-h-[58svh]">
                   <div className="relative h-full w-full drop-shadow-[0_20px_36px_rgba(0,0,0,0.18)]">
                     <Image
                       src={frame.src}
