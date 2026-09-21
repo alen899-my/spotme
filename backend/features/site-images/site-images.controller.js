@@ -2,11 +2,13 @@
 
 const siteImagesService = require('./site-images.service');
 
-// Public — fast, cacheable. No auth.
+// Public — dynamic, no-cache so changes appear immediately. No auth.
 async function getPublicMap(_req, res) {
   try {
     const payload = await siteImagesService.getPublicMap();
-    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     return res.json(payload);
   } catch (err) {
     console.error('GET /site-images error:', err);
@@ -18,6 +20,9 @@ async function getPublicMap(_req, res) {
 async function listAdmin(_req, res) {
   try {
     const images = await siteImagesService.listSiteImages();
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     return res.json({ images });
   } catch (err) {
     console.error('GET /admin/site-images error:', err);

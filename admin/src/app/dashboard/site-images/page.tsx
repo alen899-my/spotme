@@ -16,6 +16,12 @@ const SECTION_LABELS: Record<string, string> = {
   team: "Meet the Team",
 };
 
+function withBuster(url: string, updatedAt?: string | null) {
+  if (!url) return "";
+  const v = updatedAt ? new Date(updatedAt).getTime() : Date.now();
+  return url.includes("?") ? `${url}&v=${v}` : `${url}?v=${v}`;
+}
+
 export default function SiteImagesPage() {
   const [images, setImages] = useState<SiteImageItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +35,10 @@ export default function SiteImagesPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ images: SiteImageItem[] }>("/admin/site-images");
+      const res = await api.get<{ images: SiteImageItem[] }>("/admin/site-images", {
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+        params: { _t: Date.now() },
+      });
       setImages(res.data.images ?? []);
     } catch (e) {
       console.error("Failed to load site images", e);
@@ -132,7 +141,7 @@ export default function SiteImagesPage() {
                     <div key={img.slug} className="overflow-hidden rounded-lg border bg-card">
                       <div className="relative aspect-[4/3] bg-secondary">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img.url} alt={img.alt ?? img.title} className="h-full w-full object-cover" loading="lazy" />
+                        <img src={withBuster(img.url, img.updated_at)} alt={img.alt ?? img.title} className="h-full w-full object-cover" loading="lazy" />
                         <span
                           className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${
                             img.isCustom ? "bg-emerald-500/90 text-white" : "bg-black/60 text-white"
@@ -186,7 +195,7 @@ export default function SiteImagesPage() {
           {preview && (
             <div className="overflow-hidden rounded-md bg-secondary">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={preview.url} alt={preview.alt ?? preview.title} className="max-h-[60vh] w-full object-contain" />
+              <img src={withBuster(preview.url, preview.updated_at)} alt={preview.alt ?? preview.title} className="max-h-[60vh] w-full object-contain" />
             </div>
           )}
           <p className="break-all font-mono text-[10px] text-muted-foreground">{preview?.url}</p>

@@ -77,12 +77,8 @@ async function listSiteImages() {
   return rows.map(toPublicRow);
 }
 
-// Fast public payload: { map, updated_at }. map[slug] = display URL (R2 or local fallback).
-let _memCache = { at: 0, payload: null };
-const MEM_TTL_MS = 5 * 60 * 1000;
-
+// Public payload: { map, updated_at }. map[slug] = display URL (R2 or local fallback).
 async function getPublicMap() {
-  if (_memCache.payload && Date.now() - _memCache.at < MEM_TTL_MS) return _memCache.payload;
   await ensureTable();
   const { rows } = await pool.query(`SELECT slug, r2_url, local_fallback, MAX(updated_at) OVER () AS max_updated FROM site_images`);
   const map = {};
@@ -95,12 +91,11 @@ async function getPublicMap() {
   for (const d of SITE_IMAGE_DEFS) {
     if (!map[d.slug]) map[d.slug] = d.local_fallback;
   }
-  _memCache = { at: Date.now(), payload: { map, updated_at } };
-  return _memCache.payload;
+  return { map, updated_at };
 }
 
 function invalidateCache() {
-  _memCache = { at: 0, payload: null };
+  // No-op (memory cache removed in favor of fresh direct queries)
 }
 
 async function replaceImage(slug, file) {

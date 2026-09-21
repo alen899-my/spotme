@@ -16,10 +16,9 @@ export const metadata: Metadata = {
     "SpotMe is your complete fitness companion. Track workouts, log meals, monitor body metrics, and build consistency — all in one place.",
 };
 
-// ISR: landing HTML is statically generated and revalidated hourly.
-// Site images resolve to Cloudflare R2 URLs with local-file fallback,
-// so admin changes go live without a redeploy.
-export const revalidate = 3600;
+// Force dynamic rendering on every request so site image changes go live immediately
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function HomePage() {
   const srcMap = await getSiteImageMap();

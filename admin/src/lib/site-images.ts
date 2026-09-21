@@ -40,12 +40,18 @@ export function resolveSiteImage(map: Record<string, string> | undefined, slug: 
 
 /**
  * Server-side fetch of the public site-images map.
- * ISR-cached for 1h; never throws — returns {} so callers fall back to R2 seed URLs.
+ * Dynamic (no-store); never throws — returns {} so callers fall back to R2 seed URLs.
  */
 export async function getSiteImageMap(): Promise<Record<string, string>> {
   const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
   try {
-    const res = await fetch(`${base}/site-images`, { next: { revalidate: 3600 } });
+    const res = await fetch(`${base}/site-images`, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    });
     if (!res.ok) return {};
     const data = await res.json();
     return (data?.map ?? {}) as Record<string, string>;
