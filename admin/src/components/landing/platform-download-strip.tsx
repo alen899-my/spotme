@@ -1,53 +1,111 @@
 "use client"
 
+import Image from "next/image"
 import { motion } from "framer-motion"
+import { Download, ArrowRight } from "lucide-react"
 
 const LATEST_APK_URL = "https://pub-a5b499b8927a41d0aab85cb763ff97c7.r2.dev/spotme/builds/1789875707389_g09z6.apk"
 const WEB_APP_URL = "https://spotme-gym.vercel.app"
 
 export function PlatformDownloadStrip() {
   return (
-    <section id="platforms" className="relative mx-auto w-full max-w-5xl px-4 sm:px-6 py-6 sm:py-8 scroll-mt-24">
-      {/* Single Connected Card with Smooth Scroll Reveal */}
+    <section id="platforms" className="relative mx-auto w-full max-w-5xl px-4 sm:px-6 py-8 sm:py-12 scroll-mt-24">
+      {/* Connected Dual-Platform Card with Olympic Plate Spinners */}
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-50px" }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="rounded-3xl bg-neutral-950 dark:bg-black text-white border border-neutral-800 overflow-hidden shadow-xl"
+        className="relative rounded-3xl bg-neutral-950 dark:bg-black text-white border border-neutral-800/90 overflow-hidden shadow-2xl backdrop-blur-xl"
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-neutral-800">
+        {/* Ambient Corner Atmosphere */}
+        <div className="pointer-events-none absolute -top-20 -left-20 h-52 w-52 rounded-full bg-[#F7CB16]/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -right-20 h-52 w-52 rounded-full bg-amber-500/10 blur-3xl" />
+
+        <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-neutral-800/90">
           
-          {/* Side 1: Android App */}
-          <div className="p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-neutral-900/40 transition-colors duration-200">
-            <div>
-              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Android App</h3>
-              <p className="text-xs sm:text-sm text-neutral-400 mt-0.5">Native build for your phone</p>
+          {/* ── Side 1: Android Native App with Yellow Olympic Plate Spinner ── */}
+          <div className="group p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5 hover:bg-neutral-900/35 transition-colors duration-200">
+            <div className="flex items-center gap-4 sm:gap-5">
+              {/* Interactive Olympic Yellow Bumper Plate Spinner */}
+              <div className="relative h-14 w-14 sm:h-16 sm:w-16 shrink-0 flex items-center justify-center select-none">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 24, ease: "linear", repeat: Infinity }}
+                  whileHover={{ rotate: 720, transition: { duration: 1.2, ease: "easeOut" } }}
+                  className="relative h-full w-full rounded-full drop-shadow-[0_4px_14px_rgba(247,203,22,0.25)] cursor-pointer"
+                >
+                  <Image
+                    src="/images/plate.png"
+                    alt="Olympic Yellow Plate Spinner"
+                    fill
+                    sizes="64px"
+                    className="object-contain pointer-events-none"
+                  />
+                </motion.div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Android App</h3>
+                  <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                    APK
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-neutral-400 mt-0.5">Native build for your phone</p>
+              </div>
             </div>
 
             <a
               href={LATEST_APK_URL}
               download="spotme-v2.apk"
-              className="inline-flex items-center justify-center rounded-full bg-[#F7CB16] hover:bg-[#E5BC14] text-neutral-950 font-bold text-xs sm:text-sm px-6 py-2.5 transition-all duration-200 active:scale-95 cursor-pointer shadow-sm shrink-0 w-full sm:w-auto"
+              className="group/btn inline-flex items-center justify-center gap-2 rounded-full bg-[#F7CB16] hover:bg-[#E5BC14] text-neutral-950 font-bold text-xs sm:text-sm px-6 py-3 transition-all duration-200 active:scale-95 cursor-pointer shadow-md shrink-0 w-full sm:w-auto"
             >
-              Download APK
+              <span>Download APK</span>
+              <Download className="h-4 w-4 transition-transform duration-200 group-hover/btn:translate-y-0.5" />
             </a>
           </div>
 
-          {/* Side 2: Web Companion */}
-          <div className="p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-neutral-900/40 transition-colors duration-200">
-            <div>
-              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Web Companion</h3>
-              <p className="text-xs sm:text-sm text-neutral-400 mt-0.5">Access in any browser</p>
+          {/* ── Side 2: Web Companion with Cast-Iron Olympic Plate Spinner ── */}
+          <div className="group p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5 hover:bg-neutral-900/35 transition-colors duration-200">
+            <div className="flex items-center gap-4 sm:gap-5">
+              {/* Interactive Olympic Matte Black Plate Spinner */}
+              <div className="relative h-14 w-14 sm:h-16 sm:w-16 shrink-0 flex items-center justify-center select-none">
+                <motion.div
+                  animate={{ rotate: -360 }}
+                  transition={{ duration: 24, ease: "linear", repeat: Infinity }}
+                  whileHover={{ rotate: -720, transition: { duration: 1.2, ease: "easeOut" } }}
+                  className="relative h-full w-full rounded-full drop-shadow-[0_4px_14px_rgba(255,255,255,0.12)] cursor-pointer"
+                >
+                  <Image
+                    src="/images/plate.png"
+                    alt="Olympic Black Plate Spinner"
+                    fill
+                    sizes="64px"
+                    className="object-contain grayscale brightness-50 contrast-125 pointer-events-none"
+                  />
+                </motion.div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Web Companion</h3>
+                  <span className="inline-flex items-center rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] font-semibold text-neutral-300">
+                    Live
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-neutral-400 mt-0.5">Access in any browser</p>
+              </div>
             </div>
 
             <a
               href={WEB_APP_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-full bg-white hover:bg-neutral-200 text-neutral-950 font-bold text-xs sm:text-sm px-6 py-2.5 transition-all duration-200 active:scale-95 cursor-pointer shadow-sm shrink-0 w-full sm:w-auto"
+              className="group/btn inline-flex items-center justify-center gap-2 rounded-full bg-white hover:bg-neutral-200 text-neutral-950 font-bold text-xs sm:text-sm px-6 py-3 transition-all duration-200 active:scale-95 cursor-pointer shadow-md shrink-0 w-full sm:w-auto"
             >
-              Open Web App
+              <span>Open Web App</span>
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover/btn:translate-x-0.5" />
             </a>
           </div>
 
@@ -56,3 +114,4 @@ export function PlatformDownloadStrip() {
     </section>
   )
 }
+

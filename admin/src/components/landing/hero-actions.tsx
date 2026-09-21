@@ -34,13 +34,13 @@ export function HeroActions() {
       </div>
 
       {/* Trust Badges */}
-      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-1 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
         <div className="inline-flex items-center gap-1.5">
-          <Check className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 stroke-[2.5]" />
+          <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
           <span>Free to start</span>
         </div>
         <div className="inline-flex items-center gap-1.5">
-          <Check className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400 stroke-[2.5]" />
+          <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 stroke-[3]" />
           <span>No credit card required</span>
         </div>
       </div>

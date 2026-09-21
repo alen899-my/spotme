@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
-import { motion, useReducedMotion } from "framer-motion"
+import { motion } from "framer-motion"
 
 interface FrameConfig {
   id: number
@@ -17,7 +17,7 @@ interface FrameConfig {
 }
 
 const R2_SEED_BASE =
-  "https://pub-a5b499b8927a41d0aab85cb763ff97c7.r2.dev/spotme/site-images";
+  "https://pub-a5b499b8927a41d0aab85cb763ff97c7.r2.dev/spotme/site-images"
 
 const FRAMES: FrameConfig[] = [
   {
@@ -29,7 +29,7 @@ const FRAMES: FrameConfig[] = [
     targetRotate: -7.5,
     targetScale: 0.86,
     zIndex: 10,
-    delay: 0.48, // Alternating Left (Step 3)
+    delay: 0.38,
   },
   {
     id: 2,
@@ -40,7 +40,7 @@ const FRAMES: FrameConfig[] = [
     targetRotate: -4,
     targetScale: 0.93,
     zIndex: 20,
-    delay: 0.22, // Alternating Left (Step 1)
+    delay: 0.18,
   },
   {
     id: 3,
@@ -51,7 +51,7 @@ const FRAMES: FrameConfig[] = [
     targetRotate: 0,
     targetScale: 1.04,
     zIndex: 30,
-    delay: 0.08, // Center Anchor (Step 0)
+    delay: 0.05,
   },
   {
     id: 4,
@@ -62,7 +62,7 @@ const FRAMES: FrameConfig[] = [
     targetRotate: 4,
     targetScale: 0.93,
     zIndex: 20,
-    delay: 0.35, // Alternating Right (Step 2)
+    delay: 0.26,
   },
   {
     id: 5,
@@ -73,7 +73,7 @@ const FRAMES: FrameConfig[] = [
     targetRotate: 7.5,
     targetScale: 0.86,
     zIndex: 10,
-    delay: 0.62, // Alternating Right (Step 4)
+    delay: 0.46,
   },
 ]
 
@@ -83,195 +83,85 @@ const FRAME_DEFAULTS = [
   `${R2_SEED_BASE}/seed-hero-frame-3.webp`,
   `${R2_SEED_BASE}/seed-hero-frame-4.webp`,
   `${R2_SEED_BASE}/seed-hero-frame-5.webp`,
-];
-
-const AUTOPLAY_MS = 10000
-const RESUME_MS = 5000
+]
 
 export function HeroFramesMockup({ srcMap }: { srcMap?: Record<string, string> }) {
   const [hoveredId, setHoveredId] = useState<number | null>(null)
+  const [activeId, setActiveId] = useState<number | null>(null)
   const [isFanned, setIsFanned] = useState(false)
-  const hasOpened = useRef(false)
+
   const frames = FRAMES.map((f, i) => ({
     ...f,
     src: srcMap?.[`hero-frame-${f.id}`] || FRAME_DEFAULTS[i] || f.src,
-  }));
+  }))
 
-  // Desktop fan-out: one-way latch — plays ONCE on first scroll past 30px,
-  // never collapses or replays when scrolling back up/down.
+  // Blossom into the fanned-out stacked formation on mount or scroll
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsFanned(true)
+    }, 120)
+
     const handleScroll = () => {
-      if (!hasOpened.current && window.scrollY > 30) {
-        hasOpened.current = true
+      if (window.scrollY > 20) {
         setIsFanned(true)
       }
     }
 
-    // Check current scroll position in case of page refresh while scrolled
-    handleScroll()
-
     window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
-  // ── Mobile carousel state ──────────────────────────────────────────────
-  const [index, setIndex] = useState(2) // start on dashboard frame (LCP visual)
-  const [autoplayPaused, setAutoplayPaused] = useState(false)
-  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const viewportRef = useRef<HTMLDivElement>(null)
-  const reduceMotion = useReducedMotion()
-
-  const go = useCallback(
-    (delta: number) => {
-      const n = FRAMES.length
-      setIndex((prev) => (((prev + delta) % n) + n) % n)
-    },
-    []
-  )
-
-  const pauseAutoplay = useCallback(() => {
-    setAutoplayPaused(true)
-    if (resumeTimer.current) clearTimeout(resumeTimer.current)
-    resumeTimer.current = setTimeout(() => setAutoplayPaused(false), RESUME_MS)
-  }, [])
-
-  useEffect(() => {
     return () => {
-      if (resumeTimer.current) clearTimeout(resumeTimer.current)
+      clearTimeout(timer)
+      window.removeEventListener("scroll", handleScroll)
     }
   }, [])
 
-  // Autoplay loop (mobile carousel only). Skipped for reduced-motion users.
-  useEffect(() => {
-    if (autoplayPaused || reduceMotion) return
-    const id = setInterval(() => {
-      if (document.hidden) return
-      setIndex((prev) => (prev + 1) % frames.length)
-    }, AUTOPLAY_MS)
-    return () => clearInterval(id)
-  }, [autoplayPaused, reduceMotion, frames.length])
-
   return (
-    <div className="relative mx-auto w-full max-w-7xl px-2 sm:px-4 overflow-x-clip py-4 sm:py-8">
+    <div className="relative mx-auto w-full max-w-7xl overflow-x-clip pt-2 sm:pt-6 pb-2 h-[340px] min-[360px]:h-[370px] min-[420px]:h-[420px] min-[520px]:h-[500px] sm:h-[580px] md:h-[660px] lg:h-[730px] flex items-start justify-center">
       {/* Soft Ambient Radial Backdrop Glow */}
       <div
-        className="pointer-events-none absolute -top-10 left-1/2 h-80 w-full max-w-5xl -translate-x-1/2 rounded-full opacity-65 blur-3xl transition-opacity duration-500"
+        className="pointer-events-none absolute -top-8 left-1/2 h-72 w-full max-w-4xl -translate-x-1/2 rounded-full opacity-60 blur-3xl transition-opacity duration-500"
         style={{
           background:
-            "radial-gradient(circle, rgba(247,203,22,0.18) 0%, rgba(37,150,190,0.14) 45%, transparent 75%)",
-          opacity: isFanned ? 0.75 : 0.45,
+            "radial-gradient(circle, rgba(247,203,22,0.18) 0%, rgba(37,150,190,0.12) 45%, transparent 75%)",
+          opacity: isFanned ? 0.7 : 0.4,
         }}
       />
 
-      {/* ── Mobile: full-size swipeable looping carousel (below md) ── */}
-      <div
-        className="md:hidden"
-        role="region"
-        aria-roledescription="carousel"
-        aria-label="SpotMe app screenshots"
-      >
-        <div ref={viewportRef} className="cursor-grab overflow-hidden active:cursor-grabbing">
-          <motion.div
-            className="flex"
-            initial={false}
-            // Each slide is w-full (= track's own width), so -100% = exactly one slide.
-            animate={{ x: `-${index * 100}%` }}
-            transition={{ type: "spring", stiffness: 260, damping: 30 }}
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.6}
-            dragMomentum={false}
-            onDragStart={pauseAutoplay}
-            onDragEnd={(_, info) => {
-              const width = viewportRef.current?.offsetWidth || 1
-              const { offset, velocity } = info
-              // Dead zone: tiny accidental touches snap back to the current frame.
-              if (Math.abs(offset.x) < 24 && Math.abs(velocity.x) < 500) return
-              // Dragged distance maps to whole frames (long drags can skip
-              // multiple frames); a fast flick always moves at least one.
-              let delta = Math.round(-offset.x / width)
-              if (delta === 0) delta = velocity.x < 0 ? 1 : -1
-              go(delta)
-            }}
-          >
-            {frames.map((frame, i) => (
-              <div
-                key={frame.id}
-                className="w-full min-w-full shrink-0"
-                aria-hidden={i !== index}
-                aria-roledescription="slide"
-                aria-label={`${i + 1} of ${frames.length}: ${frame.alt}`}
-              >
-                {/* Scales with screen width AND caps to viewport height
-                    so the full frame is always visible on small phones. */}
-                <div className="mx-auto aspect-[2/3] w-[72vw] max-w-[300px] max-h-[58svh]">
-                  <div className="relative h-full w-full drop-shadow-[0_20px_36px_rgba(0,0,0,0.18)]">
-                    <Image
-                      src={frame.src}
-                      alt={frame.alt}
-                      width={1024}
-                      height={1536}
-                      priority={i === index}
-                      draggable={false}
-                      className="h-full w-full object-contain select-none"
-                      sizes="72vw"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-
-        {/* Dots */}
-        <div className="mt-4 flex items-center justify-center gap-2">
-          {frames.map((frame, i) => (
-            <button
-              key={frame.id}
-              type="button"
-              onClick={() => {
-                pauseAutoplay()
-                setIndex(i)
-              }}
-              aria-label={`Go to slide ${i + 1}: ${frame.alt}`}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                i === index ? "w-6" : "w-2 bg-neutral-300 dark:bg-neutral-700 hover:bg-neutral-400"
-              }`}
-              style={i === index ? { background: "#F7CB16" } : undefined}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* ── Desktop: fan-out stack (md and up, unchanged behavior) ── */}
-      <div className="hidden md:flex items-center justify-center scale-[0.82] md:scale-[0.92] lg:scale-100 origin-top transition-transform duration-300">
-        <div className="relative h-[560px] sm:h-[620px] md:h-[660px] lg:h-[700px] w-[260px] sm:w-[300px] md:w-[330px] lg:w-[350px]">
+      {/* ── Unified Responsive Stack & Fan-Out Showcase (Mobile & Desktop) ── */}
+      <div className="flex items-center justify-center scale-[0.44] min-[360px]:scale-[0.50] min-[420px]:scale-[0.58] min-[520px]:scale-[0.70] sm:scale-[0.80] md:scale-[0.92] lg:scale-100 origin-top transition-transform duration-300">
+        <div className="relative h-[660px] lg:h-[700px] w-[310px] md:w-[330px] lg:w-[350px]">
           {frames.map((frame) => {
             const isHovered = hoveredId === frame.id
+            const isActive = activeId === frame.id
+            const isElevated = isHovered || isActive
 
-            // Subtle organic tilt when stacked in center
+            // Organic tilt when resting stacked in center
             const stackedRotate = (frame.id - 3) * 2.2
 
             return (
               <motion.div
                 key={frame.id}
-                className="absolute inset-0 cursor-pointer will-change-transform"
+                className="absolute inset-0 cursor-pointer will-change-transform select-none"
                 style={{
-                  zIndex: isHovered ? 50 : frame.zIndex,
+                  zIndex: isElevated ? 50 : frame.zIndex,
                 }}
-                initial={false}
+                initial={{
+                  x: "0%",
+                  y: 0,
+                  rotate: stackedRotate,
+                  scale: 0.96,
+                  opacity: 0.8,
+                }}
                 animate={{
-                  // When scrolled down: fan out to targetX. When at top: stay stacked at 0%
-                  x: isFanned ? frame.targetX : "0%",
+                  x: isFanned ? (isActive ? "0%" : frame.targetX) : "0%",
                   y: isFanned
-                    ? (isHovered ? frame.targetY - 14 : frame.targetY)
-                    : (isHovered ? -10 : 0),
+                    ? (isElevated ? frame.targetY - 14 : frame.targetY)
+                    : (isElevated ? -10 : 0),
                   rotate: isFanned
-                    ? (isHovered ? 0 : frame.targetRotate)
-                    : (isHovered ? 0 : stackedRotate),
+                    ? (isElevated ? 0 : frame.targetRotate)
+                    : (isElevated ? 0 : stackedRotate),
                   scale: isFanned
-                    ? (isHovered ? frame.targetScale * 1.05 : frame.targetScale)
-                    : (isHovered ? 1.02 : 0.96),
+                    ? (isElevated ? frame.targetScale * 1.06 : frame.targetScale)
+                    : (isElevated ? 1.02 : 0.96),
                   opacity: 1,
                 }}
                 transition={{
@@ -279,17 +169,18 @@ export function HeroFramesMockup({ srcMap }: { srcMap?: Record<string, string> }
                   stiffness: 64,
                   damping: 16,
                   mass: 0.85,
-                  delay: isFanned ? frame.delay : (5 - frame.id) * 0.04,
+                  delay: isFanned ? frame.delay : 0,
                 }}
                 onMouseEnter={() => setHoveredId(frame.id)}
                 onMouseLeave={() => setHoveredId(null)}
+                onClick={() => setActiveId(activeId === frame.id ? null : frame.id)}
               >
                 <div
                   className={`relative h-full w-full transition-all duration-300 ${
-                    isHovered
-                      ? "drop-shadow-[0_28px_45px_rgba(0,0,0,0.22)]"
+                    isElevated
+                      ? "drop-shadow-[0_28px_45px_rgba(0,0,0,0.25)]"
                       : isFanned
-                      ? "drop-shadow-[0_16px_30px_rgba(0,0,0,0.12)]"
+                      ? "drop-shadow-[0_16px_30px_rgba(0,0,0,0.14)]"
                       : "drop-shadow-[0_12px_24px_rgba(0,0,0,0.08)]"
                   }`}
                 >
@@ -299,8 +190,8 @@ export function HeroFramesMockup({ srcMap }: { srcMap?: Record<string, string> }
                     width={1024}
                     height={1536}
                     priority={frame.id === 3}
-                    className="h-full w-full object-contain select-none"
-                    sizes="(max-width: 640px) 240px, (max-width: 1024px) 320px, 350px"
+                    className="h-full w-full object-contain pointer-events-none"
+                    sizes="(max-width: 640px) 260px, (max-width: 1024px) 320px, 350px"
                   />
                 </div>
               </motion.div>
@@ -311,3 +202,4 @@ export function HeroFramesMockup({ srcMap }: { srcMap?: Record<string, string> }
     </div>
   )
 }
+
