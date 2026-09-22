@@ -1,13 +1,54 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { motion } from "framer-motion"
 import { Download, ArrowRight } from "lucide-react"
+import { FALLBACK_APK_URL } from "@/lib/builds"
 
-const LATEST_APK_URL = "https://pub-a5b499b8927a41d0aab85cb763ff97c7.r2.dev/spotme/builds/1789875707389_g09z6.apk"
 const WEB_APP_URL = "https://spotme-gym.vercel.app"
 
-export function PlatformDownloadStrip() {
+interface PlatformDownloadStripProps {
+  apkUrl?: string
+  apkVersion?: string
+}
+
+export function PlatformDownloadStrip({ apkUrl: initialApkUrl, apkVersion: initialApkVersion }: PlatformDownloadStripProps) {
+  const [downloadUrl, setDownloadUrl] = useState<string>(initialApkUrl || FALLBACK_APK_URL)
+  const [version, setVersion] = useState<string | undefined>(initialApkVersion)
+
+  useEffect(() => {
+    if (initialApkUrl) {
+      setDownloadUrl(initialApkUrl)
+    }
+    if (initialApkVersion) {
+      setVersion(initialApkVersion)
+    }
+
+    // Refresh client-side to ensure always up-to-date with admin uploads
+    let isMounted = true
+    fetch("/api/updates/latest?channel=production")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!isMounted || !data?.build) return
+        if (data.build.file_url) {
+          setDownloadUrl(data.build.file_url)
+        }
+        if (data.build.version) {
+          setVersion(data.build.version)
+        }
+      })
+      .catch((err) => {
+        console.warn("Client updates check fallback:", err)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [initialApkUrl, initialApkVersion])
+
+  const downloadFilename = version ? `spotme-v${version}.apk` : "spotme-latest.apk"
+
   return (
     <section id="platforms" className="relative mx-auto w-full max-w-5xl px-4 sm:px-6 py-8 sm:py-12 scroll-mt-24">
       {/* Connected Dual-Platform Card with Olympic Plate Spinners */}
@@ -49,7 +90,7 @@ export function PlatformDownloadStrip() {
                 <div className="flex items-center gap-2">
                   <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Android App</h3>
                   <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
-                    APK
+                    APK {version ? `v${version}` : ""}
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-neutral-400 mt-0.5">Native build for your phone</p>
@@ -57,8 +98,8 @@ export function PlatformDownloadStrip() {
             </div>
 
             <a
-              href={LATEST_APK_URL}
-              download="spotme-v2.apk"
+              href={downloadUrl}
+              download={downloadFilename}
               className="group/btn inline-flex items-center justify-center gap-2 rounded-full bg-[#F7CB16] hover:bg-[#E5BC14] text-neutral-950 font-bold text-xs sm:text-sm px-6 py-3 transition-all duration-200 active:scale-95 cursor-pointer shadow-md shrink-0 w-full sm:w-auto"
             >
               <span>Download APK</span>
@@ -114,4 +155,3 @@ export function PlatformDownloadStrip() {
     </section>
   )
 }
-

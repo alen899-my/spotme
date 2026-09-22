@@ -9,6 +9,7 @@ import { MeetTeamCtaSection } from "@/components/landing/meet-team-cta";
 import { AppFooter } from "@/components/landing/app-footer";
 import { FloatingDownloadBar } from "@/components/landing/floating-download-bar";
 import { getSiteImageMap } from "@/lib/site-images";
+import { getLatestApkBuild, FALLBACK_APK_URL } from "@/lib/builds";
 
 export const metadata: Metadata = {
   title: "SpotMe — A Healthier, Stronger You | Complete Fitness Companion",
@@ -16,12 +17,19 @@ export const metadata: Metadata = {
     "SpotMe is your complete fitness companion. Track workouts, log meals, monitor body metrics, and build consistency — all in one place.",
 };
 
-// Force dynamic rendering on every request so site image changes go live immediately
+// Force dynamic rendering on every request so site image and build changes go live immediately
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function HomePage() {
-  const srcMap = await getSiteImageMap();
+  const [srcMap, latestBuild] = await Promise.all([
+    getSiteImageMap(),
+    getLatestApkBuild("production"),
+  ]);
+
+  const apkUrl = latestBuild?.file_url || FALLBACK_APK_URL;
+  const apkVersion = latestBuild?.version || undefined;
+
   return (
     <div className="min-h-screen bg-white dark:bg-black text-neutral-900 dark:text-neutral-100 selection:bg-[#F7CB16]/30 selection:text-neutral-900 dark:selection:text-white transition-colors duration-300">
       {/* Sticky Responsive Header */}
@@ -33,7 +41,7 @@ export default async function HomePage() {
         <HeroSection srcMap={srcMap} />
 
         {/* Cross-Platform: Native Android APK & Web Companion */}
-        <PlatformDownloadStrip />
+        <PlatformDownloadStrip apkUrl={apkUrl} apkVersion={apkVersion} />
 
         {/* Authentic Bento Grid with Expo App Assets */}
         <BentoGrid srcMap={srcMap} />
@@ -54,7 +62,7 @@ export default async function HomePage() {
       <AppFooter />
 
       {/* Floating Download & Web App Bar */}
-      <FloatingDownloadBar />
+      <FloatingDownloadBar apkUrl={apkUrl} apkVersion={apkVersion} />
     </div>
   );
 }

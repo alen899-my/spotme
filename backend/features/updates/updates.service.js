@@ -13,7 +13,7 @@ async function getLatestUpdate({ channel, clientCode }) {
             version_code, file_url, file_size, is_latest, force_update, created_at
      FROM app_builds
      WHERE build_channel = $1 AND file_type = 'apk'
-     ORDER BY created_at DESC, id DESC
+     ORDER BY is_latest DESC, created_at DESC, id DESC
      LIMIT 1`,
     [selectedChannel]
   );

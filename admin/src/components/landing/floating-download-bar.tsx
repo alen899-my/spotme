@@ -1,17 +1,56 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { FALLBACK_APK_URL } from "@/lib/builds"
 
-const LATEST_APK_URL = "https://pub-a5b499b8927a41d0aab85cb763ff97c7.r2.dev/spotme/builds/1789875707389_g09z6.apk"
 const WEB_APP_URL = "https://spotme-gym.vercel.app"
 
-export function FloatingDownloadBar() {
+interface FloatingDownloadBarProps {
+  apkUrl?: string
+  apkVersion?: string
+}
+
+export function FloatingDownloadBar({ apkUrl: initialApkUrl, apkVersion: initialApkVersion }: FloatingDownloadBarProps) {
   const [isDismissed, setIsDismissed] = useState(false)
+  const [downloadUrl, setDownloadUrl] = useState<string>(initialApkUrl || FALLBACK_APK_URL)
+  const [version, setVersion] = useState<string | undefined>(initialApkVersion)
+
+  useEffect(() => {
+    if (initialApkUrl) {
+      setDownloadUrl(initialApkUrl)
+    }
+    if (initialApkVersion) {
+      setVersion(initialApkVersion)
+    }
+
+    let isMounted = true
+    fetch("/api/updates/latest?channel=production")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!isMounted || !data?.build) return
+        if (data.build.file_url) {
+          setDownloadUrl(data.build.file_url)
+        }
+        if (data.build.version) {
+          setVersion(data.build.version)
+        }
+      })
+      .catch((err) => {
+        console.warn("Floating bar updates check fallback:", err)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [initialApkUrl, initialApkVersion])
 
   if (isDismissed) return null
+
+  const downloadFilename = version ? `spotme-v${version}.apk` : "spotme-latest.apk"
+  const apkTitle = version ? `Download Android APK (v${version})` : "Download Android APK"
 
   return (
     <aside
@@ -29,9 +68,9 @@ export function FloatingDownloadBar() {
           >
             {/* ── Olympic Plate 1: Yellow Bumper Plate (Android APK) ── */}
             <motion.a
-              href={LATEST_APK_URL}
-              download="spotme-v2.apk"
-              title="Download Android APK"
+              href={downloadUrl}
+              download={downloadFilename}
+              title={apkTitle}
               whileHover="hover"
               whileTap={{ scale: 0.92 }}
               className="group relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#F7CB16]/60 select-none"
@@ -111,4 +150,3 @@ export function FloatingDownloadBar() {
     </aside>
   )
 }
-
