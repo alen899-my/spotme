@@ -1,6 +1,7 @@
 'use strict';
 
 const adminService = require('./admin.service');
+const workoutAnalyticsService = require('./admin-workout-analytics.service');
 
 async function login(req, res) {
   try {
@@ -605,6 +606,51 @@ async function listWorkouts(req, res) {
   }
 }
 
+async function getWorkoutAnalytics(req, res) {
+  try {
+    const { userId, range, tz } = req.query;
+    const data = await workoutAnalyticsService.getWorkoutAnalytics({ userId, range, tz });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getWorkoutAnalytics error:', error);
+    res.status(500).json({ message: 'Failed to retrieve workout analytics' });
+  }
+}
+
+async function getAthleteExercises(req, res) {
+  try {
+    const { userId, search, bodyPart } = req.query;
+    if (!userId) {
+      return res.status(400).json({ message: 'userId is required' });
+    }
+    const data = await workoutAnalyticsService.getAthleteExercises({ userId, search, bodyPart });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getAthleteExercises error:', error);
+    res.status(500).json({ message: 'Failed to retrieve athlete exercises' });
+  }
+}
+
+async function getAthleteExerciseProgression(req, res) {
+  try {
+    const { userId, exerciseId, range, tz, workoutTitle } = req.query;
+    if (!userId || !exerciseId) {
+      return res.status(400).json({ message: 'userId and exerciseId are required' });
+    }
+    const data = await workoutAnalyticsService.getAthleteExerciseProgression({
+      userId,
+      exerciseId,
+      range,
+      tz,
+      workoutTitle,
+    });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getAthleteExerciseProgression error:', error);
+    res.status(500).json({ message: 'Failed to retrieve exercise progression' });
+  }
+}
+
 // ─── Phase 2 Controllers ──────────────────────────────────────────────────────
 async function getOnboarding(req, res) {
   try {
@@ -739,6 +785,9 @@ module.exports = {
   broadcastPush,
   listCampaigns,
   listWorkouts,
+  getWorkoutAnalytics,
+  getAthleteExercises,
+  getAthleteExerciseProgression,
   getOnboarding,
   getHabits,
   getUser360,

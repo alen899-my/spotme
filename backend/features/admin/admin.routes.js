@@ -98,6 +98,9 @@ router.get('/notifications/campaigns', authenticateAdmin, adminController.listCa
 
 // ─── Workouts Activity ────────────────────────────────────────────────────────
 router.get('/workouts/sessions', authenticateAdmin, adminController.listWorkouts);
+router.get('/workouts/analytics', authenticateAdmin, adminController.getWorkoutAnalytics);
+router.get('/workouts/athlete-exercises', authenticateAdmin, adminController.getAthleteExercises);
+router.get('/workouts/exercise-progression', authenticateAdmin, adminController.getAthleteExerciseProgression);
 
 // ─── Phase 2: Onboarding, Habits & User 360 ───────────────────────────────────
 router.get('/onboarding/analytics', authenticateAdmin, adminController.getOnboarding);

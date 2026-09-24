@@ -39,7 +39,7 @@ const navItems = [
   { href: "/dashboard/nutrition", label: "Nutrition & Meals", icon: Utensils },
   { href: "/dashboard/physique", label: "Physique Moderation", icon: Camera },
   { href: "/dashboard/notifications", label: "Push Campaigns", icon: Bell },
-  { href: "/dashboard/workouts", label: "Live Workouts & PRs", icon: Flame },
+  { href: "/dashboard/workouts", label: "Workout Analytics & PRs", icon: Flame },
   { href: "/dashboard/onboarding", label: "Onboarding Funnel", icon: Compass },
   { href: "/dashboard/habits", label: "Habits & Retention", icon: CalendarCheck },
   { href: "/dashboard/gamification", label: "Gamification & XP", icon: Trophy },
