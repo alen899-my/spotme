@@ -44,6 +44,7 @@ const navItems = [
   { href: "/dashboard/habits", label: "Habits & Retention", icon: CalendarCheck },
   { href: "/dashboard/gamification", label: "Gamification & XP", icon: Trophy },
   { href: "/dashboard/ai", label: "AI Intelligence", icon: Bot },
+  { href: "/dashboard/ai/config", label: "AI Config Center", icon: Sliders },
   { href: "/dashboard/remote-config", label: "Remote Config", icon: Sliders },
   { href: "/dashboard/exercises", label: "Exercises", icon: Dumbbell },
   { href: "/dashboard/analytics", label: "Analytics & APM", icon: BarChart3 },

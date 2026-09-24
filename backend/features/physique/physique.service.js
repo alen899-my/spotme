@@ -111,7 +111,8 @@ Return ONLY a valid JSON object. No markdown, no code fences, no text outside th
   }
 }`.trim();
 
-  const aiResponse = await callAI(prompt, imageUrl, null);
+  // 'physique_analysis' task: vision model required — scores muscle groups from body photo.
+  const aiResponse = await callAI(prompt, imageUrl, 'physique_analysis');
 
   const fencedMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
   const bareMatch = aiResponse.match(/\{[\s\S]*\}/);

@@ -291,7 +291,8 @@ User's Latest Message: "${message.trim()}"
 
 Provide your expert coaching response now:`;
 
-  const reply = await callAI(masterPrompt);
+  // 'coach_chat' is the task key for the AI Coach (Spotty) conversation feature.
+  const reply = await callAI(masterPrompt, null, 'coach_chat');
   const cleanReply = reply ? sanitizeCleanText(reply) : "I'm reviewing your workout stats! Keep up the great consistency and progressive overload.";
 
   await pool.query(

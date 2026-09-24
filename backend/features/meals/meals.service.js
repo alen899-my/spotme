@@ -76,7 +76,8 @@ Return ONLY a valid JSON object with the following structure. No conversational 
 }
 `.trim();
 
-  const aiResponse = await callAI(prompt, imageUrl, null);
+  // 'meal_analysis' task: vision model required — analyzes food image and returns nutrition JSON.
+  const aiResponse = await callAI(prompt, imageUrl, 'meal_analysis');
 
   let analysis = null;
   const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);

@@ -1466,7 +1466,8 @@ async function generateReport({ workoutId, userId, forceRetry }) {
 
         async function callWithFallback(prompt, model = null, options = {}) {
           try {
-            return await callAI(prompt, null, model, options);
+            // 'workout_report' task: multi-section post-workout AI analysis with configurable model.
+            return await callAI(prompt, null, 'workout_report', options);
           } catch (err) {
             console.error('[Workout AI Report] callWithFallback error:', err.message);
             return null;
@@ -1862,7 +1863,8 @@ User Question: "${message.trim()}"
 
 Provide a motivating, concise, and technically accurate answer (2-4 paragraphs max). Do not use markdown syntax symbols like hashes (#), dashes (-), asterisks (* or **), or divider lines. Format cleanly in natural paragraphs or numbered steps.`;
 
-  const rawReply = await callAI(prompt);
+  // 'workout_coach_chat' task: answers mid-workout questions based on the active session context.
+  const rawReply = await callAI(prompt, null, 'workout_coach_chat');
   let reply = (rawReply || '').trim();
   reply = reply
     .replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, '')

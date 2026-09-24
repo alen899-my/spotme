@@ -320,12 +320,8 @@ async function generateAIDietPlan(user, targets, mealsPerDay, pool) {
 
   let aiResponse;
   try {
-    aiResponse = await callAI(
-      prompt,
-      null,
-      'groq',          // ← same model/provider as meal analysis & nutrient detection
-      { max_tokens: 4096, temperature: 0.3 }
-    );
+    // 'diet_plan_generate' task: generates a personalized daily meal plan from user profile data.
+    aiResponse = await callAI(prompt, null, 'diet_plan_generate', { max_tokens: 4096, temperature: 0.3 });
   } catch (aiErr) {
     console.error('[DietRAG] AI call failed, using static fallback:', aiErr.message);
     return generateDynamicMealPlan(user, caloriesTarget, proteinTarget, carbsTarget, fatTarget, mealsPerDay);

@@ -116,4 +116,11 @@ router.get('/remote-config', authenticateAdmin, adminController.getRemoteConfig)
 router.put('/remote-config', authenticateAdmin, adminController.updateRemoteConfig);
 router.get('/gamification/analytics', authenticateAdmin, adminController.getGamification);
 
+// ─── AI Config System (Phase 4) ───────────────────────────────────────────────
+// The ai-config controller is itself a sub-router.
+// Mounting it under /ai/config means all its routes become:
+//   /api/admin/ai/config/providers, /ai/config/tasks, /ai/config/usage, etc.
+const aiConfigRouter = require('./ai-config.controller');
+router.use('/ai/config', authenticateAdmin, aiConfigRouter);
+
 module.exports = router;

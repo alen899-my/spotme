@@ -547,7 +547,8 @@ IMPORTANT: Respond ONLY with a valid JSON object in this EXACT structure (no mar
   ]
 }`;
 
-  const rawAI = await callAI(prompt);
+  // 'workout_split_generate' task: generates a new structured N-day training plan as JSON.
+  const rawAI = await callAI(prompt, null, 'workout_split_generate');
   const parsed = extractJson(rawAI);
 
   let sessionsArray = [];
@@ -654,7 +655,8 @@ IMPORTANT: Respond ONLY with a valid JSON object in this EXACT structure (no mar
   ]
 }`;
 
-  const rawAI = await callAI(prompt);
+  // 'workout_split_refine' task: updates/refines an existing training split as JSON.
+  const rawAI = await callAI(prompt, null, 'workout_split_refine');
   const parsed = extractJson(rawAI);
   let sessionsArray = [];
   if (Array.isArray(parsed)) {
