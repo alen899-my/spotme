@@ -229,8 +229,7 @@ async function getNutritionAnalytics({ userId = null, range = '30d', tz = 'UTC' 
     LEFT JOIN meals m ON u.id = m.user_id
     LEFT JOIN water_logs wl ON u.id = wl.user_id
     GROUP BY u.id, u.full_name, u.email, u.profile_pic_url, u.gender
-    HAVING COUNT(m.id) > 0 OR COUNT(wl.id) > 0
-    ORDER BY meals_count DESC, u.id ASC
+    ORDER BY meals_count DESC, water_logs_count DESC, u.id ASC
     LIMIT 50
   `;
 
