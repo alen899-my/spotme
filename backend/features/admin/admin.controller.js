@@ -2,6 +2,7 @@
 
 const adminService = require('./admin.service');
 const workoutAnalyticsService = require('./admin-workout-analytics.service');
+const nutritionAnalyticsService = require('./admin-nutrition-analytics.service');
 
 async function login(req, res) {
   try {
@@ -651,6 +652,37 @@ async function getAthleteExerciseProgression(req, res) {
   }
 }
 
+async function getNutritionAnalytics(req, res) {
+  try {
+    const { userId, range, tz } = req.query;
+    const data = await nutritionAnalyticsService.getNutritionAnalytics({ userId, range, tz });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getNutritionAnalytics error:', error);
+    res.status(500).json({ message: 'Failed to retrieve nutrition analytics' });
+  }
+}
+
+async function getRecentLoggedMeals(req, res) {
+  try {
+    const { userId, page, limit, mealType, minProtein, maxCalories, search, tz } = req.query;
+    const data = await nutritionAnalyticsService.getRecentLoggedMeals({
+      userId,
+      page,
+      limit,
+      mealType,
+      minProtein,
+      maxCalories,
+      search,
+      tz,
+    });
+    res.json(data);
+  } catch (error) {
+    console.error('Admin getRecentLoggedMeals error:', error);
+    res.status(500).json({ message: 'Failed to retrieve recent logged meals' });
+  }
+}
+
 // ─── Phase 2 Controllers ──────────────────────────────────────────────────────
 async function getOnboarding(req, res) {
   try {
@@ -788,6 +820,8 @@ module.exports = {
   getWorkoutAnalytics,
   getAthleteExercises,
   getAthleteExerciseProgression,
+  getNutritionAnalytics,
+  getRecentLoggedMeals,
   getOnboarding,
   getHabits,
   getUser360,

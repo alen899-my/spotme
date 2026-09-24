@@ -23,6 +23,18 @@ import {
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import api from "@/lib/api"
+import {
+  NutritionRange,
+  NutritionAnalyticsData,
+} from "@/components/nutrition-analytics/types"
+import { NutritionFilterBar } from "@/components/nutrition-analytics/nutrition-filter-bar"
+import { NutritionHeroRibbon } from "@/components/nutrition-analytics/nutrition-hero-ribbon"
+import { CaloricBalanceCard } from "@/components/nutrition-analytics/caloric-balance-card"
+import { MacronutrientProgressionCard } from "@/components/nutrition-analytics/macronutrient-progression-card"
+import { HydrationWaterCard } from "@/components/nutrition-analytics/hydration-water-card"
+import { MicronutrientHealthCard } from "@/components/nutrition-analytics/micronutrient-health-card"
+import { CircadianMealTimingCard } from "@/components/nutrition-analytics/circadian-meal-timing-card"
+import { RecentMealsSquareGrid } from "@/components/nutrition-analytics/recent-meals-square-grid"
 
 interface FoodItem {
   id: number
@@ -67,7 +79,39 @@ interface LoggedMeal {
 }
 
 export default function NutritionPage() {
-  const [activeTab, setActiveTab] = useState<"foods" | "meals">("foods")
+  const [activeTab, setActiveTab] = useState<"analytics" | "meals" | "foods">("analytics")
+
+  // Analytics State
+  const [analyticsData, setAnalyticsData] = useState<NutritionAnalyticsData | null>(null)
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
+  const [range, setRange] = useState<NutritionRange>("30d")
+  const [analyticsLoading, setAnalyticsLoading] = useState<boolean>(true)
+
+  // Fetch Nutrition Analytics
+  const fetchNutritionAnalytics = async (userId: number | null, rangeVal: NutritionRange) => {
+    setAnalyticsLoading(true)
+    const clientTz = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC"
+    try {
+      const res = await api.get<NutritionAnalyticsData>("/admin/nutrition/analytics", {
+        params: {
+          userId: userId || undefined,
+          range: rangeVal,
+          tz: clientTz,
+        },
+      })
+      setAnalyticsData(res.data)
+    } catch (err) {
+      console.error("Failed to load nutrition analytics:", err)
+    } finally {
+      setAnalyticsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "analytics") {
+      fetchNutritionAnalytics(selectedUserId, range)
+    }
+  }, [selectedUserId, range, activeTab])
 
   // Foods state
   const [foods, setFoods] = useState<FoodItem[]>([])
@@ -138,7 +182,7 @@ export default function NutritionPage() {
   useEffect(() => {
     if (activeTab === "foods") {
       fetchFoods()
-    } else {
+    } else if (activeTab === "meals") {
       fetchMeals()
     }
   }, [activeTab, foodsPage, selectedCategory, mealsPage])
@@ -199,31 +243,29 @@ export default function NutritionPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-5">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">
-              Nutrition & Food Library
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Utensils className="h-5 w-5 text-amber-500" />
+              Food &amp; Water
             </h1>
-            <span className="inline-flex items-center rounded-full border border-border bg-secondary/50 px-2.5 py-0.5 text-xs font-medium font-mono text-muted-foreground">
-              {activeTab === "foods" ? `${foodsTotal} Verified Items` : `${mealsTotal} Logged Meals`}
-            </span>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Manage global nutritional database and inspect user meal logs
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Track meals, calories, macros, and daily water intake
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           {/* Segmented Tab Switch */}
-          <div className="flex items-center rounded-lg border bg-muted/40 p-0.5">
+          <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5 font-mono text-xs">
             <button
               type="button"
-              onClick={() => setActiveTab("foods")}
+              onClick={() => setActiveTab("analytics")}
               className={`rounded-md px-3 py-1 text-xs font-medium transition-all ${
-                activeTab === "foods"
+                activeTab === "analytics"
                   ? "bg-background text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Food Database
+              Analytics
             </button>
             <button
               type="button"
@@ -234,7 +276,18 @@ export default function NutritionPage() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              User Meal Logs
+              Meal Logs
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("foods")}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-all ${
+                activeTab === "foods"
+                  ? "bg-background text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Food Database
             </button>
           </div>
 
@@ -250,6 +303,92 @@ export default function NutritionPage() {
           )}
         </div>
       </div>
+
+      {/* TAB 1: NUTRITION & HYDRATION ANALYTICS (PREMIER DASHBOARD) */}
+      {activeTab === "analytics" && (
+        <div className="space-y-5 sm:space-y-6">
+          {/* 1. Athlete Selector & Range Filter Bar */}
+          <NutritionFilterBar
+            athletes={analyticsData?.athletes || []}
+            selectedUserId={selectedUserId}
+            selectedUserMeta={analyticsData?.meta.selectedUser || null}
+            targets={analyticsData?.meta.targets}
+            range={range}
+            timezone={analyticsData?.meta.timezone}
+            onSelectUser={(uid) => setSelectedUserId(uid)}
+            onChangeRange={(r) => setRange(r)}
+            onRefresh={() => fetchNutritionAnalytics(selectedUserId, range)}
+            isLoading={analyticsLoading}
+            lastUpdated={analyticsData?.meta.generatedAt}
+          />
+
+          {analyticsLoading && !analyticsData ? (
+            <div className="py-20 text-center space-y-2">
+              <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <p className="text-xs font-mono text-muted-foreground">
+                Loading food &amp; water data...
+              </p>
+            </div>
+          ) : analyticsData ? (
+            <>
+              {/* 2. Top Hero KPI Ribbon (6 Primary Headline Cards) */}
+              <NutritionHeroRibbon
+                kpis={analyticsData.kpis}
+                targets={analyticsData.meta.targets}
+                isAthleteMode={Boolean(selectedUserId)}
+              />
+
+              {/* 3. Caloric Intake Curve vs Target & Deficit/Surplus Histogram */}
+              <CaloricBalanceCard
+                timeline={analyticsData.timeline}
+                dayOfWeek={analyticsData.dayOfWeek}
+                targets={analyticsData.meta.targets}
+                kpis={analyticsData.kpis}
+                isAthleteMode={Boolean(selectedUserId)}
+              />
+
+              {/* 4. Macronutrient Progression Curves & Caloric Yield */}
+              <MacronutrientProgressionCard
+                timeline={analyticsData.timeline}
+                kpis={analyticsData.kpis}
+                targets={analyticsData.meta.targets}
+                isAthleteMode={Boolean(selectedUserId)}
+              />
+
+              {/* 5. Hydration & Daily Water Volume Analytics + 24h Rhythm */}
+              <HydrationWaterCard
+                timeline={analyticsData.timeline}
+                circadianWater={analyticsData.circadianWater}
+                waterDayPeriods={analyticsData.waterDayPeriods}
+                targets={analyticsData.meta.targets}
+                kpis={analyticsData.kpis}
+                isAthleteMode={Boolean(selectedUserId)}
+              />
+
+              {/* 6. Micronutrient & Cardiovascular Health Guardrails */}
+              <MicronutrientHealthCard
+                kpis={analyticsData.kpis}
+                isAthleteMode={Boolean(selectedUserId)}
+              />
+
+              {/* 7. Circadian Meal Timing & Feeding Windows */}
+              <CircadianMealTimingCard
+                circadianMeals={analyticsData.circadianMeals}
+                mealTypes={analyticsData.mealTypes}
+                kpis={analyticsData.kpis}
+                isAthleteMode={Boolean(selectedUserId)}
+              />
+
+              {/* 8. Recent Logged Meals Square Visual Grid & Food Items Ranking */}
+              <RecentMealsSquareGrid
+                userId={selectedUserId}
+                timezone={analyticsData.meta.timezone}
+                topFoods={analyticsData.topFoods}
+              />
+            </>
+          ) : null}
+        </div>
+      )}
 
       {/* TAB 1: FOOD DATABASE */}
       {activeTab === "foods" && (

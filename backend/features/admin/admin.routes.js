@@ -81,11 +81,13 @@ router.post('/builds', authenticateAdmin, upload.single('build_file'), adminCont
 router.put('/builds/:id', authenticateAdmin, upload.single('build_file'), adminController.updateBuild);
 router.delete('/builds/:id', authenticateAdmin, adminController.deleteBuild);
 
-// ─── Nutrition & Food Database ────────────────────────────────────────────────
+// ─── Nutrition, Food Database & Analytics ────────────────────────────────────
 router.get('/nutrition/foods', authenticateAdmin, adminController.listFoods);
 router.post('/nutrition/foods', authenticateAdmin, adminController.createFood);
 router.delete('/nutrition/foods/:id', authenticateAdmin, adminController.deleteFood);
 router.get('/nutrition/meals', authenticateAdmin, adminController.listMeals);
+router.get('/nutrition/analytics', authenticateAdmin, adminController.getNutritionAnalytics);
+router.get('/nutrition/recent-meals', authenticateAdmin, adminController.getRecentLoggedMeals);
 
 // ─── Physique Moderation ──────────────────────────────────────────────────────
 router.get('/physique', authenticateAdmin, adminController.listPhysique);
