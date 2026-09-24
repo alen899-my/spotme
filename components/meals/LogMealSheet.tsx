@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity,
   ScrollView, TextInput, Image, ActivityIndicator,
-  KeyboardAvoidingView, Platform, Dimensions, Animated,
+  KeyboardAvoidingView, Platform, useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,8 +10,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export type LogMealPayload = {
   imageUri: string | null;
@@ -40,11 +38,18 @@ const SOURCE_OPTIONS = [
     id: 'gallery',
     icon: 'images' as const,
     label: 'Choose from Gallery',
-    sub: 'Pick an existing photo',
+    sub: 'Pick an existing photo or upload file',
     gradient: ['#065f46', '#10B981'] as [string, string],
     glow: '#10B98140',
   },
-  
+  {
+    id: 'manual',
+    icon: 'create-outline' as const,
+    label: 'Describe Meal Manually',
+    sub: 'Enter food items without a photo',
+    gradient: ['#7c3aed', '#a855f7'] as [string, string],
+    glow: '#a855f740',
+  },
 ];
 
 export default function LogMealSheet({
@@ -57,10 +62,11 @@ export default function LogMealSheet({
 }: Props) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const [step, setStep] = useState<0 | 1>(0);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [ingredients, setIngredients] = useState([{ name: '', quantity: '' }]);
-  
+
   const reset = useCallback(() => {
     setStep(0);
     setImageUri(null);
@@ -71,7 +77,11 @@ export default function LogMealSheet({
     if (visible) {
       if (initialImageUri || (initialIngredients && initialIngredients.length > 0)) {
         setImageUri(initialImageUri || null);
-        setIngredients(initialIngredients && initialIngredients.length > 0 ? initialIngredients : [{ name: '', quantity: '' }]);
+        setIngredients(
+          initialIngredients && initialIngredients.length > 0
+            ? initialIngredients
+            : [{ name: '', quantity: '' }]
+        );
         setStep(1);
       } else {
         reset();
@@ -94,50 +104,80 @@ export default function LogMealSheet({
     setImageUri(null);
   }, []);
 
-  const handleSourceSelect = useCallback(async (id: string) => {
-    if (id === 'camera') {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') return;
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.88,
-      });
-      if (!result.canceled) {
-        goToStep1(result.assets[0].uri);
+  const handleSourceSelect = useCallback(
+    async (id: string) => {
+      if (id === 'camera') {
+        try {
+          if (Platform.OS !== 'web') {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') return;
+          }
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.88,
+          });
+          if (!result.canceled && result.assets?.[0]?.uri) {
+            goToStep1(result.assets[0].uri);
+          }
+        } catch (err) {
+          console.warn('Camera failed on this device, falling back to library:', err);
+          try {
+            const fallback = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: false,
+              quality: 0.88,
+            });
+            if (!fallback.canceled && fallback.assets?.[0]?.uri) {
+              goToStep1(fallback.assets[0].uri);
+            }
+          } catch (e) {
+            goToStep1(null);
+          }
+        }
+      } else if (id === 'gallery') {
+        try {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.88,
+          });
+          if (!result.canceled && result.assets?.[0]?.uri) {
+            goToStep1(result.assets[0].uri);
+          }
+        } catch (err) {
+          console.warn('Image picker error:', err);
+          goToStep1(null);
+        }
+      } else {
+        // Manual — no image required
+        goToStep1(null);
       }
-    } else if (id === 'gallery') {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.88,
-      });
-      if (!result.canceled) {
-        goToStep1(result.assets[0].uri);
-      }
-    } else {
-      // Manual — no image required
-      goToStep1(null);
-    }
-  }, [goToStep1]);
+    },
+    [goToStep1]
+  );
 
   const handleSubmit = useCallback(() => {
-    const filled = ingredients.filter(i => i.name.trim());
+    const filled = ingredients.filter((i) => i.name.trim());
     onSubmit({ imageUri, ingredients: filled });
     reset();
     onClose();
   }, [imageUri, ingredients, onSubmit, reset, onClose]);
 
   const addIngredient = () =>
-    setIngredients(prev => [...prev, { name: '', quantity: '' }]);
+    setIngredients((prev) => [...prev, { name: '', quantity: '' }]);
 
   const updateIngredient = (index: number, field: 'name' | 'quantity', value: string) =>
-    setIngredients(prev => prev.map((ing, i) => i === index ? { ...ing, [field]: value } : ing));
+    setIngredients((prev) =>
+      prev.map((ing, i) => (i === index ? { ...ing, [field]: value } : ing))
+    );
 
   const removeIngredient = (index: number) =>
-    setIngredients(prev => prev.length === 1 ? [{ name: '', quantity: '' }] : prev.filter((_, i) => i !== index));
+    setIngredients((prev) =>
+      prev.length === 1 ? [{ name: '', quantity: '' }] : prev.filter((_, i) => i !== index)
+    );
 
-  const canSubmit = !!(imageUri || ingredients.some(i => i.name.trim()));
+  const canSubmit = !!(imageUri || ingredients.some((i) => i.name.trim()));
 
   return (
     <Modal
@@ -148,27 +188,60 @@ export default function LogMealSheet({
       onRequestClose={handleClose}
     >
       <View style={styles.backdrop}>
-        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={handleClose} />
+        {/* Backdrop overlay tap to close */}
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.sheetWrapper}
+          enabled={Platform.OS !== 'web'}
           pointerEvents="box-none"
         >
           <View
+            pointerEvents="auto"
             style={[
               styles.sheet,
               {
                 backgroundColor: isDark ? '#111' : '#FAFAFA',
-                paddingBottom: insets.bottom + 8,
-                flex: step === 0 ? 0 : 1,
-              }
+                paddingBottom: Math.max(insets.bottom, 16) + 8,
+                maxHeight: Math.min(Math.round(windowHeight * 0.92), 780),
+                ...(Platform.OS === 'web'
+                  ? {
+                      maxWidth: 540,
+                      alignSelf: 'center',
+                      borderBottomLeftRadius: 0,
+                      borderBottomRightRadius: 0,
+                      ...(step === 0
+                        ? {
+                            minHeight: 340,
+                            flexGrow: 0,
+                            flexShrink: 0,
+                          }
+                        : {
+                            height: Math.min(Math.round(windowHeight * 0.85), 650),
+                            flexGrow: 0,
+                            flexShrink: 0,
+                          }),
+                    }
+                  : {
+                      flex: step === 0 ? undefined : 1,
+                      minHeight: step === 0 ? 280 : undefined,
+                    }),
+              },
             ]}
           >
-
             {/* Handle bar */}
             <View style={styles.handleWrap}>
-              <View style={[styles.handle, { backgroundColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)' }]} />
+              <View
+                style={[
+                  styles.handle,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)' },
+                ]}
+              />
             </View>
 
             {/* ── Step 0: Source Picker ── */}
@@ -177,12 +250,26 @@ export default function LogMealSheet({
                 {/* Header */}
                 <View style={styles.stepHeader}>
                   <View>
-                    <Text style={[styles.stepTitle, { color: isDark ? '#fff' : '#04282B' }]}>Log a Meal</Text>
-                    <Text style={[styles.stepSub, { color: isDark ? 'rgba(255,255,255,0.55)' : '#607D8B' }]}>
+                    <Text style={[styles.stepTitle, { color: isDark ? '#fff' : '#04282B' }]}>
+                      Log a Meal
+                    </Text>
+                    <Text
+                      style={[
+                        styles.stepSub,
+                        { color: isDark ? 'rgba(255,255,255,0.55)' : '#607D8B' },
+                      ]}
+                    >
                       How would you like to log it?
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={handleClose} style={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]} activeOpacity={0.65}>
+                  <TouchableOpacity
+                    onPress={handleClose}
+                    style={[
+                      styles.closeBtn,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+                    ]}
+                    activeOpacity={0.65}
+                  >
                     <Ionicons name="close" size={20} color={isDark ? '#fff' : '#222'} />
                   </TouchableOpacity>
                 </View>
@@ -194,7 +281,10 @@ export default function LogMealSheet({
                       key={opt.id}
                       activeOpacity={0.68}
                       onPress={() => handleSourceSelect(opt.id)}
-                      style={[styles.sourceCard, { borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)' }]}
+                      style={[
+                        styles.sourceCard,
+                        { borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)' },
+                      ]}
                     >
                       <LinearGradient
                         colors={opt.gradient}
@@ -206,11 +296,24 @@ export default function LogMealSheet({
                       </LinearGradient>
 
                       <View style={styles.sourceText}>
-                        <Text style={[styles.sourceLabel, { color: isDark ? '#fff' : '#1A1A1A' }]}>{opt.label}</Text>
-                        <Text style={[styles.sourceSub, { color: isDark ? 'rgba(255,255,255,0.48)' : '#78909C' }]}>{opt.sub}</Text>
+                        <Text style={[styles.sourceLabel, { color: isDark ? '#fff' : '#1A1A1A' }]}>
+                          {opt.label}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.sourceSub,
+                            { color: isDark ? 'rgba(255,255,255,0.48)' : '#78909C' },
+                          ]}
+                        >
+                          {opt.sub}
+                        </Text>
                       </View>
 
-                      <Ionicons name="chevron-forward" size={18} color={isDark ? 'rgba(255,255,255,0.28)' : '#B0BEC5'} />
+                      <Ionicons
+                        name="chevron-forward"
+                        size={18}
+                        color={isDark ? 'rgba(255,255,255,0.28)' : '#B0BEC5'}
+                      />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -222,16 +325,37 @@ export default function LogMealSheet({
               <View style={[styles.stepWrap, { flex: 1 }]}>
                 {/* Header */}
                 <View style={styles.stepHeader}>
-                  <TouchableOpacity onPress={goBack} style={[styles.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]} activeOpacity={0.65}>
+                  <TouchableOpacity
+                    onPress={goBack}
+                    style={[
+                      styles.backBtn,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' },
+                    ]}
+                    activeOpacity={0.65}
+                  >
                     <Ionicons name="arrow-back" size={18} color={isDark ? '#fff' : '#222'} />
                   </TouchableOpacity>
                   <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={[styles.stepTitle, { color: isDark ? '#fff' : '#04282B' }]}>Review & Log</Text>
-                    <Text style={[styles.stepSub, { color: isDark ? 'rgba(255,255,255,0.55)' : '#607D8B' }]}>
+                    <Text style={[styles.stepTitle, { color: isDark ? '#fff' : '#04282B' }]}>
+                      Review &amp; Log
+                    </Text>
+                    <Text
+                      style={[
+                        styles.stepSub,
+                        { color: isDark ? 'rgba(255,255,255,0.55)' : '#607D8B' },
+                      ]}
+                    >
                       {imageUri ? 'AI will analyze your photo' : 'Describe your meal ingredients'}
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={handleClose} style={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]} activeOpacity={0.65}>
+                  <TouchableOpacity
+                    onPress={handleClose}
+                    style={[
+                      styles.closeBtn,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+                    ]}
+                    activeOpacity={0.65}
+                  >
                     <Ionicons name="close" size={20} color={isDark ? '#fff' : '#222'} />
                   </TouchableOpacity>
                 </View>
@@ -242,12 +366,18 @@ export default function LogMealSheet({
                   contentContainerStyle={styles.formScroll}
                   keyboardShouldPersistTaps="handled"
                 >
-
                   {/* Image preview */}
                   {imageUri ? (
                     <View style={styles.previewWrap}>
-                      <Image source={{ uri: imageUri }} style={styles.previewImage} resizeMode="contain" />
-                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={styles.previewOverlay} />
+                      <Image
+                        source={{ uri: imageUri }}
+                        style={styles.previewImage}
+                        resizeMode="contain"
+                      />
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.55)']}
+                        style={styles.previewOverlay}
+                      />
                       <TouchableOpacity
                         onPress={() => setImageUri(null)}
                         style={styles.removeImageBtn}
@@ -255,11 +385,20 @@ export default function LogMealSheet({
                       >
                         <Ionicons name="close-circle" size={22} color="#FFF" />
                       </TouchableOpacity>
-                     
                     </View>
                   ) : (
                     <TouchableOpacity
-                      style={[styles.addPhotoBox, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(37,150,190,0.25)', backgroundColor: isDark ? 'rgba(37,150,190,0.06)' : 'rgba(37,150,190,0.04)' }]}
+                      style={[
+                        styles.addPhotoBox,
+                        {
+                          borderColor: isDark
+                            ? 'rgba(255,255,255,0.1)'
+                            : 'rgba(37,150,190,0.25)',
+                          backgroundColor: isDark
+                            ? 'rgba(37,150,190,0.06)'
+                            : 'rgba(37,150,190,0.04)',
+                        },
+                      ]}
                       onPress={() => handleSourceSelect('gallery')}
                       activeOpacity={0.68}
                     >
@@ -270,10 +409,19 @@ export default function LogMealSheet({
 
                   {/* Ingredients section */}
                   <View style={styles.sectionRow}>
-                    <Text style={[styles.sectionLabel, { color: isDark ? 'rgba(255,255,255,0.55)' : '#607D8B' }]}>
+                    <Text
+                      style={[
+                        styles.sectionLabel,
+                        { color: isDark ? 'rgba(255,255,255,0.55)' : '#607D8B' },
+                      ]}
+                    >
                       INGREDIENTS
                     </Text>
-                    <TouchableOpacity onPress={addIngredient} style={styles.addIngBtn} activeOpacity={0.68}>
+                    <TouchableOpacity
+                      onPress={addIngredient}
+                      style={styles.addIngBtn}
+                      activeOpacity={0.68}
+                    >
                       <Ionicons name="add" size={15} color="#2596BE" />
                       <Text style={styles.addIngText}>Add</Text>
                     </TouchableOpacity>
@@ -282,25 +430,48 @@ export default function LogMealSheet({
                   {ingredients.map((ing, idx) => (
                     <View key={`ing-${idx}`} style={styles.ingRow}>
                       <TextInput
-                        style={[styles.ingInput, styles.ingNameInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9', color: isDark ? '#fff' : '#1A1A1A', borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0' }]}
+                        style={[
+                          styles.ingInput,
+                          styles.ingNameInput,
+                          {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                            color: isDark ? '#fff' : '#1A1A1A',
+                            borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                          },
+                        ]}
                         placeholder="e.g. Grilled chicken"
                         placeholderTextColor={isDark ? 'rgba(255,255,255,0.28)' : '#94A3B8'}
                         value={ing.name}
-                        onChangeText={v => updateIngredient(idx, 'name', v)}
+                        onChangeText={(v) => updateIngredient(idx, 'name', v)}
                       />
                       <TextInput
-                        style={[styles.ingInput, styles.ingQtyInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9', color: isDark ? '#fff' : '#1A1A1A', borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0' }]}
+                        style={[
+                          styles.ingInput,
+                          styles.ingQtyInput,
+                          {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                            color: isDark ? '#fff' : '#1A1A1A',
+                            borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                          },
+                        ]}
                         placeholder="100g"
                         placeholderTextColor={isDark ? 'rgba(255,255,255,0.28)' : '#94A3B8'}
                         value={ing.quantity}
-                        onChangeText={v => updateIngredient(idx, 'quantity', v)}
+                        onChangeText={(v) => updateIngredient(idx, 'quantity', v)}
                       />
                       <TouchableOpacity
                         onPress={() => removeIngredient(idx)}
-                        style={[styles.ingRemoveBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}
+                        style={[
+                          styles.ingRemoveBtn,
+                          { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' },
+                        ]}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="close" size={16} color={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'} />
+                        <Ionicons
+                          name="close"
+                          size={16}
+                          color={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'}
+                        />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -309,7 +480,12 @@ export default function LogMealSheet({
                 </ScrollView>
 
                 {/* CTA Button */}
-                <View style={[styles.ctaBar, { borderTopColor: isDark ? 'rgba(255,255,255,0.07)' : '#E2E8F0' }]}>
+                <View
+                  style={[
+                    styles.ctaBar,
+                    { borderTopColor: isDark ? 'rgba(255,255,255,0.07)' : '#E2E8F0' },
+                  ]}
+                >
                   <TouchableOpacity
                     style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
                     onPress={handleSubmit}
@@ -326,7 +502,11 @@ export default function LogMealSheet({
                         <ActivityIndicator color="#FFF" size="small" />
                       ) : (
                         <>
-                          <Ionicons name={imageUri ? 'sparkles' : 'checkmark-circle'} size={20} color="#FFF" />
+                          <Ionicons
+                            name={imageUri ? 'sparkles' : 'checkmark-circle'}
+                            size={20}
+                            color="#FFF"
+                          />
                           <Text style={styles.submitBtnText}>
                             {imageUri ? 'Analyze & Log Meal' : 'Log Meal'}
                           </Text>
@@ -349,16 +529,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'flex-end',
+    ...(Platform.OS === 'web'
+      ? {
+          position: 'fixed' as any,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 99999,
+          display: 'flex',
+        }
+      : {}),
   },
   sheetWrapper: {
     flex: 1,
     justifyContent: 'flex-end',
+    width: '100%',
+    ...(Platform.OS === 'web'
+      ? {
+          zIndex: 10,
+        }
+      : {}),
   },
   sheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     overflow: 'hidden',
-    maxHeight: SCREEN_HEIGHT * 0.88,
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.28,
@@ -471,24 +668,6 @@ const styles = StyleSheet.create({
     right: 10,
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderRadius: 12,
-  },
-  previewBadge: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  previewBadgeText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 11,
-    color: '#FFF',
-    letterSpacing: 0.3,
   },
   addPhotoBox: {
     height: 100,
