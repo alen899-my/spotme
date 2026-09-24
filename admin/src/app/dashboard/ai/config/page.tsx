@@ -12,12 +12,13 @@
 
 import React, { useEffect, useState, useCallback } from "react"
 import {
-  Bot, Cpu, Layers, Zap, Activity, ChevronDown,
+  Bot, Cpu, Layers, Zap, Activity,
   ToggleLeft, ToggleRight, Plus, RefreshCw, Eye, EyeOff,
   CheckCircle, XCircle, AlertCircle, Clock, DollarSign,
   Pencil, Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import api from "@/lib/api"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -179,7 +180,7 @@ function SectionHeader({ icon: Icon, title, sub }: { icon: React.FC<any>; title:
 function TasksTab({ models }: { models: AiModel[] }) {
   const [tasks, setTasks] = useState<TaskConfig[]>([])
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState<string | null>(null)  // task_key being edited
+  const [editingTask, setEditingTask] = useState<TaskConfig | null>(null)
   const [form, setForm] = useState<Partial<TaskConfig>>({})
   const [saving, setSaving] = useState(false)
 
@@ -195,25 +196,33 @@ function TasksTab({ models }: { models: AiModel[] }) {
 
   useEffect(() => { load() }, [load])
 
-  /** Open inline editor for a row */
+  /** Open edit dialog for a task */
   const startEdit = (t: TaskConfig) => {
-    setEditing(t.task_key)
+    setEditingTask(t)
     setForm({ primary_model_id: t.primary_model_id, temperature: t.temperature, max_tokens: t.max_tokens })
   }
 
+  const closeDialog = () => {
+    if (saving) return
+    setEditingTask(null)
+    setForm({})
+  }
+
   /** Save edits — applies immediately, no cache */
-  const save = async (taskKey: string) => {
+  const save = async () => {
+    if (!editingTask) return
     setSaving(true)
     try {
-      await api.patch(`/admin/ai/config/tasks/${taskKey}`, form)
+      await api.patch(`/admin/ai/config/tasks/${editingTask.task_key}`, form)
       await load()
-      setEditing(null)
+      setEditingTask(null)
+      setForm({})
     } finally {
       setSaving(false)
     }
   }
 
-  /** Toggle is_enabled for a task without opening the full editor */
+  /** Toggle is_enabled for a task without opening the dialog */
   const toggle = async (t: TaskConfig) => {
     await api.patch(`/admin/ai/config/tasks/${t.task_key}`, { is_enabled: !t.is_enabled })
     await load()
@@ -263,22 +272,25 @@ function TasksTab({ models }: { models: AiModel[] }) {
               >
                 {t.is_enabled ? <ToggleRight className="h-4 w-4 text-emerald-400" /> : <ToggleLeft className="h-4 w-4" />}
               </button>
-              <Button
-                size="sm"
-                variant={editing === t.task_key ? "default" : "outline"}
-                className="h-7 text-xs"
-                onClick={() => editing === t.task_key ? setEditing(null) : startEdit(t)}
-              >
-                {editing === t.task_key ? "Cancel" : "Edit"}
-                <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${editing === t.task_key ? "rotate-180" : ""}`} />
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => startEdit(t)}>
+                Edit
               </Button>
             </div>
           </div>
+        </div>
+      ))}
 
-          {/* Inline editor — only shown for the row being edited */}
-          {editing === t.task_key && (
-            <div className="border-t border-border p-4 space-y-3">
-              {/* Model picker */}
+      {/* Edit dialog */}
+      <Dialog open={!!editingTask} onClose={closeDialog}>
+        <DialogContent onClose={closeDialog}>
+          <DialogHeader>
+            <DialogTitle>Edit {editingTask?.display_name ?? "Task"}</DialogTitle>
+            <DialogDescription className="font-mono text-[11px]">
+              {editingTask?.task_key} · changes apply immediately
+            </DialogDescription>
+          </DialogHeader>
+          {editingTask && (
+            <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">
                   Primary Model
@@ -290,7 +302,7 @@ function TasksTab({ models }: { models: AiModel[] }) {
                 >
                   <option value="">— Select a model —</option>
                   {models
-                    .filter((m) => !t.requires_vision || m.supports_vision)
+                    .filter((m) => !editingTask.requires_vision || m.supports_vision)
                     .map((m) => (
                       <option key={m.id} value={m.id}>
                         [{m.provider_name}] {m.display_name || m.model_id}
@@ -298,12 +310,10 @@ function TasksTab({ models }: { models: AiModel[] }) {
                       </option>
                     ))}
                 </select>
-                {t.requires_vision && (
+                {editingTask.requires_vision && (
                   <p className="mt-1 text-[10px] text-blue-400 font-mono">Only vision-capable models shown</p>
                 )}
               </div>
-
-              {/* Temperature + Max tokens side by side */}
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">
@@ -312,7 +322,7 @@ function TasksTab({ models }: { models: AiModel[] }) {
                   <input
                     type="number" step="0.05" min="0" max="1"
                     className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    value={form.temperature ?? t.temperature}
+                    value={form.temperature ?? editingTask.temperature}
                     onChange={(e) => setForm({ ...form, temperature: parseFloat(e.target.value) })}
                   />
                 </div>
@@ -323,24 +333,23 @@ function TasksTab({ models }: { models: AiModel[] }) {
                   <input
                     type="number" step="256" min="256" max="32768"
                     className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    value={form.max_tokens ?? t.max_tokens}
+                    value={form.max_tokens ?? editingTask.max_tokens}
                     onChange={(e) => setForm({ ...form, max_tokens: parseInt(e.target.value) })}
                   />
                 </div>
               </div>
-
-              <div className="flex justify-end gap-2">
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(null)}>
-                  Cancel
-                </Button>
-                <Button size="sm" className="h-7 text-xs" onClick={() => save(t.task_key)} disabled={saving}>
-                  {saving ? "Saving…" : "Save Changes"}
-                </Button>
-              </div>
             </div>
           )}
-        </div>
-      ))}
+          <DialogFooter>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={closeDialog}>
+              Cancel
+            </Button>
+            <Button size="sm" className="h-7 text-xs" onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -388,6 +397,11 @@ function ModelsTab({ providers }: { providers: Provider[] }) {
     }
   }
 
+  const closeAddDialog = () => {
+    if (saving) return
+    setShowAdd(false)
+  }
+
   if (loading) return <LoadingRow />
 
   // Group by provider for cleaner display
@@ -407,56 +421,61 @@ function ModelsTab({ providers }: { providers: Provider[] }) {
       </div>
 
       {showAdd && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <p className="text-xs font-semibold text-foreground">Add / Update Model</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Provider</label>
-              <select
-                className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:outline-none"
-                value={form.provider_id}
-                onChange={(e) => setForm({ ...form, provider_id: e.target.value })}
-              >
-                <option value="">— Select provider —</option>
-                {providers.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}
-              </select>
+        <Dialog open={showAdd} onClose={closeAddDialog}>
+          <DialogContent onClose={closeAddDialog}>
+            <DialogHeader>
+              <DialogTitle>Add / Update Model</DialogTitle>
+              <DialogDescription>Register a model ID exactly as the provider API expects.</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Provider</label>
+                <select
+                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:outline-none"
+                  value={form.provider_id}
+                  onChange={(e) => setForm({ ...form, provider_id: e.target.value })}
+                >
+                  <option value="">— Select provider —</option>
+                  {providers.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Model ID (exact API string)</label>
+                <input
+                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground font-mono focus:outline-none"
+                  placeholder="e.g. gemini-3.1-flash-lite"
+                  value={form.model_id}
+                  onChange={(e) => setForm({ ...form, model_id: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Display Name</label>
+                <input
+                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:outline-none"
+                  placeholder="e.g. Gemini 3.1 Flash Lite"
+                  value={form.display_name}
+                  onChange={(e) => setForm({ ...form, display_name: e.target.value })}
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-4">
+                <input
+                  type="checkbox"
+                  id="vision"
+                  className="accent-foreground"
+                  checked={form.supports_vision}
+                  onChange={(e) => setForm({ ...form, supports_vision: e.target.checked })}
+                />
+                <label htmlFor="vision" className="text-xs text-foreground">Supports Vision (multimodal)</label>
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Model ID (exact API string)</label>
-              <input
-                className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground font-mono focus:outline-none"
-                placeholder="e.g. gemini-3.1-flash-lite"
-                value={form.model_id}
-                onChange={(e) => setForm({ ...form, model_id: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Display Name</label>
-              <input
-                className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:outline-none"
-                placeholder="e.g. Gemini 3.1 Flash Lite"
-                value={form.display_name}
-                onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-              />
-            </div>
-            <div className="flex items-center gap-2 pt-4">
-              <input
-                type="checkbox"
-                id="vision"
-                className="accent-foreground"
-                checked={form.supports_vision}
-                onChange={(e) => setForm({ ...form, supports_vision: e.target.checked })}
-              />
-              <label htmlFor="vision" className="text-xs text-foreground">Supports Vision (multimodal)</label>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button size="sm" className="h-7 text-xs" onClick={addModel} disabled={saving}>
-              {saving ? "Saving…" : "Save Model"}
-            </Button>
-          </div>
-        </div>
+            <DialogFooter>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={closeAddDialog}>Cancel</Button>
+              <Button size="sm" className="h-7 text-xs" onClick={addModel} disabled={saving}>
+                {saving ? "Saving…" : "Save Model"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Grouped model rows */}
@@ -532,6 +551,9 @@ function ProvidersTab() {
   const [editForm, setEditForm] = useState({ name: "", display_name: "", base_url: "", api_key: "", priority: 10, clearKey: false })
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Provider | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -569,6 +591,17 @@ function ProvidersTab() {
     setEditForm({ name: p.name, display_name: p.display_name, base_url: p.base_url, api_key: "", priority: p.priority, clearKey: false })
   }
 
+  const closeEditDialog = () => {
+    if (editSaving) return
+    setEditingId(null)
+    setEditError(null)
+  }
+
+  const closeAddDialog = () => {
+    if (saving) return
+    setShowAdd(false)
+  }
+
   const saveEdit = async (id: number) => {
     if (!editForm.display_name.trim() || !editForm.base_url.trim()) {
       setEditError("Display name and Base URL are required.")
@@ -595,29 +628,40 @@ function ProvidersTab() {
     }
   }
 
-  const remove = async (p: Provider) => {
-    if (!confirm(`Delete provider "${p.display_name}"? Blocked while models still reference it.`)) return
+  const remove = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    setDeleteError(null)
     try {
-      await api.delete(`/admin/ai/config/providers/${p.id}`)
+      await api.delete(`/admin/ai/config/providers/${deleteTarget.id}`)
+      setDeleteTarget(null)
       await load()
     } catch (e: any) {
-      alert(e?.response?.data?.message || "Delete failed.")
+      setDeleteError(e?.response?.data?.message || "Delete failed.")
+    } finally {
+      setDeleting(false)
     }
   }
+
+  const editingProvider = providers.find((p) => p.id === editingId) ?? null
 
   if (loading) return <LoadingRow />
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button size="sm" className="h-7 text-xs gap-1" onClick={() => setShowAdd(!showAdd)}>
+        <Button size="sm" className="h-7 text-xs gap-1" onClick={() => setShowAdd(true)}>
           <Plus className="h-3 w-3" /> Add Provider
         </Button>
       </div>
 
-      {showAdd && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <p className="text-xs font-semibold text-foreground">Register New Provider</p>
+      {/* Add dialog */}
+      <Dialog open={showAdd} onClose={closeAddDialog}>
+        <DialogContent onClose={closeAddDialog}>
+          <DialogHeader>
+            <DialogTitle>Register New Provider</DialogTitle>
+            <DialogDescription>Add a new LLM provider endpoint.</DialogDescription>
+          </DialogHeader>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {[
               { key: "name", label: "Internal Name (lowercase)", placeholder: "anthropic" },
@@ -646,14 +690,14 @@ function ProvidersTab() {
               />
             </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowAdd(false)}>Cancel</Button>
+          <DialogFooter>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={closeAddDialog}>Cancel</Button>
             <Button size="sm" className="h-7 text-xs" onClick={save} disabled={saving}>
               {saving ? "Saving…" : "Save Provider"}
             </Button>
-          </div>
-        </div>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {providers.map((p) => (
@@ -673,7 +717,7 @@ function ProvidersTab() {
                 <button onClick={() => startEdit(p)} title="Edit provider" className="rounded border border-border bg-secondary p-1.5 text-muted-foreground hover:text-foreground transition-colors">
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => remove(p)} title="Delete provider" className="rounded border border-border bg-secondary p-1.5 text-muted-foreground hover:text-red-400 transition-colors">
+                <button onClick={() => { setDeleteTarget(p); setDeleteError(null) }} title="Delete provider" className="rounded border border-border bg-secondary p-1.5 text-muted-foreground hover:text-red-400 transition-colors">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={() => toggle(p)} title="Toggle">
@@ -714,75 +758,102 @@ function ProvidersTab() {
               <span className="text-[10px] font-mono text-muted-foreground">Priority: {p.priority}</span>
               <StatusPill enabled={p.is_enabled} />
             </div>
-
-            {/* Inline editor */}
-            {editingId === p.id && (
-              <div className="space-y-3 rounded-lg border border-border bg-secondary/40 p-3">
-                {editError && <p className="text-[11px] font-mono text-red-400">{editError}</p>}
-                <div>
-                  <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Internal Name (lowercase, unique)</label>
-                  <input
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground font-mono focus:outline-none"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Display Name</label>
-                  <input
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:outline-none"
-                    value={editForm.display_name}
-                    onChange={(e) => setEditForm({ ...editForm, display_name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Base URL</label>
-                  <input
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground font-mono focus:outline-none"
-                    value={editForm.base_url}
-                    onChange={(e) => setEditForm({ ...editForm, base_url: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">API Key (blank = keep existing)</label>
-                  <input
-                    type="password"
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground font-mono focus:outline-none"
-                    placeholder={p.api_key_masked ? "•••• leave blank to keep ••••" : "sk-..."}
-                    value={editForm.api_key}
-                    disabled={editForm.clearKey}
-                    onChange={(e) => setEditForm({ ...editForm, api_key: e.target.value })}
-                  />
-                  <label className="mt-1.5 flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      className="accent-foreground"
-                      checked={editForm.clearKey}
-                      onChange={(e) => setEditForm({ ...editForm, clearKey: e.target.checked, api_key: "" })}
-                    />
-                    Clear stored key
-                  </label>
-                </div>
-                <div>
-                  <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Priority (1-99)</label>
-                  <input
-                    type="number" min="1" max="99"
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:outline-none"
-                    value={editForm.priority}
-                    onChange={(e) => setEditForm({ ...editForm, priority: parseInt(e.target.value) || 10 })}
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingId(null)}>Cancel</Button>
-                  <Button size="sm" className="h-7 text-xs" onClick={() => saveEdit(p.id)} disabled={editSaving}>
-                    {editSaving ? "Saving…" : "Save Changes"}
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
         ))}
       </div>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editingProvider} onClose={closeEditDialog}>
+        <DialogContent onClose={closeEditDialog}>
+          <DialogHeader>
+            <DialogTitle>Edit {editingProvider?.display_name ?? "Provider"}</DialogTitle>
+            <DialogDescription className="font-mono text-[11px]">
+              Blank API key keeps the stored value.
+            </DialogDescription>
+          </DialogHeader>
+          {editError && <p className="text-[11px] font-mono text-red-400">{editError}</p>}
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Internal Name (lowercase, unique)</label>
+              <input
+                className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground font-mono focus:outline-none"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Display Name</label>
+              <input
+                className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:outline-none"
+                value={editForm.display_name}
+                onChange={(e) => setEditForm({ ...editForm, display_name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Base URL</label>
+              <input
+                className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground font-mono focus:outline-none"
+                value={editForm.base_url}
+                onChange={(e) => setEditForm({ ...editForm, base_url: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">API Key (blank = keep existing)</label>
+              <input
+                type="password"
+                className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground font-mono focus:outline-none"
+                placeholder={editingProvider?.api_key_masked ? "•••• leave blank to keep ••••" : "sk-..."}
+                value={editForm.api_key}
+                disabled={editForm.clearKey}
+                onChange={(e) => setEditForm({ ...editForm, api_key: e.target.value })}
+              />
+              <label className="mt-1.5 flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="accent-foreground"
+                  checked={editForm.clearKey}
+                  onChange={(e) => setEditForm({ ...editForm, clearKey: e.target.checked, api_key: "" })}
+                />
+                Clear stored key
+              </label>
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-mono uppercase text-muted-foreground">Priority (1-99)</label>
+              <input
+                type="number" min="1" max="99"
+                className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:outline-none"
+                value={editForm.priority}
+                onChange={(e) => setEditForm({ ...editForm, priority: parseInt(e.target.value) || 10 })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={closeEditDialog}>Cancel</Button>
+            <Button size="sm" className="h-7 text-xs" onClick={() => editingId != null && saveEdit(editingId)} disabled={editSaving}>
+              {editSaving ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm dialog */}
+      <Dialog open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
+        <DialogContent onClose={() => !deleting && setDeleteTarget(null)}>
+          <DialogHeader>
+            <DialogTitle>Delete {deleteTarget?.display_name}?</DialogTitle>
+            <DialogDescription>
+              Blocked while models still reference this provider. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p className="text-[11px] font-mono text-red-400">{deleteError}</p>}
+          <DialogFooter>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={remove} disabled={deleting}>
+              {deleting ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
