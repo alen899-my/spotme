@@ -12,7 +12,12 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useUnits } from '../../contexts/UnitContext';
 import { formatWeightValue, weightUnit } from '../../utils/units';
 
-const STEP_OPTIONS = [0.1, 0.5, 1, 2.5, 5];
+const STEP_OPTIONS = [0.01, 0.05, 0.1, 0.5, 1];
+
+function formatStep(s: number): string {
+  if (s < 0.1) return `±${Math.round(s * 1000)}g`;
+  return `±${s.toFixed(1)}`;
+}
 
 interface WeightScaleProps {
   value: number;
@@ -34,7 +39,7 @@ export default function WeightScale({
 }: WeightScaleProps) {
   const { colors, isDark } = useTheme();
   const { unitSystem } = useUnits();
-  const [currentStep, setCurrentStep] = useState(0.1);
+  const [currentStep, setCurrentStep] = useState(0.05);
 
   const cycleStep = useCallback(() => {
     setCurrentStep(prev => {
@@ -44,7 +49,7 @@ export default function WeightScale({
   }, []);
 
   const adjust = (delta: number) => {
-    const next = Math.round((value + delta) / currentStep) * currentStep;
+    const next = Math.round((value + delta) * 100) / 100;
     onChange(Math.max(min, Math.min(max, next)));
   };
 
@@ -87,7 +92,7 @@ export default function WeightScale({
                 { color: currentStep === s ? '#fff' : colors.textMuted },
               ]}
             >
-              ±{s.toFixed(1)}
+              {formatStep(s)}
             </Text>
           </TouchableOpacity>
         ))}

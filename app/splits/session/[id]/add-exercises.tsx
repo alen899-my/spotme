@@ -21,7 +21,7 @@ import { getToken as getSecureToken } from '../../../../utils/tokenStorage';
 
 export default function AddSessionExercisesScreen() {
   const router = useRouter();
-  const { id: sessionId } = useLocalSearchParams();
+  const { id: sessionId, replaceWseId, replaceSnapshot } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
@@ -29,19 +29,41 @@ export default function AddSessionExercisesScreen() {
   const [addingId, setAddingId] = useState<string | null>(null);
   const [previewEx, setPreviewEx] = useState<any>(null);
 
+  const replacing = !!replaceWseId;
+
   const handleAdd = async (exerciseId: string) => {
     setAddingId(exerciseId);
     try {
       const token = await getSecureToken();
-      await axios.post(
+      let snapshot: any = null;
+      try { snapshot = replaceSnapshot ? JSON.parse(String(replaceSnapshot)) : null; } catch { snapshot = null; }
+      const created = await axios.post(
         `${API_URL}/workouts/sessions/${sessionId}/exercises`,
-        { exercise_id: exerciseId, sets: 3, reps: '8-12', rest_time: '60s' },
+        {
+          exercise_id: exerciseId,
+          sets: snapshot?.sets ? parseInt(snapshot.sets) : 3,
+          reps: snapshot?.reps || '8-12',
+          rest_time: snapshot?.rest_time || '60s',
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      showToast('Exercise added to session!');
+      if (snapshot?.weight !== undefined && snapshot?.weight !== null && String(snapshot.weight).trim() !== '') {
+        await axios.put(`${API_URL}/workouts/exercises/${created.data.id}`, { weight: String(snapshot.weight) }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      if (replacing) {
+        await axios.delete(`${API_URL}/workouts/exercises/${replaceWseId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        showToast('Exercise swapped!');
+      } else {
+        showToast('Exercise added to session!');
+      }
+      router.back();
     } catch (err) {
       console.error('Error adding exercise:', err);
-      showToast('Failed to add exercise', 'error');
+      showToast(replacing ? 'Failed to swap exercise' : 'Failed to add exercise', 'error');
     } finally {
       setAddingId(null);
     }
@@ -54,7 +76,7 @@ export default function AddSessionExercisesScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="close" size={28} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Add Exercises</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{replacing ? 'Swap Exercise' : 'Add Exercises'}</Text>
           <View style={{ width: 28 }} />
         </View>
 

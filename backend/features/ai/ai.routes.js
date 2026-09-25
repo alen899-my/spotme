@@ -6,6 +6,9 @@ const aiController = require('./ai.controller');
 // POST /api/ai/chat
 router.post('/chat', authenticateToken, aiController.chat);
 
+// POST /api/ai/actions/confirm { token, confirmed, session_id }
+router.post('/actions/confirm', authenticateToken, aiController.confirmAction);
+
 // GET /api/ai/sessions
 router.get('/sessions', authenticateToken, aiController.getSessions);
 

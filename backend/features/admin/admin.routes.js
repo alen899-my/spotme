@@ -5,6 +5,7 @@ const router = express.Router();
 
 const adminController = require('./admin.controller');
 const authenticateAdmin = require('../../middleware/adminAuth');
+const authenticateAdminOrBuildToken = require('../../middleware/adminBuildAuth');
 const upload = require('../../utils/upload');
 const { validate, schemas } = require('../../middleware/validate');
 
@@ -76,8 +77,8 @@ for (const [table, entityName] of Object.entries(entityNameMap)) {
 // ─── App Builds ───────────────────────────────────────────────────────────────
 router.get('/builds', authenticateAdmin, adminController.listBuilds);
 router.get('/builds/:id', authenticateAdmin, adminController.getBuild);
-router.post('/builds/presigned-url', authenticateAdmin, adminController.getBuildPresignedUrl);
-router.post('/builds', authenticateAdmin, upload.single('build_file'), adminController.createBuild);
+router.post('/builds/presigned-url', authenticateAdminOrBuildToken, adminController.getBuildPresignedUrl);
+router.post('/builds', authenticateAdminOrBuildToken, upload.single('build_file'), adminController.createBuild);
 router.put('/builds/:id', authenticateAdmin, upload.single('build_file'), adminController.updateBuild);
 router.delete('/builds/:id', authenticateAdmin, adminController.deleteBuild);
 

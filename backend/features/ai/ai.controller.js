@@ -5,16 +5,34 @@ const aiService = require('./ai.service');
  */
 async function chat(req, res) {
   try {
-    const { message, session_id } = req.body;
+    const { message, session_id, split_id } = req.body;
     if (!message || !message.trim()) {
       return res.status(400).json({ error: 'Message cannot be empty.' });
     }
 
-    const data = await aiService.sendChatMessage(req.user.id, { message, session_id });
+    const data = await aiService.sendChatMessage(req.user.id, { message, session_id, split_id });
     return res.json(data);
   } catch (err) {
     console.error('POST /ai/chat error:', err);
     return res.status(500).json({ error: err.message || 'Failed to process AI chat message' });
+  }
+}
+
+/**
+ * Controller to confirm or cancel a pending destructive tool action.
+ * Body: { token: string, confirmed: boolean, session_id: string }
+ */
+async function confirmAction(req, res) {
+  try {
+    const { token, confirmed, session_id } = req.body || {};
+    if (!token || !session_id) {
+      return res.status(400).json({ error: 'token and session_id are required.' });
+    }
+    const data = await aiService.runConfirmedTool(req.user.id, session_id, token, confirmed !== false);
+    return res.json(data);
+  } catch (err) {
+    console.error('POST /ai/actions/confirm error:', err);
+    return res.status(err.status || 500).json({ error: err.message || 'Failed to confirm action' });
   }
 }
 
@@ -62,6 +80,7 @@ async function deleteSession(req, res) {
 
 module.exports = {
   chat,
+  confirmAction,
   getSessions,
   getSessionMessages,
   deleteSession,

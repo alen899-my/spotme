@@ -11,6 +11,7 @@
     "eas:update:production": "eas update --branch production",
     "eas:build:preview": "eas build --platform android --profile preview",
     "eas:build:production": "eas build --platform android --profile production",
+    "eas:build:apk:ci": "eas build --platform android --profile production-apk --non-interactive --wait --json",
     "eas:submit:production": "eas submit --platform android --profile production"
   },
   "dependencies": {

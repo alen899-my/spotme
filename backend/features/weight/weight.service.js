@@ -33,7 +33,7 @@ async function getWeightLogs(userId, { limit, range }) {
 
   const result = await pool.query(
     `SELECT * FROM (
-      SELECT DISTINCT ON (logged_at::date, ROUND(weight::numeric, 1))
+      SELECT DISTINCT ON (logged_at::date, ROUND(weight::numeric, 3))
         id, weight::text, notes, logged_at
       FROM (
         SELECT id, weight::text AS weight, notes, logged_at FROM weight_logs WHERE user_id = $1 ${logFilter}
@@ -44,7 +44,7 @@ async function getWeightLogs(userId, { limit, range }) {
         FROM daily_workouts dw
         WHERE dw.user_id = $1 AND dw.post_workout_weight IS NOT NULL AND dw.status = 'completed' ${workoutFilter}
       ) combined
-      ORDER BY logged_at::date, ROUND(weight::numeric, 1), logged_at DESC
+      ORDER BY logged_at::date, ROUND(weight::numeric, 3), logged_at DESC
     ) deduped ORDER BY logged_at ASC` +
       (limit ? ' LIMIT ' + parseInt(limit) : ''),
     [userId]

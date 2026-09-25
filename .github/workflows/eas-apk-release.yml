@@ -1,0 +1,62 @@
+name: EAS APK release
+
+# Tag-gated on purpose: every run consumes EAS cloud build minutes.
+# Release with:  git tag v1.2.3 && git push origin v1.2.3
+# The tag MUST equal app.json expo.version (checked fail-fast below).
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: eas-apk-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Tag matches app.json version (fail fast)
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          APP_VERSION=$(node -p "require('./app.json').expo.version")
+          echo "tag=$TAG app.json=$APP_VERSION"
+          if [ "$TAG" != "$APP_VERSION" ]; then
+            echo "::error::Tag v$TAG does not match app.json expo.version ($APP_VERSION). Bump app.json first, or tag the matching commit."
+            exit 1
+          fi
+
+      - name: EAS cloud build (production-apk)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx -y eas-cli build --platform android --profile production-apk --non-interactive --wait --json > eas-build.json
+
+      - name: Publish APK to backend (R2 + app_builds)
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          ADMIN_BUILD_TOKEN: ${{ secrets.ADMIN_BUILD_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          BUILD_CHANNEL: production
+          EAS_BUILD_JSON: eas-build.json
+          APK_OUT: spotme-release.apk
+        run: node scripts/eas-apk-publish.js
+
+      - name: Keep build manifest for debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eas-build-manifest
+          path: eas-build.json
+          retention-days: 7

@@ -981,17 +981,210 @@ async function deleteExerciseFromSession(exerciseSessionId, userId) {
 
 /**
  * Update exercise within session.
+ * Supports partial updates; accepts sort_order and exercise_id (swap) too.
  */
-async function updateExerciseInSession(exerciseSessionId, userId, { sets, reps, rest_time, weight }) {
+async function updateExerciseInSession(exerciseSessionId, userId, { sets, reps, rest_time, weight, sort_order, exercise_id }) {
+  const owner = await pool.query(
+    `SELECT wse.id FROM workout_session_exercises wse
+      JOIN workout_sessions ws ON ws.id = wse.session_id
+      JOIN workout_splits s ON s.id = ws.split_id
+      WHERE wse.id = $1 AND s.user_id = $2`,
+    [exerciseSessionId, userId]
+  );
+  if (owner.rows.length === 0) return null;
+
+  const setsArr = [];
+  const params = [];
+  if (sets !== undefined) { params.push(sets); setsArr.push(`sets = $${params.length}`); }
+  if (reps !== undefined) { params.push(reps); setsArr.push(`reps = $${params.length}`); }
+  if (rest_time !== undefined) { params.push(rest_time); setsArr.push(`rest_time = $${params.length}`); }
+  if (weight !== undefined) { params.push(weight); setsArr.push(`weight = $${params.length}`); }
+  if (sort_order !== undefined) { params.push(sort_order); setsArr.push(`sort_order = $${params.length}`); }
+  if (exercise_id !== undefined) {
+    const exCheck = await pool.query('SELECT id FROM exercises WHERE id = $1', [exercise_id]);
+    if (exCheck.rows.length === 0) {
+      const err = new Error('Exercise not found in library.');
+      err.status = 404;
+      throw err;
+    }
+    params.push(exercise_id);
+    setsArr.push(`exercise_id = $${params.length}`);
+  }
+  if (!setsArr.length) {
+    const cur = await pool.query('SELECT * FROM workout_session_exercises WHERE id = $1', [exerciseSessionId]);
+    return cur.rows[0] || null;
+  }
+  params.push(exerciseSessionId, userId);
   const result = await pool.query(
-    `UPDATE workout_session_exercises 
-     SET sets = $1, reps = $2, rest_time = $3, weight = $4
-     WHERE id = $5 AND session_id IN (SELECT ws.id FROM workout_sessions ws JOIN workout_splits s ON ws.split_id = s.id WHERE s.user_id = $6)
-     RETURNING *`,
-    [sets, reps, rest_time, weight, exerciseSessionId, userId]
+    `UPDATE workout_session_exercises
+      SET ${setsArr.join(', ')}
+      WHERE id = $${params.length - 1} AND session_id IN (SELECT ws.id FROM workout_sessions ws JOIN workout_splits s ON ws.split_id = s.id WHERE s.user_id = $${params.length})
+      RETURNING *`,
+    params
   );
   if (result.rows.length === 0) return null;
   return result.rows[0];
+}
+
+/**
+ * Move an exercise row to another session (same split, owner only),
+ * optionally at a specific position. Re-normalizes sort_order in both sessions.
+ */
+async function moveExerciseToSession(exerciseSessionId, userId, { to_session_id, sort_order }) {
+  const owner = await pool.query(
+    `SELECT wse.id, wse.session_id, ws.split_id FROM workout_session_exercises wse
+      JOIN workout_sessions ws ON ws.id = wse.session_id
+      JOIN workout_splits s ON s.id = ws.split_id
+      WHERE wse.id = $1 AND s.user_id = $2`,
+    [exerciseSessionId, userId]
+  );
+  if (owner.rows.length === 0) return null;
+  const fromSessionId = owner.rows[0].session_id;
+  const splitId = owner.rows[0].split_id;
+
+  const dest = await pool.query(
+    `SELECT ws.id FROM workout_sessions ws
+      JOIN workout_splits s ON s.id = ws.split_id
+      WHERE ws.id = $1 AND s.user_id = $2`,
+    [to_session_id, userId]
+  );
+  if (dest.rows.length === 0) {
+    const err = new Error('Destination session not found.');
+    err.status = 404;
+    throw err;
+  }
+  // Enforce same-split moves (cross-split moves would orphan programming).
+  const destSplit = await pool.query('SELECT split_id FROM workout_sessions WHERE id = $1', [to_session_id]);
+  if (destSplit.rows[0].split_id !== splitId) {
+    const err = new Error('Can only move exercises within the same split.');
+    err.status = 400;
+    throw err;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('UPDATE workout_session_exercises SET session_id = $1 WHERE id = $2', [to_session_id, exerciseSessionId]);
+    // Append at end or splice at position, then renormalize both sessions.
+    const tgt = await client.query(
+      'SELECT id FROM workout_session_exercises WHERE session_id = $1 AND id <> $2 ORDER BY sort_order ASC, id ASC',
+      [to_session_id, exerciseSessionId]
+    );
+    const ids = tgt.rows.map(r => r.id);
+    const pos = sort_order == null ? ids.length : Math.max(0, Math.min(Number(sort_order) || 0, ids.length));
+    ids.splice(pos, 0, Number(exerciseSessionId));
+    for (let i = 0; i < ids.length; i++) {
+      await client.query('UPDATE workout_session_exercises SET sort_order = $1 WHERE id = $2', [i, ids[i]]);
+    }
+    const src = await client.query(
+      'SELECT id FROM workout_session_exercises WHERE session_id = $1 ORDER BY sort_order ASC, id ASC',
+      [fromSessionId]
+    );
+    for (let i = 0; i < src.rows.length; i++) {
+      await client.query('UPDATE workout_session_exercises SET sort_order = $1 WHERE id = $2', [i, src.rows[i].id]);
+    }
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+  const moved = await pool.query('SELECT * FROM workout_session_exercises WHERE id = $1', [exerciseSessionId]);
+  return moved.rows[0] || null;
+}
+
+/**
+ * Duplicate a session (with all its exercises) inside the same split.
+ */
+async function duplicateSession(sessionId, userId, { name } = {}) {
+  const src = await pool.query(
+    `SELECT ws.* FROM workout_sessions ws
+      JOIN workout_splits s ON s.id = ws.split_id
+      WHERE ws.id = $1 AND s.user_id = $2`,
+    [sessionId, userId]
+  );
+  if (src.rows.length === 0) return null;
+  const source = src.rows[0];
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const maxRes = await client.query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS nxt FROM workout_sessions WHERE split_id = $1', [source.split_id]);
+    const created = await client.query(
+      'INSERT INTO workout_sessions (split_id, name, sort_order) VALUES ($1, $2, $3) RETURNING *',
+      [source.split_id, name || `${source.name} (Copy)`, maxRes.rows[0].nxt]
+    );
+    const newSession = created.rows[0];
+    const exRes = await client.query(
+      'SELECT * FROM workout_session_exercises WHERE session_id = $1 ORDER BY sort_order ASC, id ASC',
+      [sessionId]
+    );
+    for (const ex of exRes.rows) {
+      await client.query(
+        'INSERT INTO workout_session_exercises (session_id, exercise_id, sets, reps, rest_time, weight, sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+        [newSession.id, ex.exercise_id, ex.sets, ex.reps, ex.rest_time, ex.weight, ex.sort_order]
+      );
+    }
+    await client.query('COMMIT');
+    return newSession;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Bulk layout update: reorder sessions and exercises atomically.
+ * Body: { sessions: [{ id, sort_order, exercises?: [{ id, sort_order }] }] }
+ */
+async function updateSplitLayout(splitId, userId, { sessions }) {
+  const split = await pool.query('SELECT id FROM workout_splits WHERE id = $1 AND user_id = $2', [splitId, userId]);
+  if (split.rows.length === 0) {
+    const err = new Error('Unauthorized');
+    err.status = 403;
+    throw err;
+  }
+  if (!Array.isArray(sessions)) {
+    const err = new Error('sessions must be an array.');
+    err.status = 400;
+    throw err;
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const s of sessions) {
+      if (s.id == null) continue;
+      const own = await client.query('SELECT id FROM workout_sessions WHERE id = $1 AND split_id = $2', [s.id, splitId]);
+      if (own.rows.length === 0) {
+        throw Object.assign(new Error(`Session ${s.id} does not belong to this split.`), { status: 400 });
+      }
+      if (s.sort_order !== undefined) {
+        await client.query('UPDATE workout_sessions SET sort_order = $1 WHERE id = $2', [s.sort_order, s.id]);
+      }
+      if (Array.isArray(s.exercises)) {
+        for (const e of s.exercises) {
+          if (e.id == null) continue;
+          const exOwn = await client.query('SELECT id FROM workout_session_exercises WHERE id = $1 AND session_id = $2', [e.id, s.id]);
+          if (exOwn.rows.length === 0) {
+            throw Object.assign(new Error(`Exercise ${e.id} does not belong to session ${s.id}.`), { status: 400 });
+          }
+          if (e.sort_order !== undefined) {
+            await client.query('UPDATE workout_session_exercises SET sort_order = $1 WHERE id = $2', [e.sort_order, e.id]);
+          }
+        }
+      }
+    }
+    await client.query('COMMIT');
+    return { success: true };
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /**
@@ -1100,6 +1293,9 @@ module.exports = {
   addExerciseToSession,
   deleteExerciseFromSession,
   updateExerciseInSession,
+  moveExerciseToSession,
+  duplicateSession,
+  updateSplitLayout,
   getUniqueExerciseCategories,
   getExercisesByCategory,
   searchExercises,

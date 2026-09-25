@@ -44,7 +44,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/favicon.png",
+      "favicon": "./assets/appicn/appicon.png",
       "themeColor": "#ef4444",
       "manifest": {
         "name": "SpotMe - Fitness Tracker",
@@ -63,13 +63,13 @@
             "type": "image/png"
           },
           {
-            "src": "icon-192.png",
+            "src": "favicon.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "maskable"
           },
           {
-            "src": "icon-512.png",
+            "src": "favicon.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"

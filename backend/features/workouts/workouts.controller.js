@@ -265,7 +265,53 @@ async function updateExerciseInSession(req, res) {
     }
     return res.json(row);
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(error.status || 500).json({ error: error.message });
+  }
+}
+
+/**
+ * Controller to move an exercise row to another session (same split).
+ */
+async function moveExerciseToSession(req, res) {
+  try {
+    const { to_session_id, sort_order } = req.body || {};
+    if (to_session_id == null) {
+      return res.status(400).json({ error: 'to_session_id is required.' });
+    }
+    const row = await workoutsService.moveExerciseToSession(req.params.id, req.user.id, { to_session_id, sort_order });
+    if (!row) {
+      return res.status(404).json({ error: 'Exercise not found or unauthorized' });
+    }
+    return res.json(row);
+  } catch (error) {
+    return res.status(error.status || 500).json({ error: error.message });
+  }
+}
+
+/**
+ * Controller to duplicate a session with its exercises.
+ */
+async function duplicateSession(req, res) {
+  try {
+    const row = await workoutsService.duplicateSession(req.params.id, req.user.id, req.body || {});
+    if (!row) {
+      return res.status(404).json({ error: 'Session not found or unauthorized' });
+    }
+    return res.status(201).json(row);
+  } catch (error) {
+    return res.status(error.status || 500).json({ error: error.message });
+  }
+}
+
+/**
+ * Controller to bulk-reorder sessions/exercises within a split.
+ */
+async function updateSplitLayout(req, res) {
+  try {
+    const data = await workoutsService.updateSplitLayout(req.params.id, req.user.id, req.body || {});
+    return res.json(data);
+  } catch (error) {
+    return res.status(error.status || 500).json({ error: error.message });
   }
 }
 
@@ -329,6 +375,9 @@ module.exports = {
   addExerciseToSession,
   deleteExerciseFromSession,
   updateExerciseInSession,
+  moveExerciseToSession,
+  duplicateSession,
+  updateSplitLayout,
   getUniqueExerciseCategories,
   getExercisesByCategory,
   searchExercises,

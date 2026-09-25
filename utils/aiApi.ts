@@ -7,6 +7,7 @@ export interface AIChatMessage {
   role: 'user' | 'assistant';
   content: string;
   created_at?: string;
+  actions?: AIChatAction[];
 }
 
 export interface AIChatSession {
@@ -18,10 +19,25 @@ export interface AIChatSession {
   message_count?: number;
 }
 
+export interface AIChatAction {
+  kind: 'created' | 'updated' | 'deleted' | 'moved' | 'pending';
+  label: string;
+  confirmToken?: string;
+  tool?: string;
+}
+
 export interface SendMessageResponse {
   session_id: string;
   session_title: string;
   reply: string;
+  actions?: AIChatAction[];
+}
+
+export interface ConfirmActionResponse {
+  session_id: string;
+  session_title: string;
+  reply: string;
+  actions?: AIChatAction[];
 }
 
 export interface SessionDetailsResponse {
@@ -38,11 +54,21 @@ async function getAuthHeaders() {
 }
 
 export const aiApi = {
-  sendMessage: async (message: string, sessionId?: string): Promise<SendMessageResponse> => {
+  sendMessage: async (message: string, sessionId?: string, splitId?: number): Promise<SendMessageResponse> => {
     const headers = await getAuthHeaders();
     const res = await axios.post(
       `${API_URL}/ai/chat`,
-      { message, session_id: sessionId },
+      { message, session_id: sessionId, split_id: splitId },
+      { headers, timeout: 120000 }
+    );
+    return res.data;
+  },
+
+  confirmAction: async (token: string, sessionId: string, confirmed = true): Promise<ConfirmActionResponse> => {
+    const headers = await getAuthHeaders();
+    const res = await axios.post(
+      `${API_URL}/ai/actions/confirm`,
+      { token, session_id: sessionId, confirmed },
       { headers, timeout: 90000 }
     );
     return res.data;

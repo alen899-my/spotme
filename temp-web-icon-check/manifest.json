@@ -1,0 +1,21 @@
+{
+  "short_name": "SpotMe",
+  "name": "SpotMe - Ultimate Fitness Tracker",
+  "description": "Your ultimate workout companion for tracking sets, volume, and progress.",
+  "icons": [
+    {
+      "src": "favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#ef4444",
+  "background_color": "#000000"
+}

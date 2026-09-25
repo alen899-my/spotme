@@ -37,6 +37,11 @@ router.get('/sessions/:id/exercises', authenticateToken, workoutsController.getS
 router.post('/sessions/:id/exercises', authenticateToken, workoutsController.addExerciseToSession);
 router.delete('/exercises/:id', authenticateToken, workoutsController.deleteExerciseFromSession);
 router.put('/exercises/:id', authenticateToken, workoutsController.updateExerciseInSession);
+router.post('/exercises/:id/move', authenticateToken, workoutsController.moveExerciseToSession);
+
+// SESSION DUPLICATE + SPLIT LAYOUT
+router.post('/sessions/:id/duplicate', authenticateToken, workoutsController.duplicateSession);
+router.put('/splits/:id/layout', authenticateToken, workoutsController.updateSplitLayout);
 
 // GLOBAL EXERCISES BROWSER
 router.get('/exercises/categories', authenticateToken, workoutsController.getUniqueExerciseCategories);

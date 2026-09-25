@@ -28,19 +28,21 @@ import { getToken } from '../../../utils/tokenStorage';
 import SplitRating from '../../../components/ui/SplitRating';
 import RatingModal from '../../../components/ui/RatingModal';
 import ActionModal from '../../../components/ui/ActionModal';
+import AIChatModal from '../../../components/ai/AIChatModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-function RenameModal({ visible, title, currentName, onSave, onClose, colors, isDark }: any) {
+function RenameModal({ visible, title, currentName, currentDescription, withDescription, onSave, onClose, colors, isDark }: any) {
   const [name, setName] = useState(currentName);
+  const [description, setDescription] = useState(currentDescription || '');
   const [saving, setSaving] = useState(false);
 
-  React.useEffect(() => { setName(currentName); }, [currentName]);
+  React.useEffect(() => { setName(currentName); setDescription(currentDescription || ''); }, [currentName, currentDescription]);
 
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await onSave(name.trim());
+    await onSave(name.trim(), description.trim());
     setSaving(false);
   };
 
@@ -57,6 +59,16 @@ function RenameModal({ visible, title, currentName, onSave, onClose, colors, isD
             placeholderTextColor={colors.textDim}
             autoFocus
           />
+          {withDescription ? (
+            <TextInput
+              style={[rStyles.input, { height: 76, textAlignVertical: 'top', paddingTop: 12, fontFamily: FONTS.body, fontSize: 14 }]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Description (optional)"
+              placeholderTextColor={colors.textDim}
+              multiline
+            />
+          ) : null}
           <View style={rStyles.actions}>
             <TouchableOpacity style={[rStyles.cancelBtn, isDark && { backgroundColor: colors.inputBg }]} onPress={onClose}>
               <Text style={{ color: colors.textMuted, fontFamily: FONTS.bodyBold }}>CANCEL</Text>
@@ -99,6 +111,7 @@ export default function SplitSessionsScreen() {
   const [renameSession, setRenameSession] = useState<any>(null);
   const [deleteSessionId, setDeleteSessionId] = useState<number | null>(null);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [aiChatVisible, setAiChatVisible] = useState(false);
 
   const isShared = shared === '1';
   const clonedFromId = splitDetail?.cloned_from_id;
@@ -162,14 +175,14 @@ export default function SplitSessionsScreen() {
     }
   };
 
-  const handleRenameSplit = async (newName: string) => {
+  const handleRenameSplit = async (newName: string, newDescription?: string) => {
     try {
       const token = await getToken();
-      await axios.put(`${API_URL}/workouts/splits/${id}`, { name: newName }, {
+      await axios.put(`${API_URL}/workouts/splits/${id}`, { name: newName, description: newDescription }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSplitDetail((prev: any) => ({ ...prev, name: newName }));
-      showToast('Program renamed!');
+      setSplitDetail((prev: any) => ({ ...prev, name: newName, description: newDescription ?? prev?.description }));
+      showToast('Program updated!');
       setShowSplitRename(false);
     } catch (err) {
       showToast('Failed to rename', 'error');
@@ -226,7 +239,41 @@ export default function SplitSessionsScreen() {
     }
   };
 
-  const renderSession = ({ item }: { item: any }) => (
+  const handleDuplicateSession = async (sessionId: number) => {
+    try {
+      const token = await getToken();
+      await axios.post(`${API_URL}/workouts/sessions/${sessionId}/duplicate`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast('Day duplicated!');
+      fetchData();
+    } catch (err) {
+      console.error('Error duplicating session:', err);
+      showToast('Duplicate failed', 'error');
+    }
+  };
+
+  const handleSessionMove = async (index: number, dir: -1 | 1) => {
+    const j = index + dir;
+    if (j < 0 || j >= sessions.length) return;
+    const ordered = [...sessions];
+    const [moved] = ordered.splice(index, 1);
+    ordered.splice(j, 0, moved);
+    const prev = sessions;
+    setSessions(ordered);
+    try {
+      const token = await getToken();
+      await axios.put(`${API_URL}/workouts/splits/${id}/layout`, {
+        sessions: ordered.map((s: any, i: number) => ({ id: s.id, sort_order: i })),
+      }, { headers: { Authorization: `Bearer ${token}` } });
+    } catch (err) {
+      console.error('Error reordering sessions:', err);
+      showToast('Reorder failed', 'error');
+      setSessions(prev);
+    }
+  };
+
+  const renderSession = ({ item, index }: { item: any; index: number }) => (
     <TouchableOpacity
       style={[
         styles.sessionCard,
@@ -267,6 +314,26 @@ export default function SplitSessionsScreen() {
               onPress={() => setRenameSession(item)}
             >
               <Ionicons name="create-outline" size={16} color={isDark ? '#2596BE' : '#FFF'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editIconBtn, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(255,255,255,0.12)', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(255,255,255,0.22)', borderWidth: 1 }]}
+              onPress={() => handleDuplicateSession(item.id)}
+            >
+              <Ionicons name="copy-outline" size={16} color={isDark ? '#2596BE' : '#FFF'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editIconBtn, { opacity: index === 0 ? 0.4 : 1, backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(255,255,255,0.12)', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(255,255,255,0.22)', borderWidth: 1 }]}
+              onPress={() => handleSessionMove(index, -1)}
+              disabled={index === 0}
+            >
+              <Ionicons name="chevron-up" size={16} color={isDark ? '#2596BE' : '#FFF'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editIconBtn, { opacity: index === sessions.length - 1 ? 0.4 : 1, backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(255,255,255,0.12)', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(255,255,255,0.22)', borderWidth: 1 }]}
+              onPress={() => handleSessionMove(index, 1)}
+              disabled={index === sessions.length - 1}
+            >
+              <Ionicons name="chevron-down" size={16} color={isDark ? '#2596BE' : '#FFF'} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.deleteBtn, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.12)', borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.22)', borderWidth: 1 }]}
@@ -383,6 +450,13 @@ export default function SplitSessionsScreen() {
               />
             )}
             {!isShared && !clonedFromId && (
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+              <TouchableOpacity
+                style={[{ borderRadius: 12, borderWidth: 1, borderColor: colors.primary, width: 44, height: 44, justifyContent: 'center', alignItems: 'center' }]}
+                onPress={() => setAiChatVisible(true)}
+              >
+                <Ionicons name="sparkles-outline" size={22} color={colors.primary} />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.addBtn}
                 onPress={() => router.push({ pathname: `/splits/${id}/create-session` })}
@@ -396,6 +470,7 @@ export default function SplitSessionsScreen() {
                   <Ionicons name="add" size={24} color="#FFF" />
                 </LinearGradient>
               </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -499,8 +574,10 @@ export default function SplitSessionsScreen() {
       {/* Split Rename Modal */}
       <RenameModal
         visible={showSplitRename}
-        title="Rename Program"
+        title="Edit Program"
         currentName={splitDetail?.name || ''}
+        currentDescription={splitDetail?.description || ''}
+        withDescription
         onSave={handleRenameSplit}
         onClose={() => setShowSplitRename(false)}
         colors={colors}
@@ -536,6 +613,14 @@ export default function SplitSessionsScreen() {
         colors={colors}
         isDark={isDark}
         insets={insets}
+      />
+
+      <AIChatModal
+        visible={aiChatVisible}
+        onClose={() => { setAiChatVisible(false); fetchData(); }}
+        user={undefined}
+        splitId={Number(id)}
+        splitName={splitDetail?.name}
       />
     </SafeAreaView>
   );

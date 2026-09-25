@@ -28,6 +28,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import ActionModal from '../../../components/ui/ActionModal';
 import ExercisePreviewModal from '../../../components/modals/ExercisePreviewModal';
 import ExerciseCard from '../../../components/exercises/ExerciseCard';
+import AIChatModal from '../../../components/ai/AIChatModal';
 import { API_URL } from '../../../utils/api';
 import { getToken } from '../../../utils/tokenStorage';
 import { useUnits } from '../../../contexts/UnitContext';
@@ -63,6 +64,15 @@ export default function SessionDetailScreen() {
 
   // Deletion state
   const [removeId, setRemoveId] = useState<number | null>(null);
+
+  // Reorder / move / AI-chat state
+  const [reorderMode, setReorderMode] = useState(false);
+  const [moveWse, setMoveWse] = useState<any>(null);
+  const [siblingSessions, setSiblingSessions] = useState<any[]>([]);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [aiChatVisible, setAiChatVisible] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
 
   // Preview State
   const [previewEx, setPreviewEx] = useState<any>(null);
@@ -155,22 +165,134 @@ export default function SessionDetailScreen() {
     }
   };
 
-  const renderExercise = ({ item }: { item: any }) => (
-    <ExerciseCard
-      exercise={item}
-      variant="session"
-      onPress={() => setPreviewEx(item)}
-      onEdit={!isShared && !clonedFromId ? () => openEditModal(item) : undefined}
-      onDelete={!isShared && !clonedFromId ? () => handleRemoveExercise(item.id) : undefined}
-      sessionData={{
-        sets: item.sets,
-        reps: item.reps,
-        weight: item.weight,
-        rest_time: item.rest_time,
-      }}
-      isShared={!!isShared || !!clonedFromId}
-    />
+  const renderExercise = ({ item, index }: { item: any; index: number }) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      {reorderMode && !isShared && !clonedFromId && (
+        <View style={{ gap: 4 }}>
+          <TouchableOpacity
+            onPress={() => handleMoveUpDown(index, -1)}
+            disabled={index === 0}
+            style={{ opacity: index === 0 ? 0.3 : 1, padding: 4 }}
+            accessibilityLabel="Move up"
+          >
+            <Ionicons name="chevron-up" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleMoveUpDown(index, 1)}
+            disabled={index === exercises.length - 1}
+            style={{ opacity: index === exercises.length - 1 ? 0.3 : 1, padding: 4 }}
+            accessibilityLabel="Move down"
+          >
+            <Ionicons name="chevron-down" size={22} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
+        <ExerciseCard
+          exercise={item}
+          variant="session"
+          onPress={() => setPreviewEx(item)}
+          onEdit={!isShared && !clonedFromId ? () => openEditModal(item) : undefined}
+          onDelete={!isShared && !clonedFromId ? () => handleRemoveExercise(item.id) : undefined}
+          sessionData={{
+            sets: item.sets,
+            reps: item.reps,
+            weight: item.weight,
+            rest_time: item.rest_time,
+          }}
+          isShared={!!isShared || !!clonedFromId}
+        />
+        {!isShared && !clonedFromId && (
+          <TouchableOpacity
+            onPress={() => openMoveModal(item)}
+            style={{ alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 6 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="swap-horizontal-outline" size={14} color={colors.primary} />
+            <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: colors.primary }}>Move to another day</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
   );
+
+  const handleMoveUpDown = async (index: number, dir: -1 | 1) => {
+    const j = index + dir;
+    if (j < 0 || j >= exercises.length) return;
+    const ordered = [...exercises];
+    const [moved] = ordered.splice(index, 1);
+    ordered.splice(j, 0, moved);
+    await persistExerciseOrder(ordered);
+  };
+
+  const persistExerciseOrder = async (ordered: any[]) => {
+    const prev = exercises;
+    setExercises(ordered);
+    try {
+      const token = await getToken();
+      const splitId = (session as any)?.split_id;
+      if (!splitId) throw new Error('Missing split');
+      await axios.put(`${API_URL}/workouts/splits/${splitId}/layout`, {
+        sessions: [{ id: Number(id), exercises: ordered.map((e, i) => ({ id: e.id, sort_order: i })) }],
+      }, { headers: { Authorization: `Bearer ${token}` } });
+    } catch (err) {
+      console.error('Error reordering exercises:', err);
+      showToast('Reorder failed', 'error');
+      setExercises(prev);
+    }
+  };
+
+  const openMoveModal = async (wse: any) => {
+    setMoveWse(wse);
+    setShowMoveModal(true);
+    try {
+      const token = await getToken();
+      const splitId = (session as any)?.split_id;
+      if (!splitId) return;
+      const res = await axios.get(`${API_URL}/workouts/splits/${splitId}/sessions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSiblingSessions((res.data || []).filter((s: any) => String(s.id) !== String(id)));
+    } catch (err) {
+      console.error('Error loading sessions:', err);
+    }
+  };
+
+  const handleMoveToSession = async (toSessionId: number) => {
+    if (!moveWse) return;
+    setMoving(true);
+    try {
+      const token = await getToken();
+      await axios.post(`${API_URL}/workouts/exercises/${moveWse.id}/move`, {
+        to_session_id: toSessionId,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      showToast('Exercise moved');
+      setShowMoveModal(false);
+      setMoveWse(null);
+      fetchData();
+    } catch (err: any) {
+      console.error('Error moving exercise:', err);
+      showToast(err.response?.data?.error || 'Move failed', 'error');
+    } finally {
+      setMoving(false);
+    }
+  };
+
+  const handleDuplicateSession = async () => {
+    setDuplicating(true);
+    try {
+      const token = await getToken();
+      await axios.post(`${API_URL}/workouts/sessions/${id}/duplicate`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      showToast('Day duplicated! Pull to refresh your program.');
+    } catch (err) {
+      console.error('Error duplicating session:', err);
+      showToast('Duplicate failed', 'error');
+    } finally {
+      setDuplicating(false);
+    }
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -197,7 +319,24 @@ export default function SessionDetailScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
-                <Text style={[styles.headerSub, { color: colors.textMuted }]}>{exercises.length} exercise{exercises.length !== 1 ? 's' : ''}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                  <Text style={[styles.headerSub, { color: colors.textMuted }]}>{exercises.length} exercise{exercises.length !== 1 ? 's' : ''}</Text>
+                  {!isShared && !clonedFromId && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <TouchableOpacity onPress={() => setReorderMode(v => !v)} activeOpacity={0.7}>
+                        <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: reorderMode ? colors.primary : colors.textMuted }}>
+                          {reorderMode ? 'DONE' : 'REORDER'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handleDuplicateSession} disabled={duplicating} activeOpacity={0.7}>
+                        <Ionicons name="copy-outline" size={17} color={colors.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setAiChatVisible(true)} activeOpacity={0.7}>
+                        <Ionicons name="sparkles-outline" size={18} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               </>
             )}
           </View>
@@ -233,16 +372,28 @@ export default function SessionDetailScreen() {
               backgroundColor: colors.bg,
               paddingBottom: Math.max(insets.bottom, 12) + 12,
               borderTopColor: isDark ? colors.border : 'rgba(0,0,0,0.05)',
+              flexDirection: 'row',
+              gap: 10,
+              paddingHorizontal: 16,
             }
           ]}
         >
-          <TouchableOpacity 
-            style={[styles.addExBtn]}
+          <TouchableOpacity
+            style={[{ flex: 1, height: 52, borderRadius: 14, borderWidth: 1, borderColor: colors.primary, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 }]}
+            onPress={() => setAiChatVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="sparkles-outline" size={20} color={colors.primary} />
+            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: colors.primary, letterSpacing: 0.8 }}>AI EDIT</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[{ flex: 2, height: 52, borderRadius: 14, overflow: 'hidden' }]}
             onPress={() => router.push({ pathname: `/splits/session/${id}/add-exercises`, params: { sessionId: id } })}
+            activeOpacity={0.85}
           >
             <LinearGradient
               colors={isDark ? [colors.primary, colors.primaryDark || colors.primary] : [P.cta, P.ctaDark]}
-              style={styles.addBtnGradient}
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
@@ -326,7 +477,22 @@ export default function SessionDetailScreen() {
                   />
                 </View>
 
-                <TouchableOpacity 
+                <TouchableOpacity
+                  style={[styles.updateBtn, { marginTop: 10, opacity: 1 }]}
+                  onPress={() => {
+                    const wseId = editingEx?.id;
+                    const snapshot = editingEx ? { sets: editSets, reps: editReps, rest_time: editRest, weight: editWeight } : null;
+                    setIsEditModalVisible(false);
+                    router.push({ pathname: `/splits/session/${id}/add-exercises`, params: { sessionId: String(id), replaceWseId: wseId ? String(wseId) : undefined, replaceSnapshot: snapshot ? JSON.stringify(snapshot) : undefined } });
+                  }}
+                >
+                  <View style={{ height: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.primary, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 }}>
+                    <Ionicons name="swap-horizontal-outline" size={18} color={colors.primary} />
+                    <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: colors.primary, letterSpacing: 0.8 }}>REPLACE EXERCISE…</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   style={styles.updateBtn}
                   onPress={handleUpdateStats}
                   disabled={isUpdating}
@@ -389,6 +555,47 @@ export default function SessionDetailScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Move-to-day Modal */}
+        <Modal visible={showMoveModal} transparent animationType="fade" onRequestClose={() => setShowMoveModal(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFillObject} onPress={() => !moving && setShowMoveModal(false)} />
+            <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: colors.text }]} numberOfLines={2}>
+                Move {moveWse?.name || 'exercise'} to…
+              </Text>
+              <View style={{ marginTop: 12, gap: 8 }}>
+                {siblingSessions.length === 0 ? (
+                  <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: colors.textMuted }}>
+                    No other days in this program yet.
+                  </Text>
+                ) : siblingSessions.map((s: any) => (
+                  <TouchableOpacity
+                    key={s.id}
+                    disabled={moving}
+                    onPress={() => handleMoveToSession(s.id)}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBg }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 13, color: colors.text }} numberOfLines={1}>{s.name}</Text>
+                    {moving
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : <Ionicons name="arrow-forward" size={16} color={colors.primary} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        <AIChatModal
+          visible={aiChatVisible}
+          onClose={() => { setAiChatVisible(false); fetchData(); }}
+          user={undefined}
+          splitId={(session as any)?.split_id ? Number((session as any).split_id) : undefined}
+          splitName={(session as any)?.split_name}
+        />
       </View>
     </SafeAreaView>
   );

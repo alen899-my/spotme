@@ -8,13 +8,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { FONTS } from '../../constants/theme';
-import { aiApi, AIChatMessage, AIChatSession } from '../../utils/aiApi';
+import { aiApi, AIChatMessage, AIChatSession, AIChatAction } from '../../utils/aiApi';
 const coachAvatarSource = require('../../assets/coach/fit-cartoon-character-training.png');
 
 interface AIChatModalProps {
   visible: boolean;
   onClose: () => void;
   user?: any;
+  splitId?: number;
+  splitName?: string;
 }
 
 const STARTER_CARDS = [
@@ -45,6 +47,13 @@ const STARTER_CARDS = [
     desc: 'Hydration & rest intervals',
     prompt: 'Check my hydration and rest days and tell me how my recovery is supporting my training.',
     color: '#EA580C',
+  },
+  {
+    icon: 'sparkles' as const,
+    title: 'Edit My Split',
+    desc: 'Add, swap or reorder exercises',
+    prompt: 'Show me my workout splits, then help me edit them — I want full control over days and exercises.',
+    color: '#2596BE',
   },
 ];
 
@@ -201,7 +210,7 @@ function ThinkingBubble({ colors, isDark }: { colors: any; isDark: boolean }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
-export default function AIChatModal({ visible, onClose, user }: AIChatModalProps) {
+export default function AIChatModal({ visible, onClose, user, splitId, splitName }: AIChatModalProps) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { width: SW } = useWindowDimensions();
@@ -220,6 +229,7 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [confirmingToken, setConfirmingToken] = useState<string | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
   const historyPanelAnim = useRef(new Animated.Value(SW)).current;
@@ -311,13 +321,14 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
     scrollToBottom();
 
     try {
-      const res = await aiApi.sendMessage(text, currentSessionId);
+      const res = await aiApi.sendMessage(text, currentSessionId, splitId);
       if (!currentSessionId && res.session_id) setCurrentSessionId(res.session_id);
       const assistantMsg: AIChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'assistant',
         content: res.reply,
         created_at: new Date().toISOString(),
+        actions: res.actions,
       };
       setMessages(prev => [...prev, assistantMsg]);
       loadSessions();
@@ -331,6 +342,43 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
       setMessages(prev => [...prev, fallbackMsg]);
     } finally {
       setSending(false);
+      scrollToBottom();
+    }
+  };
+
+  const handleConfirmAction = async (action: AIChatAction, confirmed: boolean) => {
+    if (!action.confirmToken || !currentSessionId || confirmingToken) return;
+    setConfirmingToken(action.confirmToken);
+    try {
+      const res = await aiApi.confirmAction(action.confirmToken, currentSessionId, confirmed);
+      const assistantMsg: AIChatMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: res.reply,
+        created_at: new Date().toISOString(),
+        actions: res.actions,
+      };
+      setMessages(prev => {
+        // Mark the confirmed action so its buttons disappear.
+        const next = prev.map(m => ({
+          ...m,
+          actions: m.actions?.map(a =>
+            a.confirmToken === action.confirmToken ? { ...a, kind: (confirmed ? 'updated' : 'deleted') as const, label: `${a.label} — ${confirmed ? 'confirmed' : 'cancelled'}`, confirmToken: undefined } : a
+          ),
+        }));
+        return [...next, assistantMsg];
+      });
+      loadSessions();
+    } catch (err: any) {
+      const fallbackMsg: AIChatMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: err?.response?.data?.error || 'That confirmation expired. Please ask again.',
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, fallbackMsg]);
+    } finally {
+      setConfirmingToken(null);
       scrollToBottom();
     }
   };
@@ -490,7 +538,46 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
                         {isUser ? (
                           <Text style={S.userBubbleText}>{msg.content}</Text>
                         ) : (
-                          <MarkdownText content={msg.content} textColor={colors.text} primaryColor={colors.primary} isDark={isDark} />
+                          <>
+                            <MarkdownText content={msg.content} textColor={colors.text} primaryColor={colors.primary} isDark={isDark} />
+                            {msg.actions?.map((action, ai) => (
+                              <View
+                                key={`${msg.id}-act-${ai}`}
+                                style={[S.actionCard, { backgroundColor: isDark ? 'rgba(37,150,190,0.10)' : 'rgba(37,150,190,0.08)', borderColor: colors.primary + '44' }]}
+                              >
+                                <View style={S.actionRow}>
+                                  <Ionicons
+                                    name={action.kind === 'pending' ? 'alert-circle-outline' : action.kind === 'deleted' && action.label.endsWith('cancelled') ? 'close-circle-outline' : 'checkmark-circle-outline'}
+                                    size={16}
+                                    color={action.kind === 'pending' ? '#F7CB16' : colors.primary}
+                                  />
+                                  <Text style={[S.actionLabel, { color: colors.text }]}>{action.label}</Text>
+                                </View>
+                                {action.kind === 'pending' && action.confirmToken ? (
+                                  <View style={S.actionBtnRow}>
+                                    <TouchableOpacity
+                                      onPress={() => handleConfirmAction(action, false)}
+                                      disabled={confirmingToken === action.confirmToken}
+                                      style={[S.actionBtn, S.actionBtnGhost, { borderColor: cardBorder }]}
+                                      activeOpacity={0.8}
+                                    >
+                                      <Text style={[S.actionBtnText, { color: colors.textMuted }]}>Cancel</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      onPress={() => handleConfirmAction(action, true)}
+                                      disabled={confirmingToken === action.confirmToken}
+                                      style={[S.actionBtn, { backgroundColor: colors.primary }]}
+                                      activeOpacity={0.8}
+                                    >
+                                      {confirmingToken === action.confirmToken
+                                        ? <ActivityIndicator size="small" color="#FFFFFF" />
+                                        : <Text style={[S.actionBtnText, { color: '#FFFFFF' }]}>Confirm</Text>}
+                                    </TouchableOpacity>
+                                  </View>
+                                ) : null}
+                              </View>
+                            ))}
+                          </>
                         )}
                         {msg.created_at ? (
                           <Text style={[S.msgTime, { color: isUser ? 'rgba(255,255,255,0.65)' : colors.textDim, alignSelf: isUser ? 'flex-end' : 'flex-start' }]}>
@@ -513,6 +600,16 @@ export default function AIChatModal({ visible, onClose, user }: AIChatModalProps
               </View>
             )}
           </ScrollView>
+
+          {/* ── SPLIT CONTEXT PILL ── */}
+          {splitId ? (
+            <View style={[S.ctxPill, { backgroundColor: colors.primary + '14', borderColor: colors.primary + '44' }]}>
+              <Ionicons name="barbell-outline" size={13} color={colors.primary} />
+              <Text style={[S.ctxPillText, { color: colors.text }]} numberOfLines={1}>
+                Editing: {splitName || `Split #${splitId}`}
+              </Text>
+            </View>
+          ) : null}
 
           {/* ── BOTTOM INPUT BAR ── */}
           <View style={[S.inputBar, { backgroundColor: colors.card, borderTopColor: cardBorder, paddingBottom: Math.max(insets.bottom, 14), paddingHorizontal: isSmall ? 10 : 14 }]}>
@@ -934,6 +1031,64 @@ const S = StyleSheet.create({
   },
 
   // ── Input bar ──
+  ctxPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginHorizontal: 14,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    maxWidth: '90%',
+  },
+  ctxPillText: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 11,
+    flexShrink: 1,
+  },
+  // ── Action cards inside assistant bubbles ──
+  actionCard: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    gap: 8,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionLabel: {
+    fontFamily: FONTS.bodySemiBold,
+    fontSize: 12,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  actionBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  actionBtn: {
+    minWidth: 84,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  actionBtnGhost: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  actionBtnText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+  },
   inputBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
