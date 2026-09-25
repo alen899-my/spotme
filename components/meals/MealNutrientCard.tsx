@@ -6,7 +6,6 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -15,15 +14,13 @@ type Props = {
 };
 
 const MACRO_CONFIG = [
-  { key: 'total_protein', label: 'Protein',  unit: 'g',  color: '#34EEB0', dimColor: 'rgba(52,238,176,0.12)',  icon: 'barbell-outline'   as const },
-  { key: 'total_carbs',   label: 'Carbs',    unit: 'g',  color: '#60A5FA', dimColor: 'rgba(96,165,250,0.12)',  icon: 'flash-outline'     as const },
-  { key: 'total_fat',     label: 'Fat',      unit: 'g',  color: '#FBBF24', dimColor: 'rgba(251,191,36,0.12)',  icon: 'water-outline'     as const },
-  { key: 'total_fiber',   label: 'Fiber',    unit: 'g',  color: '#A78BFA', dimColor: 'rgba(167,139,250,0.12)', icon: 'leaf-outline'      as const },
-  { key: 'total_sugar',   label: 'Sugar',    unit: 'g',  color: '#F472B6', dimColor: 'rgba(244,114,182,0.12)', icon: 'cafe-outline'      as const },
-  { key: 'total_sodium',  label: 'Sodium',   unit: 'mg', color: '#FB923C', dimColor: 'rgba(251,146,60,0.12)',  icon: 'beaker-outline'    as const },
+  { key: 'total_protein', label: 'Protein',  unit: 'g',  icon: 'barbell-outline'   as const },
+  { key: 'total_carbs',   label: 'Carbs',    unit: 'g',  icon: 'flash-outline'     as const },
+  { key: 'total_fat',     label: 'Fat',      unit: 'g',  icon: 'water-outline'     as const },
+  { key: 'total_fiber',   label: 'Fiber',    unit: 'g',  icon: 'leaf-outline'      as const },
+  { key: 'total_sugar',   label: 'Sugar',    unit: 'g',  icon: 'cafe-outline'      as const },
+  { key: 'total_sodium',  label: 'Sodium',   unit: 'mg', icon: 'beaker-outline'    as const },
 ];
-
-const ITEM_ACCENT_COLORS = ['#34EEB0', '#60A5FA', '#FBBF24', '#A78BFA', '#F472B6', '#FB923C'];
 
 export default function MealNutrientCard({ meal }: Props) {
   const { colors, isDark } = useTheme();
@@ -47,29 +44,23 @@ export default function MealNutrientCard({ meal }: Props) {
     <View style={styles.root}>
 
       {/* ── CALORIE HERO ─────────────────────────────────────────── */}
-      <LinearGradient
-        colors={isDark
-          ? ['rgba(231,177,0,0.18)', 'rgba(251,146,60,0.10)', 'rgba(0,0,0,0)']
-          : ['rgba(251,191,36,0.22)', 'rgba(245,158,11,0.10)', 'rgba(255,255,255,0)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.calHero, { borderColor: isDark ? 'rgba(231,177,0,0.18)' : 'rgba(245,158,11,0.20)' }]}
+      <View
+        style={[styles.calHero, { backgroundColor: surface, borderColor: surfaceBorder }]}
       >
         <View style={styles.calHeroContent}>
-          {/* Icon pulse ring */}
+          {/* Icon */}
           <View style={styles.flameWrapper}>
-            <View style={[styles.flamePulse, { backgroundColor: 'rgba(231,177,0,0.12)' }]} />
-            <View style={[styles.flameInner, { backgroundColor: isDark ? 'rgba(231,177,0,0.16)' : 'rgba(231,177,0,0.20)' }]}>
-              <Ionicons name="flame" size={24} color="#FBBF24" />
+            <View style={[styles.flameInner, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}>
+              <Ionicons name="flame" size={24} color={textMuted} />
             </View>
           </View>
 
           <View style={styles.calTextGroup}>
             <View style={styles.calRow}>
-              <Text style={[styles.calValue, { color: isDark ? '#FCD34D' : '#D97706' }]}>
+              <Text style={[styles.calValue, { color: textPrimary }]}>
                 {cals}
               </Text>
-              <Text style={[styles.calUnit, { color: isDark ? 'rgba(252,211,77,0.65)' : 'rgba(217,119,6,0.70)' }]}>
+              <Text style={[styles.calUnit, { color: textMuted }]}>
                 kcal
               </Text>
             </View>
@@ -79,8 +70,8 @@ export default function MealNutrientCard({ meal }: Props) {
           </View>
         </View>
 
-       
-      </LinearGradient>
+
+      </View>
 
       {/* ── MACRO GRID ───────────────────────────────────────────── */}
       {activeMacros.length > 0 && (
@@ -93,18 +84,18 @@ export default function MealNutrientCard({ meal }: Props) {
                 style={[
                   styles.macroCell,
                   {
-                    backgroundColor: isDark ? surface : m.dimColor,
-                    borderColor:     isDark ? surfaceBorder : `${m.color}22`,
+                    backgroundColor: surface,
+                    borderColor: surfaceBorder,
                   },
                 ]}
               >
-                <View style={[styles.macroIconWrap, { backgroundColor: m.dimColor }]}>
-                  <Ionicons name={m.icon} size={13} color={m.color} />
+                <View style={[styles.macroIconWrap, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}>
+                  <Ionicons name={m.icon} size={13} color={textMuted} />
                 </View>
 
-                <Text style={[styles.macroVal, { color: m.color }]}>
+                <Text style={[styles.macroVal, { color: textPrimary }]}>
                   {val}
-                  <Text style={[styles.macroUnitInline, { color: isDark ? `${m.color}90` : `${m.color}bb` }]}>
+                  <Text style={[styles.macroUnitInline, { color: textMuted }]}>
                     {m.unit}
                   </Text>
                 </Text>
@@ -129,15 +120,14 @@ export default function MealNutrientCard({ meal }: Props) {
           </View>
 
           {meal.items.map((item: any, idx: number) => {
-            const accent = ITEM_ACCENT_COLORS[idx % ITEM_ACCENT_COLORS.length];
             const itemCals = Math.round(item.calories || 0);
             const itemMacros = [
-              { key: 'protein', val: Math.round(item.protein || 0), unit: 'g', color: '#34EEB0', label: 'Protein' },
-              { key: 'carbs',   val: Math.round(item.carbs || 0),   unit: 'g', color: '#60A5FA', label: 'Carbs' },
-              { key: 'fat',     val: Math.round(item.fat || 0),     unit: 'g', color: '#FBBF24', label: 'Fat' },
-              { key: 'fiber',   val: Math.round(item.fiber || 0),   unit: 'g', color: '#A78BFA', label: 'Fiber' },
-              { key: 'sugar',   val: Math.round(item.sugar || 0),   unit: 'g', color: '#F472B6', label: 'Sugar' },
-              { key: 'sodium',  val: Math.round(item.sodium || 0),  unit: 'mg', color: '#FB923C', label: 'Sodium' },
+              { key: 'protein', val: Math.round(item.protein || 0), unit: 'g', label: 'Protein' },
+              { key: 'carbs',   val: Math.round(item.carbs || 0),   unit: 'g', label: 'Carbs' },
+              { key: 'fat',     val: Math.round(item.fat || 0),     unit: 'g', label: 'Fat' },
+              { key: 'fiber',   val: Math.round(item.fiber || 0),   unit: 'g', label: 'Fiber' },
+              { key: 'sugar',   val: Math.round(item.sugar || 0),   unit: 'g', label: 'Sugar' },
+              { key: 'sodium',  val: Math.round(item.sodium || 0),  unit: 'mg', label: 'Sodium' },
             ].filter(m => m.val > 0);
 
             return (
@@ -153,11 +143,11 @@ export default function MealNutrientCard({ meal }: Props) {
               >
                 {/* Top row: thumb + name + calorie badge */}
                 <View style={styles.itemRow}>
-                  <View style={[styles.itemThumb, { backgroundColor: `${accent}15` }]}>
+                  <View style={[styles.itemThumb, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}>
                     <Ionicons
                       name={idx % 2 === 0 ? 'restaurant' : 'nutrition'}
                       size={17}
-                      color={accent}
+                      color={textMuted}
                     />
                   </View>
 
@@ -170,9 +160,9 @@ export default function MealNutrientCard({ meal }: Props) {
                     </Text>
                   </View>
 
-                  <View style={[styles.itemCalBadge, { backgroundColor: `${accent}15`, borderColor: `${accent}30` }]}>
-                    <Text style={[styles.itemCalBadgeVal, { color: accent }]}>{itemCals}</Text>
-                    <Text style={[styles.itemCalBadgeUnit, { color: isDark ? `${accent}90` : `${accent}bb` }]}>kcal</Text>
+                  <View style={[styles.itemCalBadge, { backgroundColor: surface, borderColor: surfaceBorder }]}>
+                    <Text style={[styles.itemCalBadgeVal, { color: textPrimary }]}>{itemCals}</Text>
+                    <Text style={[styles.itemCalBadgeUnit, { color: textMuted }]}>kcal</Text>
                   </View>
                 </View>
 
@@ -180,12 +170,12 @@ export default function MealNutrientCard({ meal }: Props) {
                 {itemMacros.length > 0 && (
                   <View style={styles.itemMacroGrid}>
                     {itemMacros.map(m => (
-                      <View key={m.key} style={[styles.itemMacroChip, { backgroundColor: `${m.color}12`, borderColor: `${m.color}22` }]}>
-                        <Text style={[styles.itemMacroChipText, { color: m.color }]}>
+                      <View key={m.key} style={[styles.itemMacroChip, { backgroundColor: surface, borderColor: surfaceBorder }]}>
+                        <Text style={[styles.itemMacroChipText, { color: textPrimary }]}>
                           {m.val}
-                          <Text style={[styles.itemMacroChipUnit, { color: isDark ? `${m.color}90` : `${m.color}bb` }]}>{m.unit}</Text>
+                          <Text style={[styles.itemMacroChipUnit, { color: textMuted }]}>{m.unit}</Text>
                         </Text>
-                        <Text style={[styles.itemMacroChipLabel, { color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)' }]}>{m.label}</Text>
+                        <Text style={[styles.itemMacroChipLabel, { color: textMuted }]}>{m.label}</Text>
                       </View>
                     ))}
                   </View>
@@ -223,12 +213,6 @@ const styles = StyleSheet.create({
     height: 52,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  flamePulse: {
-    position: 'absolute',
-    width: 52,
-    height: 52,
-    borderRadius: 26,
   },
   flameInner: {
     width: 44,

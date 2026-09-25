@@ -792,21 +792,21 @@ export default function MealsScreen() {
 
           {!open && (
             <View style={styles.mealStatsRow}>
-              <View style={[styles.mealStatCol, { backgroundColor: isDark ? '#E7B10015' : '#E7B100' }]}>
-                <Text style={[styles.mealStatNum, { color: isDark ? '#E7B100' : '#3F2C00' }]}>{Math.round(item.total_calories)}</Text>
-                <Text style={[styles.mealStatUnit, { color: isDark ? 'rgba(231,177,0,0.7)' : '#5B4300' }]}>kcal</Text>
+              <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+                <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_calories)}</Text>
+                <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>kcal</Text>
               </View>
-              <View style={[styles.mealStatCol, { backgroundColor: isDark ? '#10B98115' : '#10B981' }]}>
-                <Text style={[styles.mealStatNum, { color: isDark ? '#10B981' : '#FFF' }]}>{Math.round(item.total_protein)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: isDark ? 'rgba(16,185,129,0.7)' : 'rgba(255,255,255,0.9)' }]}>Protein</Text>
+              <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+                <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_protein)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Protein</Text>
               </View>
-              <View style={[styles.mealStatCol, { backgroundColor: isDark ? '#3B82F615' : '#3B82F6' }]}>
-                <Text style={[styles.mealStatNum, { color: isDark ? '#3B82F6' : '#FFF' }]}>{Math.round(item.total_carbs)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: isDark ? 'rgba(59,130,246,0.7)' : 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
+              <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+                <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_carbs)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Carbs</Text>
               </View>
-              <View style={[styles.mealStatCol, { backgroundColor: isDark ? '#F59E0B15' : '#F59E0B' }]}>
-                <Text style={[styles.mealStatNum, { color: isDark ? '#F59E0B' : '#4A2900' }]}>{Math.round(item.total_fat)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: isDark ? 'rgba(245,158,11,0.7)' : '#6B3A00' }]}>Fats</Text>
+              <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+                <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_fat)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Fats</Text>
               </View>
             </View>
           )}
@@ -999,21 +999,21 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           </View>
 
           <View style={styles.mealStatsRow}>
-            <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#E7B100' } : { backgroundColor: '#E7B100' }]}>
-              <Text style={[styles.mealStatNum, { color: isDark ? '#E7B100' : '#3F2C00' }]}>{Math.round(meal.calories)}</Text>
-              <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : '#5B4300' }]}>kcal</Text>
+            <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.calories)}</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>kcal</Text>
             </View>
-            <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#10B981' } : { backgroundColor: '#10B981' }]}>
-              <Text style={[styles.mealStatNum, { color: isDark ? '#10B981' : '#FFF' }]}>{Math.round(meal.protein)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Protein</Text>
+            <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.protein)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Protein</Text>
             </View>
-            <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#3B82F6' } : { backgroundColor: '#3B82F6' }]}>
-              <Text style={[styles.mealStatNum, { color: isDark ? '#3B82F6' : '#FFF' }]}>{Math.round(meal.carbs)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
+            <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.carbs)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Carbs</Text>
             </View>
-            <View style={[styles.mealStatCol, isDark ? { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: '#F59E0B' } : { backgroundColor: '#F59E0B' }]}>
-              <Text style={[styles.mealStatNum, { color: isDark ? '#F59E0B' : '#4A2900' }]}>{Math.round(meal.fat)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: isDark ? colors.textMuted : '#6B3A00' }]}>Fats</Text>
+            <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.fat)}g</Text>
+              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Fats</Text>
             </View>
           </View>
         </TouchableOpacity>

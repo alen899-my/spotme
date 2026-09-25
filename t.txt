@@ -1,0 +1,8 @@
+echo 'ADMIN_BUILD_TOKEN=dd79f9ab9c82099f471917b434683d4ed1395683b46680e110fa34f8dd625336' >> .env
+grep -c '^ADMIN_BUILD_TOKEN=' .env
+pm2 reload spotme-backend --update-env
+sleep 5
+pm2 logs spotme-backend --lines 10 --nostream
+
+
+curl -s -o /dev/null -w "%{http_code}\n" -X POST https://spotme-api.duckdns.org/api/admin/builds/presigned-url -H "Authorization: Bearer dd79f9ab9c82099f471917b434683d4ed1395683b46680e110fa34f8dd625336" -H "Content-Type: application/json" -d '{"filename":"probe.apk","fileType":"application/vnd.android.package-archive","fileSize":123}'
