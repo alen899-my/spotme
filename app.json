@@ -3,7 +3,7 @@
     "name": "spotme",
     "scheme": "spotme",
     "slug": "spotme",
-    "version": "1.0.0",
+    "version": "1.0.5",
     "description": "Your ultimate fitness companion for tracking workouts and progress.",
     "orientation": "portrait",
     "icon": "./assets/appicn/appicon.png",
