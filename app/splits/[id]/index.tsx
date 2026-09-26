@@ -21,6 +21,7 @@ import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
 import { P } from '../../../constants/homeTheme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTimerBarOffset } from '../../../components/ui/FloatingTimerBar';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { API_URL } from '../../../utils/api';
@@ -102,6 +103,8 @@ export default function SplitSessionsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
+  // Lifts the bottom action bar above the floating workout-timer pill.
+  const timerLift = useTimerBarOffset();
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cloning, setCloning] = useState(false);
@@ -239,41 +242,7 @@ export default function SplitSessionsScreen() {
     }
   };
 
-  const handleDuplicateSession = async (sessionId: number) => {
-    try {
-      const token = await getToken();
-      await axios.post(`${API_URL}/workouts/sessions/${sessionId}/duplicate`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      showToast('Day duplicated!');
-      fetchData();
-    } catch (err) {
-      console.error('Error duplicating session:', err);
-      showToast('Duplicate failed', 'error');
-    }
-  };
-
-  const handleSessionMove = async (index: number, dir: -1 | 1) => {
-    const j = index + dir;
-    if (j < 0 || j >= sessions.length) return;
-    const ordered = [...sessions];
-    const [moved] = ordered.splice(index, 1);
-    ordered.splice(j, 0, moved);
-    const prev = sessions;
-    setSessions(ordered);
-    try {
-      const token = await getToken();
-      await axios.put(`${API_URL}/workouts/splits/${id}/layout`, {
-        sessions: ordered.map((s: any, i: number) => ({ id: s.id, sort_order: i })),
-      }, { headers: { Authorization: `Bearer ${token}` } });
-    } catch (err) {
-      console.error('Error reordering sessions:', err);
-      showToast('Reorder failed', 'error');
-      setSessions(prev);
-    }
-  };
-
-  const renderSession = ({ item, index }: { item: any; index: number }) => (
+  const renderSession = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={[
         styles.sessionCard,
@@ -302,38 +271,27 @@ export default function SplitSessionsScreen() {
           <View style={styles.sessionOverlay} />
         </View>
         <View style={styles.titleArea}>
-          <Text style={[styles.sessionName, { color: isDark ? colors.text : '#FFF' }]}>{item.name}</Text>
-          <Text style={[styles.sessionMeta, { color: isDark ? colors.textMuted : '#FFF' }]}>
-            <Ionicons name="barbell-outline" size={12} color={isDark ? colors.textMuted : '#FFF'} /> {item.exercise_count} Exercises
+          <Text
+            style={[styles.sessionName, { color: isDark ? colors.text : '#FFF' }]}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {item.name}
           </Text>
+          <View style={styles.sessionMetaRow}>
+            <Ionicons name="barbell-outline" size={12} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.85)'} />
+            <Text style={[styles.sessionMeta, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.9)' }]}>
+              {item.exercise_count ?? 0} Exercises
+            </Text>
+          </View>
         </View>
         {!isShared && !clonedFromId && (
-          <View style={{ flexDirection: 'row', gap: 6 }}>
+          <View style={styles.cardActions}>
             <TouchableOpacity
               style={[styles.editIconBtn, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(255,255,255,0.12)', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(255,255,255,0.22)', borderWidth: 1 }]}
               onPress={() => setRenameSession(item)}
             >
               <Ionicons name="create-outline" size={16} color={isDark ? '#2596BE' : '#FFF'} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.editIconBtn, { backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(255,255,255,0.12)', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(255,255,255,0.22)', borderWidth: 1 }]}
-              onPress={() => handleDuplicateSession(item.id)}
-            >
-              <Ionicons name="copy-outline" size={16} color={isDark ? '#2596BE' : '#FFF'} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.editIconBtn, { opacity: index === 0 ? 0.4 : 1, backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(255,255,255,0.12)', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(255,255,255,0.22)', borderWidth: 1 }]}
-              onPress={() => handleSessionMove(index, -1)}
-              disabled={index === 0}
-            >
-              <Ionicons name="chevron-up" size={16} color={isDark ? '#2596BE' : '#FFF'} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.editIconBtn, { opacity: index === sessions.length - 1 ? 0.4 : 1, backgroundColor: isDark ? 'rgba(37,150,190,0.15)' : 'rgba(255,255,255,0.12)', borderColor: isDark ? 'rgba(37,150,190,0.3)' : 'rgba(255,255,255,0.22)', borderWidth: 1 }]}
-              onPress={() => handleSessionMove(index, 1)}
-              disabled={index === sessions.length - 1}
-            >
-              <Ionicons name="chevron-down" size={16} color={isDark ? '#2596BE' : '#FFF'} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.deleteBtn, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.12)', borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.22)', borderWidth: 1 }]}
@@ -513,7 +471,7 @@ export default function SplitSessionsScreen() {
               styles.bottomBar,
               {
                 backgroundColor: colors.bg,
-                paddingBottom: Math.max(insets.bottom, 12) + 12,
+                paddingBottom: Math.max(insets.bottom, 12) + 12 + timerLift,
                 borderTopColor: colors.border,
               }
             ]}
@@ -728,15 +686,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    gap: 12,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: 6,
+    flexShrink: 0,
   },
   sessionImageContainer: {
     width: 54,
     height: 54,
     borderRadius: 14,
     overflow: 'hidden',
-    marginRight: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+    flexShrink: 0,
   },
   sessionImage: {
     width: '100%',
@@ -746,9 +710,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.05)',
   },
-  titleArea: { flex: 1 },
-  sessionName: { fontFamily: FONTS.bodyBold, fontSize: 17, marginBottom: 4, flexShrink: 1 },
-  sessionMeta: { fontFamily: FONTS.body, fontSize: 12, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  titleArea: { flex: 1, minWidth: 0, flexShrink: 1 },
+  sessionName: { fontFamily: FONTS.bodyBold, fontSize: 17, lineHeight: 22, marginBottom: 4, flexShrink: 1 },
+  sessionMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  sessionMeta: { fontFamily: FONTS.body, fontSize: 12 },
   deleteBtn: {
     width: 34,
     height: 34,

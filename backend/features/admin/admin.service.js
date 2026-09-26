@@ -1050,8 +1050,8 @@ async function listWorkoutSessionsAdmin({ page = 1, limit = 30 }) {
      LEFT JOIN users u ON dw.user_id = u.id
      LEFT JOIN daily_workout_exercises dwe ON dw.id = dwe.daily_workout_id
      GROUP BY dw.id, u.full_name, u.email, u.profile_pic_url
-     ORDER BY dw.completed_at DESC NULLS LAST, dw.id DESC
-     LIMIT $1 OFFSET $2`,
+      ORDER BY COALESCE(dw.completed_at, dw.started_at) DESC, dw.id DESC
+      LIMIT $1 OFFSET $2`,
     [parseInt(limit), parseInt(offset)]
   );
 

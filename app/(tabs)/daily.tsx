@@ -19,6 +19,7 @@ import { useWorkoutTimer } from '../../contexts/WorkoutTimerContext';
 import ActionModal from '../../components/ui/ActionModal';
 import DatePicker from '../../components/ui/DatePicker';
 import { DailySkeleton } from '../../components/ui/Skeleton';
+import { useTimerBarOffset } from '../../components/ui/FloatingTimerBar';
 import { api } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
 import { formatDuration, formatDateTime, isSameDay, isToday, parseUTC } from '../../utils/datetime';
@@ -171,6 +172,8 @@ export default function DailyTab() {
 
   const { activeWorkoutId, endWorkoutSession } = useWorkoutTimer();
   const { unitSystem } = useUnits();
+  // Lifts bottom FABs above the floating workout-timer pill when it shows.
+  const timerLift = useTimerBarOffset();
 
   // Rest day modal state
   const [showRestModal, setShowRestModal] = useState(false);
@@ -846,13 +849,43 @@ export default function DailyTab() {
         </Pressable>
       </Modal>
 
+      {/* ── FAB: Workout Analytics ── */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => router.push('/analytics/workout' as any)}
+        style={{
+          position: 'absolute',
+          bottom: insets.bottom + 252 + timerLift,
+          right: 20,
+          zIndex: 100,
+        }}
+      >
+        <LinearGradient
+          colors={['#FEF6D0', '#F7CB16']}
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            justifyContent: 'center',
+            alignItems: 'center',
+            elevation: 6,
+            shadowColor: '#E7B100',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 6,
+          }}
+        >
+          <Ionicons name="bar-chart" size={24} color="#04282B" />
+        </LinearGradient>
+      </TouchableOpacity>
+
       {/* ── FAB: Rest Day ── */}
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={() => setShowRestModal(true)}
         style={{
           position: 'absolute',
-          bottom: insets.bottom + 176,
+          bottom: insets.bottom + 176 + timerLift,
           right: 20,
           zIndex: 100,
         }}
@@ -882,7 +915,7 @@ export default function DailyTab() {
         onPress={() => router.push('/daily/new')}
         style={{
           position: 'absolute',
-          bottom: insets.bottom + 100,
+          bottom: insets.bottom + 100 + timerLift,
           right: 20,
           width: 56,
           height: 56,

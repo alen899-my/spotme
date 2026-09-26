@@ -49,6 +49,11 @@ router.delete('/reports/:id', authenticateToken, dailyController.deleteReport);
 router.get('/reports/:id', authenticateToken, dailyController.getReport);
 router.get('/workouts/:id/report', authenticateToken, dailyController.getWorkoutReport);
 
+// ── Personal Analytics (same charts as admin, own user only) ──────────────────
+router.get('/analytics', authenticateToken, dailyController.getMyAnalytics);
+router.get('/exercises', authenticateToken, dailyController.getMyExercises);
+router.get('/exercise-progression', authenticateToken, dailyController.getMyExerciseProgression);
+
 // ── Muscle Progress & Calendar ────────────────────────────────────────────────
 router.get('/muscle-detail/:slug', authenticateToken, dailyController.getMuscleDetail);
 router.get('/calendar-stats', authenticateToken, dailyController.getCalendarStats);

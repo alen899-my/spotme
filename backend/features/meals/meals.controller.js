@@ -155,6 +155,44 @@ async function getFoodAlternatives(req, res) {
 }
 
 /**
+ * Controller to get own nutrition analytics (same data as admin, scoped).
+ */
+async function getMyAnalytics(req, res) {
+  try {
+    const nutritionAnalyticsService = require('../admin/admin-nutrition-analytics.service');
+    const { range, tz } = req.query;
+    const data = await nutritionAnalyticsService.getNutritionAnalytics({
+      userId: req.user.id,
+      range,
+      tz,
+    });
+    return res.json(data);
+  } catch (err) {
+    console.error('My nutrition analytics error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * Controller to get own recent logged meals (same shape as admin grid).
+ */
+async function getMyRecentMeals(req, res) {
+  try {
+    const nutritionAnalyticsService = require('../admin/admin-nutrition-analytics.service');
+    const { page, limit } = req.query;
+    const data = await nutritionAnalyticsService.getRecentLoggedMeals({
+      userId: req.user.id,
+      page,
+      limit,
+    });
+    return res.json(data);
+  } catch (err) {
+    console.error('My recent meals error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
  * Controller to browse food database with range filters and dynamic sorting.
  */
 async function browseFood(req, res) {
@@ -179,4 +217,6 @@ module.exports = {
   deleteMeal,
   getFoodAlternatives,
   browseFood,
+  getMyAnalytics,
+  getMyRecentMeals,
 };

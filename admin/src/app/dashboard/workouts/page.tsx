@@ -15,6 +15,7 @@ import {
   BarChart3,
   Layers,
   Sparkles,
+  RefreshCw,
 } from "lucide-react"
 import Link from "next/link"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -72,6 +73,9 @@ function WorkoutsDashboardContent() {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(initialUserId)
   const [range, setRange] = useState<AnalyticsRange>("30d")
   const [analyticsLoading, setAnalyticsLoading] = useState<boolean>(true)
+  // Live-update state: fresh logs must appear without manual tab switching
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(true)
 
   // Sessions & PRs State
   const [sessions, setSessions] = useState<WorkoutSession[]>([])
@@ -80,9 +84,9 @@ function WorkoutsDashboardContent() {
   const [page, setPage] = useState(1)
   const [sessionsLoading, setSessionsLoading] = useState(false)
 
-  // 1. Fetch Workout Analytics with Local Timezone
-  const fetchAnalytics = async (userId: number | null, rangeVal: AnalyticsRange) => {
-    setAnalyticsLoading(true)
+  // 1. Fetch Workout Analytics with Local Timezone (cache-busted so new logs show instantly)
+  const fetchAnalytics = async (userId: number | null, rangeVal: AnalyticsRange, silent = false) => {
+    if (!silent) setAnalyticsLoading(true)
     const clientTz = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC"
     try {
       const res = await api.get<WorkoutAnalyticsData>("/admin/workouts/analytics", {
@@ -90,9 +94,11 @@ function WorkoutsDashboardContent() {
           userId: userId || undefined,
           range: rangeVal,
           tz: clientTz,
+          _t: Date.now(),
         },
       })
       setAnalyticsData(res.data)
+      setLastUpdated(new Date())
     } catch (err) {
       console.error("Failed to load workout analytics:", err)
     } finally {
@@ -101,15 +107,16 @@ function WorkoutsDashboardContent() {
   }
 
   // 2. Fetch Sessions & PRs
-  const fetchWorkoutsList = async () => {
-    setSessionsLoading(true)
+  const fetchWorkoutsList = async (silent = false) => {
+    if (!silent) setSessionsLoading(true)
     try {
       const res = await api.get("/admin/workouts/sessions", {
-        params: { page, limit: 25 },
+        params: { page, limit: 25, _t: Date.now() },
       })
       setSessions(res.data.sessions || [])
       setGlobalPrs(res.data.globalPrs || [])
       setTotal(res.data.total || 0)
+      setLastUpdated(new Date())
     } catch (err) {
       console.error("Failed to fetch workouts list:", err)
     } finally {
@@ -117,12 +124,37 @@ function WorkoutsDashboardContent() {
     }
   }
 
+  const refreshActiveTab = (silent = false) => {
+    if (activeTab === "analytics") fetchAnalytics(selectedUserId, range, silent)
+    else fetchWorkoutsList(silent)
+  }
+
   // Load analytics when userId or range changes
   useEffect(() => {
     if (activeTab === "analytics") {
       fetchAnalytics(selectedUserId, range)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, range, activeTab])
+
+  // Live updates: poll every 30s + refetch on window focus so just-logged
+  // workouts appear without switching tabs. Silent = no loading spinner flash.
+  useEffect(() => {
+    if (!autoRefresh) return
+    const id = setInterval(() => refreshActiveTab(true), 30000)
+    const onFocus = () => refreshActiveTab(true)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshActiveTab(true)
+    }
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      clearInterval(id)
+      window.removeEventListener("focus", onFocus)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh, activeTab, selectedUserId, range, page])
 
   // Load sessions list when sessions or prs tab is active
   useEffect(() => {
@@ -151,6 +183,36 @@ function WorkoutsDashboardContent() {
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Track workouts, exercise progress, training volume, and consistency.
           </p>
+        </div>
+
+        {/* Live status + Refresh */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {lastUpdated && (
+            <span className="text-[11px] text-muted-foreground">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refreshActiveTab(false)}
+            disabled={analyticsLoading || sessionsLoading}
+            className="gap-1.5"
+            title="Refresh now — new logs appear instantly"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${(analyticsLoading || sessionsLoading) ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <button
+            type="button"
+            onClick={() => setAutoRefresh((v) => !v)}
+            title={autoRefresh ? "Auto-refresh every 30s is ON" : "Auto-refresh is OFF"}
+            className={`relative h-5 w-9 rounded-full transition-colors ${autoRefresh ? "bg-primary" : "bg-muted"}`}
+          >
+            <span
+              className={`absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition-all ${autoRefresh ? "left-[18px]" : "left-0.5"}`}
+            />
+          </button>
         </div>
 
         {/* Tab Switcher: Analytics (1st), Sessions (2nd), PRs (3rd) */}

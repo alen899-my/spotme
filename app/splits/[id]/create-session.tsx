@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTimerBarOffset } from '../../../components/ui/FloatingTimerBar';
 import { FONTS } from '../../../constants/theme';
 import { P } from '../../../constants/homeTheme';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -31,6 +32,8 @@ export default function CreateSessionScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { showToast } = useToast();
+  // Lifts the bottom action bar above the floating workout-timer pill.
+  const timerLift = useTimerBarOffset();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -114,7 +117,7 @@ export default function CreateSessionScreen() {
               styles.bottomBar,
               {
                 backgroundColor: colors.bg,
-                paddingBottom: Math.max(insets.bottom, 12) + 12,
+                paddingBottom: Math.max(insets.bottom, 12) + 12 + timerLift,
               }
             ]}
           >

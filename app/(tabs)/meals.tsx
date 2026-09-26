@@ -11,11 +11,12 @@ import { optimizeImage } from '../../utils/imageOptimizer';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useTimerBarOffset } from '../../components/ui/FloatingTimerBar';
 import NutritionMeter from '../../components/ui/NutritionMeter';
 import DatePicker from '../../components/ui/DatePicker';
 import WaterTracker from '../../components/ui/WaterTracker';
@@ -24,18 +25,353 @@ import LogMealSheet, { LogMealPayload } from '../../components/meals/LogMealShee
 import MealNutrientCard from '../../components/meals/MealNutrientCard';
 import { API_URL } from '../../utils/api';
 import { getToken } from '../../utils/tokenStorage';
-import { isSameDay, isToday } from '../../utils/datetime';
+import { isSameDay, isToday, parseUTC } from '../../utils/datetime';
 import { useUnits } from '../../contexts/UnitContext';
 import { formatWeight, formatHeight, weightUnit, heightUnit, weightUnitLabel, heightUnitLabel } from '../../utils/units';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// ── Module-scope cards ─────────────────────────────────────────────────────
+// These MUST live outside MealsScreen: when defined inside the screen, every
+// parent re-render creates new component types, React remounts every card,
+// open accordions snap shut and images replay their fade (blink).
+
+function getMealIconDetails(type: string) {
+  switch (type) {
+    case 'Morning':
+      return { icon: 'sunny-outline', color: '#E7B100', bg: '#E7B10015', label: 'Morning' };
+    case 'Breakfast':
+      return { icon: 'sunny-outline', color: '#E7B100', bg: '#E7B10015', label: 'Breakfast' };
+    case 'Afternoon':
+      return { icon: 'sunny', color: '#3B82F6', bg: '#3B82F615', label: 'Afternoon' };
+    case 'Lunch':
+      return { icon: 'sunny', color: '#3B82F6', bg: '#3B82F615', label: 'Lunch' };
+    case 'Evening':
+      return { icon: 'partly-sunny-outline', color: '#F59E0B', bg: '#F59E0B15', label: 'Evening' };
+    case 'Dinner':
+      return { icon: 'partly-sunny-outline', color: '#F59E0B', bg: '#F59E0B15', label: 'Dinner' };
+    case 'Night':
+      return { icon: 'moon-outline', color: '#6366F1', bg: '#6366F115', label: 'Night' };
+    default:
+      return { icon: 'nutrition-outline', color: '#F59E0B', bg: '#F59E0B15', label: 'Snack' };
+  }
+}
+
+const MealAccordionCard = React.memo(function MealAccordionCard({ item, onDelete, onEdit }: {
+  item: any; onDelete: (id: number) => void; onEdit: (item: any) => void;
+}) {
+  const { colors, isDark } = useTheme();
+  const [open, setOpen] = React.useState(false);
+  const anim = React.useRef(new Animated.Value(0)).current;
+  const date = new Date(item.logged_at);
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const iconInfo = getMealIconDetails(item.meal_type);
+
+  const toggle = () => {
+    const toVal = open ? 0 : 1;
+    setOpen(!open);
+    Animated.spring(anim, { toValue: toVal, useNativeDriver: false, tension: 60, friction: 12 }).start();
+  };
+
+  const macros = [
+    { label: 'Protein', value: Math.round(item.total_protein), unit: 'g', color: '#10B981' },
+    { label: 'Carbs',   value: Math.round(item.total_carbs),   unit: 'g', color: '#3B82F6' },
+    { label: 'Fat',     value: Math.round(item.total_fat),     unit: 'g', color: '#F59E0B' },
+    { label: 'Fiber',   value: Math.round(item.total_fiber),   unit: 'g', color: '#34D399' },
+    { label: 'Sugar',   value: Math.round(item.total_sugar),   unit: 'g', color: '#E7B100' },
+    { label: 'Sodium',  value: Math.round(item.total_sodium),  unit: 'mg', color: '#FB923C' },
+  ];
+
+  const arrowRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+
+  return (
+    <View style={[styles.accCard, isDark ? { backgroundColor: colors.card, borderColor: colors.border } : { backgroundColor: '#2596BE', borderColor: '#2596BE' }, isDark && { borderWidth: 1 }]}>
+      <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
+        <View style={styles.cardHeaderRow}>
+          {item.image_url ? (
+            <OptimizedImage uri={item.image_url} style={styles.mealThumbImage} />
+          ) : (
+            <View style={[styles.mealIconBox, { backgroundColor: isDark ? colors.inputBg : iconInfo.bg }, isDark && { borderWidth: 1, borderColor: iconInfo.color + '30' }]}>
+              <Ionicons name={iconInfo.icon as any} size={23} color={iconInfo.color} />
+            </View>
+          )}
+
+          <View style={styles.mealMetaInfo}>
+            <Text style={[styles.mealTitleLabel, { color: isDark ? colors.text : '#FFF' }]}>{iconInfo.label}</Text>
+            <Text style={[styles.mealTimeLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.78)' }]}>{timeStr}</Text>
+          </View>
+
+          <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
+            <Ionicons name="chevron-down" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.82)'} />
+          </Animated.View>
+        </View>
+
+          {!open && (
+            <View style={styles.mealStatsRow}>
+              <View style={[styles.mealStatCol, { backgroundColor: '#F59E0B', borderWidth: 0 }]}>
+                <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(item.total_calories)}</Text>
+                <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>kcal</Text>
+              </View>
+              <View style={[styles.mealStatCol, { backgroundColor: '#10B981', borderWidth: 0 }]}>
+                <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(item.total_protein)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Protein</Text>
+              </View>
+              <View style={[styles.mealStatCol, { backgroundColor: '#3B82F6', borderWidth: 0 }]}>
+                <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(item.total_carbs)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Carbs</Text>
+              </View>
+              <View style={[styles.mealStatCol, { backgroundColor: '#FB923C', borderWidth: 0 }]}>
+                <Text style={[styles.mealStatNum, { color: '#FFF' }]}>{Math.round(item.total_fat)}g</Text>
+                <Text style={[styles.mealStatUnit, { color: 'rgba(255,255,255,0.9)' }]}>Fats</Text>
+              </View>
+            </View>
+          )}
+      </TouchableOpacity>
+
+      {open && (
+        <View style={[styles.accDetail, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              onPress={() => onEdit(item)}
+              style={[
+                styles.actionBtn,
+                {
+                  borderColor: colors.primary + '30',
+                  backgroundColor: colors.primary + '08',
+                  marginRight: 8,
+                }
+              ]}
+              activeOpacity={0.65}
+            >
+              <Ionicons name="create-outline" size={16} color={colors.primary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => onDelete(item.id)}
+              style={[
+                styles.actionBtn,
+                {
+                  borderColor: (colors.error || '#DC2626') + '30',
+                  backgroundColor: (colors.error || '#DC2626') + '08',
+                }
+              ]}
+              activeOpacity={0.65}
+            >
+              <Ionicons name="trash-outline" size={16} color={colors.error || '#DC2626'} />
+            </TouchableOpacity>
+          </View>
+
+          <MealNutrientCard meal={item} />
+        </View>
+      )}
+    </View>
+  );
+});
+
+const normalizeMealKey = (value?: string) => (value || '').toLowerCase();
+
+function getMealVisual(mealType?: string, title?: string, fallbackName?: string) {
+  const key = `${normalizeMealKey(mealType)} ${normalizeMealKey(title)} ${normalizeMealKey(fallbackName)}`;
+
+  if (key.includes('breakfast') || key.includes('morning') || key.includes('egg') || key.includes('oat')) {
+    return {
+      image: 'https://images.unsplash.com/photo-1494859802809-d069c3b71a8a?w=900&auto=format&fit=crop',
+      icon: 'sunny-outline',
+    };
+  }
+  if (key.includes('lunch') || key.includes('rice') || key.includes('bowl') || key.includes('quinoa')) {
+    return {
+      image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=900&auto=format&fit=crop',
+      icon: 'restaurant-outline',
+    };
+  }
+  if (key.includes('dinner') || key.includes('beef') || key.includes('fish') || key.includes('salmon')) {
+    return {
+      image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=900&auto=format&fit=crop',
+      icon: 'moon-outline',
+    };
+  }
+  if (key.includes('snack') || key.includes('yogurt') || key.includes('berries') || key.includes('hummus')) {
+    return {
+      image: 'https://images.unsplash.com/photo-1505253716362-afaea1d3d1af?w=900&auto=format&fit=crop',
+      icon: 'cafe-outline',
+    };
+  }
+
+  return {
+    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=900&auto=format&fit=crop',
+    icon: 'sparkles-outline',
+  };
+}
+
+const RecommendedMealCard = React.memo(function RecommendedMealCard({ meal, mealIndex, onLogMeal, onDeleteIngredient, onChangeIngredient }: {
+  meal: any; mealIndex: number;
+  onLogMeal: (meal: any) => void;
+  onDeleteIngredient: (mealIndex: number, ingredientIndex: number) => void;
+  onChangeIngredient: (mealIndex: number, ingredientIndex: number, ing: any) => void;
+}) {
+  const { colors, isDark } = useTheme();
+  const [open, setOpen] = useState(false);
+  const anim = React.useRef(new Animated.Value(0)).current;
+  const visual = getMealVisual(meal.meal_type, meal.title);
+
+  const toggle = () => {
+    const toVal = open ? 0 : 1;
+    setOpen(!open);
+    Animated.spring(anim, { toValue: toVal, useNativeDriver: false, tension: 60, friction: 12 }).start();
+  };
+
+  const arrowRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+
+  return (
+    <View style={[styles.accCard, styles.recMealCardShell, isDark && { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
+      <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
+        <OptimizedImage uri={visual.image} style={styles.recommendedMealHero} />
+        <LinearGradient colors={isDark ? ['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)'] : ['rgba(6,78,120,0.06)', 'rgba(37,150,190,0.24)']} style={styles.recommendedMealHeroOverlay} />
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.mealIconBox, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.16)' }, isDark && { borderWidth: 1, borderColor: colors.border }]}>
+            <Ionicons name={visual.icon as any} size={20} color={isDark ? colors.primary : '#D9F3FF'} />
+          </View>
+          <View style={styles.mealMetaInfo}>
+            <Text style={[styles.mealTitleLabel, { color: isDark ? colors.text : '#FFF', fontSize: 16 }]}>{meal.meal_type}</Text>
+            <Text style={[styles.mealTimeLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.82)', fontSize: 12, marginTop: 2 }]} numberOfLines={1}>{meal.title}</Text>
+          </View>
+          <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
+            <Ionicons name="chevron-down" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.82)'} />
+          </Animated.View>
+        </View>
+
+        <View style={styles.mealStatsRow}>
+          <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+            <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.calories)}</Text>
+            <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>kcal</Text>
+          </View>
+          <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+            <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.protein)}g</Text>
+            <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Protein</Text>
+          </View>
+          <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+            <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.carbs)}g</Text>
+            <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Carbs</Text>
+          </View>
+          <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
+            <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.fat)}g</Text>
+            <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Fats</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      {open && (
+        <View style={[styles.accDetail, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
+          <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: isDark ? colors.text : 'rgba(255,255,255,0.82)', lineHeight: 18, marginTop: 10 }}>
+            {meal.description}
+          </Text>
+
+          <View style={{ marginTop: 12 }}>
+            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: isDark ? colors.text : '#FFF', marginBottom: 6 }}>Ingredients</Text>
+            {meal.ingredients?.map((ing: any, i: number) => (
+              <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: isDark ? colors.border : 'rgba(255,255,255,0.16)' }}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: isDark ? colors.text : '#FFF' }}>{ing.name}</Text>
+                  <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: isDark ? colors.textMuted : 'rgba(255,255,255,0.78)', marginTop: 1 }}>{ing.quantity}</Text>
+                  {ing.calories !== undefined && (
+                    <Text style={{ fontFamily: FONTS.body, fontSize: 10, color: isDark ? colors.textMuted : 'rgba(255,255,255,0.62)', marginTop: 2 }}>
+                      {ing.calories} kcal · P: {ing.protein}g · C: {ing.carbs}g · F: {ing.fat}g
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <TouchableOpacity
+                    onPress={() => onChangeIngredient(mealIndex, i, ing)}
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)', borderWidth: isDark ? 1 : 0, borderColor: colors.border }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="create-outline" size={14} color={isDark ? colors.text : '#FFF'} style={{ marginRight: 2 }} />
+                    <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: isDark ? colors.text : '#FFF' }}>Change</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => onDeleteIngredient(mealIndex, i)}
+                    style={{ padding: 6, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(231,177,0,0.2)' }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="trash-outline" size={14} color={isDark ? '#E14B4B' : '#FDE68A'} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          <View style={{ marginTop: 12 }}>
+            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: isDark ? colors.text : '#FFF', marginBottom: 4 }}>Preparation Instructions</Text>
+            <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: isDark ? colors.textMuted : 'rgba(255,255,255,0.82)', lineHeight: 18 }}>{meal.instructions}</Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => onLogMeal(meal)}
+            style={[styles.deleteMealBtn, isDark ? { borderColor: colors.primary, backgroundColor: 'transparent' } : { borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.12)' }]}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="checkmark-circle-outline" size={16} color={isDark ? colors.primary : '#FFF'} style={{ marginRight: 6 }} />
+            <Text style={[styles.deleteMealBtnText, { color: isDark ? colors.primary : '#FFF' }]}>Quick Log Meal</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+});
+
+const RenderLoadingCard = React.memo(function RenderLoadingCard() {
+  const { colors, isDark } = useTheme();
+  const pulseAnim = React.useRef(new Animated.Value(0.4)).current;
+  const skeletonColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
+
+  React.useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
+  return (
+    <View style={[styles.mealCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Animated.View style={[styles.mealCardImage, { backgroundColor: skeletonColor, opacity: pulseAnim }]} />
+      <View style={styles.mealCardContent}>
+        <View style={styles.mealCardHeader}>
+          <View style={{ flex: 1 }}>
+            <Animated.View style={{ height: 24, width: '50%', backgroundColor: skeletonColor, borderRadius: 6, opacity: pulseAnim }} />
+            <Animated.View style={{ height: 14, width: '30%', backgroundColor: skeletonColor, borderRadius: 4, marginTop: 10, opacity: pulseAnim }} />
+          </View>
+        </View>
+
+        <View style={[styles.nutrientRow, { marginTop: 20 }]}>
+          {[1, 2, 3, 4].map((i) => (
+            <Animated.View key={i} style={[styles.nutrientBadge, { backgroundColor: skeletonColor, height: 50, opacity: pulseAnim }]} />
+          ))}
+        </View>
+
+        <View style={[styles.foodItemsList, { marginTop: 16 }]}>
+          <Animated.View style={{ height: 12, width: '80%', backgroundColor: skeletonColor, borderRadius: 4, opacity: pulseAnim, marginBottom: 8 }} />
+          <Animated.View style={{ height: 12, width: '70%', backgroundColor: skeletonColor, borderRadius: 4, opacity: pulseAnim }} />
+        </View>
+      </View>
+    </View>
+  );
+});
+
 
 export default function MealsScreen() {
+  const router = useRouter();
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const { unitSystem } = useUnits();
+  // Lifts bottom FABs above the floating workout-timer pill when it shows.
+  const timerLift = useTimerBarOffset();
   const [meals, setMeals] = useState<any[]>([]);
   const [mealsPage, setMealsPage] = useState(1);
   const [mealsTotal, setMealsTotal] = useState(0);
@@ -114,17 +450,13 @@ export default function MealsScreen() {
   useEffect(() => {
     loadUser();
     fetchMeals();
-    fetchLoggedWaterDates();
   }, []);
 
-  useEffect(() => {
-    fetchMeals(1);
-    fetchLoggedWaterDates();
-  }, [selectedDate]);
-
+  // Like the workout tab: fetch once, filter client-side by selectedDate.
+  // No refetch on date change — filteredMeals/loggedMealsDates derive locally.
   useFocusEffect(
     useCallback(() => {
-      fetchMeals(mealsPage === 1 ? 1 : mealsPage);
+      fetchMeals();
     }, [])
   );
 
@@ -176,41 +508,7 @@ export default function MealsScreen() {
     }
   };
 
-  const normalizeMealKey = (value?: string) => (value || '').toLowerCase();
-
-  const getMealVisual = (mealType?: string, title?: string, fallbackName?: string) => {
-    const key = `${normalizeMealKey(mealType)} ${normalizeMealKey(title)} ${normalizeMealKey(fallbackName)}`;
-
-    if (key.includes('breakfast') || key.includes('morning') || key.includes('egg') || key.includes('oat')) {
-      return {
-        image: 'https://images.unsplash.com/photo-1494859802809-d069c3b71a8a?w=900&auto=format&fit=crop',
-        icon: 'sunny-outline',
-      };
-    }
-    if (key.includes('lunch') || key.includes('rice') || key.includes('bowl') || key.includes('quinoa')) {
-      return {
-        image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=900&auto=format&fit=crop',
-        icon: 'restaurant-outline',
-      };
-    }
-    if (key.includes('dinner') || key.includes('beef') || key.includes('fish') || key.includes('salmon')) {
-      return {
-        image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=900&auto=format&fit=crop',
-        icon: 'moon-outline',
-      };
-    }
-    if (key.includes('snack') || key.includes('yogurt') || key.includes('berries') || key.includes('hummus')) {
-      return {
-        image: 'https://images.unsplash.com/photo-1505253716362-afaea1d3d1af?w=900&auto=format&fit=crop',
-        icon: 'cafe-outline',
-      };
-    }
-
-    return {
-      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=900&auto=format&fit=crop',
-      icon: 'sparkles-outline',
-    };
-  };
+  // getMealVisual + normalizeMealKey live at module scope (pure helpers).
 
   const loadFeaturedFoods = async () => {
     setFeaturedFoodsLoading(true);
@@ -552,13 +850,15 @@ export default function MealsScreen() {
     }
   };
 
+  // Workout-tab pattern: fetch recent history once (no server date filter),
+  // then filter client-side with parseUTC + isSameDay so past days work
+  // regardless of UTC/timezone offset.
   const fetchMeals = async (page = 1, append = false) => {
     try {
       if (append) setMealsLoadingMore(true);
       const token = await getToken();
-      const dateStr = selectedDate.toISOString().split('T')[0];
       const res = await axios.get(`${API_URL}/meals`, {
-        params: { page, limit: 20, date: dateStr },
+        params: { page, limit: 100 },
         headers: { Authorization: `Bearer ${token}` }
       });
       const { meals: newMeals, total } = res.data;
@@ -575,18 +875,6 @@ export default function MealsScreen() {
     } finally {
       setLoading(false);
       setMealsLoadingMore(false);
-    }
-  };
-
-  const fetchLoggedWaterDates = async () => {
-    try {
-      const token = await getToken();
-      const res = await axios.get(`${API_URL}/water/logged-dates`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setLoggedWaterDates(res.data || []);
-    } catch (err) {
-      console.error('Error fetching water logged dates:', err);
     }
   };
 
@@ -722,194 +1010,22 @@ export default function MealsScreen() {
     }
   };
 
-  const MealAccordionCard = ({ item }: { item: any }) => {
-    const [open, setOpen] = React.useState(false);
-    const anim = React.useRef(new Animated.Value(0)).current;
-    const date = new Date(item.logged_at);
-    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const handleEditMeal = useCallback((meal: any) => {
+    const mapped = meal.items ? meal.items.map((it: any) => ({
+      name: it.item_name,
+      quantity: it.quantity || '',
+    })) : [];
+    setInitialImageUri(meal.image_url || null);
+    setInitialIngredients(mapped);
+    setEditingMealId(meal.id);
+    setShowLogSheet(true);
+  }, []);
 
-    const getMealIconDetails = (type: string) => {
-      switch (type) {
-        case 'Morning':
-          return { icon: 'sunny-outline', color: '#E7B100', bg: '#E7B10015', label: 'Morning' };
-        case 'Breakfast':
-          return { icon: 'sunny-outline', color: '#E7B100', bg: '#E7B10015', label: 'Breakfast' };
-        case 'Afternoon':
-          return { icon: 'sunny', color: '#3B82F6', bg: '#3B82F615', label: 'Afternoon' };
-        case 'Lunch':
-          return { icon: 'sunny', color: '#3B82F6', bg: '#3B82F615', label: 'Lunch' };
-        case 'Evening':
-          return { icon: 'partly-sunny-outline', color: '#F59E0B', bg: '#F59E0B15', label: 'Evening' };
-        case 'Dinner':
-          return { icon: 'partly-sunny-outline', color: '#F59E0B', bg: '#F59E0B15', label: 'Dinner' };
-        case 'Night':
-          return { icon: 'moon-outline', color: '#6366F1', bg: '#6366F115', label: 'Night' };
-        default:
-          return { icon: 'nutrition-outline', color: '#F59E0B', bg: '#F59E0B15', label: 'Snack' };
-      }
-    };
+  const renderMealCard = useCallback(({ item }: { item: any }) => (
+    <MealAccordionCard item={item} onDelete={deleteMeal} onEdit={handleEditMeal} />
+  ), [deleteMeal, handleEditMeal]);
 
-    const iconInfo = getMealIconDetails(item.meal_type);
-
-    const toggle = () => {
-      const toVal = open ? 0 : 1;
-      setOpen(!open);
-      Animated.spring(anim, { toValue: toVal, useNativeDriver: false, tension: 60, friction: 12 }).start();
-    };
-
-    const macros = [
-      { label: 'Protein', value: Math.round(item.total_protein), unit: 'g', color: '#10B981' },
-      { label: 'Carbs',   value: Math.round(item.total_carbs),   unit: 'g', color: '#3B82F6' },
-      { label: 'Fat',     value: Math.round(item.total_fat),     unit: 'g', color: '#F59E0B' },
-      { label: 'Fiber',   value: Math.round(item.total_fiber),   unit: 'g', color: '#34D399' },
-      { label: 'Sugar',   value: Math.round(item.total_sugar),   unit: 'g', color: '#E7B100' },
-      { label: 'Sodium',  value: Math.round(item.total_sodium),  unit: 'mg', color: '#FB923C' },
-    ];
-
-    const arrowRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
-
-    return (
-      <View style={[styles.accCard, isDark ? { backgroundColor: colors.card, borderColor: colors.border } : { backgroundColor: '#2596BE', borderColor: '#2596BE' }, isDark && { borderWidth: 1 }]}>
-        <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
-          <View style={styles.cardHeaderRow}>
-            {item.image_url ? (
-              <OptimizedImage uri={item.image_url} style={styles.mealThumbImage} />
-            ) : (
-              <View style={[styles.mealIconBox, { backgroundColor: isDark ? colors.inputBg : iconInfo.bg }, isDark && { borderWidth: 1, borderColor: iconInfo.color + '30' }]}>
-                <Ionicons name={iconInfo.icon as any} size={23} color={iconInfo.color} />
-              </View>
-            )}
-
-            <View style={styles.mealMetaInfo}>
-              <Text style={[styles.mealTitleLabel, { color: isDark ? colors.text : '#FFF' }]}>{iconInfo.label}</Text>
-              <Text style={[styles.mealTimeLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.78)' }]}>{timeStr}</Text>
-            </View>
-
-            <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
-              <Ionicons name="chevron-down" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.82)'} />
-            </Animated.View>
-          </View>
-
-          {!open && (
-            <View style={styles.mealStatsRow}>
-              <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
-                <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_calories)}</Text>
-                <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>kcal</Text>
-              </View>
-              <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
-                <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_protein)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Protein</Text>
-              </View>
-              <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
-                <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_carbs)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Carbs</Text>
-              </View>
-              <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
-                <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(item.total_fat)}g</Text>
-                <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Fats</Text>
-              </View>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {open && (
-          <View style={[styles.accDetail, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
-            {/* ── Edit / Re-analyze & Delete Buttons Row ── */}
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                onPress={() => {
-                  const mapped = item.items ? item.items.map((it: any) => ({
-                    name: it.item_name,
-                    quantity: it.quantity || '',
-                  })) : [];
-                  setInitialImageUri(item.image_url || null);
-                  setInitialIngredients(mapped);
-                  setEditingMealId(item.id);
-                  setShowLogSheet(true);
-                }}
-                style={[
-                  styles.actionBtn,
-                  {
-                    borderColor: colors.primary + '30',
-                    backgroundColor: colors.primary + '08',
-                    marginRight: 8,
-                  }
-                ]}
-                activeOpacity={0.65}
-              >
-                <Ionicons name="create-outline" size={16} color={colors.primary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => deleteMeal(item.id)}
-                style={[
-                  styles.actionBtn,
-                  {
-                    borderColor: (colors.error || '#DC2626') + '30',
-                    backgroundColor: (colors.error || '#DC2626') + '08',
-                  }
-                ]}
-                activeOpacity={0.65}
-              >
-                <Ionicons name="trash-outline" size={16} color={colors.error || '#DC2626'} />
-              </TouchableOpacity>
-            </View>
-
-            {/* ── Inline nutrition summary (replaces analysis modal) ── */}
-            <MealNutrientCard meal={item} />
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  const renderMealCard = ({ item }: { item: any }) => <MealAccordionCard item={item} />;
-
-  const RenderLoadingCard = () => {
-    const pulseAnim = React.useRef(new Animated.Value(0.4)).current;
-    const skeletonColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
-
-    React.useEffect(() => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 0.4, duration: 1000, useNativeDriver: true }),
-        ])
-      ).start();
-    }, []);
-
-    return (
-      <View style={[styles.mealCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Animated.View style={[styles.mealCardImage, { backgroundColor: skeletonColor, opacity: pulseAnim }]} />
-        <View style={styles.mealCardContent}>
-          <View style={styles.mealCardHeader}>
-            <View style={{ flex: 1 }}>
-              <Animated.View style={{ height: 24, width: '50%', backgroundColor: skeletonColor, borderRadius: 6, opacity: pulseAnim }} />
-              <Animated.View style={{ height: 14, width: '30%', backgroundColor: skeletonColor, borderRadius: 4, marginTop: 10, opacity: pulseAnim }} />
-            </View>
-          </View>
-          
-          <View style={[styles.nutrientRow, { marginTop: 20 }]}>
-            {[1, 2, 3, 4].map((i) => (
-              <Animated.View key={i} style={[styles.nutrientBadge, { backgroundColor: skeletonColor, height: 50, opacity: pulseAnim }]} />
-            ))}
-          </View>
-
-          <View style={[styles.foodItemsList, { marginTop: 16 }]}>
-            <Animated.View style={{ height: 12, width: '80%', backgroundColor: skeletonColor, borderRadius: 4, opacity: pulseAnim, marginBottom: 8 }} />
-            <Animated.View style={{ height: 12, width: '70%', backgroundColor: skeletonColor, borderRadius: 4, opacity: pulseAnim }} />
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  const NutrientBadge = ({ label, value, color, unit = 'g' }: { label: string, value: number, color: string, unit?: string }) => (
-    <View style={[styles.nutrientBadge, { backgroundColor: color + '15' }]}>
-      <Text style={[styles.nutrientBadgeValue, { color }]}>{value}{unit}</Text>
-      <Text style={[styles.nutrientBadgeLabel, { color: colors.textMuted }]}>{label}</Text>
-    </View>
-  );
+  // RenderLoadingCard lives at module scope (stable identity — see top of file).
 
   // Target calculations — prefer backend-computed targets (AI coach) for accuracy
   const getTargets = () => {
@@ -967,122 +1083,14 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     }
   };
 
-  const RecommendedMealCard = ({ meal, mealIndex }: { meal: any, mealIndex: number }) => {
-    const [open, setOpen] = useState(false);
-    const anim = React.useRef(new Animated.Value(0)).current;
-    const visual = getMealVisual(meal.meal_type, meal.title);
-    
-    const toggle = () => {
-      const toVal = open ? 0 : 1;
-      setOpen(!open);
-      Animated.spring(anim, { toValue: toVal, useNativeDriver: false, tension: 60, friction: 12 }).start();
-    };
-
-    const arrowRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
-
-    return (
-      <View style={[styles.accCard, styles.recMealCardShell, isDark && { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
-        <TouchableOpacity onPress={toggle} activeOpacity={0.85} style={styles.cardContentWrap}>
-          <OptimizedImage uri={visual.image} style={styles.recommendedMealHero} />
-          <LinearGradient colors={isDark ? ['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)'] : ['rgba(6,78,120,0.06)', 'rgba(37,150,190,0.24)']} style={styles.recommendedMealHeroOverlay} />
-          <View style={styles.cardHeaderRow}>
-            <View style={[styles.mealIconBox, { backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.16)' }, isDark && { borderWidth: 1, borderColor: colors.border }]}>
-              <Ionicons name={visual.icon as any} size={20} color={isDark ? colors.primary : '#D9F3FF'} />
-            </View>
-            <View style={styles.mealMetaInfo}>
-              <Text style={[styles.mealTitleLabel, { color: isDark ? colors.text : '#FFF', fontSize: 16 }]}>{meal.meal_type}</Text>
-              <Text style={[styles.mealTimeLabel, { color: isDark ? colors.textMuted : 'rgba(255,255,255,0.82)', fontSize: 12, marginTop: 2 }]} numberOfLines={1}>{meal.title}</Text>
-            </View>
-            <Animated.View style={{ transform: [{ rotate: arrowRotate }], marginHorizontal: 6 }}>
-              <Ionicons name="chevron-down" size={16} color={isDark ? colors.textMuted : 'rgba(255,255,255,0.82)'} />
-            </Animated.View>
-          </View>
-
-          <View style={styles.mealStatsRow}>
-            <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
-              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.calories)}</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>kcal</Text>
-            </View>
-            <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
-              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.protein)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Protein</Text>
-            </View>
-            <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
-              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.carbs)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Carbs</Text>
-            </View>
-            <View style={[styles.mealStatCol, { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border }]}>
-              <Text style={[styles.mealStatNum, { color: colors.text }]}>{Math.round(meal.fat)}g</Text>
-              <Text style={[styles.mealStatUnit, { color: colors.textMuted }]}>Fats</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        {open && (
-          <View style={[styles.accDetail, { borderTopColor: isDark ? colors.border : 'rgba(255,255,255,0.18)' }]}>
-            <Text style={{ fontFamily: FONTS.body, fontSize: 13, color: isDark ? colors.text : 'rgba(255,255,255,0.82)', lineHeight: 18, marginTop: 10 }}>
-              {meal.description}
-            </Text>
-
-            <View style={{ marginTop: 12 }}>
-              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: isDark ? colors.text : '#FFF', marginBottom: 6 }}>Ingredients</Text>
-              {meal.ingredients?.map((ing: any, i: number) => (
-                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: isDark ? colors.border : 'rgba(255,255,255,0.16)' }}>
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: isDark ? colors.text : '#FFF' }}>{ing.name}</Text>
-                    <Text style={{ fontFamily: FONTS.bodySemiBold, fontSize: 11, color: isDark ? colors.textMuted : 'rgba(255,255,255,0.78)', marginTop: 1 }}>{ing.quantity}</Text>
-                    {ing.calories !== undefined && (
-                      <Text style={{ fontFamily: FONTS.body, fontSize: 10, color: isDark ? colors.textMuted : 'rgba(255,255,255,0.62)', marginTop: 2 }}>
-                        {ing.calories} kcal · P: {ing.protein}g · C: {ing.carbs}g · F: {ing.fat}g
-                      </Text>
-                    )}
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setActiveMealIdx(mealIndex);
-                        setActiveIngredientIdx(i);
-                        setSelectorSearch('');
-                        setSelectorFoods([]);
-                        setShowItemSelector(true);
-                        loadAlternativeFoods(ing);
-                      }}
-                      style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: isDark ? colors.inputBg : 'rgba(255,255,255,0.12)', borderWidth: isDark ? 1 : 0, borderColor: colors.border }}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="create-outline" size={14} color={isDark ? colors.text : '#FFF'} style={{ marginRight: 2 }} />
-                      <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, color: isDark ? colors.text : '#FFF' }}>Change</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteIngredient(mealIndex, i)}
-                      style={{ padding: 6, borderRadius: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(231,177,0,0.2)' }}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="trash-outline" size={14} color={isDark ? '#E14B4B' : '#FDE68A'} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
-
-            <View style={{ marginTop: 12 }}>
-              <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 13, color: isDark ? colors.text : '#FFF', marginBottom: 4 }}>Preparation Instructions</Text>
-              <Text style={{ fontFamily: FONTS.body, fontSize: 12, color: isDark ? colors.textMuted : 'rgba(255,255,255,0.82)', lineHeight: 18 }}>{meal.instructions}</Text>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => handleLogRecommendedMeal(meal)}
-              style={[styles.deleteMealBtn, isDark ? { borderColor: colors.primary, backgroundColor: 'transparent' } : { borderColor: 'rgba(255,255,255,0.28)', backgroundColor: 'rgba(255,255,255,0.12)' }]}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="checkmark-circle-outline" size={16} color={isDark ? colors.primary : '#FFF'} style={{ marginRight: 6 }} />
-              <Text style={[styles.deleteMealBtnText, { color: isDark ? colors.primary : '#FFF' }]}>Quick Log Meal</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
-  };
+  const handleChangeIngredient = useCallback((mealIndex: number, ingredientIndex: number, ing: any) => {
+    setActiveMealIdx(mealIndex);
+    setActiveIngredientIdx(ingredientIndex);
+    setSelectorSearch('');
+    setSelectorFoods([]);
+    setShowItemSelector(true);
+    loadAlternativeFoods(ing);
+  }, [loadAlternativeFoods]);
 
   const renderRecommendations = () => {
     const renderRecommendationState = (content: React.ReactNode) => (
@@ -1237,7 +1245,14 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
 
         {recommendationData.recommendedMeals?.length > 0 ? (
           recommendationData.recommendedMeals.map((meal: any, idx: number) => (
-            <RecommendedMealCard key={idx} meal={meal} mealIndex={idx} />
+            <RecommendedMealCard
+              key={idx}
+              meal={meal}
+              mealIndex={idx}
+              onLogMeal={handleLogRecommendedMeal}
+              onDeleteIngredient={handleDeleteIngredient}
+              onChangeIngredient={handleChangeIngredient}
+            />
           ))
         ) : (
           <View style={[styles.recCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1437,7 +1452,14 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
             </View>
             {recommendationData.recommendedMeals.map((meal: any, idx: number) => (
-              <RecommendedMealCard key={idx} meal={meal} mealIndex={idx} />
+              <RecommendedMealCard
+                key={idx}
+                meal={meal}
+                mealIndex={idx}
+                onLogMeal={handleLogRecommendedMeal}
+                onDeleteIngredient={handleDeleteIngredient}
+                onChangeIngredient={handleChangeIngredient}
+              />
             ))}
           </>
         )}
@@ -1445,13 +1467,19 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
     );
   };
 
-  const filteredMeals = meals.filter(m => isSameDay(new Date(m.logged_at), selectedDate));
-  
+  // Same as workout tab (daily.tsx): parse server UTC timestamp, compare local day.
+  const filteredMeals = meals.filter(m => {
+    if (!m.logged_at) return false;
+    const d = parseUTC(m.logged_at);
+    return d ? isSameDay(d, selectedDate) : false;
+  });
+
   const loggedMealsDates = React.useMemo(() => {
     const datesSet = new Set<string>();
     meals.forEach(m => {
       if (m.logged_at) {
-        const d = new Date(m.logged_at);
+        const d = parseUTC(m.logged_at);
+        if (!d) return;
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const dayVal = String(d.getDate()).padStart(2, '0');
@@ -1612,7 +1640,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
               loggedDates={loggedWaterDates}
               showStatusMarkers={true}
             />
-            <WaterTracker selectedDate={selectedDate} onLogChange={fetchLoggedWaterDates} />
+            <WaterTracker selectedDate={selectedDate} onLogChange={(dates) => { if (Array.isArray(dates)) setLoggedWaterDates(dates); }} />
           </View>
         </ScrollView>
       ) : activeTab === 2 ? (
@@ -2183,6 +2211,34 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
         </KeyboardAvoidingView>
       </Modal>
 
+      {(activeTab === 0 || activeTab === 1) && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push('/analytics/nutrition' as any)}
+          style={{
+            position: 'absolute',
+            bottom: insets.bottom + 168 + timerLift,
+            right: 20,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            elevation: 6,
+            shadowColor: '#E7B100',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 6,
+            zIndex: 100,
+          }}
+        >
+          <LinearGradient
+            colors={['#FEF6D0', '#F7CB16']}
+            style={{ width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <Ionicons name="bar-chart" size={24} color="#04282B" />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+
       {activeTab === 0 && (
         <TouchableOpacity
           activeOpacity={0.85}
@@ -2194,7 +2250,7 @@ else if (activity.toLowerCase().includes('moderate')) mult = 1.55;
           }}
           style={{
             position: 'absolute',
-            bottom: insets.bottom + 100,
+            bottom: insets.bottom + 100 + timerLift,
             right: 20,
             width: 56,
             height: 56,

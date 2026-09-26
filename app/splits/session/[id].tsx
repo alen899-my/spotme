@@ -23,6 +23,7 @@ import axios from 'axios';
 import { FONTS } from '../../../constants/theme';
 import { P } from '../../../constants/homeTheme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTimerBarOffset } from '../../../components/ui/FloatingTimerBar';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useToast } from '../../../contexts/ToastContext';
 import ActionModal from '../../../components/ui/ActionModal';
@@ -44,6 +45,8 @@ export default function SessionDetailScreen() {
   const { colors, isDark } = useTheme();
   const { showToast } = useToast();
   const { unitSystem } = useUnits();
+  // Lifts the bottom action bar above the floating workout-timer pill.
+  const timerLift = useTimerBarOffset();
   const isShared = shared === '1';
   const clonedFromId = cfId;
   
@@ -370,7 +373,7 @@ export default function SessionDetailScreen() {
             styles.bottomBar,
             {
               backgroundColor: colors.bg,
-              paddingBottom: Math.max(insets.bottom, 12) + 12,
+              paddingBottom: Math.max(insets.bottom, 12) + 12 + timerLift,
               borderTopColor: isDark ? colors.border : 'rgba(0,0,0,0.05)',
               flexDirection: 'row',
               gap: 10,

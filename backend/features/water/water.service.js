@@ -118,6 +118,19 @@ async function getLoggedDates(userId) {
 }
 
 /**
+ * Get recent water logs across days (for client-side date filtering,
+ * same pattern as the workout tab which fetches all then filters locally).
+ */
+async function getRecentWaterLogs(userId, limit = 500) {
+  const limitNum = Math.min(1000, Math.max(1, parseInt(limit) || 500));
+  const result = await pool.query(
+    `SELECT * FROM water_logs WHERE user_id = $1 ORDER BY logged_at DESC LIMIT $2`,
+    [userId, limitNum]
+  );
+  return result.rows;
+}
+
+/**
  * Get water logs for a specific day.
  */
 async function getWaterLogsByDate(userId, dateStr) {
@@ -185,6 +198,7 @@ module.exports = {
   checkSendWaterReminder,
   logWaterIntake,
   getLoggedDates,
+  getRecentWaterLogs,
   getWaterLogsByDate,
   resetWaterLogs,
   deleteWaterLog,

@@ -27,7 +27,14 @@ const rem = (size: number) => Math.round((size / 390) * W);
 
 interface Props {
   selectedDate: Date;
-  onLogChange?: () => void;
+  onLogChange?: (loggedDates?: string[]) => void;
+}
+
+function toLocalDateKey(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const dayVal = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${dayVal}`;
 }
 
 const HYDRATION = {
@@ -391,8 +398,9 @@ export default function WaterTracker({ selectedDate, onLogChange }: Props) {
 
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [totalWater, setTotalWater] = useState(0);
-  const [waterLogs, setWaterLogs] = useState<any[]>([]);
+  // Workout-tab pattern: hold full recent history, filter client-side by
+  // selectedDate with parseUTC + local day parts (no UTC toISOString filter).
+  const [allWaterLogs, setAllWaterLogs] = useState<any[]>([]);
   const [userData, setUserData] = useState<any>(null);
   const [sliderVal, setSliderVal] = useState(250);
 
@@ -412,25 +420,55 @@ export default function WaterTracker({ selectedDate, onLogChange }: Props) {
   }, []);
 
   useEffect(() => {
-    fetchWaterLogs();
-  }, [selectedDate]);
+    fetchRecentWaterLogs();
+  }, []);
 
-  const fetchWaterLogs = async () => {
+  const fetchRecentWaterLogs = async () => {
     setLoading(true);
     try {
       const token = await getToken();
-      const d = selectedDate.toISOString().split('T')[0];
-      const res = await axios.get(`${API_URL}/water?date=${d}`, {
+      const res = await axios.get(`${API_URL}/water/recent`, {
+        params: { limit: 500 },
         headers: { Authorization: `Bearer ${token}` },
       });
-      setTotalWater(res.data.total_ml || 0);
-      setWaterLogs(res.data.logs || []);
+      setAllWaterLogs(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
   };
+
+  // Client-side day filter — same as workout tab daily.tsx filteredWorkouts.
+  const waterLogs = React.useMemo(() => {
+    return allWaterLogs.filter((log) => {
+      if (!log.logged_at) return false;
+      const d = parseUTC(log.logged_at);
+      if (!d) return false;
+      return d.getDate() === selectedDate.getDate() &&
+        d.getMonth() === selectedDate.getMonth() &&
+        d.getFullYear() === selectedDate.getFullYear();
+    });
+  }, [allWaterLogs, selectedDate]);
+
+  const totalWater = React.useMemo(
+    () => waterLogs.reduce((sum, r) => sum + (Number(r.amount_ml) || 0), 0),
+    [waterLogs]
+  );
+
+  const loggedDates = React.useMemo(() => {
+    const set = new Set<string>();
+    allWaterLogs.forEach((log) => {
+      if (!log.logged_at) return;
+      const d = parseUTC(log.logged_at);
+      if (d) set.add(toLocalDateKey(d));
+    });
+    return Array.from(set);
+  }, [allWaterLogs]);
+
+  useEffect(() => {
+    onLogChange?.(loggedDates);
+  }, [loggedDates]);
 
   const { target, maxSafe } = getWaterTarget(userData);
   const interval = getInterval(userData?.activity_level);
@@ -523,8 +561,7 @@ export default function WaterTracker({ selectedDate, onLogChange }: Props) {
     const exceeds = totalWater + amount > maxSafe;
     if (exceeds) showToast('Overhydration warning. Logging anyway.', 'error');
 
-    const prevTotal = totalWater;
-    const prevLogs = waterLogs;
+    const prevLogs = allWaterLogs;
     const tempId = --tempIdCounter.current;
     const optimisticLog = {
       id: tempId,
@@ -533,9 +570,8 @@ export default function WaterTracker({ selectedDate, onLogChange }: Props) {
       _clientLoggedAt: Date.now(),
     };
 
-    // Optimistic update
-    setTotalWater(prevTotal + amount);
-    setWaterLogs([optimisticLog, ...prevLogs]);
+    // Optimistic update on full history (filtered view derives from this)
+    setAllWaterLogs([optimisticLog, ...prevLogs]);
 
     // Animate immediately
     Animated.sequence([
@@ -556,7 +592,7 @@ export default function WaterTracker({ selectedDate, onLogChange }: Props) {
       );
 
       // Replace optimistic entry with real one
-      setWaterLogs((p) =>
+      setAllWaterLogs((p) =>
         p.map((log) =>
           log.id === tempId
             ? { ...res.data, _clientLoggedAt: Date.now() }
@@ -566,23 +602,21 @@ export default function WaterTracker({ selectedDate, onLogChange }: Props) {
 
       onLogChange?.();
     } catch (e) {
-      setTotalWater(prevTotal);
-      setWaterLogs(prevLogs);
+      setAllWaterLogs(prevLogs);
       showToast('Failed to log water', 'error');
     } finally {
       isLogging.current = false;
     }
   };
 
-  const handleDelete = async (id: number, amount: number) => {
+  const handleDelete = async (id: number, _amount?: number) => {
     try {
       const token = await getToken();
       await axios.delete(`${API_URL}/water/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       showToast('Entry removed');
-      setTotalWater((p) => Math.max(0, p - amount));
-      setWaterLogs((p) => p.filter((l) => l.id !== id));
+      setAllWaterLogs((p) => p.filter((l) => l.id !== id));
       onLogChange?.();
     } catch (e) {
       showToast('Failed to remove entry', 'error');

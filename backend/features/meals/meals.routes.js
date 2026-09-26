@@ -17,6 +17,10 @@ router.put('/:id', authenticateToken, validate(schemas.meal), mealsController.up
 // List user meals
 router.get('/', authenticateToken, mealsController.getMeals);
 
+// Personal analytics (same charts as admin, own user only)
+router.get('/analytics', authenticateToken, mealsController.getMyAnalytics);
+router.get('/recent-logs', authenticateToken, mealsController.getMyRecentMeals);
+
 // Meal recommendations
 router.get('/recommendation', authenticateToken, mealsController.getRecommendation);
 router.post('/recommendation', authenticateToken, mealsController.saveRecommendation);

@@ -9,6 +9,23 @@ import { FONTS } from '../../constants/theme';
 
 const TAB_BAR_HEIGHT = 58;
 
+// Extra bottom spacing screens need when the timer pill is visible,
+// so bottom-anchored FABs / action bars never hide behind it.
+export const TIMER_BAR_SPACE = 64;
+
+// Same visibility rule as <FloatingTimerBar/> below: active workout,
+// except on the live workout screens where the bar hides itself.
+export function useTimerBarVisible() {
+  const pathname = usePathname();
+  const { isWorkoutActive } = useWorkoutTimer();
+  return isWorkoutActive && !pathname.startsWith('/daily/');
+}
+
+// Returns TIMER_BAR_SPACE when the pill is showing, else 0.
+export function useTimerBarOffset() {
+  return useTimerBarVisible() ? TIMER_BAR_SPACE : 0;
+}
+
 const P = {
   cta: '#2596BE',
   ctaDark: '#1A6E8A',

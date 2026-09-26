@@ -6,6 +6,7 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -13,14 +14,34 @@ type Props = {
   meal: any;
 };
 
+// Solid vibrant palette — white text sits directly on these.
+const SOLID: Record<string, string> = {
+  protein: '#10B981',
+  carbs:   '#3B82F6',
+  fat:     '#F59E0B',
+  fiber:   '#14B8A6',
+  sugar:   '#EC4899',
+  sodium:  '#8B5CF6',
+};
+
 const MACRO_CONFIG = [
-  { key: 'total_protein', label: 'Protein',  unit: 'g',  icon: 'barbell-outline'   as const },
-  { key: 'total_carbs',   label: 'Carbs',    unit: 'g',  icon: 'flash-outline'     as const },
-  { key: 'total_fat',     label: 'Fat',      unit: 'g',  icon: 'water-outline'     as const },
-  { key: 'total_fiber',   label: 'Fiber',    unit: 'g',  icon: 'leaf-outline'      as const },
-  { key: 'total_sugar',   label: 'Sugar',    unit: 'g',  icon: 'cafe-outline'      as const },
-  { key: 'total_sodium',  label: 'Sodium',   unit: 'mg', icon: 'beaker-outline'    as const },
+  { key: 'total_protein', macro: 'protein', label: 'Protein',  unit: 'g',  icon: 'barbell-outline'   as const },
+  { key: 'total_carbs',   macro: 'carbs',   label: 'Carbs',    unit: 'g',  icon: 'flash-outline'     as const },
+  { key: 'total_fat',     macro: 'fat',     label: 'Fat',      unit: 'g',  icon: 'water-outline'     as const },
+  { key: 'total_fiber',   macro: 'fiber',   label: 'Fiber',    unit: 'g',  icon: 'leaf-outline'      as const },
+  { key: 'total_sugar',   macro: 'sugar',   label: 'Sugar',    unit: 'g',  icon: 'cafe-outline'      as const },
+  { key: 'total_sodium',  macro: 'sodium',  label: 'Sodium',   unit: 'mg', icon: 'beaker-outline'    as const },
 ];
+
+const ITEM_THUMBS = ['#2596BE', '#8B5CF6', '#F59E0B', '#10B981', '#EC4899', '#06B6D4'];
+
+const shortMacroColor = (key: string) =>
+  key === 'protein' ? SOLID.protein
+  : key === 'carbs' ? SOLID.carbs
+  : key === 'fat' ? SOLID.fat
+  : key === 'fiber' ? SOLID.fiber
+  : key === 'sugar' ? SOLID.sugar
+  : SOLID.sodium;
 
 export default function MealNutrientCard({ meal }: Props) {
   const { colors, isDark } = useTheme();
@@ -43,63 +64,66 @@ export default function MealNutrientCard({ meal }: Props) {
   return (
     <View style={styles.root}>
 
-      {/* ── CALORIE HERO ─────────────────────────────────────────── */}
-      <View
-        style={[styles.calHero, { backgroundColor: surface, borderColor: surfaceBorder }]}
+      {/* ── CALORIE HERO (solid amber gradient) ──────────────────── */}
+      <LinearGradient
+        colors={['#FBBF24', '#F59E0B', '#F97316']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.calHero}
       >
+        <View style={styles.calGlow} />
         <View style={styles.calHeroContent}>
           {/* Icon */}
           <View style={styles.flameWrapper}>
-            <View style={[styles.flameInner, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}>
-              <Ionicons name="flame" size={24} color={textMuted} />
+            <View style={styles.flameInner}>
+              <Ionicons name="flame" size={24} color="#FFF" />
             </View>
           </View>
 
           <View style={styles.calTextGroup}>
             <View style={styles.calRow}>
-              <Text style={[styles.calValue, { color: textPrimary }]}>
+              <Text style={styles.calValue}>
                 {cals}
               </Text>
-              <Text style={[styles.calUnit, { color: textMuted }]}>
+              <Text style={styles.calUnit}>
                 kcal
               </Text>
             </View>
-            <Text style={[styles.calSubtext, { color: textMuted }]}>
+            <Text style={styles.calSubtext}>
               Total energy · this meal
             </Text>
           </View>
         </View>
+      </LinearGradient>
 
-
-      </View>
-
-      {/* ── MACRO GRID ───────────────────────────────────────────── */}
+      {/* ── MACRO GRID (solid per-macro colors) ──────────────────── */}
       {activeMacros.length > 0 && (
         <View style={styles.macroGrid}>
           {activeMacros.map(m => {
             const val = Math.round(meal[m.key] || 0);
+            const solid = SOLID[m.macro] || colors.primary;
             return (
               <View
                 key={m.key}
                 style={[
                   styles.macroCell,
                   {
-                    backgroundColor: surface,
-                    borderColor: surfaceBorder,
+                    backgroundColor: solid,
+                    borderColor: 'transparent',
                   },
                 ]}
               >
-                <View style={[styles.macroIconWrap, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}>
-                  <Ionicons name={m.icon} size={13} color={textMuted} />
+                <View style={styles.macroIconWrap}>
+                  <Ionicons name={m.icon} size={13} color="#FFF" />
                 </View>
 
-                <Text style={[styles.macroVal, { color: textPrimary }]}>
+                <Text style={styles.macroVal}>
                   {val}
-                  <Text style={[styles.macroUnitInline, { color: textMuted }]}>
+                  <Text style={styles.macroUnitInline}>
                     {m.unit}
                   </Text>
                 </Text>
-                <Text style={[styles.macroLabel, { color: textMuted }]}>
+                <Text style={styles.macroLabel}>
                   {m.label}
                 </Text>
               </View>
@@ -143,11 +167,11 @@ export default function MealNutrientCard({ meal }: Props) {
               >
                 {/* Top row: thumb + name + calorie badge */}
                 <View style={styles.itemRow}>
-                  <View style={[styles.itemThumb, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}>
+                  <View style={[styles.itemThumb, { backgroundColor: ITEM_THUMBS[idx % ITEM_THUMBS.length] }]}>
                     <Ionicons
                       name={idx % 2 === 0 ? 'restaurant' : 'nutrition'}
                       size={17}
-                      color={textMuted}
+                      color="#FFF"
                     />
                   </View>
 
@@ -160,24 +184,27 @@ export default function MealNutrientCard({ meal }: Props) {
                     </Text>
                   </View>
 
-                  <View style={[styles.itemCalBadge, { backgroundColor: surface, borderColor: surfaceBorder }]}>
-                    <Text style={[styles.itemCalBadgeVal, { color: textPrimary }]}>{itemCals}</Text>
-                    <Text style={[styles.itemCalBadgeUnit, { color: textMuted }]}>kcal</Text>
+                  <View style={[styles.itemCalBadge, { backgroundColor: colors.primary, borderColor: 'transparent' }]}>
+                    <Text style={[styles.itemCalBadgeVal, { color: '#FFF' }]}>{itemCals}</Text>
+                    <Text style={[styles.itemCalBadgeUnit, { color: 'rgba(255,255,255,0.8)' }]}>kcal</Text>
                   </View>
                 </View>
 
-                {/* Macro chips */}
+                {/* Macro chips (solid) */}
                 {itemMacros.length > 0 && (
                   <View style={styles.itemMacroGrid}>
-                    {itemMacros.map(m => (
-                      <View key={m.key} style={[styles.itemMacroChip, { backgroundColor: surface, borderColor: surfaceBorder }]}>
-                        <Text style={[styles.itemMacroChipText, { color: textPrimary }]}>
-                          {m.val}
-                          <Text style={[styles.itemMacroChipUnit, { color: textMuted }]}>{m.unit}</Text>
-                        </Text>
-                        <Text style={[styles.itemMacroChipLabel, { color: textMuted }]}>{m.label}</Text>
-                      </View>
-                    ))}
+                    {itemMacros.map(m => {
+                      const solid = shortMacroColor(m.key);
+                      return (
+                        <View key={m.key} style={[styles.itemMacroChip, { backgroundColor: solid, borderColor: 'transparent' }]}>
+                          <Text style={[styles.itemMacroChipText, { color: '#FFF' }]}>
+                            {m.val}
+                            <Text style={[styles.itemMacroChipUnit, { color: 'rgba(255,255,255,0.85)' }]}>{m.unit}</Text>
+                          </Text>
+                          <Text style={[styles.itemMacroChipLabel, { color: 'rgba(255,255,255,0.9)' }]}>{m.label}</Text>
+                        </View>
+                      );
+                    })}
                   </View>
                 )}
               </View>
@@ -197,11 +224,20 @@ const styles = StyleSheet.create({
   /* ── Calorie Hero ── */
   calHero: {
     borderRadius: 20,
-    borderWidth: 1,
     paddingHorizontal: 18,
     paddingTop: 18,
     paddingBottom: 14,
     gap: 14,
+    overflow: 'hidden',
+  },
+  calGlow: {
+    position: 'absolute',
+    top: -50,
+    right: -36,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   calHeroContent: {
     flexDirection: 'row',
@@ -220,6 +256,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   calTextGroup: {
     gap: 3,
@@ -234,17 +271,20 @@ const styles = StyleSheet.create({
     fontSize: 36,
     lineHeight: 38,
     letterSpacing: -1,
+    color: '#FFF',
   },
   calUnit: {
     fontFamily: FONTS.bodyBold,
     fontSize: 14,
     marginBottom: 4,
     letterSpacing: 0.3,
+    color: 'rgba(255,255,255,0.9)',
   },
   calSubtext: {
     fontFamily: FONTS.body,
     fontSize: 11,
     letterSpacing: 0.2,
+    color: 'rgba(255,255,255,0.85)',
   },
 
   /* Ratio bar */
@@ -288,12 +328,17 @@ const styles = StyleSheet.create({
     flexBasis: '30%',
     flexGrow: 1,
     borderRadius: 16,
-    borderWidth: 1,
+    borderWidth: 0,
     paddingTop: 12,
     paddingBottom: 12,
     paddingHorizontal: 12,
     overflow: 'hidden',
     gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    elevation: 3,
   },
   macroIconWrap: {
     width: 26,
@@ -301,22 +346,26 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   macroVal: {
     fontFamily: FONTS.bodyBold,
     fontSize: 17,
     letterSpacing: -0.3,
     lineHeight: 20,
+    color: '#FFF',
   },
   macroUnitInline: {
     fontSize: 11,
     letterSpacing: 0,
+    color: 'rgba(255,255,255,0.85)',
   },
   macroLabel: {
-    fontFamily: FONTS.body,
+    fontFamily: FONTS.bodyBold,
     fontSize: 10,
     letterSpacing: 0.3,
     textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.92)',
   },
 
   /* ── Items Section ── */
@@ -377,7 +426,7 @@ const styles = StyleSheet.create({
   },
   itemCalBadge: {
     borderRadius: 10,
-    borderWidth: 1,
+    borderWidth: 0,
     paddingHorizontal: 9,
     paddingVertical: 5,
     alignItems: 'center',
@@ -406,7 +455,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: 0,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },

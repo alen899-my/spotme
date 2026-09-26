@@ -9,6 +9,9 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { FONTS } from '../../constants/theme';
 import { aiApi, AIChatMessage, AIChatSession, AIChatAction } from '../../utils/aiApi';
+import ExerciseCard from '../exercises/ExerciseCard';
+import ExercisePreviewModal from '../modals/ExercisePreviewModal';
+import { getExerciseIndex, findMentionedExercises, MentionableExercise } from '../../utils/exerciseMentions';
 const coachAvatarSource = require('../../assets/coach/fit-cartoon-character-training.png');
 
 interface AIChatModalProps {
@@ -207,6 +210,91 @@ function ThinkingBubble({ colors, isDark }: { colors: any; isDark: boolean }) {
   );
 }
 
+// ── Assistant message: raw text + rich exercise cards ────────────────────────
+// Detects library exercises named in the reply and renders our ExerciseCard
+// (image, rating, target/equipment) under the text, tappable for preview.
+function CoachMessage({ msg, exerciseIndex, onPreview, onConfirm, confirmingToken, cardBg, cardBorder }: {
+  msg: AIChatMessage;
+  exerciseIndex: MentionableExercise[];
+  onPreview: (exercise: any) => void;
+  onConfirm: (action: AIChatAction, confirmed: boolean) => void;
+  confirmingToken: string | null;
+  cardBg: string;
+  cardBorder: string;
+}) {
+  const { colors, isDark } = useTheme();
+  const mentioned = React.useMemo(
+    () => findMentionedExercises(msg.content || '', exerciseIndex, 3),
+    [msg.content, exerciseIndex]
+  );
+
+  return (
+    <View style={[S.chatBubble, S.coachBubble, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+      <MarkdownText content={msg.content} textColor={colors.text} primaryColor={colors.primary} isDark={isDark} />
+      {mentioned.length > 0 && (
+        <View style={{ marginTop: 10, gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="barbell-outline" size={13} color={colors.primary} />
+            <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 11, color: colors.primary, letterSpacing: 0.4 }}>
+              {mentioned.length === 1 ? 'MENTIONED EXERCISE' : 'MENTIONED EXERCISES'}
+            </Text>
+          </View>
+          {mentioned.map((ex) => (
+            <ExerciseCard
+              key={`mention-${msg.id}-${ex.id}`}
+              exercise={ex}
+              variant="compact"
+              onPress={() => onPreview(ex)}
+            />
+          ))}
+        </View>
+      )}
+      {msg.actions?.map((action, ai) => (
+        <View
+          key={`${msg.id}-act-${ai}`}
+          style={[S.actionCard, { backgroundColor: isDark ? 'rgba(37,150,190,0.10)' : 'rgba(37,150,190,0.08)', borderColor: colors.primary + '44' }]}
+        >
+          <View style={S.actionRow}>
+            <Ionicons
+              name={action.kind === 'pending' ? 'alert-circle-outline' : action.kind === 'deleted' && action.label.endsWith('cancelled') ? 'close-circle-outline' : 'checkmark-circle-outline'}
+              size={16}
+              color={action.kind === 'pending' ? '#F7CB16' : colors.primary}
+            />
+            <Text style={[S.actionLabel, { color: colors.text }]}>{action.label}</Text>
+          </View>
+          {action.kind === 'pending' && action.confirmToken ? (
+            <View style={S.actionBtnRow}>
+              <TouchableOpacity
+                onPress={() => onConfirm(action, false)}
+                disabled={confirmingToken === action.confirmToken}
+                style={[S.actionBtn, S.actionBtnGhost, { borderColor: cardBorder }]}
+                activeOpacity={0.8}
+              >
+                <Text style={[S.actionBtnText, { color: colors.textMuted }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onConfirm(action, true)}
+                disabled={confirmingToken === action.confirmToken}
+                style={[S.actionBtn, { backgroundColor: colors.primary }]}
+                activeOpacity={0.8}
+              >
+                {confirmingToken === action.confirmToken
+                  ? <ActivityIndicator size="small" color="#FFFFFF" />
+                  : <Text style={[S.actionBtnText, { color: '#FFFFFF' }]}>Confirm</Text>}
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
+      ))}
+      {msg.created_at ? (
+        <Text style={[S.msgTime, { color: colors.textDim, alignSelf: 'flex-start' }]}>
+          {formatTime(msg.created_at)}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
@@ -230,6 +318,8 @@ export default function AIChatModal({ visible, onClose, user, splitId, splitName
   const [sending, setSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [confirmingToken, setConfirmingToken] = useState<string | null>(null);
+  const [exerciseIndex, setExerciseIndex] = useState<MentionableExercise[]>([]);
+  const [previewEx, setPreviewEx] = useState<any>(null);
 
   const scrollRef = useRef<ScrollView>(null);
   const historyPanelAnim = useRef(new Animated.Value(SW)).current;
@@ -252,11 +342,14 @@ export default function AIChatModal({ visible, onClose, user, splitId, splitName
   useEffect(() => {
     if (visible) {
       loadSessions();
+      // Exercise library for rich cards under assistant replies (cached).
+      getExerciseIndex().then(setExerciseIndex).catch(() => {});
     } else {
       setCurrentSessionId(undefined);
       setMessages([]);
       setInputValue('');
       setShowHistory(false);
+      setPreviewEx(null);
     }
   }, [visible, loadSessions]);
 
@@ -529,62 +622,26 @@ export default function AIChatModal({ visible, onClose, user, splitId, splitName
                   return (
                     <View key={msg.id} style={[S.chatRow, isUser ? S.chatRowUser : S.chatRowCoach]}>
                       {!isUser && <Image source={coachAvatarSource} style={S.coachAvatar} />}
-                      <View style={[
-                        S.chatBubble,
-                        isUser
-                          ? [S.userBubble, { backgroundColor: colors.primary }]
-                          : [S.coachBubble, { backgroundColor: cardBg, borderColor: cardBorder }],
-                      ]}>
-                        {isUser ? (
+                      {isUser ? (
+                        <View style={[S.chatBubble, S.userBubble, { backgroundColor: colors.primary }]}>
                           <Text style={S.userBubbleText}>{msg.content}</Text>
-                        ) : (
-                          <>
-                            <MarkdownText content={msg.content} textColor={colors.text} primaryColor={colors.primary} isDark={isDark} />
-                            {msg.actions?.map((action, ai) => (
-                              <View
-                                key={`${msg.id}-act-${ai}`}
-                                style={[S.actionCard, { backgroundColor: isDark ? 'rgba(37,150,190,0.10)' : 'rgba(37,150,190,0.08)', borderColor: colors.primary + '44' }]}
-                              >
-                                <View style={S.actionRow}>
-                                  <Ionicons
-                                    name={action.kind === 'pending' ? 'alert-circle-outline' : action.kind === 'deleted' && action.label.endsWith('cancelled') ? 'close-circle-outline' : 'checkmark-circle-outline'}
-                                    size={16}
-                                    color={action.kind === 'pending' ? '#F7CB16' : colors.primary}
-                                  />
-                                  <Text style={[S.actionLabel, { color: colors.text }]}>{action.label}</Text>
-                                </View>
-                                {action.kind === 'pending' && action.confirmToken ? (
-                                  <View style={S.actionBtnRow}>
-                                    <TouchableOpacity
-                                      onPress={() => handleConfirmAction(action, false)}
-                                      disabled={confirmingToken === action.confirmToken}
-                                      style={[S.actionBtn, S.actionBtnGhost, { borderColor: cardBorder }]}
-                                      activeOpacity={0.8}
-                                    >
-                                      <Text style={[S.actionBtnText, { color: colors.textMuted }]}>Cancel</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      onPress={() => handleConfirmAction(action, true)}
-                                      disabled={confirmingToken === action.confirmToken}
-                                      style={[S.actionBtn, { backgroundColor: colors.primary }]}
-                                      activeOpacity={0.8}
-                                    >
-                                      {confirmingToken === action.confirmToken
-                                        ? <ActivityIndicator size="small" color="#FFFFFF" />
-                                        : <Text style={[S.actionBtnText, { color: '#FFFFFF' }]}>Confirm</Text>}
-                                    </TouchableOpacity>
-                                  </View>
-                                ) : null}
-                              </View>
-                            ))}
-                          </>
-                        )}
-                        {msg.created_at ? (
-                          <Text style={[S.msgTime, { color: isUser ? 'rgba(255,255,255,0.65)' : colors.textDim, alignSelf: isUser ? 'flex-end' : 'flex-start' }]}>
-                            {formatTime(msg.created_at)}
-                          </Text>
-                        ) : null}
-                      </View>
+                          {msg.created_at ? (
+                            <Text style={[S.msgTime, { color: 'rgba(255,255,255,0.65)', alignSelf: 'flex-end' }]}>
+                              {formatTime(msg.created_at)}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ) : (
+                        <CoachMessage
+                          msg={msg}
+                          exerciseIndex={exerciseIndex}
+                          onPreview={setPreviewEx}
+                          onConfirm={handleConfirmAction}
+                          confirmingToken={confirmingToken}
+                          cardBg={cardBg}
+                          cardBorder={cardBorder}
+                        />
+                      )}
                       {isUser && (
                         <View style={[S.userAvatarCircle, { backgroundColor: colors.primary + '28' }]}>
                           {userAvatar
@@ -706,6 +763,13 @@ export default function AIChatModal({ visible, onClose, user, splitId, splitName
             </ScrollView>
           )}
         </Animated.View>
+
+        {/* Exercise detail when tapping a mentioned-exercise card */}
+        <ExercisePreviewModal
+          visible={previewEx !== null}
+          exercise={previewEx}
+          onClose={() => setPreviewEx(null)}
+        />
       </View>
     </Modal>
   );

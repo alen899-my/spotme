@@ -511,6 +511,60 @@ async function getWorkoutsByDate(req, res) {
   }
 }
 
+// ── GET /daily/analytics (own user only — same data as admin, scoped) ─────────
+async function getMyAnalytics(req, res) {
+  try {
+    const workoutAnalyticsService = require('../admin/admin-workout-analytics.service');
+    const { range, tz } = req.query;
+    const data = await workoutAnalyticsService.getWorkoutAnalytics({
+      userId: req.user.id,
+      range,
+      tz,
+    });
+    res.json(data);
+  } catch (err) {
+    console.error('GET /daily/analytics error:', err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+// ── GET /daily/exercises (own user only — same as admin athlete view) ─────────
+async function getMyExercises(req, res) {
+  try {
+    const workoutAnalyticsService = require('../admin/admin-workout-analytics.service');
+    const { search, bodyPart } = req.query;
+    const data = await workoutAnalyticsService.getAthleteExercises({
+      userId: req.user.id,
+      search,
+      bodyPart,
+    });
+    res.json(data);
+  } catch (err) {
+    console.error('GET /daily/exercises error:', err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+// ── GET /daily/exercise-progression (own user only) ───────────────────────────
+async function getMyExerciseProgression(req, res) {
+  try {
+    const workoutAnalyticsService = require('../admin/admin-workout-analytics.service');
+    const { exerciseId, range, tz, workoutTitle } = req.query;
+    if (!exerciseId) return res.status(400).json({ error: 'exerciseId query param required' });
+    const data = await workoutAnalyticsService.getAthleteExerciseProgression({
+      userId: req.user.id,
+      exerciseId,
+      range,
+      tz,
+      workoutTitle,
+    });
+    res.json(data);
+  } catch (err) {
+    console.error('GET /daily/exercise-progression error:', err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // ── POST /daily/rest-day ──────────────────────────────────────────────────────
 async function logRestDay(req, res) {
   try {
@@ -559,4 +613,7 @@ module.exports = {
   getCalendarStats,
   getWorkoutsByDate,
   logRestDay,
+  getMyAnalytics,
+  getMyExercises,
+  getMyExerciseProgression,
 };

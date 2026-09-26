@@ -86,10 +86,13 @@ export default function NutritionPage() {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
   const [range, setRange] = useState<NutritionRange>("30d")
   const [analyticsLoading, setAnalyticsLoading] = useState<boolean>(true)
+  // Live-update state: fresh meal/water logs must appear without tab switching
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(true)
 
-  // Fetch Nutrition Analytics
-  const fetchNutritionAnalytics = async (userId: number | null, rangeVal: NutritionRange) => {
-    setAnalyticsLoading(true)
+  // Fetch Nutrition Analytics (cache-busted so new logs show instantly)
+  const fetchNutritionAnalytics = async (userId: number | null, rangeVal: NutritionRange, silent = false) => {
+    if (!silent) setAnalyticsLoading(true)
     const clientTz = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC"
     try {
       const res = await api.get<NutritionAnalyticsData>("/admin/nutrition/analytics", {
@@ -97,9 +100,11 @@ export default function NutritionPage() {
           userId: userId || undefined,
           range: rangeVal,
           tz: clientTz,
+          _t: Date.now(),
         },
       })
       setAnalyticsData(res.data)
+      setLastUpdated(new Date())
     } catch (err) {
       console.error("Failed to load nutrition analytics:", err)
     } finally {
@@ -107,11 +112,36 @@ export default function NutritionPage() {
     }
   }
 
+  const refreshActiveTab = (silent = false) => {
+    if (activeTab === "analytics") fetchNutritionAnalytics(selectedUserId, range, silent)
+    else if (activeTab === "meals") fetchMeals(silent)
+    else fetchFoods()
+  }
+
   useEffect(() => {
     if (activeTab === "analytics") {
       fetchNutritionAnalytics(selectedUserId, range)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, range, activeTab])
+
+  // Live updates: poll every 30s + refetch on window focus. Silent = no spinner flash.
+  useEffect(() => {
+    if (!autoRefresh) return
+    const id = setInterval(() => refreshActiveTab(true), 30000)
+    const onFocus = () => refreshActiveTab(true)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshActiveTab(true)
+    }
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      clearInterval(id)
+      window.removeEventListener("focus", onFocus)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh, activeTab, selectedUserId, range, mealsPage, foodsPage, selectedCategory])
 
   // Foods state
   const [foods, setFoods] = useState<FoodItem[]>([])
@@ -143,8 +173,8 @@ export default function NutritionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Fetch Foods
-  const fetchFoods = async () => {
-    setFoodsLoading(true)
+  const fetchFoods = async (silent = false) => {
+    if (!silent) setFoodsLoading(true)
     try {
       const res = await api.get("/admin/nutrition/foods", {
         params: {
@@ -152,10 +182,12 @@ export default function NutritionPage() {
           limit: 25,
           search: foodsSearch || undefined,
           category: selectedCategory !== "ALL" ? selectedCategory : undefined,
+          _t: Date.now(),
         },
       })
       setFoods(res.data.foods || [])
       setFoodsTotal(res.data.total || 0)
+      setLastUpdated(new Date())
     } catch (err) {
       console.error("Error fetching foods:", err)
     } finally {
@@ -164,14 +196,15 @@ export default function NutritionPage() {
   }
 
   // Fetch Meals
-  const fetchMeals = async () => {
-    setMealsLoading(true)
+  const fetchMeals = async (silent = false) => {
+    if (!silent) setMealsLoading(true)
     try {
       const res = await api.get("/admin/nutrition/meals", {
-        params: { page: mealsPage, limit: 25 },
+        params: { page: mealsPage, limit: 25, _t: Date.now() },
       })
       setMeals(res.data.meals || [])
       setMealsTotal(res.data.total || 0)
+      setLastUpdated(new Date())
     } catch (err) {
       console.error("Error fetching meals:", err)
     } finally {
@@ -254,6 +287,33 @@ export default function NutritionPage() {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {/* Live status + Refresh */}
+          {lastUpdated && (
+            <span className="text-[11px] text-muted-foreground">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => refreshActiveTab(false)}
+            disabled={analyticsLoading || mealsLoading || foodsLoading}
+            className="h-8 gap-1.5 text-xs font-medium"
+            title="Refresh now — new logs appear instantly"
+          >
+            <Clock className={`h-3.5 w-3.5 ${(analyticsLoading || mealsLoading || foodsLoading) ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </Button>
+          <button
+            type="button"
+            onClick={() => setAutoRefresh((v) => !v)}
+            title={autoRefresh ? "Auto-refresh every 30s is ON" : "Auto-refresh is OFF"}
+            className={`relative h-5 w-9 rounded-full transition-colors ${autoRefresh ? "bg-primary" : "bg-muted"}`}
+          >
+            <span
+              className={`absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition-all ${autoRefresh ? "left-[18px]" : "left-0.5"}`}
+            />
+          </button>
           {/* Segmented Tab Switch */}
           <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5 font-mono text-xs">
             <button

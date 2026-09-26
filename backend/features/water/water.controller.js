@@ -32,6 +32,20 @@ async function getLoggedDates(req, res) {
 }
 
 /**
+ * Controller to get recent water logs across days (client filters by date).
+ */
+async function getRecentWaterLogs(req, res) {
+  try {
+    const { limit } = req.query;
+    const data = await waterService.getRecentWaterLogs(req.user.id, limit);
+    return res.json(data);
+  } catch (err) {
+    console.error('Water recent fetch error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
  * Controller to get logs for a specific day.
  */
 async function getWaterLogs(req, res) {
@@ -115,6 +129,7 @@ async function updateReminderSettings(req, res) {
 module.exports = {
   logWater,
   getLoggedDates,
+  getRecentWaterLogs,
   getWaterLogs,
   resetWaterLogs,
   deleteWaterLog,

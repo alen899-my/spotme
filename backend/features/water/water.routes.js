@@ -9,6 +9,9 @@ router.post('/', authenticateToken, waterController.logWater);
 // GET /api/water/logged-dates — get all dates with water logs
 router.get('/logged-dates', authenticateToken, waterController.getLoggedDates);
 
+// GET /api/water/recent — recent logs across days (client filters by date, like workout tab)
+router.get('/recent', authenticateToken, waterController.getRecentWaterLogs);
+
 // GET /api/water?date=YYYY-MM-DD — get logs for a specific day
 router.get('/', authenticateToken, waterController.getWaterLogs);
 
