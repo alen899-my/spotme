@@ -598,11 +598,38 @@ async function listCampaigns(req, res) {
 // ─── Workouts ─────────────────────────────────────────────────────────────────
 async function listWorkouts(req, res) {
   try {
-    const { page = 1, limit = 30 } = req.query;
-    const data = await adminService.listWorkoutSessionsAdmin({ page, limit });
+    const { page = 1, limit = 30, status, search, userId } = req.query;
+    const data = await adminService.listWorkoutSessionsAdmin({ page, limit, status, search, userId });
     res.json(data);
   } catch (error) {
     console.error('Admin listWorkouts error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+async function updateWorkout(req, res) {
+  try {
+    const { title, status } = req.body || {};
+    const data = await adminService.updateWorkoutSessionAdmin(req.params.id, { title, status });
+    if (!data) {
+      return res.status(404).json({ message: 'Workout not found' });
+    }
+    res.json(data);
+  } catch (error) {
+    console.error('Admin updateWorkout error:', error);
+    res.status(error.status || 500).json({ message: error.message || 'Server error' });
+  }
+}
+
+async function deleteWorkout(req, res) {
+  try {
+    const deleted = await adminService.deleteWorkoutSessionAdmin(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ message: 'Workout not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin deleteWorkout error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 }
@@ -817,6 +844,8 @@ module.exports = {
   broadcastPush,
   listCampaigns,
   listWorkouts,
+  updateWorkout,
+  deleteWorkout,
   getWorkoutAnalytics,
   getAthleteExercises,
   getAthleteExerciseProgression,

@@ -78,8 +78,45 @@ async function deleteSession(req, res) {
   }
 }
 
+/**
+ * Controller to stream coaching reply via SSE.
+ * POST /api/ai/chat/stream — events: token / done / error.
+ * Falls back to a single full-text event when V2/streaming unavailable.
+ */
+async function streamChat(req, res) {
+  try {
+    const { message, session_id, split_id, taskKey } = req.body || {};
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Message cannot be empty.' });
+    }
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    });
+    const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    const runner = require('./agent/runner');
+    const out = await runner.runChatStream(
+      req.user.id,
+      { message, session_id, split_id, taskKey },
+      (tok) => send('token', { token: tok })
+    );
+    send('done', { session_id: out.session_id, session_title: out.session_title, actions: out.actions || [] });
+    return res.end();
+  } catch (err) {
+    console.error('POST /ai/chat/stream error:', err);
+    try {
+      res.write(`event: error\ndata: ${JSON.stringify({ error: err.message || 'Stream failed' })}\n\n`);
+      return res.end();
+    } catch (_) {
+      return res.status(500).json({ error: err.message || 'Failed to stream AI chat message' });
+    }
+  }
+}
+
 module.exports = {
   chat,
+  streamChat,
   confirmAction,
   getSessions,
   getSessionMessages,

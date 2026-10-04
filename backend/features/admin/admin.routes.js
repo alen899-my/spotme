@@ -101,6 +101,8 @@ router.get('/notifications/campaigns', authenticateAdmin, adminController.listCa
 
 // ─── Workouts Activity ────────────────────────────────────────────────────────
 router.get('/workouts/sessions', authenticateAdmin, adminController.listWorkouts);
+router.put('/workouts/sessions/:id', authenticateAdmin, adminController.updateWorkout);
+router.delete('/workouts/sessions/:id', authenticateAdmin, adminController.deleteWorkout);
 router.get('/workouts/analytics', authenticateAdmin, adminController.getWorkoutAnalytics);
 router.get('/workouts/athlete-exercises', authenticateAdmin, adminController.getAthleteExercises);
 router.get('/workouts/exercise-progression', authenticateAdmin, adminController.getAthleteExerciseProgression);

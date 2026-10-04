@@ -1,6 +1,9 @@
 const { pool } = require('../../db');
 const { callAI, extractJson } = require('../../utils/ai');
 const aiTools = require('./ai-tools');
+// LangGraph RAG agent (V2). Top-level require is safe: runner never requires
+// ai.service at load time (only lazily inside fallbacks, post-load).
+const runner = require('./agent/runner');
 
 const CONFIRM_WORDS = /^(yes|yeah|yep|yup|confirm|confirm it|do it|proceed|go ahead|delete it|remove it|ok do it)\.?$/i;
 
@@ -283,7 +286,20 @@ async function buildSplitsDetailContext(userId, focusedSplitId) {
  * Returns { session_id, session_title, reply, actions[] } — actions is
  * additive so older app versions keep working on `reply` alone.
  */
-async function sendChatMessage(userId, { message, session_id, split_id } = {}) {
+/**
+ * sendChatMessage(userId, opts) — PUBLIC FACADE (API contract unchanged).
+ * Always V2 LangGraph RAG agent first; runner degrades to the legacy
+ * SQL-context loop on any internal failure (zero downtime, no env flag).
+ */
+async function sendChatMessage(userId, opts = {}) {
+  return runner.runChat(userId, { taskKey: 'coach_chat', ...opts });
+}
+
+/**
+ * sendChatMessageLegacy() — original SQL-context + envelope tool loop.
+ * Kept as the guaranteed fallback AND the default until packages+migration land.
+ */
+async function sendChatMessageLegacy(userId, { message, session_id, split_id } = {}) {
   let activeSessionId = session_id;
 
   if (activeSessionId) {
@@ -685,6 +701,7 @@ module.exports = {
   sanitizeCleanText,
   buildUserContextSnapshot,
   sendChatMessage,
+  sendChatMessageLegacy,
   getChatSessions,
   getSessionMessages,
   deleteChatSession,

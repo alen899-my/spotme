@@ -8,18 +8,41 @@ import {
   Dumbbell,
   Clock,
   User,
-  ChevronLeft,
-  ChevronRight,
   TrendingUp,
   Calendar,
   BarChart3,
   Layers,
   Sparkles,
   RefreshCw,
+  Pencil,
+  Trash2,
+  Search,
+  X,
+  Star,
 } from "lucide-react"
 import Link from "next/link"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { FormSelect } from "@/components/ui/form-select"
+import { Pagination } from "@/components/ui/pagination"
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import api from "@/lib/api"
 
 // Modular Analytics Components
@@ -40,12 +63,46 @@ interface WorkoutSession {
   full_name: string
   email: string
   profile_pic_url: string | null
+  title: string | null
   scheduled_date: string
+  started_at: string | null
   status: string
   completed_at: string | null
   duration_seconds: number | null
   exercises_count: number
+  total_sets: number
   total_volume_kg: number
+  rating: number | null
+}
+
+function statusBadgeVariant(status: string): "success" | "warning" | "destructive" | "secondary" | "outline" {
+  switch ((status || "").toLowerCase()) {
+    case "completed":
+      return "success"
+    case "active":
+      return "warning"
+    case "cancelled":
+    case "abandoned":
+      return "destructive"
+    case "rest":
+      return "secondary"
+    default:
+      return "outline"
+  }
+}
+
+function formatDateTime(iso: string | null): string {
+  if (!iso) return "—"
+  try {
+    return new Date(iso).toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  } catch {
+    return "—"
+  }
 }
 
 interface GlobalPR {
@@ -82,7 +139,19 @@ function WorkoutsDashboardContent() {
   const [globalPrs, setGlobalPrs] = useState<GlobalPR[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(25)
   const [sessionsLoading, setSessionsLoading] = useState(false)
+  // Sessions filters
+  const [searchInput, setSearchInput] = useState("")
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  // Edit / delete state
+  const [editing, setEditing] = useState<WorkoutSession | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editStatus, setEditStatus] = useState("completed")
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [deleting, setDeleting] = useState<WorkoutSession | null>(null)
+  const [deletingBusy, setDeletingBusy] = useState(false)
 
   // 1. Fetch Workout Analytics with Local Timezone (cache-busted so new logs show instantly)
   const fetchAnalytics = async (userId: number | null, rangeVal: AnalyticsRange, silent = false) => {
@@ -106,12 +175,19 @@ function WorkoutsDashboardContent() {
     }
   }
 
-  // 2. Fetch Sessions & PRs
+  // 2. Fetch Sessions & PRs (respects toolbar filters + athlete filter)
   const fetchWorkoutsList = async (silent = false) => {
     if (!silent) setSessionsLoading(true)
     try {
       const res = await api.get("/admin/workouts/sessions", {
-        params: { page, limit: 25, _t: Date.now() },
+        params: {
+          page,
+          limit,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          search: search.trim() || undefined,
+          userId: selectedUserId || undefined,
+          _t: Date.now(),
+        },
       })
       setSessions(res.data.sessions || [])
       setGlobalPrs(res.data.globalPrs || [])
@@ -121,6 +197,54 @@ function WorkoutsDashboardContent() {
       console.error("Failed to fetch workouts list:", err)
     } finally {
       setSessionsLoading(false)
+    }
+  }
+
+  // Debounce the search box so every keystroke doesn't refetch
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setPage(1)
+      setSearch(searchInput.trim())
+    }, 400)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
+  const openEdit = (sess: WorkoutSession) => {
+    setEditing(sess)
+    setEditTitle(sess.title || "")
+    setEditStatus((sess.status || "completed").toLowerCase())
+  }
+
+  const saveEdit = async () => {
+    if (!editing) return
+    setSavingEdit(true)
+    try {
+      await api.put(`/admin/workouts/sessions/${editing.id}`, {
+        title: editTitle.trim() || null,
+        status: editStatus,
+      })
+      setEditing(null)
+      fetchWorkoutsList(true)
+    } catch (err) {
+      console.error("Failed to update workout:", err)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleting) return
+    setDeletingBusy(true)
+    try {
+      await api.delete(`/admin/workouts/sessions/${deleting.id}`)
+      // If we removed the last row of the page, step back so we don't strand on empty
+      if (sessions.length <= 1 && page > 1) setPage((p) => p - 1)
+      setDeleting(null)
+      fetchWorkoutsList(true)
+    } catch (err) {
+      console.error("Failed to delete workout:", err)
+    } finally {
+      setDeletingBusy(false)
     }
   }
 
@@ -154,14 +278,15 @@ function WorkoutsDashboardContent() {
       document.removeEventListener("visibilitychange", onVisible)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRefresh, activeTab, selectedUserId, range, page])
+  }, [autoRefresh, activeTab, selectedUserId, range, page, limit, search, statusFilter])
 
   // Load sessions list when sessions or prs tab is active
   useEffect(() => {
     if (activeTab === "sessions" || activeTab === "prs") {
       fetchWorkoutsList()
     }
-  }, [page, activeTab])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, limit, activeTab, search, statusFilter, selectedUserId])
 
   const formatDuration = (secs: number | null) => {
     if (!secs) return "—"
@@ -385,9 +510,59 @@ function WorkoutsDashboardContent() {
         </div>
       )}
 
-      {/* ─── TAB 2: WORKOUT SESSIONS (AUDIT LOG) ─── */}
+      {/* ─── TAB 2: WORKOUT SESSIONS (MANAGE ALL) ─── */}
       {activeTab === "sessions" && (
         <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Toolbar: search + status filter + athlete scope */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search athlete, email, or workout…"
+                className="pl-8 h-9"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => setSearchInput("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  title="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="w-full sm:w-44">
+              <FormSelect
+                label="Status"
+                items={["all", "active", "completed", "cancelled", "abandoned", "rest"]}
+                value={statusFilter}
+                onChange={(v) => {
+                  setPage(1)
+                  setStatusFilter(v)
+                }}
+              />
+            </div>
+            {selectedUserId && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSelectedUserId(null)}
+                className="gap-1.5 h-9"
+                title="Show workouts from all athletes"
+              >
+                <User className="h-3.5 w-3.5" />
+                Athlete #{selectedUserId}
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            <span className="text-xs text-muted-foreground font-mono sm:ml-auto">
+              {total} session{total === 1 ? "" : "s"}
+            </span>
+          </div>
+
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             {sessionsLoading ? (
               <div className="py-16 text-center text-xs text-muted-foreground font-mono">
@@ -395,114 +570,182 @@ function WorkoutsDashboardContent() {
               </div>
             ) : sessions.length === 0 ? (
               <div className="py-16 text-center text-xs text-muted-foreground font-mono">
-                No completed workout sessions logged yet.
+                No workouts match these filters.
               </div>
             ) : (
-              <div className="divide-y divide-border/40">
-                {sessions.map((sess) => {
-                  const dateStr = sess.completed_at
-                    ? new Date(sess.completed_at).toLocaleDateString([], {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "In progress"
-
-                  return (
-                    <div
-                      key={sess.id}
-                      className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-secondary/20 transition-colors text-xs"
-                    >
-                      <div className="flex items-start gap-3 min-w-0">
-                        <UserAvatar
-                          src={sess.profile_pic_url}
-                          name={sess.full_name}
-                          size="md"
-                        />
-
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Workout</TableHead>
+                    <TableHead>Athlete</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Started</TableHead>
+                    <TableHead className="text-right">Time</TableHead>
+                    <TableHead className="text-right">Exs</TableHead>
+                    <TableHead className="text-right">Sets</TableHead>
+                    <TableHead className="text-right">Volume</TableHead>
+                    <TableHead className="text-right">Rating</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sessions.map((sess) => (
+                    <TableRow key={sess.id}>
+                      <TableCell>
+                        <div className="font-semibold text-foreground truncate max-w-44" title={sess.title || ""}>
+                          {sess.title || "Workout"}
+                        </div>
+                        <div className="text-[10px] font-mono text-muted-foreground">#{sess.id}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <UserAvatar src={sess.profile_pic_url} name={sess.full_name} size="sm" />
+                          <div className="min-w-0">
                             <Link
                               href={`/dashboard/users/${sess.user_id}`}
-                              className="font-semibold text-foreground hover:underline truncate"
+                              className="block text-xs font-semibold text-foreground hover:underline truncate"
                             >
                               {sess.full_name || "Athlete"}
                             </Link>
-                            <span
-                              className={`rounded-full border px-2 py-0.5 text-[10px] font-mono font-medium ${
-                                sess.status === "completed"
-                                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
-                                  : "bg-secondary border-border text-muted-foreground"
-                              }`}
-                            >
-                              {sess.status || "completed"}
-                            </span>
+                            <div className="text-[10px] text-muted-foreground truncate" title={sess.email || ""}>
+                              {sess.email || `User #${sess.user_id}`}
+                            </div>
                           </div>
-                          <p className="text-[11px] text-muted-foreground truncate">
-                            {sess.email || `User #${sess.user_id}`}
-                          </p>
-                          <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <Clock className="h-2.5 w-2.5" />
-                            {dateStr}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={statusBadgeVariant(sess.status)}>
+                          {sess.status || "completed"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+                        {formatDateTime(sess.started_at || sess.scheduled_date)}
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-mono text-sky-500 whitespace-nowrap">
+                        {formatDuration(sess.duration_seconds)}
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-mono">
+                        {sess.exercises_count || 0}
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-mono">
+                        {sess.total_sets ?? 0}
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-mono text-amber-500 whitespace-nowrap">
+                        {Math.round(sess.total_volume_kg || 0).toLocaleString()} kg
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-mono whitespace-nowrap">
+                        {sess.rating != null ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Star className="h-3 w-3 text-amber-500" />
+                            {sess.rating}
                           </span>
-                        </div>
-                      </div>
-
-                      {/* Workout Metrics */}
-                      <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono shrink-0 sm:w-72">
-                        <div className="rounded border border-border/50 bg-secondary/30 p-1.5">
-                          <span className="text-[9px] text-muted-foreground uppercase">Exercises</span>
-                          <div className="font-semibold text-foreground">
-                            {sess.exercises_count || 0}
-                          </div>
-                        </div>
-                        <div className="rounded border border-border/50 bg-secondary/30 p-1.5">
-                          <span className="text-[9px] text-muted-foreground uppercase">Duration</span>
-                          <div className="font-semibold text-sky-500">
-                            {formatDuration(sess.duration_seconds)}
-                          </div>
-                        </div>
-                        <div className="rounded border border-border/50 bg-secondary/30 p-1.5">
-                          <span className="text-[9px] text-muted-foreground uppercase">Volume</span>
-                          <div className="font-semibold text-amber-500">
-                            {Math.round(sess.total_volume_kg || 0)} kg
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openEdit(sess)}
+                          className="h-7 w-7 p-0"
+                          title={`Edit workout #${sess.id}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDeleting(sess)}
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          title={`Delete workout #${sess.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </div>
 
-          {/* Pagination */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground font-mono pt-2">
-            <span>
-              Page {page} of {Math.max(1, Math.ceil(total / 25))} ({total} sessions)
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="h-7 w-7 p-0"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page * 25 >= total}
-                className="h-7 w-7 p-0"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
+          <Pagination
+            page={page}
+            limit={limit}
+            total={total}
+            onPageChange={setPage}
+            onLimitChange={(n) => {
+              setPage(1)
+              setLimit(n)
+            }}
+          />
+
+          {/* Edit dialog */}
+          {editing && (
+            <Dialog open={!!editing} onClose={() => !savingEdit && setEditing(null)}>
+              <DialogContent onClose={() => !savingEdit && setEditing(null)}>
+                <DialogHeader>
+                  <DialogTitle>Edit workout #{editing.id}</DialogTitle>
+                  <DialogDescription>
+                    {editing.full_name ? `${editing.full_name} · ` : ""}
+                    {formatDateTime(editing.started_at || editing.scheduled_date)}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Title</label>
+                    <Input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder="Workout title"
+                      maxLength={120}
+                    />
+                  </div>
+                  <FormSelect
+                    label="Status"
+                    items={["active", "completed", "cancelled", "abandoned", "rest"]}
+                    value={editStatus}
+                    onChange={setEditStatus}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Marking completed stamps the finish time; reopening to active clears it.
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setEditing(null)} disabled={savingEdit}>
+                    Cancel
+                  </Button>
+                  <Button onClick={saveEdit} disabled={savingEdit}>
+                    {savingEdit ? "Saving…" : "Save changes"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Delete confirm */}
+          {deleting && (
+            <Dialog open={!!deleting} onClose={() => !deletingBusy && setDeleting(null)}>
+              <DialogContent onClose={() => !deletingBusy && setDeleting(null)}>
+                <DialogHeader>
+                  <DialogTitle>Delete workout #{deleting.id}?</DialogTitle>
+                  <DialogDescription>
+                    “{deleting.title || "Workout"}” by {deleting.full_name || `User #${deleting.user_id}`} will be
+                    permanently removed with all of its exercises and sets. This cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDeleting(null)} disabled={deletingBusy}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive" onClick={confirmDelete} disabled={deletingBusy}>
+                    {deletingBusy ? "Deleting…" : "Delete workout"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       )}
 

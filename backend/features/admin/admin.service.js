@@ -1036,23 +1036,54 @@ async function deletePhysiqueAnalysis(id) {
 }
 
 // ─── Workouts & Global PRs ────────────────────────────────────────────────────
-async function listWorkoutSessionsAdmin({ page = 1, limit = 30 }) {
-  const offset = (page - 1) * limit;
-  const countRes = await pool.query('SELECT COUNT(*)::int AS total FROM daily_workouts');
+async function listWorkoutSessionsAdmin({ page = 1, limit = 30, status, search, userId }) {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limitNum = Math.min(250, Math.max(1, parseInt(limit) || 30));
+  const offset = (pageNum - 1) * limitNum;
+
+  const conditions = [];
+  const params = [];
+  let paramIdx = 1;
+
+  if (status && status !== 'all') {
+    conditions.push(`dw.status = $${paramIdx++}`);
+    params.push(String(status).toLowerCase());
+  }
+  if (userId) {
+    conditions.push(`dw.user_id = $${paramIdx++}`);
+    params.push(parseInt(userId, 10));
+  }
+  if (search && String(search).trim()) {
+    conditions.push(`(u.full_name ILIKE $${paramIdx} OR u.email ILIKE $${paramIdx} OR COALESCE(dw.title, '') ILIKE $${paramIdx})`);
+    params.push(`%${String(search).trim()}%`);
+    paramIdx++;
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countRes = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM daily_workouts dw LEFT JOIN users u ON dw.user_id = u.id ${whereClause}`,
+    params
+  );
   const res = await pool.query(
     `SELECT dw.id, dw.user_id, u.full_name, u.email, u.profile_pic_url,
+            dw.title, dw.status, dw.started_at, dw.completed_at,
             COALESCE(dw.started_at, dw.completed_at) AS scheduled_date,
-            dw.status, dw.completed_at,
             COALESCE(dw.total_duration_seconds, 0) AS duration_seconds,
             COUNT(dwe.id)::int AS exercises_count,
-            COALESCE(dw.total_volume, 0)::numeric AS total_volume_kg
+            COALESCE(dw.total_volume, 0)::numeric AS total_volume_kg,
+            (SELECT COUNT(*)::int FROM daily_workout_sets dws
+              JOIN daily_workout_exercises dwe2 ON dws.daily_exercise_id = dwe2.id
+              WHERE dwe2.daily_workout_id = dw.id) AS total_sets,
+            dw.rating
      FROM daily_workouts dw
      LEFT JOIN users u ON dw.user_id = u.id
      LEFT JOIN daily_workout_exercises dwe ON dw.id = dwe.daily_workout_id
+     ${whereClause}
      GROUP BY dw.id, u.full_name, u.email, u.profile_pic_url
-      ORDER BY COALESCE(dw.completed_at, dw.started_at) DESC, dw.id DESC
-      LIMIT $1 OFFSET $2`,
-    [parseInt(limit), parseInt(offset)]
+     ORDER BY COALESCE(dw.completed_at, dw.started_at) DESC, dw.id DESC
+     LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+    [...params, limitNum, offset]
   );
 
   const prsRes = await pool.query(
@@ -1068,6 +1099,57 @@ async function listWorkoutSessionsAdmin({ page = 1, limit = 30 }) {
   );
 
   return { sessions: res.rows, total: countRes.rows[0]?.total || 0, globalPrs: prsRes.rows };
+}
+
+const ADMIN_WORKOUT_STATUSES = ['active', 'completed', 'cancelled', 'abandoned', 'rest'];
+
+async function updateWorkoutSessionAdmin(id, { title, status }) {
+  const existing = await pool.query('SELECT id, status, completed_at FROM daily_workouts WHERE id = $1', [parseInt(id)]);
+  if (existing.rows.length === 0) return null;
+
+  const updates = [];
+  const params = [];
+  let paramIdx = 1;
+
+  if (title !== undefined) {
+    updates.push(`title = $${paramIdx++}`);
+    params.push(title ? String(title).trim().slice(0, 120) : null);
+  }
+
+  if (status !== undefined && status !== null && String(status).trim() !== '') {
+    const next = String(status).trim().toLowerCase();
+    if (!ADMIN_WORKOUT_STATUSES.includes(next)) {
+      const err = new Error(`Invalid status. Allowed: ${ADMIN_WORKOUT_STATUSES.join(', ')}`);
+      err.status = 400;
+      throw err;
+    }
+    updates.push(`status = $${paramIdx++}`);
+    params.push(next);
+    const prev = existing.rows[0];
+    if (next === 'completed' && !prev.completed_at) {
+      updates.push(`completed_at = NOW()`);
+    }
+    if (next === 'active') {
+      updates.push(`completed_at = NULL`);
+    }
+  }
+
+  if (updates.length === 0) {
+    const row = await pool.query('SELECT * FROM daily_workouts WHERE id = $1', [parseInt(id)]);
+    return row.rows[0];
+  }
+
+  params.push(parseInt(id));
+  const res = await pool.query(
+    `UPDATE daily_workouts SET ${updates.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+    params
+  );
+  return res.rows[0];
+}
+
+async function deleteWorkoutSessionAdmin(id) {
+  const res = await pool.query('DELETE FROM daily_workouts WHERE id = $1 RETURNING id', [parseInt(id)]);
+  return res.rows.length > 0;
 }
 
 // ─── Notifications Broadcast Log ──────────────────────────────────────────────
@@ -1637,6 +1719,8 @@ module.exports = {
   updatePhysiqueStatus,
   deletePhysiqueAnalysis,
   listWorkoutSessionsAdmin,
+  updateWorkoutSessionAdmin,
+  deleteWorkoutSessionAdmin,
   listNotificationHistory,
   getOnboardingAnalytics,
   getHabitsAnalytics,
